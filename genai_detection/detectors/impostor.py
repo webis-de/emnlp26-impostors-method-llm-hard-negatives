@@ -181,7 +181,7 @@ class ImpostorDetector(DetectorBase):
             # add m-grams with spaces, where m < n
             # TODO: should be >2 whitespaces to pad be allowed? I don't think so
             for token in text.split():
-                if (len(token) < n )and ((n - 2) <= len(token)):
+                if (len(token) < n) and ((n - 2) <= len(token)):
                     # add all n-grams options with spaces
                     n_grams.extend(' ' * i + token + ' ' * (n - len(token) - i) for i in range(n - len(token) + 1))
 
