@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from config import CONFIG
 
 import genai_detection.detectors.llm_unmasking as unm
 
@@ -18,14 +19,18 @@ plt.rcParams['grid.linewidth'] = .25
 def split_pan_ds_dataset_by_model_pan(df, seed=42):
     return {
         'Human': df.query('model == "human"').sample(frac=1, random_state=seed),
-        'GPT3': df.query('model.str.startswith("gpt-3")').sample(frac=1, random_state=seed),
+        # 'GPT3': df.query('model.str.startswith("gpt-3")').sample(frac=1, random_state=seed),
         # 'GPT4': df.query('model.str.startswith("gpt-4")').sample(frac=1, random_state=seed),
         # 'o1': df.query('model.str.startswith("openai")').sample(frac=1, random_state=seed),
         # 'Llama2': df.query('model.str.startswith("llama")').sample(frac=1, random_state=seed),
         # 'PaLM2': df.query('model.str.startswith("text-bison")').sample(frac=1, random_state=seed),
         # 'Gemini': df.query('model.str.startswith("gemini")').sample(frac=1, random_state=seed),
-        'Mistral': df.query('model.str.startswith("mistral") or model.str.startswith("mixtral")').sample(
-            frac=1, random_state=seed),
+        'gpt-4-turbo-paraphrase': df.query('model == "gpt-4-turbo-paraphrase"').sample(frac=1, random_state=seed),
+        'gemini-pro': df.query('model == "gemini-pro"').sample(frac=1, random_state=seed),
+        'gpt-4-turbo': df.query('model == "gpt-4-turbo"').sample(frac=1, random_state=seed),
+        'gemini-pro-paraphrase': df.query('model == "gemini-pro-paraphrase"').sample(frac=1, random_state=seed),
+        # 'Mistral': df.query('model.str.startswith("mistral") or model.str.startswith("mixtral")').sample(
+            # frac=1, random_state=seed),
         # 'Qwen': df.query('model.str.startswith("qwen")').sample(frac=1, random_state=seed),
     }
 
@@ -33,15 +38,15 @@ def split_pan_ds_dataset_by_model_pan(df, seed=42):
 def split_pan_ds_dataset_by_model_hd(df, seed=42):
     return {
         'Human': df.query('model == "human"').sample(frac=1, random_state=seed),
-        'Claude': df.query('model.str.startswith("claude")').sample(frac=1, random_state=seed),
+        # 'Claude': df.query('model.str.startswith("claude")').sample(frac=1, random_state=seed),
         'GPT-4o': df.query('model.str.startswith("gpt-4o")').sample(frac=1, random_state=seed),
-        'o1': df.query('model.str.startswith("o1-pro")').sample(frac=1, random_state=seed),
-        'o1 (Humanized)': df.query('model.str.startswith("humanized_o1")').sample(frac=1, random_state=seed),
+        # 'o1': df.query('model.str.startswith("o1-pro")').sample(frac=1, random_state=seed),
+        # 'o1 (Humanized)': df.query('model.str.startswith("humanized_o1")').sample(frac=1, random_state=seed),
         'GPT-4o (Paraphrased)': df.query('model.str.startswith("paraphrased_gpt")').sample(frac=1, random_state=seed),
     }
 
 
-ds = load_from_disk('data/datasets/pan24-extended-converted')['train'].to_pandas()
+ds = load_from_disk(CONFIG.PATH2PAN25)['train'].to_pandas()
 ds_by_model = split_pan_ds_dataset_by_model_pan(ds)
 # ds = load_from_disk('data/datasets/human-detectors-converted')['train'].to_pandas()
 # ds_by_model = split_pan_ds_dataset_by_model_hd(ds)
