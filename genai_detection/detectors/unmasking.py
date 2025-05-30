@@ -90,11 +90,7 @@ class UnmaskingDetector(DetectorBase):
         :return: list of curve points (half the size of the input)
         """
         curves = []
-        for t in batched(text, 2):  # TODO: has strict attribute
-            if len(t) != 2:
-                if self.strict:
-                    raise ValueError('Final batch is not a full pair.')
-                break
+        for t in batched(text, 2, strict=self.strict):  
             tokens_left = self.tokenizer(t[0])
             tokens_right = self.tokenizer(t[1])
 
