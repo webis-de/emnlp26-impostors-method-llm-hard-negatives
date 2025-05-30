@@ -4,10 +4,20 @@ import numpy as np
 from nltk import ngrams
 from sklearn.feature_extraction.text import TfidfTransformer
 
+from genai_detection.detectors.detector_base import DetectorBase
 
-class ImpostorPipeline:
+__all__ = ['ImpostorDetector']
+
+class ImpostorDetector(DetectorBase):
     """
-    Impostors method by Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’.
+    LLM detector calculating TODO.
+
+    The input is a list of texts where text ``i`` and text ``i+1`` belong to a pair. 
+    The output is a list of TODO.
+
+    References:
+    ===========
+    Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’.
     Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
     """
     def __init__(self):
