@@ -149,7 +149,7 @@ class ImpostorDetector(DetectorBase):
     @staticmethod
     def cosine_similarity(vec1, vec2):
         """ Calculate cosine similarity between two vectors. """
-        if not vec1 or not vec2:
+        if vec1 is None or vec2 is None:
             return 0.0
         assert len(vec1) == len(vec2), "Vectors must be of the same length."
         dot_product = sum(a * b for a, b in zip(vec1, vec2))
@@ -161,7 +161,7 @@ class ImpostorDetector(DetectorBase):
 
     def minmax_similarity(self, vec1, vec2):
         """ Calculate min-max similarity between two vectors in TFIDF format. """
-        if not vec1 or not vec2:
+        if vec1 is None or vec2 is None:
             return 0.0
         assert len(vec1) == len(vec2), "Vectors must be of the same length."
         return sum(min(a, b) for a, b in zip(vec1, vec2)) / sum(max(a, b) for a, b in zip(vec1, vec2))
