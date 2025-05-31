@@ -7,6 +7,7 @@ from typing import Iterable, List
 
 import numpy as np
 from nltk import ngrams
+import pandas as pd
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 
@@ -57,12 +58,16 @@ class ImpostorDetector(DetectorBase):
         :param text: input text or batch of input texts
         :return: score indicating whether the input text is machine-generated, i.e. close 1 means machine-generated, close 0 means human-written
         """
-        assert isinstance(text, list), "Input must be a list of strings."
+        text = list(text)  # convert to tuple to list
+        #print(text)
         scores_per_pair = defaultdict(int)  # id is index of pair (i.e, length is half of the input text list)
         for i,t in enumerate(batched(text, 2, strict=self.strict)):  
             # TODO: check text length, if too short, i.e. less than 500 words, skip?
+            #print(t[0])
             tokens_left = self.tokenizer(t[0])
             tokens_right = self.tokenizer(t[1])
+
+            #print(tokens_left)
 
             # frequencies as defaultdict(int) 
             freqs_left = self.get_token_freqs(tokens_left)
@@ -134,8 +139,8 @@ class ImpostorDetector(DetectorBase):
         :param top_token_list: list of top tokens to include in the matrix
         :return: Numpy array of term tfidf values, `shape = (len(tokens), len(top_token_list))`
         """
-        vectorizer = TfidfVectorizer(vocabulary=top_token_list)
-        tfidf_matrix = vectorizer.fit_transform(' '.join(tokens))   # (n_samples=1, n_features=self.top_n)
+        vectorizer = TfidfVectorizer(vocabulary=top_token_list, input='content')
+        tfidf_matrix = vectorizer.fit_transform([' '.join(tokens)])   # (n_samples=1, n_features=self.top_n)
         assert tfidf_matrix.shape[1] == len(top_token_list), "TFIDF matrix shape mismatch with top token list length."
         assert tfidf_matrix.shape[0] == 1, "TFIDF matrix should have one row for the single input document."
         return tfidf_matrix.toarray()
@@ -184,6 +189,7 @@ class ImpostorDetector(DetectorBase):
                 if (len(token) < n) and ((n - 2) <= len(token)):
                     # add all n-grams options with spaces
                     n_grams.extend(' ' * i + token + ' ' * (n - len(token) - i) for i in range(n - len(token) + 1))
+            return n_grams
 
         else:
             return [text[i:i + n] for i in range(0, len(text) - n + 1)]
