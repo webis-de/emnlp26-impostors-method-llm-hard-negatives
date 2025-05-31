@@ -1,7 +1,7 @@
 from collections import Counter, defaultdict
 from itertools import batched
 import itertools
-from random import random
+from random import sample
 import re
 from typing import Iterable, List
 
@@ -98,7 +98,7 @@ class ImpostorDetector(DetectorBase):
                     tmp_store[candidate] = store[candidate] # add actual candidate
 
                     # feature selection: randomly delete a portion of features
-                    rand_feat_to_delete_ids = random.sample(range(len(top_tokens)), int(len(top_tokens) * self.portion_delete))
+                    rand_feat_to_delete_ids = sample(range(len(top_tokens)), int(len(top_tokens) * self.portion_delete))
                     scores = {c: self.minmax_similarity(store[unknown]['tfidf'][:,rand_feat_to_delete_ids], 
                                                         tmp_store[c]['tfidf'][:,rand_feat_to_delete_ids]) 
                                                         for c in list(tmp_store.keys())}
