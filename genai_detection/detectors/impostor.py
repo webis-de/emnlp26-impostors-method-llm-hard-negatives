@@ -9,6 +9,7 @@ import numpy as np
 from nltk import ngrams
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 from genai_detection.detectors.detector_base import DetectorBase
 
@@ -87,16 +88,16 @@ class ImpostorDetector(DetectorBase):
             # two iterations, generating imposters for each candidate once
             for j,(unknown, candidate) in enumerate(itertools.permutations(list(store.keys()), 2)):
                 scores_over_different_rounds = 0
-                # for different rounds, randomly delete a portion of features (reset in each round)
-                for _ in range(self.rounds):                   
-                    impostor_candidates = self._get_imposters(store[candidate]['text'], self.n_impostors)   # returns dict of model:text pairs
-                    tmp_store = {impostor_name: {'tfidf': self.tokens_to_matrix(self.tokenizer(impostor_text), top_tokens), 
+                impostor_candidates = self._get_imposters(store[candidate]['text'], self.n_impostors)   # returns dict of model:text pairs
+                tmp_store = {impostor_name: {'tfidf': self.tokens_to_matrix(self.tokenizer(impostor_text), top_tokens), 
                                                 'text': impostor_text, 
                                                 'tokens':self.tokenizer(impostor_text)} 
                                                 for impostor_name, impostor_text in impostor_candidates.items()}
-                    tmp_store[candidate] = store[candidate] # add actual candidate
-
-                    # feature selection: randomly delete a portion of features
+                tmp_store[candidate] = store[candidate] # add actual candidate
+                
+                # for different rounds, randomly delete a portion of features (reset in each round)
+                for _ in range(self.rounds):                   
+                   # feature selection: randomly delete a portion of features
                     rand_feat_to_delete_ids = sample(range(len(top_tokens)), int(len(top_tokens) * self.portion_delete))
                     scores = {c: self.minmax_similarity(store[unknown]['tfidf'][:,rand_feat_to_delete_ids], 
                                                         tmp_store[c]['tfidf'][:,rand_feat_to_delete_ids]) 
@@ -108,6 +109,7 @@ class ImpostorDetector(DetectorBase):
                 scores_per_pair[i] += scores_over_different_rounds
                 scores_per_pair[i] /= (j + 1)
 
+        # one elmenent = averaged score of X,Y and Y,X pair (score=number of rounds where the candidate was the most similar)
         return list(scores_per_pair.values())
     
     def get_prediction(self, text: Iterable[str]) -> List[bool]:
@@ -148,17 +150,18 @@ class ImpostorDetector(DetectorBase):
     @staticmethod
     def cosine_similarity(vec1, vec2):
         """ Calculate cosine similarity between two vectors. """
-        if vec1 is None or vec2 is None:
-            return 0.0
-        assert len(vec1) == len(vec2), "Vectors must be of the same length."
-        vec1 = vec1.flatten()
-        vec2 = vec2.flatten()
-        dot_product = sum(a * b for a, b in zip(vec1, vec2))
-        norm_a = sum(a ** 2 for a in vec1) ** 0.5
-        norm_b = sum(b ** 2 for b in vec2) ** 0.5
-        if norm_a == 0 or norm_b == 0:
-            return 0.0
-        return dot_product / (norm_a * norm_b)
+        # if vec1 is None or vec2 is None:
+        #     return 0.0
+        # assert len(vec1) == len(vec2), "Vectors must be of the same length."
+        # vec1 = vec1.flatten()
+        # vec2 = vec2.flatten()
+        # dot_product = sum(a * b for a, b in zip(vec1, vec2))
+        # norm_a = sum(a ** 2 for a in vec1) ** 0.5
+        # norm_b = sum(b ** 2 for b in vec2) ** 0.5
+        # if norm_a == 0 or norm_b == 0:
+        #     return 0.0
+        # return dot_product / (norm_a * norm_b)
+        return cosine_similarity(vec1,vec2).flatten()[0] if vec1 is not None and vec2 is not None else 0.0
 
     def minmax_similarity(self, vec1, vec2):
         """ Calculate min-max similarity between two vectors in TFIDF format. """
@@ -167,11 +170,15 @@ class ImpostorDetector(DetectorBase):
         assert len(vec1) == len(vec2), "Vectors must be of the same length."
         vec1 = vec1.flatten()
         vec2 = vec2.flatten()
-        numerator = sum(min(a, b) for a, b in zip(vec1, vec2))
-        denominator = sum(max(a, b) for a, b in zip(vec1, vec2))
-        if denominator == 0.0:
-            return 0.0 
-        return numerator / denominator
+        # numerator = sum(min(a, b) for a, b in zip(vec1, vec2))
+        # denominator = sum(max(a, b) for a, b in zip(vec1, vec2))
+        # if denominator == 0.0:
+        #     return 0.0 
+        # return numerator / denominator
+        # no libraries, but vectorized version is faster
+        numerator = np.minimum(vec1, vec2).sum()
+        denominator = np.maximum(vec1, vec2).sum()
+        return 0.0 if denominator == 0 else numerator / denominator
     
     @staticmethod
     def tokenize_char_ngrams(text:str, n:int=4, normalize_ws:bool=True, space_free:bool=True):
