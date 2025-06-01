@@ -152,6 +152,8 @@ class ImpostorDetector(DetectorBase):
         if vec1 is None or vec2 is None:
             return 0.0
         assert len(vec1) == len(vec2), "Vectors must be of the same length."
+        vec1 = vec1.flatten()
+        vec2 = vec2.flatten()
         dot_product = sum(a * b for a, b in zip(vec1, vec2))
         norm_a = sum(a ** 2 for a in vec1) ** 0.5
         norm_b = sum(b ** 2 for b in vec2) ** 0.5
@@ -164,6 +166,9 @@ class ImpostorDetector(DetectorBase):
         if vec1 is None or vec2 is None:
             return 0.0
         assert len(vec1) == len(vec2), "Vectors must be of the same length."
+        vec1 = vec1.flatten()
+        vec2 = vec2.flatten()
+        print(f"vec1: {vec1}, vec2: {vec2}")
         return sum(min(a, b) for a, b in zip(vec1, vec2)) / sum(max(a, b) for a, b in zip(vec1, vec2))
     
     @staticmethod
