@@ -8,7 +8,6 @@ from typing import Iterable, List
 import numpy as np
 from nltk import ngrams
 import pandas as pd
-from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from genai_detection.detectors.detector_base import DetectorBase
@@ -107,7 +106,7 @@ class ImpostorDetector(DetectorBase):
                     scores_over_different_rounds += (max_similar_candidate == candidate)
                 # average after second loop
                 scores_per_pair[i] += scores_over_different_rounds
-                scores_per_pair[i] /= j
+                scores_per_pair[i] /= (j + 1)
 
         return list(scores_per_pair.values())
     
@@ -168,8 +167,11 @@ class ImpostorDetector(DetectorBase):
         assert len(vec1) == len(vec2), "Vectors must be of the same length."
         vec1 = vec1.flatten()
         vec2 = vec2.flatten()
-        print(f"vec1: {vec1}, vec2: {vec2}")
-        return sum(min(a, b) for a, b in zip(vec1, vec2)) / sum(max(a, b) for a, b in zip(vec1, vec2))
+        numerator = sum(min(a, b) for a, b in zip(vec1, vec2))
+        denominator = sum(max(a, b) for a, b in zip(vec1, vec2))
+        if denominator == 0.0:
+            return 0.0 
+        return numerator / denominator
     
     @staticmethod
     def tokenize_char_ngrams(text:str, n:int=4, normalize_ws:bool=True, space_free:bool=True):
