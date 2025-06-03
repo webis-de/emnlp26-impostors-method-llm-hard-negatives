@@ -15,16 +15,27 @@
 import typing as t
 
 import numpy as np
-from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precision_score, recall_score, roc_auc_score
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 
 
 __all__ = [
-    'compute_metrics',
+    "compute_metrics",
 ]
 
 
-def compute_metrics(logits: np.ndarray, labels: t.Union[t.List[int], np.array],
-                    scores=None, machine_label=1) -> t.Dict[str, t.Any]:
+def compute_metrics(
+    logits: np.ndarray,
+    labels: t.Union[t.List[int], np.array],
+    scores=None,
+    machine_label=1,
+) -> t.Dict[str, t.Any]:
     """
     Compute evaluation metrics given a model's logits / output probabilities and the true labels.
 
@@ -46,15 +57,23 @@ def compute_metrics(logits: np.ndarray, labels: t.Union[t.List[int], np.array],
         auc_roc = roc_auc_score(labels, logits_argmax)
 
     return {
-        'acc': accuracy_score(labels, logits_argmax),
-        'auc_roc': auc_roc,
-        'confusion': cm.tolist(),
-        'fpr': cm[h, m] / cm[h].sum(),
-        'fnr': cm[m, h] / cm[m].sum(),
-        'human_prec': precision_score(labels, logits_argmax, pos_label=h, zero_division=0.0),
-        'human_rec': recall_score(labels, logits_argmax, pos_label=h, zero_division=0.0),
-        'human_f1': f1_score(labels, logits_argmax, pos_label=h, zero_division=0.0),
-        'machine_prec': precision_score(labels, logits_argmax, pos_label=m, zero_division=0.0),
-        'machine_rec': recall_score(labels, logits_argmax, pos_label=m, zero_division=0.0),
-        'machine_f1': f1_score(labels, logits_argmax, pos_label=m, zero_division=0.0),
+        "acc": accuracy_score(labels, logits_argmax),
+        "auc_roc": auc_roc,
+        "confusion": cm.tolist(),
+        "fpr": cm[h, m] / cm[h].sum(),
+        "fnr": cm[m, h] / cm[m].sum(),
+        "human_prec": precision_score(
+            labels, logits_argmax, pos_label=h, zero_division=0.0
+        ),
+        "human_rec": recall_score(
+            labels, logits_argmax, pos_label=h, zero_division=0.0
+        ),
+        "human_f1": f1_score(labels, logits_argmax, pos_label=h, zero_division=0.0),
+        "machine_prec": precision_score(
+            labels, logits_argmax, pos_label=m, zero_division=0.0
+        ),
+        "machine_rec": recall_score(
+            labels, logits_argmax, pos_label=m, zero_division=0.0
+        ),
+        "machine_f1": f1_score(labels, logits_argmax, pos_label=m, zero_division=0.0),
     }

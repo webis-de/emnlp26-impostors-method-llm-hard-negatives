@@ -20,7 +20,7 @@ import pyppmd
 
 from genai_detection.detectors.detector_base import DetectorBase
 
-__all__ = ['PPMdDetector']
+__all__ = ["PPMdDetector"]
 
 
 class PPMdDetector(DetectorBase):
@@ -51,7 +51,7 @@ class PPMdDetector(DetectorBase):
         for t in batched(text, 2):
             if len(t) != 2:
                 if self.strict:
-                    raise ValueError('Final batch is not a full pair.')
+                    raise ValueError("Final batch is not a full pair.")
                 break
             cx = len(pyppmd.compress(t[0]))
             cy = len(pyppmd.compress(t[1]))

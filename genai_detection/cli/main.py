@@ -21,12 +21,12 @@ class TransparentLazyGroup(click.Group):
         return getattr(mod, cmd)
 
 
-@click.group(context_settings={'show_default': True})
+@click.group(context_settings={"show_default": True})
 def main():
     """Generative AI detection tools."""
 
 
-@main.group(cls=TransparentLazyGroup, lazy_group='genai_detection.cli.detect:main')
+@main.group(cls=TransparentLazyGroup, lazy_group="genai_detection.cli.detect:main")
 def detect():
     """
     A collection of generative AI detection models.
@@ -41,15 +41,15 @@ def detect():
     """
 
 
-@main.group(cls=TransparentLazyGroup, lazy_group='genai_detection.cli.finetune:main')
+@main.group(cls=TransparentLazyGroup, lazy_group="genai_detection.cli.finetune:main")
 def finetune():
     """Finetune pre-trained models for generative AI detection."""
 
 
-@main.group(cls=TransparentLazyGroup, lazy_group='genai_detection.cli.dataset:main')
+@main.group(cls=TransparentLazyGroup, lazy_group="genai_detection.cli.dataset:main")
 def dataset():
     """Generative AI detection dataset tools."""
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

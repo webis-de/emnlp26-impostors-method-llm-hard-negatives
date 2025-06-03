@@ -27,9 +27,9 @@ from sklearn.utils import shuffle
 
 from genai_detection.detectors.detector_base import DetectorBase
 
-__all__ = ['UnmaskingDetector']
+__all__ = ["UnmaskingDetector"]
 
-warnings.simplefilter('ignore', category=ConvergenceWarning)
+warnings.simplefilter("ignore", category=ConvergenceWarning)
 
 
 class UnmaskingDetector(DetectorBase):
@@ -49,8 +49,22 @@ class UnmaskingDetector(DetectorBase):
         Unmasking for Short Texts.” In Proceedings of the 2019 Conference of the North, 654–59.
         Stroudsburg, PA, USA: Association for Computational Linguistics.
     """
-    def __init__(self, rounds=30, top_n=250, cv_folds=10, n_delete=3, tokenizer=None, shared_vocab_only=False,
-                 chunk_size=500, relative_freqs=True, bootstrap=True, n_chunks=60, smooth=None, strict=False):
+
+    def __init__(
+        self,
+        rounds=30,
+        top_n=250,
+        cv_folds=10,
+        n_delete=3,
+        tokenizer=None,
+        shared_vocab_only=False,
+        chunk_size=500,
+        relative_freqs=True,
+        bootstrap=True,
+        n_chunks=60,
+        smooth=None,
+        strict=False,
+    ):
         """
         :param rounds: number of deconstruction rounds
         :param top_n: number of top tokens to sample
@@ -67,7 +81,7 @@ class UnmaskingDetector(DetectorBase):
         """
 
         if top_n <= 2 * n_delete * rounds:
-            raise ValueError('top_n must be larger than 2 * n_delete * n_rounds.')
+            raise ValueError("top_n must be larger than 2 * n_delete * n_rounds.")
 
         self.rounds = rounds
         self.top_n = top_n
@@ -90,12 +104,16 @@ class UnmaskingDetector(DetectorBase):
         :return: list of curve points (half the size of the input)
         """
         curves = []
-        for t in batched(text, 2, strict=self.strict):  
+        for t in batched(text, 2, strict=self.strict):
             tokens_left = self.tokenizer(t[0])
             tokens_right = self.tokenizer(t[1])
 
-            chunks_left = self.create_chunks(tokens_left, self.chunk_size, self.bootstrap, self.n_chunks)
-            chunks_right = self.create_chunks(tokens_right, self.chunk_size, self.bootstrap, self.n_chunks)
+            chunks_left = self.create_chunks(
+                tokens_left, self.chunk_size, self.bootstrap, self.n_chunks
+            )
+            chunks_right = self.create_chunks(
+                tokens_right, self.chunk_size, self.bootstrap, self.n_chunks
+            )
 
             freqs_left = self.get_token_freqs(tokens_left)
             freqs_right = self.get_token_freqs(tokens_right)
@@ -103,16 +121,25 @@ class UnmaskingDetector(DetectorBase):
                 shared_tokens = freqs_left.keys() & freqs_right.keys()
             else:
                 shared_tokens = freqs_left.keys() | freqs_right.keys()
-            top_tokens = sorted(shared_tokens, key=lambda x: freqs_left[x] + freqs_right[x], reverse=True)[:self.top_n]
+            top_tokens = sorted(
+                shared_tokens,
+                key=lambda x: freqs_left[x] + freqs_right[x],
+                reverse=True,
+            )[: self.top_n]
 
             x_left = self.chunks_to_matrix(chunks_left, top_tokens)
             x_right = self.chunks_to_matrix(chunks_right, top_tokens)
 
-            curves.append(self.deconstruct(x_left, x_right,
-                                           self.rounds,
-                                           self.n_delete,
-                                           self.cv_folds,
-                                           self.smoothing_kernel_size))
+            curves.append(
+                self.deconstruct(
+                    x_left,
+                    x_right,
+                    self.rounds,
+                    self.n_delete,
+                    self.cv_folds,
+                    self.smoothing_kernel_size,
+                )
+            )
         return curves
 
     def _get_score_impl(self, text: Iterable[str]) -> List[float]:
@@ -134,9 +161,9 @@ class UnmaskingDetector(DetectorBase):
         """
         text = text.strip()
         if normalize_ws:
-            text = re.sub(r'\s+', ' ', text)
+            text = re.sub(r"\s+", " ", text)
         # does not use space-free n-grams
-        return [text[i:i + n] for i in range(0, len(text) - n + 1)]
+        return [text[i : i + n] for i in range(0, len(text) - n + 1)]
 
     @staticmethod
     def tokenize_word_ngrams(text, n=3, word_tokenizer=None):
@@ -148,8 +175,12 @@ class UnmaskingDetector(DetectorBase):
         :param word_tokenizer: word tokenizer to use (defaults to :meth:`tokenize_words`)
         :return: list of word n-gram tokens
         """
-        tokens = word_tokenizer(text.strip()) if word_tokenizer else re.findall(r'\w+', text.strip())
-        return [' '.join(tokens[i:i + n]) for i in range(0, len(tokens) - n + 1)]
+        tokens = (
+            word_tokenizer(text.strip())
+            if word_tokenizer
+            else re.findall(r"\w+", text.strip())
+        )
+        return [" ".join(tokens[i : i + n]) for i in range(0, len(tokens) - n + 1)]
 
     @staticmethod
     def tokenize_words(text):
@@ -159,7 +190,7 @@ class UnmaskingDetector(DetectorBase):
         :param text: input text
         :return: list of word tokens
         """
-        return re.findall(r'\w+', text)
+        return re.findall(r"\w+", text)
 
     @staticmethod
     def tokenize_whitespace(text):
@@ -212,8 +243,11 @@ class UnmaskingDetector(DetectorBase):
         if bootstrap:
             return [cls.bootstrap_tokens(tokens, chunk_size) for _ in range(n_chunks)]
 
-        return [tokens[i:i + chunk_size] for i in range(0, len(tokens), chunk_size)
-                if len(tokens) - i >= chunk_size / 2]
+        return [
+            tokens[i : i + chunk_size]
+            for i in range(0, len(tokens), chunk_size)
+            if len(tokens) - i >= chunk_size / 2
+        ]
 
     def chunks_to_matrix(self, chunks, top_token_list):
         """
@@ -231,7 +265,9 @@ class UnmaskingDetector(DetectorBase):
         return np.array(mat)
 
     @staticmethod
-    def deconstruct(x_left, x_right, rounds, n_delete, cv_folds=10, smoothing_kernel_size=None):
+    def deconstruct(
+        x_left, x_right, rounds, n_delete, cv_folds=10, smoothing_kernel_size=None
+    ):
         """
         Iteratively classify and deconstruct a text pair representation and return the resulting accuracy curve.
 
@@ -245,26 +281,40 @@ class UnmaskingDetector(DetectorBase):
         """
         X = np.vstack((x_left, x_right))
         y = np.zeros(len(x_left) + len(x_right))
-        y[len(x_left):] = 1.0
+        y[len(x_left) :] = 1.0
         X, y = shuffle(X, y)
 
         rounds = min(rounds, (X.shape[1] - 1) // n_delete)
         scores = np.zeros(rounds)
         for i in range(rounds):
             if X.shape[1] == 0:
-                warnings.warn('Feature dimension reduced to zero. Either increase top_n or reduce n_delete.')
+                warnings.warn(
+                    "Feature dimension reduced to zero. Either increase top_n or reduce n_delete."
+                )
                 break
-            cv = cross_validate(LinearSVC(dual='auto'), X, y, cv=cv_folds, return_estimator=True)
-            scores[i] = cv['test_score'].mean()
-            coefs = np.mean(np.vstack([c.coef_.squeeze() for c in cv['estimator']]), axis=0)
+            cv = cross_validate(
+                LinearSVC(dual="auto"), X, y, cv=cv_folds, return_estimator=True
+            )
+            scores[i] = cv["test_score"].mean()
+            coefs = np.mean(
+                np.vstack([c.coef_.squeeze() for c in cv["estimator"]]), axis=0
+            )
             argsort = np.argsort(coefs)
             coefs_sorted = coefs[argsort]
             # most discriminating negative and positive features
-            top_arg = np.concat([argsort[coefs_sorted > 0][-n_delete:],
-                                 argsort[coefs_sorted < 0][:n_delete]])
+            top_arg = np.concat(
+                [
+                    argsort[coefs_sorted > 0][-n_delete:],
+                    argsort[coefs_sorted < 0][:n_delete],
+                ]
+            )
             X[:, top_arg] = 0
 
         if smoothing_kernel_size:
-            scores = np.convolve(scores, np.ones(smoothing_kernel_size) / smoothing_kernel_size, mode='valid')
+            scores = np.convolve(
+                scores,
+                np.ones(smoothing_kernel_size) / smoothing_kernel_size,
+                mode="valid",
+            )
 
         return scores

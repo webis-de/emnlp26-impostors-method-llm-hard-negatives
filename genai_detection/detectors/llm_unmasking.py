@@ -23,20 +23,23 @@ from tqdm import tqdm
 from genai_detection.detectors.detector_base import DetectorBase
 from genai_detection.util import *
 
-__all__ = ['LLMUnmasking']
+__all__ = ["LLMUnmasking"]
 
 
 class LLMUnmasking(DetectorBase):
     """
     Deep Unmasking LLM detector.
     """
-    def __init__(self,
-                 base_model='mistralai/Mistral-7B-v0.1',
-                 device: TorchDeviceMapType = 'auto',
-                 verbose=True,
-                 n_remove=64,
-                 batch_size=1,
-                 **base_model_args):
+
+    def __init__(
+        self,
+        base_model="mistralai/Mistral-7B-v0.1",
+        device: TorchDeviceMapType = "auto",
+        verbose=True,
+        n_remove=64,
+        batch_size=1,
+        **base_model_args
+    ):
         """
         :param base_model: base language model
         :param device: base model device
@@ -48,7 +51,8 @@ class LLMUnmasking(DetectorBase):
         self.n_remove = n_remove
         self.batch_size = batch_size
         self.base_model, self.base_tokenizer = load_model(
-            base_model, task_type='CAUSAL_LM', device_map=device, **base_model_args)
+            base_model, task_type="CAUSAL_LM", device_map=device, **base_model_args
+        )
 
     # Elimination
     # @torch.inference_mode()
@@ -125,14 +129,30 @@ class LLMUnmasking(DetectorBase):
     @torch.inference_mode()
     def get_curves(self, text: t.Iterable[str], n_rounds) -> np.ndarray:
         curves = []
-        for batch in tqdm(batched(text, self.batch_size), desc='Generating curve points', unit=' batches',
-                          disable=not self.verbose, leave=False):
-            encoding = tokenize_sequences(batch, self.base_tokenizer, self.base_model.device, 256)
+        for batch in tqdm(
+            batched(text, self.batch_size),
+            desc="Generating curve points",
+            unit=" batches",
+            disable=not self.verbose,
+            leave=False,
+        ):
+            encoding = tokenize_sequences(
+                batch, self.base_tokenizer, self.base_model.device, 256
+            )
             orig_ids = encoding.input_ids.clone()
             c = np.zeros((len(batch), n_rounds + 1))
-            for i in tqdm(range(n_rounds + 1), desc='Predicting next tokens', disable=not self.verbose, leave=False):
+            for i in tqdm(
+                range(n_rounds + 1),
+                desc="Predicting next tokens",
+                disable=not self.verbose,
+                leave=False,
+            ):
                 logits = self.base_model(**encoding).logits.detach().clone()
-                encoding.data['input_ids'] = logits.argmax(dim=-1)
-                c[:, i] = seq_label_cross_entropy(logits, orig_ids, encoding.attention_mask).float().cpu()
+                encoding.data["input_ids"] = logits.argmax(dim=-1)
+                c[:, i] = (
+                    seq_label_cross_entropy(logits, orig_ids, encoding.attention_mask)
+                    .float()
+                    .cpu()
+                )
             curves.extend(c)
         return np.array(curves)

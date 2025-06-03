@@ -18,7 +18,7 @@ import types
 import torch
 import numpy as np
 
-__all__ = ['DetectorBase']
+__all__ = ["DetectorBase"]
 
 
 class DetectorBase:
@@ -40,15 +40,18 @@ class DetectorBase:
         """
         return scores
 
-    def _get_score_impl(self, text: t.Iterable[str]) -> t.Union[torch.Tensor, np.ndarray, t.Iterable[float]]:
+    def _get_score_impl(
+        self, text: t.Iterable[str]
+    ) -> t.Union[torch.Tensor, np.ndarray, t.Iterable[float]]:
         """
         Scoring implementation. To be overridden.
         The function should return a list of floats, a Torch tensor, or a Numpy array.
         """
         return NotImplemented
 
-    def get_score(self, text: t.Union[str, t.Iterable[str]], normalize: bool = False) -> \
-            t.Union[np.float32, np.ndarray, np.nan]:
+    def get_score(
+        self, text: t.Union[str, t.Iterable[str]], normalize: bool = False
+    ) -> t.Union[np.float32, np.ndarray, np.nan]:
         """
         Return scores indicating the probability of the input text(s) being machine-generated.
 
@@ -66,17 +69,25 @@ class DetectorBase:
         scores = self._get_score_impl(text)
         if normalize and scores is not NotImplemented:
             scores = self._normalize_scores(scores)
-        scores = _to_numpy(scores, np.float32) if scores is not NotImplemented else _create_nan_array(len(text))
+        scores = (
+            _to_numpy(scores, np.float32)
+            if scores is not NotImplemented
+            else _create_nan_array(len(text))
+        )
         return scores[0] if return_single else scores
 
-    def _predict_impl(self, text: t.Iterable[str]) -> t.Union[torch.Tensor, np.ndarray, t.Iterable[bool]]:
+    def _predict_impl(
+        self, text: t.Iterable[str]
+    ) -> t.Union[torch.Tensor, np.ndarray, t.Iterable[bool]]:
         """
         Prediction implementation. To be overridden.
         The function should return a list of bools, a Torch tensor, or a Numpy array.
         """
         return NotImplemented
 
-    def predict(self, text: t.Union[str, t.Iterable[str]]) -> t.Union[np.int32, np.ndarray, np.nan]:
+    def predict(
+        self, text: t.Union[str, t.Iterable[str]]
+    ) -> t.Union[np.int32, np.ndarray, np.nan]:
         """
         Make a prediction whether the input text(s) were written by a machine.
 
@@ -86,12 +97,17 @@ class DetectorBase:
         return_single = isinstance(text, str)
         text = [text] if return_single else text
         preds = self._predict_impl(text)
-        preds = _to_numpy(preds, np.int32) if preds is not NotImplemented else _create_nan_array(len(text))
+        preds = (
+            _to_numpy(preds, np.int32)
+            if preds is not NotImplemented
+            else _create_nan_array(len(text))
+        )
         return preds[0] if return_single else preds
 
     def _predict_with_score_impl(self, text: t.Iterable[str]) -> t.Tuple[
-            t.Union[torch.Tensor, np.ndarray, t.Iterable[bool]],
-            t.Union[torch.Tensor, np.ndarray, t.Iterable[float]]]:
+        t.Union[torch.Tensor, np.ndarray, t.Iterable[bool]],
+        t.Union[torch.Tensor, np.ndarray, t.Iterable[float]],
+    ]:
         """
         Predict and score implementation. To be overridden.
         The default implementation just calls :meth:`predict` and :meth:`get_score`. Subclasses
@@ -99,9 +115,11 @@ class DetectorBase:
         """
         return self._predict_impl(text), self._get_score_impl(text)
 
-    def predict_with_score(self, text: t.Union[str, t.Iterable[str]], normalize: bool = False) -> t.Tuple[
-            t.Union[np.int32, np.ndarray, np.nan],
-            t.Union[np.float32, np.ndarray, np.nan]]:
+    def predict_with_score(
+        self, text: t.Union[str, t.Iterable[str]], normalize: bool = False
+    ) -> t.Tuple[
+        t.Union[np.int32, np.ndarray, np.nan], t.Union[np.float32, np.ndarray, np.nan]
+    ]:
         """
         Make a prediction whether the input text(s) were written by a machine and return the
         result together with a numerical score.
@@ -119,8 +137,16 @@ class DetectorBase:
 
         if normalize and scores is not NotImplemented:
             scores = self._normalize_scores(scores)
-        preds = _to_numpy(preds, np.int32) if preds is not NotImplemented else _create_nan_array(len(text))
-        scores = _to_numpy(scores, np.float32) if scores is not NotImplemented else _create_nan_array(len(text))
+        preds = (
+            _to_numpy(preds, np.int32)
+            if preds is not NotImplemented
+            else _create_nan_array(len(text))
+        )
+        scores = (
+            _to_numpy(scores, np.float32)
+            if scores is not NotImplemented
+            else _create_nan_array(len(text))
+        )
 
         if return_single:
             return preds[0], scores[0]
