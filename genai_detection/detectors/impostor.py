@@ -1,7 +1,8 @@
 from collections import Counter, defaultdict
 from itertools import batched
 import itertools
-from random import sample
+import json
+from random import choices, sample
 import re
 from typing import Iterable, List
 
@@ -71,17 +72,15 @@ class ImpostorDetector(DetectorBase):
         :return: score indicating whether the input text is machine-generated, i.e. close 1 means machine-generated, close 0 means human-written
         """
         text = list(text)  # convert to tuple to list
-        # print(text)
+
         scores_per_pair = defaultdict(
             int
         )  # id is index of pair (i.e, length is half of the input text list)
         for i, t in enumerate(batched(text, 2, strict=self.strict)):
             # TODO: check text length, if too short, i.e. less than 500 words, skip?
-            # print(t[0])
+
             tokens_left = self.tokenizer(t[0])
             tokens_right = self.tokenizer(t[1])
-
-            # print(tokens_left)
 
             # frequencies as defaultdict(int)
             freqs_left = self.get_token_freqs(tokens_left)
@@ -177,6 +176,8 @@ class ImpostorDetector(DetectorBase):
         :param top_token_list: list of top tokens to include in the matrix
         :return: Numpy array of term tfidf values, `shape = (len(tokens), len(top_token_list))`
         """
+        if len(top_token_list) == 0:
+            return np.zeros((1, self.top_n))  # return empty matrix if no top tokens
         vectorizer = TfidfVectorizer(vocabulary=top_token_list, input="content")
         tfidf_matrix = vectorizer.fit_transform(
             [" ".join(tokens)]
@@ -263,14 +264,32 @@ class ImpostorDetector(DetectorBase):
         else:
             return [text[i : i + n] for i in range(0, len(text) - n + 1)]
 
-    def _get_imposters(self, text: str, n: int) -> dict:
+    def _get_imposters(self, text: str, n: int, use_llms:bool=False) -> dict:
         """
         Get a dictionary of impostor texts for the given input text.
 
         :param text: input text to generate impostors for
         :param n: number of impostors to generate
+        :param use_llms: whether to use LLMs to generate impostors. If not, imposters are texts of similar length. TODO: reference to paper
         :return: dictionary of model names and their corresponding impostor texts
         """
         # TODO: Placeholder for actual implementation
         # In practice, this should return a dict with model names as keys and generated texts as values.
-        return {f"impostor_{i}": f'Impostor text {i} for "{text}"' for i in range(n)}
+        if use_llms:
+            raise NotImplementedError("LLM-based impostor generation is not implemented.")
+        else:            
+            # TODO: Add path to training data
+            # pan23-dataset-converted/train/
+            path2_training_data = "../data/datasets/pan23-authorship-verification/pan23-authorship-verification-training-dataset/pairs.jsonl"  # Placeholder path
+            with open(path2_training_data, "r", encoding="utf-8") as f:
+                tr_data = [json.loads(line)['pair'] for line in f] 
+                flattened = [item for sublist in tr_data for item in sublist]
+                probs = [1 / (1 + abs(len(s) - len(text))) for s in flattened]
+                total = sum(probs)
+                probs = [prob / total for prob in probs]
+
+          
+            # select n random texts of similar length
+            tr_data = choices(flattened, weights=probs, k=min(n, len(flattened)))
+            # create a dictionary of impostors
+            return {f"impostor_{i}": tr_data[i] for i in range(n)}
