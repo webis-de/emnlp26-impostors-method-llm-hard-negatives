@@ -3,7 +3,8 @@ import os
 
 class BaseConfig:
     SERVER = False
-    PATH2PAN25 = "data/datasets/dataset-extended-2025-part-converted"
+    PATH2PAN25 = "data/datasets/pan25-genai-identification/pan25-dataset-converted"
+    PATH2PAN23 = "data/datasets/pan23-authorship-verification/pan23-dataset-converted"
 
 class ServerConfig(BaseConfig):
     SERVER = True
