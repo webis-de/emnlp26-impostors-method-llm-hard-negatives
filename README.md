@@ -28,3 +28,16 @@ Create a class that inherits from `BaseDatasetLoader` or `Pan23DatasetLoader` an
 Create a `run_<your-dataset>` function.
 Run the `run_<your-dataset>` function from main at the bottom of the script.
 This script will read the `pairs.jsonl` and `truth.jsonl` files and convert them into a Hugging Face dataset format.
+
+
+# Enroot Container
+Webis uses Enroot containers linked to the repository to facilitate code execution independently of your affiliation to the project.
+The container image is built and pushed to the Webis registry by the project maintainer.
+The image is specified in the bash script.
+
+## Pushing images
+This project's image namespace is `registry.webis.de/code-research/theses/artificial-authorship-verification:latest`.
+`docker compose build --push` builds the image and pushes it to the Webis registry (using `docker-compose.yaml`).
+Instructions followed during the building process are specified in the `Dockerfile` and `docker-compose.yaml`.
+
+View image at registry at [gitlab project](https://git.webis.de/code-research/theses/artificial-authorship-verification/container_registry/1461).

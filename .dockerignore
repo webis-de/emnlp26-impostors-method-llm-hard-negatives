@@ -10,3 +10,9 @@
 # Ignore Python byte files
 **/__pycache__/
 **/*.py[cod]
+
+.venv/
+results/
+.github/
+.git/
+.idea/
