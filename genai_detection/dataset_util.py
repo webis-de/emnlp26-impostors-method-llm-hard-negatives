@@ -33,8 +33,8 @@ class BaseDatasetLoader(ABC):
 
 
 class Pan23DatasetLoader(BaseDatasetLoader):
-    def __init__(self, train_dir: str, test_dir: str):
-        super().__init__("pan23")
+    def __init__(self, train_dir: str, test_dir: str, name: str="pan23"):
+        super().__init__(name=name)
         self.train_dir = train_dir
         self.test_dir = test_dir
 
@@ -52,6 +52,28 @@ class Pan23DatasetLoader(BaseDatasetLoader):
         train = self._load_dataset_from_directory(self.train_dir)
         test = self._load_dataset_from_directory(self.test_dir)
         return DatasetDict(train=train, test=test)
+
+
+#  === PAN20 LOADER ===
+
+class Pan20DatasetLoader(Pan23DatasetLoader):
+    def __init__(self, train_dir: str, test_dir: str):
+        super().__init__(name="pan20", train_dir=train_dir, test_dir=test_dir)
+
+    def _load_dataset_from_directory(self, directory_path: str) -> Dataset:
+        pair_name = "pan20-authorship-verification-test.jsonl"
+        truth_name = "pan20-authorship-verification-test-truth.jsonl"
+        if not os.path.exists(os.path.join(directory_path, pair_name)):
+            pair_name = "pan20-authorship-verification-training-small.jsonl"
+            truth_name = "pan20-authorship-verification-training-small-truth.jsonl"
+        pairs = self._load_jsonl(os.path.join(directory_path, pair_name))
+        truth = self._load_jsonl(os.path.join(directory_path, truth_name))
+        truth_map = {item["id"]: item for item in truth}
+
+        merged_data = []
+        for item in tqdm(pairs, desc=f"Processing {directory_path}"):
+            merged_data.append({**item, **truth_map.get(item["id"], {})})
+        return Dataset.from_list(merged_data)
 
 
 # === PAN25 LOADER ===
@@ -149,6 +171,17 @@ def run_pan23():
     dataset.save_to_disk(output_dir)
     print("PAN23 example:", dataset["train"][0])
 
+def run_pan20():
+    base_dir = "data/datasets/pan20-authorship-verification/"
+    train_dir = os.path.join(base_dir, "pan20-authorship-verification-training-dataset")
+    test_dir = os.path.join(base_dir, "pan20-authorship-verification-test-dataset")
+    output_dir = os.path.join(base_dir, "pan20-dataset-converted")
+
+    loader = Pan20DatasetLoader(train_dir=train_dir, test_dir=test_dir)
+    dataset = loader.load()
+    dataset.save_to_disk(output_dir)
+    print("PAN20 example:", dataset["train"][0])
+
 
 def run_pan25():
     base_dir = "data/datasets/dataset-extended-2025-part/"
@@ -167,3 +200,4 @@ def run_pan25():
 if __name__ == "__main__":
     run_pan23()
     run_pan25()
+    run_pan20()
