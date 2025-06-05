@@ -1,6 +1,6 @@
 services:
   args-acquisition:
-    image: registry.webis.de/code-research/theses/artificial-authorship-verification
+    image: registry.webis.de/code-teaching/theses/artificial-authorship-verification
     platform: linux/amd64
     build: .
 

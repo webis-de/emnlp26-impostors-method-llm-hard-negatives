@@ -36,7 +36,7 @@ The container image is built and pushed to the Webis registry by the project mai
 The image is specified in the bash script.
 
 ## Pushing images
-This project's image namespace is `registry.webis.de/code-research/theses/artificial-authorship-verification:latest`.
+This project's image namespace is `registry.webis.de/code-teaching/theses/artificial-authorship-verification:latest`.
 `docker compose build --push` builds the image and pushes it to the Webis registry (using `docker-compose.yaml`).
 Instructions followed during the building process are specified in the `Dockerfile` and `docker-compose.yaml`.
 
