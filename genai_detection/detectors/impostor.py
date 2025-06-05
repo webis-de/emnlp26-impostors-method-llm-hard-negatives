@@ -5,6 +5,7 @@ import json
 from random import choices, sample
 import re
 from typing import Iterable, List
+import heapq
 
 import numpy as np
 from nltk import ngrams
@@ -85,18 +86,19 @@ class ImpostorDetector(DetectorBase):
             tokens_left = self.tokenizer(t[0])
             tokens_right = self.tokenizer(t[1])
 
-            # frequencies as defaultdict(int)
-            freqs_left = self.get_token_freqs(tokens_left)
-            freqs_right = self.get_token_freqs(tokens_right)
+            # frequencies as Counter (subclass of defaultdict(int))
+            freqs_left = Counter(tokens_left)#self.get_token_freqs(tokens_left)
+            freqs_right = Counter(tokens_right)#self.get_token_freqs(tokens_right)
             if self.shared_vocab_only:  # TODO: over all corpus documents
                 shared_tokens = freqs_left.keys() & freqs_right.keys()
             else:
                 shared_tokens = freqs_left.keys() | freqs_right.keys()
-            top_tokens = sorted(
+           
+            top_tokens = heapq.nlargest(
+                self.top_n,
                 shared_tokens,
-                key=lambda x: freqs_left[x] + freqs_right[x],
-                reverse=True,
-            )[: self.top_n]
+                key=lambda x: freqs_left[x] + freqs_right[x]
+            )
 
             # TODO: muss man TFIDF gemeinsam (left, right, imposters) berechnen, wegen Dataset Normalierung?
             x_left = self.tokens_to_matrix(tokens_left, top_tokens)
