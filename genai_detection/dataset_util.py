@@ -1,3 +1,4 @@
+import argparse
 import os
 import json
 from pathlib import Path
@@ -40,7 +41,10 @@ class Pan23DatasetLoader(BaseDatasetLoader):
 
     def _load_dataset_from_directory(self, directory_path: str) -> Dataset:
         pairs = self._load_jsonl(os.path.join(directory_path, "pairs.jsonl"))
-        truth = self._load_jsonl(os.path.join(directory_path, "truth.jsonl"))
+        path2truth = os.path.join(directory_path, "truth.jsonl")
+        if not os.path.exists(path2truth):
+            path2truth = os.path.join(directory_path.strip('/') + "-truth/", "truth.jsonl")
+        truth = self._load_jsonl(path2truth)
         truth_map = {item["id"]: item for item in truth}
 
         merged_data = []
@@ -160,16 +164,15 @@ class Pan25DatasetLoader(BaseDatasetLoader):
 # === SYSTEM SPECIFIC USAGE ===
 
 
-def run_pan23():
-    base_dir = "data/datasets/pan23-authorship-verification/"
+def run_pan23(base_dir:str, save_path:str):
     train_dir = os.path.join(base_dir, "pan23-authorship-verification-training-dataset")
     test_dir = os.path.join(base_dir, "pan23-authorship-verification-test-dataset")
-    output_dir = os.path.join(base_dir, "pan23-dataset-converted")
+    output_dir = os.path.join(save_path, "pan23-dataset-converted")
 
     loader = Pan23DatasetLoader(train_dir=train_dir, test_dir=test_dir)
     dataset = loader.load()
     dataset.save_to_disk(output_dir)
-    print("PAN23 example:", dataset["train"][0])
+    # print("PAN23 example:", dataset["train"][0])
 
 def run_pan20():
     base_dir = "data/datasets/pan20-authorship-verification/"
@@ -180,7 +183,7 @@ def run_pan20():
     loader = Pan20DatasetLoader(train_dir=train_dir, test_dir=test_dir)
     dataset = loader.load()
     dataset.save_to_disk(output_dir)
-    print("PAN20 example:", dataset["train"][0])
+    # print("PAN20 example:", dataset["train"][0])
 
 
 def run_pan25():
@@ -194,10 +197,28 @@ def run_pan25():
     loader = Pan25DatasetLoader(human_dir, machine_dir, train_ids_path, test_ids_path)
     dataset = loader.load()
     dataset.save_to_disk(output_dir)
-    print("PAN25 example:", dataset["train"][0])
+    # print("PAN25 example:", dataset["train"][0])
 
 
 if __name__ == "__main__":
-    run_pan23()
-    run_pan25()
-    run_pan20()
+    parser = argparse.ArgumentParser(
+        description="Evaluate classifiers on Curlie dataset and save metrics to CSV/Parquet."
+    )
+    parser.add_argument(
+        "--path",
+        type=str,
+        default="data/datasets/pan23-authorship-verification/",
+        help="Path to the input dataset (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--out",
+        type=str,
+        default="data/datasets/pan23-authorship-verification/",
+        help="Path where Huggingface dataset should be saved (default: %(default)s)",
+    )
+   
+    args = parser.parse_args()
+
+    run_pan23(base_dir=args.path, save_path=args.out)
+    # run_pan25()
+    # run_pan20()
