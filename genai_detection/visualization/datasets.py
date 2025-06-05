@@ -64,8 +64,8 @@ class BaseDatasetVisualization(ABC):
    
 
 class Pan23Visualization(BaseDatasetVisualization):
-    def __init__(self):
-        super().__init__("pan23")
+    def __init__(self, name: str = "pan23"):
+        super().__init__(name=name)
 
     def load_dataset(self) -> DatasetDict:
         ds_pan = load_from_disk(os.path.join(os.path.abspath(".."), CONFIG.PATH2PAN23))['train'].to_pandas()
@@ -158,3 +158,10 @@ class Pan23Visualization(BaseDatasetVisualization):
 
     
 
+class Pan20Visualization(Pan23Visualization):
+    def __init__(self, name: str = "pan20"):
+        super().__init__(name=name)
+
+    def load_dataset(self) -> DatasetDict:
+        ds_pan = load_from_disk(os.path.join(os.path.abspath(".."), CONFIG.PATH2PAN20))['train'].to_pandas()
+        return ds_pan
