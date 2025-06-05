@@ -164,11 +164,9 @@ class ImpostorDetector(DetectorBase):
     def get_token_freqs(self, *token_lists):
         """Get combined frequency dictionary for all tokens in the input sequence(s)."""
         freqs = defaultdict(int)
-        n = 0
         for tokens in token_lists:
             for t in tokens:
                 freqs[t] += 1
-                n += 1
         return freqs
 
     def tokens_to_matrix(self, tokens, top_token_list):
