@@ -1,0 +1,26 @@
+# Datasets
+
+## Add a new dataset
+To add a new dataset, create new directories in the `data/datasets/<your-dataset-name>` directory with the following structure:
+
+```
+<your-dataset-name>/
+├── <train>/
+│   ├── pairs.jsonl
+│   └── truth.jsonl
+└── <test>/
+    ├── pairs.jsonl
+    └── truth.jsonl
+```
+
+Since we work with Hugging Face datasets, the `pairs.jsonl` file should contain a JSON Lines file with the following structure:
+
+```json
+{"id": "1", "text": "This is the first text.", "same": "True", "authors": ["Author1", "Author1"]}
+{"id": "2", "text": "This is the second text.", "same": "False", "authors": ["Author3"]}
+```
+To convert a dataset to a Hugging Face dataset, you can use the `genai_detection/dataset_util.py` script. 
+Create a class that inherits from `BaseDatasetLoader` or `Pan23DatasetLoader` and implements the missing methods (like `Pan20DatasetLoader`).
+Create a `run_<your-dataset>` function.
+Run the `run_<your-dataset>` function from main at the bottom of the script.
+This script will read the `pairs.jsonl` and `truth.jsonl` files and convert them into a Hugging Face dataset format.
