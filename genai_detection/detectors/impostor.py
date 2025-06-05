@@ -176,17 +176,24 @@ class ImpostorDetector(DetectorBase):
         :return: Numpy array of term tfidf values, `shape = (len(tokens), len(top_token_list))`
         """
         if len(top_token_list) == 0:
-            return np.zeros((1, self.top_n))  # return empty matrix if no top tokens
-        vectorizer = TfidfVectorizer(vocabulary=top_token_list, input="content")
-        tfidf_matrix = vectorizer.fit_transform(
+            return np.zeros((1, self.top_n), dtype=np.float32)  # return empty matrix if no top tokens
+        
+        # avoid fitting a new vectorizer every time (costly)
+        if not hasattr(self, "_vectorizer") or self._vectorizer_vocab != top_token_list:
+            self._vectorizer = TfidfVectorizer(vocabulary=top_token_list, input="content", dtype=np.float32)
+            self._vectorizer_vocab = top_token_list
+
+        tfidf_matrix = self._vectorizer.fit_transform(
             [" ".join(tokens)]
-        )  # (n_samples=1, n_features=self.top_n)
+        )  # format (n_samples=1, n_features=self.top_n)
+
         assert tfidf_matrix.shape[1] == len(
             top_token_list
         ), "TFIDF matrix shape mismatch with top token list length."
         assert (
             tfidf_matrix.shape[0] == 1
         ), "TFIDF matrix should have one row for the single input document."
+        
         return tfidf_matrix.toarray()
 
     @staticmethod
