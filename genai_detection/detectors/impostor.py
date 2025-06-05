@@ -90,7 +90,7 @@ class ImpostorDetector(DetectorBase):
         
         TODO: If the score is above a certain threshold, the input text is classified as same-author, which is not implemented yet/ not the purpose of this method.
 
-        Koppel et Al. (2014) exclude texts shorter than 500 words, TODO: but we do not do this here.
+        Koppel et Al. (2014) exclude texts shorter than 500 words.
         Kocher et Al. (2015) exclude words appearing only once to prevent overfitting to words occuring only once.
         Koppel et Al. (2014) select m most similar imposters in terms of min-max similarity as imposter candidates and then, 
         randomly select n actual imposters among potential imposters (because it has proven superior to using the top n imposters). 
