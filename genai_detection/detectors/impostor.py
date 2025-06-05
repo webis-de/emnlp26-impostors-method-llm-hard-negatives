@@ -33,6 +33,8 @@ class ImpostorDetector(DetectorBase):
     ===========
     Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’.
     Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
+
+    Kocher, Mirco, and Jacques Savoy. ‘UniNE at CLEF 2015: Author Identification’, 2015.
     """
 
     def __init__(
@@ -43,20 +45,18 @@ class ImpostorDetector(DetectorBase):
         tokenizer=None,
         shared_vocab_only=True,
         tfidf_freqs=True,
-        strict=False,
-        n_impostors=3,
+        n_impostors=25,
         threshold=0.1,
     ):
         """
-        :param rounds: number of random feature selection rounds
-        :param top_n: number of top space-free character 4-grams to consider
-        :param portion_delete: portion of features to eliminate in each round (reset in each round)
-        :param tokenizer: custom tokenizer function (must accept exactly one parameter, defaults to space-free character 4-grams)
-        :param shared_vocab_only: restrict analysis to shared vocabulary across pairs of texts (TODO: in paper: all texts in the corpus)
-        :param tfidf_freqs: use tfidf term frequencies
-        :param n_impostors: number of impostors to use for each candidate TODO: allow specification type of LLM impostors
-        :param strict: throw a :class:`ValueError` if the last input batch is not a full pair
-        :param threshold: threshold for the minimum similarity score to consider two texts same-author TODO:text machine-generated
+        :param rounds: number of random feature selection rounds, Koppel et Al. (2014) use 100
+        :param top_n: number of top space-free character 4-grams to consider, Koppel et Al. (2014) use 100,000
+        :param portion_delete: portion of features to eliminate in each round (reset in each round); Koppel et Al. (2014) use 50% of features
+        :param tokenizer: custom tokenizer function (must accept exactly one parameter, defaults to space-free character 4-grams cf. Koppel et Al. (2014))
+        :param shared_vocab_only: restrict analysis to shared vocabulary across pairs of texts (Koppel et Al. (2014): all texts in the corpus, i.e. shared)
+        :param tfidf_freqs: use tfidf term frequencies (Koppel et Al. (2014) use tfidf)
+        :param n_impostors: number of impostors to use for each candidate TODO: allow specification type of LLM impostors; Koppel et Al. (2014) use 25 impostors
+        :param threshold: threshold for the minimum similarity score to consider two texts same-author, TODO: not used yet, Koppel et Al. (2014) use 0.1
         """
 
         self.rounds = rounds
@@ -64,14 +64,44 @@ class ImpostorDetector(DetectorBase):
         self.shared_vocab_only = shared_vocab_only
         self.portion_delete = portion_delete
         self.n_impostors = n_impostors
-        self.strict = strict
         self.tfidf_freqs = tfidf_freqs
         self.tokenizer = tokenizer or self.tokenize_char_ngrams
         self.threshold = threshold
 
     def get_scores(self, text: Iterable[str]) -> List[float]:
         """
-        Get scores indicating the probability of the input text(s) being machine-generated.
+        Get scores for text pairs. A higher score indicates that the input text pair is more likely to be authored by the same author.
+        The algorithm stems from Koppel et Al. (2014)[, where some details are adapted from Kocher et Al. (2015)]:
+        Each text from the pair is the disputed text and the candidate text once.
+        For the candidate text, a set of impostors is generated.
+        For each round, a portion of features is randomly deleted, and the most similar candidate text is determined.
+        The final score is the number of rounds where the candidate text was the most similar to the disputed text.
+        The final score for a pair is the average of the scores for both directions (disputed text vs. candidate text and vice versa).
+
+        While Koppel et Al. (2014) use (1) a fixed set of imposter documents without realtion to document pair, 
+        (2) on-the-fly generated same content imposter via Google search, 
+        (3) Blogs to obtain same genre imposters, and Kocher et Al. (2015) use (4) a set of imposter documents based on the number of documents written by the author,
+        we define different techniques to generate impostors, which can be specified via the `technique` parameter in the `_get_imposters` method:
+        We currently support:
+        (1) `text_len`: generate impostors of similar length from a predefined dataset (default, see `_get_imposters` method).
+        (2) `llm`: use LLMs to generate impostors (TODO: not implemented yet), extension of Koppel et Al. (2014).
+        (3) `n_docs`: generate impostors based on the number of documents written by the author (TODO: not implemented yet), cf. Kocher et Al. (2015).
+        
+        TODO: If the score is above a certain threshold, the input text is classified as same-author, which is not implemented yet/ not the purpose of this method.
+
+        Koppel et Al. (2014) exclude texts shorter than 500 words, TODO: but we do not do this here.
+        Kocher et Al. (2015) exclude words appearing only once to prevent overfitting to words occuring only once.
+        Koppel et Al. (2014) select m most similar imposters in terms of min-max similarity as imposter candidates and then, 
+        randomly select n actual imposters among potential imposters (because it has proven superior to using the top n imposters). 
+        They claim the approach is not sensitive to the choice of m and n.
+        Koppel et Al. (2014) compare using min-max and cosine simialrity.
+
+        References:
+        ===========
+        Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’.
+        Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
+
+        Kocher, Mirco, and Jacques Savoy. ‘UniNE at CLEF 2015: Author Identification’, 2015.
 
         :param text: input text or batch of input texts
         :return: score indicating whether the input text is machine-generated, i.e. close 1 means machine-generated, close 0 means human-written
@@ -81,15 +111,24 @@ class ImpostorDetector(DetectorBase):
         scores_per_pair = defaultdict(
             int
         )  # id is index of pair (i.e, length is half of the input text list)
-        for i, t in enumerate(batched(text, 2, strict=self.strict)):
-            # TODO: check text length, if too short, i.e. less than 500 words, skip?
+        for i, t in enumerate(batched(text, 2, strict=True)):
+              # TODO: check text length, if too short, i.e. less than 500 `words`(unclear which unit from Koppel et. Al. (2014)), skip? Maybe reason for bad results
+            if len(self.tokenize_whitespace(t[0])) + len(self.tokenize_whitespace(t[1])) < 1000:
+                continue
+          
+            # TODO: preprocessing: remove punctuation, lowercasing, remove html tags (e.g., <nl>), etc.?
 
             tokens_left = self.tokenizer(t[0])
             tokens_right = self.tokenizer(t[1])
 
             # frequencies as Counter (subclass of defaultdict(int))
-            freqs_left = Counter(tokens_left)#self.get_token_freqs(tokens_left)
-            freqs_right = Counter(tokens_right)#self.get_token_freqs(tokens_right)
+            freqs_left = Counter(tokens_left)
+            freqs_right = Counter(tokens_right)
+
+            # Kocher et Al. (2015) exclude words appearing only once
+            freqs_left = Counter({k: v for k, v in freqs_left.items() if v > 1})
+            freqs_right = Counter({k: v for k, v in freqs_right.items() if v > 1})
+
             if self.shared_vocab_only:  # TODO: over all corpus documents
                 shared_tokens = freqs_left.keys() & freqs_right.keys()
             else:
@@ -154,6 +193,7 @@ class ImpostorDetector(DetectorBase):
                 scores_per_pair[i] /= j + 1
 
         # one elmenent = averaged score of X,Y and Y,X pair (score=number of rounds where the candidate was the most similar)
+        # TODO: threshold is in [0,1], maybe normalize by rounds?
         return list(scores_per_pair.values())
 
     def get_prediction(self, text: Iterable[str]) -> List[bool]:
@@ -165,10 +205,6 @@ class ImpostorDetector(DetectorBase):
         """
         scores = self.get_scores(text)
         return [score > self.threshold for score in scores]
-
-    def get_token_freqs(self, *token_lists):
-        """Get combined frequency dictionary for all tokens in the input sequence(s)."""
-        return Counter(token for tokens in token_lists for token in tokens)
 
     def tokens_to_matrix(self, tokens, top_token_list):
         """
@@ -201,7 +237,10 @@ class ImpostorDetector(DetectorBase):
 
     @staticmethod
     def cosine_similarity(vec1, vec2):
-        """Calculate cosine similarity between two vectors."""
+        """
+        Calculate cosine similarity between two vectors.
+        Koppel et Al. (2014) have use cosine similarity as a baseline.
+        """
         return (
             cosine_similarity(vec1, vec2).flatten()[0]
             if vec1 is not None and vec2 is not None
@@ -209,7 +248,10 @@ class ImpostorDetector(DetectorBase):
         )
 
     def minmax_similarity(self, vec1, vec2):
-        """Calculate min-max similarity between two vectors in TFIDF format."""
+        """
+        Calculate min-max similarity between two vectors in TFIDF format.
+        Koppel et Al. (2014) use min-max similarity.
+        """
         if vec1 is None or vec2 is None:
             return 0.0
         assert len(vec1) == len(vec2), "Vectors must be of the same length."
@@ -218,6 +260,24 @@ class ImpostorDetector(DetectorBase):
         numerator = np.minimum(vec1, vec2).sum()
         denominator = np.maximum(vec1, vec2).sum()
         return 0.0 if denominator == 0 else numerator / denominator
+    
+    @staticmethod
+    def tokenize_whitespace(text: str, normalize_ws: bool = True):
+        """
+        Tokenize input text by any whitespace character (including \n \r \t \f and spaces).
+        Kocher et Al. (2015) use isolated words without stemming but with punctuation symbols.
+
+        References:
+        ===========
+        Kocher, Mirco, and Jacques Savoy. ‘UniNE at CLEF 2015: Author Identification’, 2015.
+
+        :param text: input text
+        :param normalize_ws: collapse whitespace before tokenization
+        :return: list of tokens
+        """
+        if normalize_ws:
+            text = re.sub(r"\s+", " ", text)
+        return text.split() 
 
     @staticmethod
     def tokenize_char_ngrams(
@@ -225,6 +285,13 @@ class ImpostorDetector(DetectorBase):
     ):
         """
         Tokenize input text into character n-grams.
+        Koppel et Al. (2014) use space-free character 4-grams frequencies to represent each document as a numerical vector.
+        A space-free n-grams is a (1) sequence of n characters without any whitespace in it, (2) a sequence of <= n characters surrounded by spaces.
+
+        References:
+        ===========
+        Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’.
+        Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
 
         :param text: input text
         :param n: n-gram order
@@ -243,10 +310,11 @@ class ImpostorDetector(DetectorBase):
                 if " " not in text[i : i + n]
             ]
             # add m-grams with spaces, where m < n
-            # TODO: should be >2 whitespaces to pad be allowed? I don't think so
+            # TODO: should be >2 whitespaces to pad be allowed? I don't think so, produces: 'to  ', '  to'
             for token in text.split():
                 if (len(token) < n) and ((n - 2) <= len(token)):
                     # add all n-grams options with spaces
+                    # TODO: results in most common ngrams ('the ', 22), (' the', 22), 'to  ': 10, ' to ': 10, '  to': 10,
                     n_grams.extend(
                         " " * i + token + " " * (n - len(token) - i)
                         for i in range(n - len(token) + 1)
