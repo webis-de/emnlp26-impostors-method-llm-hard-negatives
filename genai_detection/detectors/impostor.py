@@ -113,12 +113,13 @@ class ImpostorDetector(DetectorBase):
             int
         )  # id is index of pair (i.e, length is half of the input text list)
         for i, t in enumerate(batched(text, 2, strict=True)):
-              # TODO: check text length, if too short, i.e. less than 500 `words`(unclear which unit from Koppel et. Al. (2014)), skip? Maybe reason for bad results
+              # TODO: check text length, if too short, i.e. less than 500 `words`(unclear which unit from Koppel et. Al. (2014)), skip?
             if len(self.tokenize_whitespace(t[0])) + len(self.tokenize_whitespace(t[1])) < 1000:
                 continue
           
             # TODO: preprocessing: remove punctuation, lowercasing, remove html tags (e.g., <nl>), etc.?
-            # Koppel et Al. (2014) do not normalize text pairs, but without normalization, the results are terrible.
+            # Koppel et Al. (2014) do not normalize text pairs, but without normalization, the results are terrible. 
+            # Does not make sense, bc 	idiosyncrasies of authors are not captured when using stemmed text.
             tokens_left = self.tokenizer(self.normalize_text(t[0]))
             tokens_right = self.tokenizer(self.normalize_text(t[1]))
 
@@ -181,7 +182,7 @@ class ImpostorDetector(DetectorBase):
                     )
                     scores = {
                         c: self.minmax_similarity(
-                            store[unknown]["tfidf"][:, rand_feat_to_keep_ids],
+                            store[unknown]["tfidf"][:, rand_feat_to_keep_ids],  # disputed text
                             tmp_store[c]["tfidf"][:, rand_feat_to_keep_ids],
                         )
                         for c in list(tmp_store.keys())
@@ -196,6 +197,7 @@ class ImpostorDetector(DetectorBase):
         # one elmenent = averaged score of X,Y and Y,X pair (score=number of rounds where the candidate was the most similar)
         # TODO: threshold is in [0,1], maybe normalize by rounds?
         return list(scores_per_pair.values())
+        # return [v / self.rounds for v in scores_per_pair.values()]
     
     def normalize_text(self, text):
         """
