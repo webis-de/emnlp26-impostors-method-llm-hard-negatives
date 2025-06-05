@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from random import sample
 import re
-from typing import Iterable, List
+from typing import Iterable, List, Literal
 import heapq
 
 import numpy as np
@@ -106,8 +106,9 @@ class ImpostorDetector(DetectorBase):
             x_right = self.tokens_to_matrix(tokens_right, top_tokens)
 
             store = {
-                "left": {"tfidf": x_left, "tokens": tokens_left, "text": t[0]},
-                "right": {"tfidf": x_right, "tokens": tokens_right, "text": t[1]},
+                # TODO: if I knew >=1 author, i could choose imposters based on similar number of documents written (like paper)
+                "left": {"tfidf": x_left, "tokens": tokens_left, "text": t[0], "author": "unknown"},
+                "right": {"tfidf": x_right, "tokens": tokens_right, "text": t[1], "author": "unknown"},
             }
 
             # two iterations, generating imposters for each candidate once
@@ -115,8 +116,9 @@ class ImpostorDetector(DetectorBase):
                 itertools.permutations(list(store.keys()), 2)
             ):
                 scores_over_different_rounds = 0
+                # get imposters for the candidate text, NOT the disputed text
                 impostor_candidates = self._get_imposters(
-                    store[candidate]["text"], self.n_impostors
+                    store[candidate]["text"], self.n_impostors, technique="text_len"
                 )  # returns dict of model:text pairs
                 tmp_store = {
                     impostor_name: {
@@ -254,19 +256,30 @@ class ImpostorDetector(DetectorBase):
         else:
             return [text[i : i + n] for i in range(0, len(text) - n + 1)]
 
-    def _get_imposters(self, text: str, n: int, use_llms:bool=False) -> dict:
+    def _get_imposters(self, text: str, n: int, technique: Literal["llm", "text_len", "n_docs"]="text_len") -> dict:
         """
         Get a dictionary of impostor texts for the given input text.
 
-        :param text: input text to generate impostors for
+        This method generates impostors based on the input text. If `technique` is llm, it should use LLMs to generate impostors (not implemented yet). 
+        If `technique` is text_len, it generates impostors of similar length from a predefined dataset.
+        If `technique` is n_docs, it generates impostors based on the number of documents written by the author; as proposed by Kocher et Al. (2015).
+        
+        References:
+        ===========
+        Kocher, Mirco, and Jacques Savoy. ‘UniNE at CLEF 2015: Author Identification’, 2015.
+
+        :param text: input text to generate impostors for (i.e., the candidate text, NOT the disputed text)
         :param n: number of impostors to generate
         :param use_llms: whether to use LLMs to generate impostors. If not, imposters are texts of similar length. TODO: reference to paper
         :return: dictionary of model names and their corresponding impostor texts
         """
         # TODO: Placeholder for actual implementation
         # In practice, this should return a dict with model names as keys and generated texts as values.
-        if use_llms:
+        if technique == "llm":
             raise NotImplementedError("LLM-based impostor generation is not implemented.")
+        if technique == "n_docs":
+            # TODO: I need author names for this
+            raise NotImplementedError("n-docs impostor generation is not implemented.")
         else:            
             # TODO: Add path to training data
             # pan23-dataset-converted/train/
@@ -279,7 +292,8 @@ class ImpostorDetector(DetectorBase):
             # TODO: Ensure not same author as imposter (difficult, bc during inference, we don't know the author of the input text)
             # FIXME: for PAN20 or other big datasets, this will produce OOM errors
             with open(path2_training_data, "r", encoding="utf-8") as f:
-                tr_data = [json.loads(line).get('pair',[]) for line in f] 
+                # TODO: Omit enumeration an limit of 500 pairs later
+                tr_data = [json.loads(line).get('pair',[]) for i,line in enumerate(f) if i < 500] 
                 candidates = [item for sublist in tr_data for item in sublist if abs(len(item)- len(text)) < len(text) * 0.3]  # flatten and filter by length
                 probs = [1 / (1 + abs(len(s) - len(text))) for s in candidates]
                 total = sum(probs)
