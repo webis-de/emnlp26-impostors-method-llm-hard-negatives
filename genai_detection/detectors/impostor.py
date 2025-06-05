@@ -196,17 +196,6 @@ class ImpostorDetector(DetectorBase):
     @staticmethod
     def cosine_similarity(vec1, vec2):
         """Calculate cosine similarity between two vectors."""
-        # if vec1 is None or vec2 is None:
-        #     return 0.0
-        # assert len(vec1) == len(vec2), "Vectors must be of the same length."
-        # vec1 = vec1.flatten()
-        # vec2 = vec2.flatten()
-        # dot_product = sum(a * b for a, b in zip(vec1, vec2))
-        # norm_a = sum(a ** 2 for a in vec1) ** 0.5
-        # norm_b = sum(b ** 2 for b in vec2) ** 0.5
-        # if norm_a == 0 or norm_b == 0:
-        #     return 0.0
-        # return dot_product / (norm_a * norm_b)
         return (
             cosine_similarity(vec1, vec2).flatten()[0]
             if vec1 is not None and vec2 is not None
@@ -220,12 +209,6 @@ class ImpostorDetector(DetectorBase):
         assert len(vec1) == len(vec2), "Vectors must be of the same length."
         vec1 = vec1.flatten()
         vec2 = vec2.flatten()
-        # numerator = sum(min(a, b) for a, b in zip(vec1, vec2))
-        # denominator = sum(max(a, b) for a, b in zip(vec1, vec2))
-        # if denominator == 0.0:
-        #     return 0.0
-        # return numerator / denominator
-        # no libraries, but vectorized version is faster
         numerator = np.minimum(vec1, vec2).sum()
         denominator = np.maximum(vec1, vec2).sum()
         return 0.0 if denominator == 0 else numerator / denominator
@@ -286,6 +269,7 @@ class ImpostorDetector(DetectorBase):
             path2_training_data = "../data/datasets/pan23-authorship-verification/pan23-authorship-verification-training-dataset/pairs.jsonl"  # Placeholder path
             path2_training_data = "../data/datasets/pan20-authorship-verification/pan20-authorship-verification-training-dataset/pan20-authorship-verification-training-small.jsonl"
             # TODO: Ensure not same author as imposter (difficult, bc during inference, we don't know the author of the input text)
+            # FIXME: for PAN20 or other big datasets, this will produce OOM errors
             with open(path2_training_data, "r", encoding="utf-8") as f:
                 tr_data = [json.loads(line)['pair'] for line in f] 
                 flattened = [item for sublist in tr_data for item in sublist]
