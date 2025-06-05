@@ -29,7 +29,7 @@ __all__ = [
     "compute_metrics",
 ]
 
-
+# TODO: Change to AV rather than human/machine 
 def compute_metrics(
     logits: np.ndarray,
     labels: t.Union[t.List[int], np.array],
