@@ -14,7 +14,12 @@ class BaseConfig:
 class ServerConfig(BaseConfig):
     SERVER = True
     # TODO: Add server-specific configurations here
-    PATH2PAN25 = "data-in-progress/data-research/authorship/pan24-genai-authorship-verification/dataset-extended-2025/"
+    PATH2PAN20 = "TODO"
+    PATH2PAN23 = "/mnt/ceph/storage/data-in-progress/data-research/authorship/pan23-authorship-verification/"
+    PATH2PAN25 = "/mnt/ceph/storage/data-in-progress/data-research/authorship/pan24-genai-authorship-verification/dataset-extended-2025/"
+    PAN23 = "pan23"
+    PAN25 = "pan25"
+    PAN20 = "pan20"
 
 # Choose config
 ENV = os.getenv("ENV", "local")  # default to "local" if not set
