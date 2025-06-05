@@ -2,7 +2,8 @@ from collections import Counter, defaultdict
 from itertools import batched
 import itertools
 import json
-from random import choices, sample
+from pathlib import Path
+from random import sample
 import re
 from typing import Iterable, List
 import heapq
@@ -193,7 +194,7 @@ class ImpostorDetector(DetectorBase):
         assert (
             tfidf_matrix.shape[0] == 1
         ), "TFIDF matrix should have one row for the single input document."
-        
+
         return tfidf_matrix.toarray()
 
     @staticmethod
@@ -269,19 +270,26 @@ class ImpostorDetector(DetectorBase):
         else:            
             # TODO: Add path to training data
             # pan23-dataset-converted/train/
-            path2_training_data = "../data/datasets/pan23-authorship-verification/pan23-authorship-verification-training-dataset/pairs.jsonl"  # Placeholder path
-            path2_training_data = "../data/datasets/pan20-authorship-verification/pan20-authorship-verification-training-dataset/pan20-authorship-verification-training-small.jsonl"
+            path2_training_data = Path("../data/datasets/pan23-authorship-verification/pan23-authorship-verification-training-dataset/pairs.jsonl")  # Placeholder path
+            path2_training_data = Path("../data/datasets/pan20-authorship-verification/pan20-authorship-verification-training-dataset/pan20-authorship-verification-training-small.jsonl")
+            
+            if not path2_training_data.exists():
+                raise FileNotFoundError(f"Training data not found at {path2_training_data}")
+            
             # TODO: Ensure not same author as imposter (difficult, bc during inference, we don't know the author of the input text)
             # FIXME: for PAN20 or other big datasets, this will produce OOM errors
             with open(path2_training_data, "r", encoding="utf-8") as f:
-                tr_data = [json.loads(line)['pair'] for line in f] 
-                flattened = [item for sublist in tr_data for item in sublist]
-                probs = [1 / (1 + abs(len(s) - len(text))) for s in flattened]
+                tr_data = [json.loads(line).get('pair',[]) for line in f] 
+                candidates = [item for sublist in tr_data for item in sublist if abs(len(item)- len(text)) < len(text) * 0.3]  # flatten and filter by length
+                probs = [1 / (1 + abs(len(s) - len(text))) for s in candidates]
                 total = sum(probs)
                 probs = [prob / total for prob in probs]
 
+            if not candidates:
+                raise ValueError("No suitable impostor candidates found.")
+
           
             # select n random texts of similar length
-            tr_data = choices(flattened, weights=probs, k=min(n, len(flattened)))
+            selected = np.random.choices(a=candidates, p=probs, size=min(n, len(candidates)), replace=False)
             # create a dictionary of impostors
-            return {f"impostor_{i}": tr_data[i] for i in range(n)}
+            return {f"impostor_{i}": tr_data[i] for i in range(selected)}
