@@ -37,6 +37,13 @@ The image is specified in the bash script.
 
 ## Pushing images
 This project's image namespace is `registry.webis.de/code-teaching/theses/artificial-authorship-verification:latest`.
+First, you need to log in to the Webis registry using the following command:
+
+```bash
+docker login registry.webis.de
+```
+
+Then, you can build and push the image using the following command:
 `docker compose build --push` builds the image and pushes it to the Webis registry (using `docker-compose.yaml`).
 Instructions followed during the building process are specified in the `Dockerfile` and `docker-compose.yaml`.
 
