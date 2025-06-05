@@ -7,6 +7,7 @@ from random import sample
 import re
 from typing import Iterable, List, Literal
 import heapq
+from nltk.stem.snowball import SnowballStemmer
 
 import numpy as np
 from nltk import ngrams
@@ -117,9 +118,9 @@ class ImpostorDetector(DetectorBase):
                 continue
           
             # TODO: preprocessing: remove punctuation, lowercasing, remove html tags (e.g., <nl>), etc.?
-
-            tokens_left = self.tokenizer(t[0])
-            tokens_right = self.tokenizer(t[1])
+            # Koppel et Al. (2014) do not normalize text pairs, but without normalization, the results are terrible.
+            tokens_left = self.tokenizer(self.normalize_text(t[0]))
+            tokens_right = self.tokenizer(self.normalize_text(t[1]))
 
             # frequencies as Counter (subclass of defaultdict(int))
             freqs_left = Counter(tokens_left)
@@ -195,6 +196,15 @@ class ImpostorDetector(DetectorBase):
         # one elmenent = averaged score of X,Y and Y,X pair (score=number of rounds where the candidate was the most similar)
         # TODO: threshold is in [0,1], maybe normalize by rounds?
         return list(scores_per_pair.values())
+    
+    def normalize_text(self, text):
+        """
+        Normalize input text by lowercasing and stemming.
+        Koppel et Al. (2014) do (explicitly) not normalize text pairs, but without normalization, the results are terrible.
+        Kocher et Al. (2015) use isolated words without stemming but with punctuation symbols.
+        """
+        stemmer = SnowballStemmer('english')
+        return ' '.join(stemmer.stem(w) for w in text.lower().split())
 
     def get_prediction(self, text: Iterable[str]) -> List[bool]:
         """
@@ -208,7 +218,12 @@ class ImpostorDetector(DetectorBase):
 
     def tokens_to_matrix(self, tokens, top_token_list):
         """
-        Transform list of chunks into matrix of term tfidf values of the top tokens.
+        Transform list of tokens into matrix of term tfidf values of the top tokens.
+        Koppel et Al. (2014) use space-free character 4-grams tfidf values to represent each document as a numerical vector.
+
+        References:
+        ===========
+        Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’.
 
         :param tokens: list of input tokens (e.g., space-free character 4-grams)
         :param top_token_list: list of top tokens to include in the matrix
@@ -285,7 +300,7 @@ class ImpostorDetector(DetectorBase):
     ):
         """
         Tokenize input text into character n-grams.
-        Koppel et Al. (2014) use space-free character 4-grams frequencies to represent each document as a numerical vector.
+        Koppel et Al. (2014) use space-free character 4-grams tfidf values to represent each document as a numerical vector.
         A space-free n-grams is a (1) sequence of n characters without any whitespace in it, (2) a sequence of <= n characters surrounded by spaces.
 
         References:
