@@ -19,10 +19,13 @@ __all__ = ["ImpostorDetector"]
 
 class ImpostorDetector(DetectorBase):
     """
-    LLM detector calculating TODO.
+    The Imposter method extends the ngram-unmasking method.
+    It uses saves the most similar author to the disputed text for each of multiple random feature selection rounds, 
+    where the disputed text is compared not only to the candidate text, but alos to a set of imposter texts.
+    The final prediction is made based on of how often an author is predicted after each feature-elimination step.
 
     The input is a list of texts where text ``i`` and text ``i+1`` belong to a pair.
-    The output is a list of TODO.
+    The output for one document pair is a score for the disputed text and the candidate text (i.e. author).
 
     References:
     ===========
@@ -281,6 +284,8 @@ class ImpostorDetector(DetectorBase):
             # TODO: Add path to training data
             # pan23-dataset-converted/train/
             path2_training_data = "../data/datasets/pan23-authorship-verification/pan23-authorship-verification-training-dataset/pairs.jsonl"  # Placeholder path
+            path2_training_data = "../data/datasets/pan20-authorship-verification/pan20-authorship-verification-training-dataset/pan20-authorship-verification-training-small.jsonl"
+            # TODO: Ensure not same author as imposter (difficult, bc during inference, we don't know the author of the input text)
             with open(path2_training_data, "r", encoding="utf-8") as f:
                 tr_data = [json.loads(line)['pair'] for line in f] 
                 flattened = [item for sublist in tr_data for item in sublist]
