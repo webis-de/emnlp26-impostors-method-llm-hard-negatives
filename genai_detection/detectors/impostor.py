@@ -133,14 +133,14 @@ class ImpostorDetector(DetectorBase):
                 # for different rounds, randomly delete a portion of features (reset in each round)
                 for _ in range(self.rounds):
                     # feature selection: randomly delete a portion of features
-                    rand_feat_to_delete_ids = sample(
+                    rand_feat_to_keep_ids = sample(
                         range(len(top_tokens)),
-                        int(len(top_tokens) * self.portion_delete),
+                        int(len(top_tokens) * (1 - self.portion_delete)),
                     )
                     scores = {
                         c: self.minmax_similarity(
-                            store[unknown]["tfidf"][:, rand_feat_to_delete_ids],
-                            tmp_store[c]["tfidf"][:, rand_feat_to_delete_ids],
+                            store[unknown]["tfidf"][:, rand_feat_to_keep_ids],
+                            tmp_store[c]["tfidf"][:, rand_feat_to_keep_ids],
                         )
                         for c in list(tmp_store.keys())
                     }
@@ -271,7 +271,7 @@ class ImpostorDetector(DetectorBase):
             # TODO: Add path to training data
             # pan23-dataset-converted/train/
             path2_training_data = Path("../data/datasets/pan23-authorship-verification/pan23-authorship-verification-training-dataset/pairs.jsonl")  # Placeholder path
-            path2_training_data = Path("../data/datasets/pan20-authorship-verification/pan20-authorship-verification-training-dataset/pan20-authorship-verification-training-small.jsonl")
+            #path2_training_data = Path("../data/datasets/pan20-authorship-verification/pan20-authorship-verification-training-dataset/pan20-authorship-verification-training-small.jsonl")
             
             if not path2_training_data.exists():
                 raise FileNotFoundError(f"Training data not found at {path2_training_data}")
