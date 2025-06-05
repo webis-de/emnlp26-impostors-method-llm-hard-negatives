@@ -290,6 +290,6 @@ class ImpostorDetector(DetectorBase):
 
           
             # select n random texts of similar length
-            selected = np.random.choices(a=candidates, p=probs, size=min(n, len(candidates)), replace=False)
+            selected = np.random.choice(a=candidates, p=probs, size=min(n, len(candidates)), replace=False)
             # create a dictionary of impostors
             return {f"impostor_{i}": tr_data[i] for i in range(selected)}
