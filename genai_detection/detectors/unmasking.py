@@ -107,7 +107,13 @@ class UnmaskingDetector(DetectorBase):
         for t in batched(text, 2, strict=self.strict):
             tokens_left = self.tokenizer(t[0])
             tokens_right = self.tokenizer(t[1])
-
+            if len(tokens_left) == 0 or len(tokens_right) == 0:
+                print(
+                    "Skipping empty text pair: Left: {}, Right: {}".format(
+                        t[0], t[1])
+                )
+                continue
+            
             chunks_left = self.create_chunks(
                 tokens_left, self.chunk_size, self.bootstrap, self.n_chunks
             )
@@ -225,7 +231,16 @@ class UnmaskingDetector(DetectorBase):
         :return: list of sampled tokens
         """
         # TODO: not proportionally, not full set and then again cf. Generalizing Unmasking for Short Texts, Bevendorff 2019, Chap. 3.2
-        return [tokens[randint(0, len(tokens) - 1)] for _ in range(n_tokens)]
+        try:
+            t = [tokens[randint(0, len(tokens) - 1)] for _ in range(n_tokens)]
+        except ValueError as e:
+            raise ValueError(
+                "Cannot bootstrap tokens from empty sequence. "
+                "Please check your input data."
+                "len(tokens) = {}.".format(len(tokens))
+
+            ) from e
+        return t
 
     @classmethod
     def create_chunks(cls, tokens, chunk_size, bootstrap=False, n_chunks=None):
