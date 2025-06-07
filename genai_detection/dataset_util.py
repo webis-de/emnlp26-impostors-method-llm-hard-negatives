@@ -4,8 +4,12 @@ import json
 from pathlib import Path
 from collections import Counter
 from abc import ABC, abstractmethod
+import re
+import sys
+import unicodedata
 
 from datasets import Dataset, DatasetDict, ClassLabel, Features, Value
+import pandas as pd
 from tqdm import tqdm
 
 # === BASE CLASS ===
@@ -28,6 +32,34 @@ class BaseDatasetLoader(ABC):
     def _load_ids(path: str):
         with open(path, "r", encoding="utf-8") as f:
             return set(line.strip() for line in f if line.strip())
+        
+
+# === Koppel Webis LOADER ===
+
+class KoppelWebisDatasetLoader(BaseDatasetLoader):
+    def __init__(self, path: str, name: str = "koppel-webis"):
+        super().__init__(name=name)
+        self.path = Path(path)
+
+    def load(self) -> DatasetDict:
+        data = []
+        for author in self.path.iterdir():
+            if author.is_dir():
+                for file in author.iterdir():
+                    if file.is_file() and file.suffix == '.txt':
+                        with open(file, 'r', encoding='utf-8', errors='replace') as f:
+                            content = f.read()
+                            content = unicodedata.normalize("NFKC", content)
+                            content = re.sub(r"[^\x00-\x7F]+", " ", content)
+                            content = re.sub(r"\s+", " ", content)
+                            content = content.strip().lower()
+                            data.append({'author': author.name, 'text': content})
+        #df = pd.DataFrame(data)
+        features = Features({
+            "text": Value("string"),
+            "author": Value("string"),
+        })
+        return DatasetDict({"train": Dataset.from_list(data, features=features)})
 
 
 # === PAN23 LOADER ===
@@ -199,6 +231,15 @@ def run_pan25():
     dataset.save_to_disk(output_dir)
     # print("PAN25 example:", dataset["train"][0])
 
+def run_koppel_webis():
+    base_dir = "data/datasets/corpus-webis-authorship/koppel/"
+    output_dir = os.path.join(base_dir, "koppel-webis-dataset-converted")
+
+    loader = KoppelWebisDatasetLoader(path=base_dir)
+    dataset = loader.load()
+    dataset.save_to_disk(output_dir)
+    # print("Koppel Webis example:", dataset["train"][0])
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -219,6 +260,7 @@ if __name__ == "__main__":
    
     args = parser.parse_args()
 
-    run_pan23(base_dir=args.path, save_path=args.out)
+    # run_pan23(base_dir=args.path, save_path=args.out)
     # run_pan25()
     # run_pan20()
+    run_koppel_webis()

@@ -6,6 +6,7 @@ class BaseConfig:
     PATH2PAN25 = "data/datasets/pan25-genai-identification/pan25-dataset-converted"
     PATH2PAN23 = "data/datasets/pan23-authorship-verification/pan23-dataset-converted"
     PATH2PAN20 = "data/datasets/pan20-authorship-verification/pan20-dataset-converted"
+    PATH2KOPPEL_WEBIS = "data/datasets/corpus-webis-authorship/koppel/koppel-webis-dataset-converted"
     SAVE_PATH = "results/"
     PAN23 = "pan23"
     PAN25 = "pan25"
