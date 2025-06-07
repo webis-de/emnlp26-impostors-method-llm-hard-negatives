@@ -120,8 +120,13 @@ class ImpostorDetector(DetectorBase):
             # TODO: preprocessing: remove punctuation, lowercasing, remove html tags (e.g., <nl>), etc.?
             # Koppel et Al. (2014) do not normalize text pairs, but without normalization, the results are terrible. 
             # Does not make sense, bc 	idiosyncrasies of authors are not captured when using stemmed text.
+            # Kontrolliere Situation
             tokens_left = self.tokenizer(self.normalize_text(t[0]))
             tokens_right = self.tokenizer(self.normalize_text(t[1]))
+
+            if len(tokens_left) == 0 or len(tokens_right) == 0:
+                print("Skipping empty text pair: Left: {}, Right: {}".format(t[0], t[1]))
+                continue
 
             # frequencies as Counter (subclass of defaultdict(int))
             freqs_left = Counter(tokens_left)
