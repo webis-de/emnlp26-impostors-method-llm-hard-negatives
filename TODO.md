@@ -17,9 +17,10 @@
   - Small dataset is **okay**
 
 - Sources:
-  - [ ] **Gutenberg books** (same vs. different author) — long text quality example  
+  - [x] **Gutenberg books** (same vs. different author) — long text quality example  
+    - Koppel Webis dataset contains texts also present in Gutenberg
     - [ ] Imposter  
-    - [ ] Unmasking  
+    - [x] Unmasking  
   - [ ] **Fanfiction dataset (PAN)**  
     - [ ] Imposter  
     - [ ] Unmasking  
