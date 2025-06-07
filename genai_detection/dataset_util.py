@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from collections import Counter
 from abc import ABC, abstractmethod
+import random
 import re
 import sys
 import unicodedata
@@ -34,6 +35,83 @@ class BaseDatasetLoader(ABC):
         with open(path, "r", encoding="utf-8") as f:
             return set(line.strip() for line in f if line.strip())
         
+
+# === Blog Corpus LOADER ===
+        
+class BlogCorpusDatasetLoader(BaseDatasetLoader):
+    def __init__(self, path: str, name: str = "blog-corpus"):
+        """Loader for the Blog Corpus dataset.
+        
+        Originally dataset is available at: https://www.kaggle.com/datasets/rtatman/blog-authorship-corpus?resource=download (07.06.2025)
+        """
+        super().__init__(name=name)
+        self.path = Path(path)
+
+    def load(self) -> Dataset:
+        df = pd.read_csv(self.path)
+        topic_groups = df.groupby('topic')
+        n_pairs = 5
+
+        features = Features({
+            "pair": [Value("string")],
+            "authors": [Value("string")],
+            "same": Value("bool")
+        })
+
+        all_pairs = []
+
+        for topic, group in topic_groups:
+            data = group.to_dict(orient='records')
+
+            # Group texts by author id
+            author_groups = {}
+            for item in data:
+                author_groups.setdefault(item['id'], []).append(item)
+
+            # One same-author pair per topic (if possible)
+            same_pair = None
+            for author, texts in author_groups.items():
+                if len(texts) < 2:
+                    continue
+                text_pairs = random.sample(texts, min(n_pairs*2, len(texts)))
+                random.shuffle(text_pairs)   # avoid systematic bias
+                
+                for i in range(0, len(text_pairs) - 1, 2):
+                    a = text_pairs[i]
+                    b = text_pairs[i + 1]
+                    all_pairs.append({
+                        "pair": [a['text'], b['text']], # FIXME: maybe directly text
+                        "authors": [author, author],#[a['id'], b['id']],
+                        "same": True
+                    })
+              
+
+               
+
+            # One different-author pair per topic (if possible)
+            diff_pair = None
+            authors = list(author_groups.keys())
+            if len(authors) > 1:
+                authors = random.sample(authors, min(n_pairs*2, len(authors)))
+                for i in range(0, len(authors) - 1, 2):
+                    a1 = authors[i]
+                    a2 = authors[i + 1]
+                    if a1 == a2 or len(author_groups[a1]) < 1 or len(author_groups[a2]) < 1:
+                        continue
+                    # Randomly select one text from each author
+                    t1 = random.choice(author_groups[a1])
+                    t2 = random.choice(author_groups[a2])
+
+                    all_pairs.append({
+                        "pair": [t1['text'], t2['text']], # FIXME: maybe directly text
+                        "authors": [a1, a2],
+                        "same": False
+                    })
+                   
+
+        return DatasetDict({"train": Dataset.from_list(all_pairs, features=features)})
+
+
 
 # === Koppel Webis LOADER ===
 
@@ -250,6 +328,15 @@ def run_koppel_webis():
     dataset.save_to_disk(output_dir)
     # print("Koppel Webis example:", dataset["train"][0])
 
+def run_blog_corpus():
+    sys.path.append(os.path.abspath(".."))
+    base_dir = Path("data/datasets/Blog_corpus/")
+    output_dir = base_dir / "blog-dataset-converted"
+
+    loader = BlogCorpusDatasetLoader(path=base_dir / "blogtext.csv")
+    dataset = loader.load()
+    dataset.save_to_disk(output_dir)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -273,4 +360,5 @@ if __name__ == "__main__":
     # run_pan23(base_dir=args.path, save_path=args.out)
     # run_pan25()
     # run_pan20()
-    run_koppel_webis()
+    # run_koppel_webis()
+    run_blog_corpus()

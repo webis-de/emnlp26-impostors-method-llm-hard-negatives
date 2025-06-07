@@ -7,11 +7,13 @@ class BaseConfig:
     PATH2PAN23 = "data/datasets/pan23-authorship-verification/pan23-dataset-converted"
     PATH2PAN20 = "data/datasets/pan20-authorship-verification/pan20-dataset-converted"
     PATH2KOPPEL_WEBIS = "data/datasets/corpus-webis-authorship/koppel/koppel-webis-dataset-converted"
+    PATH2BLOG = "data/datasets/Blog_corpus/blog-dataset-converted"
     SAVE_PATH = "results/"
     PAN23 = "pan23"
     PAN25 = "pan25"
     PAN20 = "pan20"
     KOPPEL = "koppel"
+    BLOG = "blog"
 
 class ServerConfig(BaseConfig):
     SERVER = True
