@@ -11,6 +11,7 @@ class BaseConfig:
     PAN23 = "pan23"
     PAN25 = "pan25"
     PAN20 = "pan20"
+    KOPPEL = "koppel"
 
 class ServerConfig(BaseConfig):
     SERVER = True

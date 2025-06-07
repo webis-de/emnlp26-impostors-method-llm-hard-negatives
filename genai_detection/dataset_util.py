@@ -1,4 +1,5 @@
 import argparse
+from itertools import combinations
 import os
 import json
 from pathlib import Path
@@ -54,12 +55,21 @@ class KoppelWebisDatasetLoader(BaseDatasetLoader):
                             content = re.sub(r"\s+", " ", content)
                             content = content.strip().lower()
                             data.append({'author': author.name, 'text': content})
-        #df = pd.DataFrame(data)
+        pairs = []
+        for a, b in combinations(data, 2):
+            pairs.append({
+                "pair": [a["text"], b["text"]],
+                "authors": [a["author"], b["author"]],
+                "same": a["author"] == b["author"]
+            })
+
+        # Define the structure for Hugging Face datasets
         features = Features({
-            "text": Value("string"),
-            "author": Value("string"),
+            "pair": [Value("string")],
+            "authors": [Value("string")],
+            "same": Value("bool")
         })
-        return DatasetDict({"train": Dataset.from_list(data, features=features)})
+        return DatasetDict({"train": Dataset.from_list(pairs, features=features)})
 
 
 # === PAN23 LOADER ===
