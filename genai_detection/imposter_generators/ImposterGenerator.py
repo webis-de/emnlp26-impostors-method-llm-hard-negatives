@@ -30,38 +30,68 @@ class BaseImposterGenerator(ABC):
 
 
 class GoogleSearchImposterGenerator(BaseImposterGenerator):
-    def __init__(self, api_key: str, num_queries: int = 50, results_per_query: int = 25, max_workers: int = 10):
+    def __init__(self, api_key: str, num_queries: int = 50, results_per_query: int = 25, max_workers: int = 10, n_min_words: int = 3, n_max_words: int = 5):
         self.api_key = api_key
         self.num_queries = num_queries
         self.results_per_query = results_per_query
         self.max_workers = max_workers
+        self.n_min_words = n_min_words
+        self.n_max_words = n_max_words
+        assert self.n_min_words < self.n_max_words, "n_min_words must be less than n_max_words"
         self.nlp = spacy.load("en_core_web_sm")
 
-    def extract_features(self, text: str, low: int = 2, high: int = 10) -> List[str]:
+    def get_medium_frequency_words(self, text: str, lower_pct: int = 30, upper_pct: int = 70) -> List[str]:
+        """
+        Extracts medium frequency words from the input text.
+        Medium frequency words are defined as those that fall between the lower and upper percentiles of word frequencies in the text.
+        :param text: input text to extract medium frequency words from
+        :param lower_pct: lower percentile threshold for word frequency (default: 30)
+        :param upper_pct: upper percentile threshold for word frequency (default: 70)
+        :return: list of medium frequency words
+        """
         doc = self.nlp(text.lower())
-        words = [token.text for token in doc if token.is_alpha and not token.is_stop]
-        freq = Counter(words)
-        return [word for word, count in freq.items() if low <= count <= high]
+        words = [token.text for token in doc if token.is_alpha and not token.is_stop]   # filter out stop words and non-alphabetic tokens
+        freq_counter = Counter(words)
+        freqs = np.array(list(freq_counter.values()))
+    
+        # Compute dynamic thresholds
+        low_thresh = np.percentile(freqs, lower_pct)
+        high_thresh = np.percentile(freqs, upper_pct)
+        return [word for word, count in freq_counter.items() if low_thresh <= count <= high_thresh]   # medium frequency words
 
-    def _generate_imposters(self, features: List[str]) -> List[str]:
+    def _generate_queries_based_on_candidate_words(self, candidate_words: List[str]) -> List[str]:
+        """
+        Generates a list of queries using random combinations of candidate words. Each query is a string and will have a random number of words between n_min_words and n_max_words separated by whitespaces.
+        :param candidate_words: list of candidate words to use for generating queries
+        :return: list of generated queries
+        """
         queries = []
+        assert len(candidate_words) >= self.n_min_words, f"Not enough candidate words to generate queries, at {self.n_min_words} necessary."
         for _ in range(self.num_queries):
-            query_words = random.sample(features, random.randint(3, 5))
+            query_words = random.sample(candidate_words, random.randint(self.n_min_words, self.n_max_words))
             queries.append(" ".join(query_words))
         return queries
 
     def fetch_results(self, query: str) -> List[Dict]:
+        """
+        Fetches search results for a given query using the SerpAPI Google Search API.
+        :param query: search query to fetch results for
+        :return: list of dictionaries containing search results with keys: 'query', 'title', 'url', 'snippet', and 'position'
+        """
+        assert query, "No query to fetch results for."
+        if not self.api_key:
+            raise ValueError("API key for SerpAPI is not provided.")
         try:
             params = {
-                "q": query,
+                "q": query, # the search query, eg. "coffee"
                 "num": self.results_per_query,
                 "api_key": self.api_key,
-                "engine": "google",
+                "engine": "google_light",
             }
             search = GoogleSearch(params)
             results = search.get_dict()
             return [
-                {"query": query, "title": res.get("title"), "url": res.get("link")}
+                {"query": query, "title": res.get("title"), "url": res.get("link"), "snippet": res.get("snippet"), "position": res.get("position")}
                 for res in results.get("organic_results", [])
             ]
         except Exception as e:
@@ -69,6 +99,11 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
             return []
 
     def _parallel_fetch(self, queries: List[str]) -> List[Dict]:
+        """
+        Fetches results for multiple queries in parallel using a thread pool.
+        :param queries: list of search queries to fetch results for
+        :return: list of dictionaries containing search results for all queries
+        """
         all_results = []
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = {executor.submit(self.fetch_results, query): query for query in queries}
@@ -77,8 +112,13 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
         return all_results
 
     def generate_imposters(self, text: str) -> pd.DataFrame:
-        features = self.extract_features(text)
-        queries = self._generate_imposters(features)
+        """
+        Generates impostors for the given input text by fetching search results based on medium frequency words extracted from the text.
+        :param text: input text to generate impostors for
+        :return: DataFrame containing search results with columns: 'query', 'title', 'url', 'snippet' (i.e. short content summary of search result), and 'position' (i.e. number of result in the search results)
+        """
+        medium_frequency_words = self.get_medium_frequency_words(text)
+        queries = self._generate_queries_based_on_candidate_words(medium_frequency_words)
         results = self._parallel_fetch(queries)
         return pd.DataFrame(results)
     
