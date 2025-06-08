@@ -25,8 +25,12 @@
     - [ ] Imposter  
     - [ ] Unmasking  
   - [ ] **Koppel et al. (2014) dataset**  
-    - [ ] Imposter  
-    - [ ] Unmasking  
+    - [x] (Blog posts)[https://www.kaggle.com/datasets/rtatman/blog-authorship-corpus?resource=download]
+      - [ ] Imposter  
+      - [x] Unmasking  
+    - [ ] Student essays 
+      - [ ] Imposter  
+      - [ ] Unmasking  
   - [ ] **Paraphrasing approaches** at PAN and ELOQUENT  
 
 ---
