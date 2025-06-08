@@ -176,6 +176,10 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
         :param path2imp (str or Path, optional): Path to save the CSV. If a directory or None, appends a timestamped filename.
 
         :return: DataFrame containing search results with columns: 'query', 'title', 'url', 'snippet' (i.e. short content summary of search result), and 'position' (i.e. number of result in the search results)
+
+        References:
+        ===========
+        Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’. Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
         """
         if not isinstance(text, str) or not text.strip():
             raise ValueError("Input text must be a non-empty string.")
@@ -206,7 +210,11 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
         
         
         # TODO: generate imposters based on results
-        return False
+        # aggregate results' texts, preferably using full_text, if empty use snippet and return a list of texts
+        imposter_texts = result_df['full_text'].dropna().tolist()
+        imposter_texts.extend(result_df[result_df['full_text'].isna()]['snippet'].dropna().tolist())
+
+        return imposter_texts
         
     
 class TextLenImposterGenerator(BaseImposterGenerator):
