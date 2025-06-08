@@ -55,7 +55,7 @@ class ImpostorDetector(DetectorBase):
         tfidf_freqs=True,
         n_impostors=25,
         threshold=0.1,
-        imposter_technique: Literal["llm", "text_len", "n_docs", "on-the-fly", "blogs"] = "text_len",
+        imposter_technique: Literal["llm", "text_len", "n_docs", "on-the-fly", "blogs", "fixed"] = "text_len",
         path2imp: str = CONFIG.PATH2GENERIC_ON_FLY_IMP,  # path to impostor file, where fixed impostors are saved or where to save generated impostors
         real_time_generation: bool = False,  # whether to generate impostors in real-time or use pre-generated ones
     ):
@@ -95,12 +95,8 @@ class ImpostorDetector(DetectorBase):
             # TODO: I need author names for this
             self.imposter_generator = ImposterGenerator.NDocsImposterGenerator(n_impostors=self.n_impostors)
         elif imposter_technique == "fixed":
-            self.imposter_generator = ImposterGenerator.FixedImposterGenerator(
-                n_impostors=self.n_impostors,
-                imposter_file=Path(__file__).parent / "imposters.json"
-            )
+            self.imposter_generator = ImposterGenerator.FixedImposterGenerator(n_impostors=self.n_impostors)
         elif imposter_technique == "on-the-fly":
-            # TODO: add secret API key for Google Search
             self.imposter_generator = ImposterGenerator.GoogleSearchImposterGenerator(api_key=CONFIG.SERPAPI_KEY)
         elif imposter_technique == "blogs":
             self.imposter_generator = ImposterGenerator.BlogImposterGenerator(n_impostors=self.n_impostors)
@@ -203,7 +199,7 @@ class ImpostorDetector(DetectorBase):
                 scores_over_different_rounds = 0
                 # get imposters for the candidate text, NOT the disputed text
                 impostor_candidates =  self.imposter_generator.generate_imposters(store[candidate]["text"], real_time_generation=self.real_time_generation, path2imp=self.path2imp)
-
+ 
                 tmp_store = {
                     impostor_name: {
                         "tfidf": self.tokens_to_matrix(
