@@ -2,9 +2,11 @@ from collections import Counter, defaultdict
 from itertools import batched
 import itertools
 import json
+import os
 from pathlib import Path
 from random import sample
 import re
+import sys
 from typing import Iterable, List, Literal
 import heapq
 from nltk.stem.snowball import SnowballStemmer
@@ -19,6 +21,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from genai_detection.detectors.detector_base import DetectorBase
 from genai_detection.imposter_generators import ImposterGenerator
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+from config import CONFIG
 
 __all__ = ["ImpostorDetector"]
 
@@ -52,6 +56,8 @@ class ImpostorDetector(DetectorBase):
         n_impostors=25,
         threshold=0.1,
         imposter_technique: Literal["llm", "text_len", "n_docs", "on-the-fly", "blogs"] = "text_len",
+        path2imp: str = CONFIG.PATH2GENERIC_ON_FLY_IMP,  # path to impostor file, where fixed impostors are saved or where to save generated impostors
+        real_time_generation: bool = False,  # whether to generate impostors in real-time or use pre-generated ones
     ):
         """
         :param rounds: number of random feature selection rounds, Koppel et Al. (2014) use 100
@@ -69,6 +75,8 @@ class ImpostorDetector(DetectorBase):
             - "fixed": use a fixed set of impostors (Koppel et. A. (2014), not implemented yet), imposters are not related to the input text
             - "on-the-fly": generate same-topic impostors on-the-fly (Koppel et. Al. (2014), not implemented yet)
             - "blogs": use blogs to obtain same genre impostors (Koppel et. Al. (2014), not implemented yet)
+        :param path2imp: path to the impostor file, where fixed impostors are saved or where to save generated impostors
+        :param real_time_generation: whether to generate impostors in real-time or use pre-generated ones (default: False, i.e. use pre-generated impostors)
         """
 
         self.rounds = rounds
@@ -79,6 +87,8 @@ class ImpostorDetector(DetectorBase):
         self.tfidf_freqs = tfidf_freqs
         self.tokenizer = tokenizer or self.tokenize_char_ngrams
         self.threshold = threshold
+        self.path2imp = path2imp
+        self.real_time_generation = real_time_generation
         if imposter_technique == "llm":
             raise NotImplementedError("LLM-based impostor generation is not implemented.")
         elif imposter_technique == "n_docs":
@@ -192,7 +202,7 @@ class ImpostorDetector(DetectorBase):
             ):
                 scores_over_different_rounds = 0
                 # get imposters for the candidate text, NOT the disputed text
-                impostor_candidates =  self.imposter_generator.generate_imposters(store[candidate]["text"])
+                impostor_candidates =  self.imposter_generator.generate_imposters(store[candidate]["text"], real_time_generation=self.real_time_generation, path2imp=self.path2imp)
 
                 tmp_store = {
                     impostor_name: {
