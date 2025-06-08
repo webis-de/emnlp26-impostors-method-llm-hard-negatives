@@ -360,12 +360,17 @@ class FixedImposterGenerator(BaseImposterGenerator):
         return imposters
 
 
-class BlogImposterGenerator(BaseImposterGenerator):
+class BlogImposterGenerator(FixedImposterGenerator):
     def __init__(self, n_impostors: int):
-        self.n_impostors = n_impostors
+        super().__init__(n_impostors=n_impostors, split='train')    # Blog has only train split
 
     def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> List[str]:
-        pass
+        """Generates imposters from the Blog dataset.
+        :param text: input text to generate imposters for (not used in this implementation)
+        :param path2imp: not used in this implementation, but kept for interface consistency
+        :param real_time_generation: not used in this implementation, but kept for interface consistency
+        :return: dictionary of imposters with keys as ids and values as texts"""
+        return super().generate_imposters(text=text, path2imp=os.path.join(os.path.abspath(".."), CONFIG.PATH2BLOG), real_time_generation=real_time_generation)
 
         
        
