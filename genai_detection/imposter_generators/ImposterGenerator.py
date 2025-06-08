@@ -41,7 +41,22 @@ class BaseImposterGenerator(ABC):
 
 
 class GoogleSearchImposterGenerator(BaseImposterGenerator):
-    def __init__(self, api_key: str, num_queries: int = 50, results_per_query: int = 25, max_workers: int = 10, n_min_words: int = 3, n_max_words: int = 5):
+    def __init__(self, api_key: str, num_queries: int = 2, results_per_query: int = 25, max_workers: int = 2, n_min_words: int = 3, n_max_words: int = 5):
+        """
+        Configuration from Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’. Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954 is:
+        - num_queries: 50
+        - results_per_query: 25
+        - max_workers: -
+        - n_min_words: 3
+        - n_max_words: 5
+        
+        :param api_key: API key for SerpAPI Google Search API
+        :param num_queries: number of queries to generate (default: 2)
+        :param results_per_query: number of results to fetch per query (default: 25)
+        :param max_workers: maximum number of threads to use for parallel fetching (default: 2)
+        :param n_min_words: minimum number of words in a query (default: 3)
+        :param n_max_words: maximum number of words in a query (default: 5)
+        """
         self.api_key = api_key
         self.num_queries = num_queries
         self.results_per_query = results_per_query
@@ -210,7 +225,15 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
             path2imp.parent.mkdir(parents=True, exist_ok=True)
             result_df.to_csv(path2imp, index=False)
         else:   # use precomputed results
+            # TODO for debugging purposes, delete later:
+            if 'PUCK' in text:  # Midsummer Night's Dream
+                path2imp = path2imp / 'imposter_A_Midsummer_Nights_Dream_William_Shakespeare_results_20250608_201352.csv'
+            elif 'Frankenstein' in text:  # Frankenstein
+                path2imp = path2imp / 'imposter_Frankenstein_Mary_Wollstonecraft_(Godwin)_Shelley_results_20250608_145350.csv'
+            else: # A Lovers Complaint
+                path2imp = path2imp / 'imposter_A_Lovers_Complaint_William_Shakespeare_results_20250608_202134.csv'
             result_df = pd.read_csv(path2imp)
+
         
         # aggregate results' texts, preferably using full_text, if empty use snippet and return a list of texts
         imposter_texts = {
@@ -233,7 +256,7 @@ class TextLenImposterGenerator(BaseImposterGenerator):
     def __init__(self, n_imposter: int):
         self.n_imposter = n_imposter
 
-    def generate_imposters(self, text: str) -> List[str]:
+    def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> List[str]:
         # TODO: Add path to training data
         # pan23-dataset-converted/train/
         path2_training_data = Path("../data/datasets/pan23-authorship-verification/pan23-authorship-verification-training-dataset/pairs.jsonl")  # Placeholder path
@@ -271,7 +294,7 @@ class NDocsImposterGenerator(BaseImposterGenerator):
         """
         self.n_imposter = n_imposter
 
-    def generate_imposters(self, text: str) -> List[str]:
+    def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> List[str]:
         pass
 
 
@@ -279,7 +302,7 @@ class LLMImposterGenerator(BaseImposterGenerator):
     def __init__(self, n_imposter: int):
         self.n_imposter = n_imposter
 
-    def generate_imposters(self, text: str) -> List[str]:
+    def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> List[str]:
         pass
 
 
@@ -290,7 +313,7 @@ class FixedImposterGenerator(BaseImposterGenerator):
         if not self.imposter_file.exists():
             raise FileNotFoundError(f"Imposter file not found at {self.imposter_file}")
 
-    def generate_imposters(self, text: str) -> List[str]:
+    def generate_imposters(self, text: str, real_time_generation:bool=False) -> List[str]:
         pass
 
 
@@ -298,25 +321,73 @@ class BlogImposterGenerator(BaseImposterGenerator):
     def __init__(self, n_imposter: int):
         self.n_imposter = n_imposter
 
-    def generate_imposters(self, text: str) -> List[str]:
+    def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> List[str]:
         pass
 
 
-        
+def extract_results_from_file(path: Path, generator) -> pd.DataFrame:
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    
+    query = data.get("search_parameters", {}).get("q", "unknown_query")
+    
+    records = []
+    for res in data.get("organic_results", []):
+        records.append({
+            "query": query,
+            "title": res.get("title"),
+            "url": res.get("link"),
+            "snippet": res.get("snippet"),
+            "rich_snippet": res.get("rich_snippet", ""),
+            "author": res.get("author", "unknown"),
+            "position": res.get("position"),
+            "full_text": generator._extract_text_from_url(res.get("link"))
+        })
+    
+    return pd.DataFrame(records)
 
         
        
 # Example usage
 if __name__ == "__main__":
-    artwork_name = "Frankenstein_Mary_Wollstonecraft_(Godwin)_Shelley.txt"
-    #"A_Midsummer_Nights_Dream_William_Shakespeare.txt"#"A_Lovers_Complaint_William_Shakespeare.txt"
-    path2lovers_shakespeare = Path(CONFIG.PATH2GUTENBERG) / artwork_name
-    with open(path2lovers_shakespeare) as f:
-        input_text = f.read()
+    # artwork_name = "Frankenstein_Mary_Wollstonecraft_(Godwin)_Shelley.txt"
+    # #"A_Midsummer_Nights_Dream_William_Shakespeare.txt"#"A_Lovers_Complaint_William_Shakespeare.txt"
+    # path2lovers_shakespeare = Path(CONFIG.PATH2GUTENBERG) / artwork_name
+    # with open(path2lovers_shakespeare) as f:
+    #     input_text = f.read()
 
-    generator = GoogleSearchImposterGenerator(api_key=CONFIG.SERPAPI_KEY, num_queries=2, results_per_query=25, max_workers=2, n_min_words=3, n_max_words=5)
-    imposters = generator.generate_imposters(input_text, path2imp=Path(CONFIG.PATH2GENERIC_ON_FLY_IMP) / f"imposter_{artwork_name.split('.')[0]}_results.csv")
-    print(f"Generated {len(imposters)} imposters for {artwork_name}:")
+    generator = GoogleSearchImposterGenerator(api_key='CONFIG.SERPAPI_KEY', num_queries=2, results_per_query=25, max_workers=2, n_min_words=3, n_max_words=5)
+    # imposters = generator.generate_imposters(input_text, path2imp=Path(CONFIG.PATH2GENERIC_ON_FLY_IMP) / f"imposter_{artwork_name.split('.')[0]}_results.csv")
+    # print(f"Generated {len(imposters)} imposters for {artwork_name}:")
 
-    for imposter_name, imposter_text in imposters.items():
-        print(f"Imposter {imposter_name}: {imposter_text[:100]}...")  # Print first 100 characters of each imposter
+    # for imposter_name, imposter_text in imposters.items():
+    #     print(f"Imposter {imposter_name}: {imposter_text[:100]}...")  # Print first 100 characters of each imposter
+
+    file1 = Path("/Users/klara/Downloads/lovers01.json")
+    file2 = Path("/Users/klara/Downloads/lovers02.json")  
+
+    # Extract data
+    df1 = extract_results_from_file(file1, generator)
+    df2 = extract_results_from_file(file2, generator)
+
+    # Create DataFrame
+    result_df = pd.concat([df1, df2], ignore_index=True)
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    path2imp = Path(CONFIG.PATH2GUTENBERG) / "on_the_fly_imp" / f"imposter_A_Lovers_Complaint_William_Shakespeare_results_{timestamp}.csv"
+    if path2imp is None:
+        path2imp = Path(CONFIG.PATH2GENERIC_ON_FLY_IMP) 
+    else:
+        path2imp = Path(path2imp)
+    if path2imp.suffix != ".csv" or path2imp.is_dir():
+        if path2imp.is_file():
+            path2imp = path2imp.with_suffix(".csv")
+        else:
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            path2imp = path2imp / f"google_on_fly_imposter_results_{timestamp}.csv"
+
+    path2imp.parent.mkdir(parents=True, exist_ok=True)
+    result_df.to_csv(path2imp, index=False)
+
+    # Display preview
+    print(result_df.head())
+
