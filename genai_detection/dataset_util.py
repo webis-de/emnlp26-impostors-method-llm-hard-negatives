@@ -49,8 +49,12 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
 
     def load(self) -> Dataset:
         df = pd.read_csv(self.path)
+        print("Initial number of entries:", len(df))
+        df = df[df['text'].apply(lambda x: len(re.sub(r'\s+', ' ', x).strip()) > 500)]
+        print("number of entries after filtering:", len(df))
+      
         topic_groups = df.groupby('topic')
-        n_pairs = 5
+        n_pairs = 2
 
         features = Features({
             "pair": [Value("string")],
@@ -69,7 +73,6 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
                 author_groups.setdefault(item['id'], []).append(item)
 
             # One same-author pair per topic (if possible)
-            same_pair = None
             for author, texts in author_groups.items():
                 if len(texts) < 2:
                     continue
