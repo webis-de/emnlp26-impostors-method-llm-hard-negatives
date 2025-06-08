@@ -185,6 +185,14 @@ class Pan23DatasetLoader(BaseDatasetLoader):
 
 class Pan20DatasetLoader(Pan23DatasetLoader):
     def __init__(self, train_dir: str, test_dir: str):
+        """
+        Loader for the PAN 2020 Authorship Verification dataset about fanfiction.
+        The dataset is available at: https://zenodo.org/records/5106099 (08.06.2025)
+        
+        References:
+        =========
+        Sebastian Bischoff, Niklas Deckers, Marcel Schliebs, Ben Thies, Matthias Hagen, Efstathios Stamatatos, Benno Stein, and Martin Potthast. The Importance of Suppressing Domain Style in Authorship Analysis. CoRR, abs/2005.14714, May 2020.
+        """
         super().__init__(name="pan20", train_dir=train_dir, test_dir=test_dir)
 
     def _load_dataset_from_directory(self, directory_path: str) -> Dataset:
@@ -203,6 +211,26 @@ class Pan20DatasetLoader(Pan23DatasetLoader):
         return Dataset.from_list(merged_data)
 
 
+# === PAN24 LOADER ===
+
+
+class Pan24DatasetLoader(BaseDatasetLoader):
+    def __init__(self, train_dir: str, test_dir: str, name: str = "pan24"):
+        """
+        Loader for the PAN 2024 Authorship Verification dataset.
+        Dataset download at https://zenodo.org/records/10718757 (08.06.2025), restricted access.
+        The dataset contains human and machine-generated texts on news articles.
+        """
+        super().__init__(name=name)
+        self.train_dir = train_dir
+        self.test_dir = test_dir
+
+    def load(self) -> DatasetDict:
+        # TODO: Implement the loading logic for PAN24 dataset
+        pass
+
+
+
 # === PAN25 LOADER ===
 
 
@@ -215,6 +243,11 @@ class Pan25DatasetLoader(BaseDatasetLoader):
         test_ids_path: str,
         model_name_parent: int = 1,
     ):
+        """
+        Loader for the PAN 2025 Authorship Verification dataset.
+        More information found at https://pan.webis.de/clef25/pan25-web/generated-content-analysis.html (08.06.2025)
+        The dataset from subtask 1 contains human and machine-generated texts, with IDs for training and testing.
+        """
         super().__init__("pan25")
         self.human_dir = human_dir
         self.machine_dir = machine_dir
