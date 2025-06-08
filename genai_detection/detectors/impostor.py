@@ -8,6 +8,8 @@ import re
 from typing import Iterable, List, Literal
 import heapq
 from nltk.stem.snowball import SnowballStemmer
+import pandas as pd
+from collections import Counter
 
 import numpy as np
 from nltk import ngrams
@@ -16,6 +18,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from genai_detection.detectors.detector_base import DetectorBase
+from genai_detection.imposter_generators import ImposterGenerator
 
 __all__ = ["ImpostorDetector"]
 
@@ -48,6 +51,7 @@ class ImpostorDetector(DetectorBase):
         tfidf_freqs=True,
         n_impostors=25,
         threshold=0.1,
+        imposter_technique: Literal["llm", "text_len", "n_docs", "on-the-fly", "blogs"] = "text_len",
     ):
         """
         :param rounds: number of random feature selection rounds, Koppel et Al. (2014) use 100
@@ -58,6 +62,13 @@ class ImpostorDetector(DetectorBase):
         :param tfidf_freqs: use tfidf term frequencies (Koppel et Al. (2014) use tfidf)
         :param n_impostors: number of impostors to use for each candidate TODO: allow specification type of LLM impostors; Koppel et Al. (2014) use 25 impostors
         :param threshold: threshold for the minimum similarity score to consider two texts same-author, TODO: not used yet, Koppel et Al. (2014) use 0.1
+        :param imposter_technique: which technique to use to generate impostors. Options are:
+            - "llm": use LLMs to generate impostors to control both topic and genre (our contribution, not implemented yet)
+            - "text_len": generate impostors of similar length from a predefined dataset (our baseline w/o reference, default)
+            - "n_docs": generate impostors based on the number of documents written by the author (Kocher et Al. (2015), not implemented yet)
+            - "fixed": use a fixed set of impostors (Koppel et. A. (2014), not implemented yet), imposters are not related to the input text
+            - "on-the-fly": generate same-topic impostors on-the-fly (Koppel et. Al. (2014), not implemented yet)
+            - "blogs": use blogs to obtain same genre impostors (Koppel et. Al. (2014), not implemented yet)
         """
 
         self.rounds = rounds
@@ -68,6 +79,24 @@ class ImpostorDetector(DetectorBase):
         self.tfidf_freqs = tfidf_freqs
         self.tokenizer = tokenizer or self.tokenize_char_ngrams
         self.threshold = threshold
+        if imposter_technique == "llm":
+            raise NotImplementedError("LLM-based impostor generation is not implemented.")
+        elif imposter_technique == "n_docs":
+            # TODO: I need author names for this
+            self.imposter_generator = ImposterGenerator.NDocsImposterGenerator(n_impostors=self.n_impostors)
+        elif imposter_technique == "fixed":
+            self.imposter_generator = ImposterGenerator.FixedImposterGenerator(
+                n_impostors=self.n_impostors,
+                imposter_file=Path(__file__).parent / "imposters.json"
+            )
+        elif imposter_technique == "on-the-fly":
+            # TODO: add secret API key for Google Search
+            self.imposter_generator = ImposterGenerator.GoogleSearchImposterGenerator(api_key='test')
+        elif imposter_technique == "blogs":
+            self.imposter_generator = ImposterGenerator.BlogImposterGenerator(n_impostors=self.n_impostors)
+        else: 
+            self.imposter_generator = ImposterGenerator.TextLenImposterGenerator(n_imposter=self.n_impostors)
+    
 
     def get_scores(self, text: Iterable[str]) -> List[float]:
         """
@@ -163,9 +192,8 @@ class ImpostorDetector(DetectorBase):
             ):
                 scores_over_different_rounds = 0
                 # get imposters for the candidate text, NOT the disputed text
-                impostor_candidates = self._get_imposters(
-                    store[candidate]["text"], self.n_impostors, technique="text_len"
-                )  # returns dict of model:text pairs
+                impostor_candidates =  self.imposter_generator.generate_imposters(store[candidate]["text"])
+
                 tmp_store = {
                     impostor_name: {
                         "tfidf": self.tokens_to_matrix(
@@ -345,67 +373,3 @@ class ImpostorDetector(DetectorBase):
 
         else:
             return [text[i : i + n] for i in range(0, len(text) - n + 1)]
-
-    def _get_imposters(self, text: str, n: int, technique: Literal["llm", "text_len", "n_docs"]="text_len") -> dict:
-        """
-        Get a dictionary of impostor texts for the given input text.
-
-        This method generates impostors based on the input text. If `technique` is llm, it should use LLMs to generate impostors (not implemented yet). 
-        If `technique` is text_len, it generates impostors of similar length from a predefined dataset.
-        If `technique` is n_docs, it generates impostors based on the number of documents written by the author; as proposed by Kocher et Al. (2015).
-        
-        References:
-        ===========
-        Kocher, Mirco, and Jacques Savoy. ‘UniNE at CLEF 2015: Author Identification’, 2015.
-
-        :param text: input text to generate impostors for (i.e., the candidate text, NOT the disputed text)
-        :param n: number of impostors to generate
-        :param technique: which technique to use to generate impostors. Options are:
-            - "llm": use LLMs to generate impostors to control both topic and genre (our contribution, not implemented yet)
-            - "text_len": generate impostors of similar length from a predefined dataset (our baseline w/o reference, default)
-            - "n_docs": generate impostors based on the number of documents written by the author (Kocher et Al. (2015), not implemented yet)
-            - "fixed": use a fixed set of impostors (Koppel et. A. (2014), not implemented yet), imposters are not related to the input text
-            - "on-the-fly": generate same-topic impostors on-the-fly (Koppel et. Al. (2014), not implemented yet)
-            - "blogs": use blogs to obtain same genre impostors (Koppel et. Al. (2014), not implemented yet)
-        :return: dictionary of model names and their corresponding impostor texts
-        """
-        # TODO: Placeholder for actual implementation
-        # In practice, this should return a dict with model names as keys and generated texts as values.
-        if technique == "llm":
-            raise NotImplementedError("LLM-based impostor generation is not implemented.")
-        elif technique == "n_docs":
-            # TODO: I need author names for this
-            raise NotImplementedError("n-docs impostor generation is not implemented.")
-        elif technique == "fixed":
-            raise NotImplementedError("Fixed impostor generation is not implemented.")
-        elif technique == "on-the-fly":
-            raise NotImplementedError("On-the-fly impostor generation is not implemented.")
-        elif technique == "blogs":
-            raise NotImplementedError("Blogs-based impostor generation is not implemented.")
-        else:            
-            # TODO: Add path to training data
-            # pan23-dataset-converted/train/
-            path2_training_data = Path("../data/datasets/pan23-authorship-verification/pan23-authorship-verification-training-dataset/pairs.jsonl")  # Placeholder path
-            #path2_training_data = Path("../data/datasets/pan20-authorship-verification/pan20-authorship-verification-training-dataset/pan20-authorship-verification-training-small.jsonl")
-            
-            if not path2_training_data.exists():
-                raise FileNotFoundError(f"Training data not found at {path2_training_data}")
-            
-            # TODO: Ensure not same author as imposter (difficult, bc during inference, we don't know the author of the input text)
-            # FIXME: for PAN20 or other big datasets, this will produce OOM errors
-            with open(path2_training_data, "r", encoding="utf-8") as f:
-                # TODO: Omit enumeration an limit of 500 pairs later
-                tr_data = [json.loads(line).get('pair',[]) for i,line in enumerate(f) if i < 500] 
-                candidates = [item for sublist in tr_data for item in sublist if abs(len(item)- len(text)) < len(text) * 0.3]  # flatten and filter by length
-                probs = [1 / (1 + abs(len(s) - len(text))) for s in candidates]
-                total = sum(probs)
-                probs = [prob / total for prob in probs]
-
-            if not candidates:
-                raise ValueError("No suitable impostor candidates found.")
-
-          
-            # select n random texts of similar length
-            selected = np.random.choice(a=candidates, p=probs, size=min(n, len(candidates)), replace=False)
-            # create a dictionary of impostors
-            return {f"impostor_{i}": selected[i] for i in range(len(selected))}
