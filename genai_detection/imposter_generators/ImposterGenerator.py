@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
+import datetime
 import json
+import os
 from pathlib import Path
+import sys
 from typing import List, Dict
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -8,7 +11,14 @@ import random
 import numpy as np
 import pandas as pd
 import spacy
-from serpapi import GoogleSearch
+import requests
+from bs4 import BeautifulSoup
+import serpapi
+from dotenv import load_dotenv
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+from config import CONFIG
+
+load_dotenv() 
 
 
 class BaseImposterGenerator(ABC):
@@ -68,9 +78,22 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
         queries = []
         assert len(candidate_words) >= self.n_min_words, f"Not enough candidate words to generate queries, at {self.n_min_words} necessary."
         for _ in range(self.num_queries):
-            query_words = random.sample(candidate_words, random.randint(self.n_min_words, self.n_max_words))
+            n_words = min(len(candidate_words), random.randint(self.n_min_words, self.n_max_words))
+            query_words = random.sample(candidate_words, n_words)
             queries.append(" ".join(query_words))
         return queries
+
+    def _extract_text_from_url(url):
+        try:
+            response = requests.get(url, timeout=5)
+            soup = BeautifulSoup(response.text, "html.parser")
+            paragraphs = soup.find_all("p")
+            full_text = " ".join(p.get_text() for p in paragraphs)
+            return full_text.strip()
+        except Exception as e:
+            print(f"Error fetching from URL {url}: {e}")
+            return ""
+
 
     def fetch_results(self, query: str) -> List[Dict]:
         """
@@ -84,14 +107,18 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
         try:
             params = {
                 "q": query, # the search query, eg. "coffee"
-                "num": self.results_per_query,
+                "num": self.results_per_query,  # default: 10
                 "api_key": self.api_key,
-                "engine": "google_light",
+                "engine": "google_light",   # might return fewer results than 'google' engine, but is faster
+                "safe": "off", # disbale filtering out adult content
+                "nfpr": 0, # include results from auto-corrected query for misspellings
+                "devices": "desktop",  # use desktop results
             }
-            search = GoogleSearch(params)
-            results = search.get_dict()
+            search = serpapi.search(params)
+            results = search.as_dict()
             return [
-                {"query": query, "title": res.get("title"), "url": res.get("link"), "snippet": res.get("snippet"), "position": res.get("position")}
+                {"query": query, "title": res.get("title"), "url": res.get("link"), "snippet": res.get("snippet"), "rich_snippet": res.get("rich_snippet", ""),
+                 "author": res.get("author", "unknown"), "position": res.get("position"), "full_text": self._extract_text_from_url(res.get("link")),}
                 for res in results.get("organic_results", [])
             ]
         except Exception as e:
@@ -120,6 +147,7 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
         medium_frequency_words = self.get_medium_frequency_words(text)
         queries = self._generate_queries_based_on_candidate_words(medium_frequency_words)
         results = self._parallel_fetch(queries)
+        print(results)
         return pd.DataFrame(results)
     
     
@@ -202,10 +230,16 @@ class BlogImposterGenerator(BaseImposterGenerator):
        
 # Example usage
 if __name__ == "__main__":
-    with open("input_text.txt") as f:
+    artwork_name = "A_Midsummer_Nights_Dream_William_Shakespeare.txt"#"A_Lovers_Complaint_William_Shakespeare.txt"
+    path2lovers_shakespeare = Path(CONFIG.PATH2GUTENBERG) / artwork_name
+    with open(path2lovers_shakespeare) as f:
         input_text = f.read()
 
-    generator = GoogleSearchImposterGenerator(api_key="YOUR_SERPAPI_KEY")
+    generator = GoogleSearchImposterGenerator(api_key=CONFIG.SERPAPI_KEY, num_queries=2, results_per_query=25, max_workers=2, n_min_words=3, n_max_words=5)
     result_df = generator.generate_imposters(input_text)
-    result_df.to_csv("imposter_results.csv", index=False)
+    output_dir = Path(CONFIG.PATH2GUTENBERG) / "on_the_fly_imp"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_path = output_dir / f"imposter_{artwork_name.split('.')[0]}_results_{timestamp}.csv"
+    result_df.to_csv(output_path, index=False)
     print(result_df.head())
