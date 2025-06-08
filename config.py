@@ -13,6 +13,7 @@ class BaseConfig:
     PATH2KOPPEL_WEBIS = "data/datasets/corpus-webis-authorship/koppel/koppel-webis-dataset-converted"
     PATH2GUTENBERG = "data/datasets/gutenberg"
     PATH2BLOG = "data/datasets/Blog_corpus/blog-dataset-converted"
+    PATH2GENERIC_ON_FLY_IMP = "data/datasets/google-on-the-fly-imposters"
     SAVE_PATH = "results/"
     PAN23 = "pan23"
     PAN25 = "pan25"
