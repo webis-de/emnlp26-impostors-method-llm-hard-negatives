@@ -363,31 +363,3 @@ if __name__ == "__main__":
     # for imposter_name, imposter_text in imposters.items():
     #     print(f"Imposter {imposter_name}: {imposter_text[:100]}...")  # Print first 100 characters of each imposter
 
-    file1 = Path("/Users/klara/Downloads/lovers01.json")
-    file2 = Path("/Users/klara/Downloads/lovers02.json")  
-
-    # Extract data
-    df1 = extract_results_from_file(file1, generator)
-    df2 = extract_results_from_file(file2, generator)
-
-    # Create DataFrame
-    result_df = pd.concat([df1, df2], ignore_index=True)
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    path2imp = Path(CONFIG.PATH2GUTENBERG) / "on_the_fly_imp" / f"imposter_A_Lovers_Complaint_William_Shakespeare_results_{timestamp}.csv"
-    if path2imp is None:
-        path2imp = Path(CONFIG.PATH2GENERIC_ON_FLY_IMP) 
-    else:
-        path2imp = Path(path2imp)
-    if path2imp.suffix != ".csv" or path2imp.is_dir():
-        if path2imp.is_file():
-            path2imp = path2imp.with_suffix(".csv")
-        else:
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            path2imp = path2imp / f"google_on_fly_imposter_results_{timestamp}.csv"
-
-    path2imp.parent.mkdir(parents=True, exist_ok=True)
-    result_df.to_csv(path2imp, index=False)
-
-    # Display preview
-    print(result_df.head())
-
