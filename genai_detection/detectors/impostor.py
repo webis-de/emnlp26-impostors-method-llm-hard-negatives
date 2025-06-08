@@ -101,7 +101,7 @@ class ImpostorDetector(DetectorBase):
             )
         elif imposter_technique == "on-the-fly":
             # TODO: add secret API key for Google Search
-            self.imposter_generator = ImposterGenerator.GoogleSearchImposterGenerator(api_key='test')
+            self.imposter_generator = ImposterGenerator.GoogleSearchImposterGenerator(api_key=CONFIG.SERPAPI_KEY)
         elif imposter_technique == "blogs":
             self.imposter_generator = ImposterGenerator.BlogImposterGenerator(n_impostors=self.n_impostors)
         else: 
