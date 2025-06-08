@@ -360,16 +360,28 @@ class ImpostorDetector(DetectorBase):
 
         :param text: input text to generate impostors for (i.e., the candidate text, NOT the disputed text)
         :param n: number of impostors to generate
-        :param use_llms: whether to use LLMs to generate impostors. If not, imposters are texts of similar length. TODO: reference to paper
+        :param technique: which technique to use to generate impostors. Options are:
+            - "llm": use LLMs to generate impostors to control both topic and genre (our contribution, not implemented yet)
+            - "text_len": generate impostors of similar length from a predefined dataset (our baseline w/o reference, default)
+            - "n_docs": generate impostors based on the number of documents written by the author (Kocher et Al. (2015), not implemented yet)
+            - "fixed": use a fixed set of impostors (Koppel et. A. (2014), not implemented yet), imposters are not related to the input text
+            - "on-the-fly": generate same-topic impostors on-the-fly (Koppel et. Al. (2014), not implemented yet)
+            - "blogs": use blogs to obtain same genre impostors (Koppel et. Al. (2014), not implemented yet)
         :return: dictionary of model names and their corresponding impostor texts
         """
         # TODO: Placeholder for actual implementation
         # In practice, this should return a dict with model names as keys and generated texts as values.
         if technique == "llm":
             raise NotImplementedError("LLM-based impostor generation is not implemented.")
-        if technique == "n_docs":
+        elif technique == "n_docs":
             # TODO: I need author names for this
             raise NotImplementedError("n-docs impostor generation is not implemented.")
+        elif technique == "fixed":
+            raise NotImplementedError("Fixed impostor generation is not implemented.")
+        elif technique == "on-the-fly":
+            raise NotImplementedError("On-the-fly impostor generation is not implemented.")
+        elif technique == "blogs":
+            raise NotImplementedError("Blogs-based impostor generation is not implemented.")
         else:            
             # TODO: Add path to training data
             # pan23-dataset-converted/train/
