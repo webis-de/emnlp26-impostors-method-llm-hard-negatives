@@ -26,7 +26,7 @@ class BaseImposterGenerator(ABC):
     """Abstract base class for generating imposters."""
 
     @abstractmethod
-    def generate_imposters(self, tetx:str) -> dict:
+    def generate_imposters(self, text:str, path2imp:str=None, real_time_generation:bool=False) -> dict:
         """Get a dictionary of impostor texts for the given input text.
         
         References:
@@ -162,7 +162,7 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
                 all_results.extend(future.result())
         return all_results
 
-    def generate_imposters(self, text: str, path2imp:str=None) -> pd.DataFrame:
+    def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> pd.DataFrame:
         """
         Generates imposters for the given input text using Google search results.
 
@@ -171,9 +171,11 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
         2. Formulate search queries using random combinations of those words.
         3. Use the SerpAPI to retrieve search result snippets.
         4. Save the results to a CSV file.
+        5. Format results into a dictionary with keys as query and position, and values as the full text (or snippets) of the search result.
 
         :param text (str): input text to generate impostors for
         :param path2imp (str or Path, optional): Path to save the CSV. If a directory or None, appends a timestamped filename.
+        :param real_time_generation (bool): If True, generates queries and fetches results in real-time. If False, uses precomputed results from the specified path.
 
         :return: DataFrame containing search results with columns: 'query', 'title', 'url', 'snippet' (i.e. short content summary of search result), and 'position' (i.e. number of result in the search results)
 
@@ -183,36 +185,46 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
         """
         if not isinstance(text, str) or not text.strip():
             raise ValueError("Input text must be a non-empty string.")
+        if real_time_generation:
+            medium_frequency_words = self.get_medium_frequency_words(text)
+            queries = self._generate_queries_based_on_candidate_words(medium_frequency_words)
+            result_df = pd.DataFrame(self._parallel_fetch(queries))
+            result_df.drop_duplicates(subset="url", inplace=True)
 
-        medium_frequency_words = self.get_medium_frequency_words(text)
-        queries = self._generate_queries_based_on_candidate_words(medium_frequency_words)
-        result_df = pd.DataFrame(self._parallel_fetch(queries))
-        result_df.drop_duplicates(subset="url", inplace=True)
 
-
-        if result_df.empty:
-            print("Warning: No results fetched. CSV not saved.")
-            return result_df
-       
-        if path2imp is None:
-            path2imp = Path(CONFIG.PATH2GENERIC_ON_FLY_IMP) 
-        else:
-            path2imp = Path(path2imp)
-        if path2imp.suffix != ".csv" or path2imp.is_dir():
-            if path2imp.is_file():
-                path2imp = path2imp.with_suffix(".csv")
+            if result_df.empty:
+                print("Warning: No results fetched. CSV not saved.")
+                return result_df
+        
+            if path2imp is None:
+                path2imp = Path(CONFIG.PATH2GENERIC_ON_FLY_IMP) 
             else:
-                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                path2imp = path2imp / f"google_on_fly_imposter_results_{timestamp}.csv"
+                path2imp = Path(path2imp)
+            if path2imp.suffix != ".csv" or path2imp.is_dir():
+                if path2imp.is_file():
+                    path2imp = path2imp.with_suffix(".csv")
+                else:
+                    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    path2imp = path2imp / f"google_on_fly_imposter_results_{timestamp}.csv"
 
-        path2imp.parent.mkdir(parents=True, exist_ok=True)
-        result_df.to_csv(path2imp, index=False)
+            path2imp.parent.mkdir(parents=True, exist_ok=True)
+            result_df.to_csv(path2imp, index=False)
+        else:   # use precomputed results
+            result_df = pd.read_csv(path2imp)
         
-        
-        # TODO: generate imposters based on results
         # aggregate results' texts, preferably using full_text, if empty use snippet and return a list of texts
-        imposter_texts = result_df['full_text'].dropna().tolist()
-        imposter_texts.extend(result_df[result_df['full_text'].isna()]['snippet'].dropna().tolist())
+        imposter_texts = {
+            f"{re.sub(' ', '_', string=row['query'])}_{row['position']}": row['full_text']
+            for _, row in result_df.iterrows()
+            if pd.notnull(row.get('full_text'))
+        }
+
+        # full_text is missing but snippet is present
+        for _, row in result_df.iterrows():
+            if pd.isna(row.get('full_text')) and pd.notnull(row.get('snippet')):
+                key = f"{re.sub(' ', '_', row['query'])}_{row['position']}"
+                imposter_texts[key] = row['snippet']
+
 
         return imposter_texts
         
@@ -302,11 +314,9 @@ if __name__ == "__main__":
     with open(path2lovers_shakespeare) as f:
         input_text = f.read()
 
-    # generator = GoogleSearchImposterGenerator(api_key=CONFIG.SERPAPI_KEY, num_queries=2, results_per_query=25, max_workers=2, n_min_words=3, n_max_words=5)
-    # result_df = generator.generate_imposters(input_text)
-    # output_dir = Path(CONFIG.PATH2GUTENBERG) / "on_the_fly_imp"
-    # output_dir.mkdir(parents=True, exist_ok=True)
-    # timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    # output_path = output_dir / f"imposter_{artwork_name.split('.')[0]}_results_{timestamp}.csv"
-    # result_df.to_csv(output_path, index=False)
-    # print(result_df.head())
+    generator = GoogleSearchImposterGenerator(api_key=CONFIG.SERPAPI_KEY, num_queries=2, results_per_query=25, max_workers=2, n_min_words=3, n_max_words=5)
+    imposters = generator.generate_imposters(input_text, path2imp=Path(CONFIG.PATH2GENERIC_ON_FLY_IMP) / f"imposter_{artwork_name.split('.')[0]}_results.csv")
+    print(f"Generated {len(imposters)} imposters for {artwork_name}:")
+
+    for imposter_name, imposter_text in imposters.items():
+        print(f"Imposter {imposter_name}: {imposter_text[:100]}...")  # Print first 100 characters of each imposter
