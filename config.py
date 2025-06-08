@@ -1,12 +1,17 @@
 # added to git since no secrets
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class BaseConfig:
     SERVER = False
+    SERPAPI_KEY = os.getenv("SERPAPI_KEY")
     PATH2PAN25 = "data/datasets/pan25-genai-identification/pan25-dataset-converted"
     PATH2PAN23 = "data/datasets/pan23-authorship-verification/pan23-dataset-converted"
     PATH2PAN20 = "data/datasets/pan20-authorship-verification/pan20-dataset-converted"
     PATH2KOPPEL_WEBIS = "data/datasets/corpus-webis-authorship/koppel/koppel-webis-dataset-converted"
+    PATH2GUTENBERG = "data/datasets/gutenberg"
     PATH2BLOG = "data/datasets/Blog_corpus/blog-dataset-converted"
     SAVE_PATH = "results/"
     PAN23 = "pan23"
