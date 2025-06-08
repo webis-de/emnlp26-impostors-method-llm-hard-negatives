@@ -367,28 +367,6 @@ class BlogImposterGenerator(BaseImposterGenerator):
     def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> List[str]:
         pass
 
-
-def extract_results_from_file(path: Path, generator) -> pd.DataFrame:
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    
-    query = data.get("search_parameters", {}).get("q", "unknown_query")
-    
-    records = []
-    for res in data.get("organic_results", []):
-        records.append({
-            "query": query,
-            "title": res.get("title"),
-            "url": res.get("link"),
-            "snippet": res.get("snippet"),
-            "rich_snippet": res.get("rich_snippet", ""),
-            "author": res.get("author", "unknown"),
-            "position": res.get("position"),
-            "full_text": generator._extract_text_from_url(res.get("link"))
-        })
-    
-    return pd.DataFrame(records)
-
         
        
 # Example usage
