@@ -3,6 +3,7 @@ import datetime
 import json
 import os
 from pathlib import Path
+import re
 import sys
 from typing import List, Dict
 from collections import Counter
@@ -83,13 +84,36 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
             queries.append(" ".join(query_words))
         return queries
 
-    def _extract_text_from_url(url):
+    def _extract_text_from_url(self, url:str) -> str:
+        """
+        Extracts and cleans main textual content from a webpage.
+
+        This function fetches the content of a given URL, removes non-informative 
+        HTML elements such as <script>, <style>, <header>, <footer>, and normalizes 
+        the text by collapsing all whitespace (tabs, newlines, multiple spaces) into 
+        single spaces. It only keeps the text found within paragraph <p> tags.
+
+        Punctuation is preserved, but all sequences of whitespace are reduced to a 
+        single space to make the text layout-agnostic and suitable for further 
+        processing.
+
+        :param url: The URL of the webpage to fetch and process.
+        :return: Cleaned textual content from the webpage, with only useful body text 
+             preserved and whitespace normalized.
+        """
         try:
             response = requests.get(url, timeout=5)
             soup = BeautifulSoup(response.text, "html.parser")
+            # Remove unwanted tags
+            for tag in soup(["script", "style", "header", "footer", "nav", "aside", "form", "noscript"]):
+                tag.decompose()
+
+            # Extract paragraph text
             paragraphs = soup.find_all("p")
             full_text = " ".join(p.get_text() for p in paragraphs)
-            return full_text.strip()
+            # Normalize all whitespace (tabs, newlines, multiple spaces) to a single space
+            cleaned_text = re.sub(r"\s+", " ", full_text)
+            return cleaned_text.strip()
         except Exception as e:
             print(f"Error fetching from URL {url}: {e}")
             return ""
@@ -138,18 +162,52 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
                 all_results.extend(future.result())
         return all_results
 
-    def generate_imposters(self, text: str) -> pd.DataFrame:
+    def generate_imposters(self, text: str, path2imp:str=None) -> pd.DataFrame:
         """
-        Generates impostors for the given input text by fetching search results based on medium frequency words extracted from the text.
-        :param text: input text to generate impostors for
+        Generates imposters for the given input text using Google search results.
+
+        Steps:
+        1. Extract medium-frequency words from the input text.
+        2. Formulate search queries using random combinations of those words.
+        3. Use the SerpAPI to retrieve search result snippets.
+        4. Save the results to a CSV file.
+
+        :param text (str): input text to generate impostors for
+        :param path2imp (str or Path, optional): Path to save the CSV. If a directory or None, appends a timestamped filename.
+
         :return: DataFrame containing search results with columns: 'query', 'title', 'url', 'snippet' (i.e. short content summary of search result), and 'position' (i.e. number of result in the search results)
         """
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("Input text must be a non-empty string.")
+
         medium_frequency_words = self.get_medium_frequency_words(text)
         queries = self._generate_queries_based_on_candidate_words(medium_frequency_words)
-        results = self._parallel_fetch(queries)
-        print(results)
-        return pd.DataFrame(results)
-    
+        result_df = pd.DataFrame(self._parallel_fetch(queries))
+        result_df.drop_duplicates(subset="url", inplace=True)
+
+
+        if result_df.empty:
+            print("Warning: No results fetched. CSV not saved.")
+            return result_df
+       
+        if path2imp is None:
+            path2imp = Path(CONFIG.PATH2GENERIC_ON_FLY_IMP) 
+        else:
+            path2imp = Path(path2imp)
+        if path2imp.suffix != ".csv" or path2imp.is_dir():
+            if path2imp.is_file():
+                path2imp = path2imp.with_suffix(".csv")
+            else:
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                path2imp = path2imp / f"google_on_fly_imposter_results_{timestamp}.csv"
+
+        path2imp.parent.mkdir(parents=True, exist_ok=True)
+        result_df.to_csv(path2imp, index=False)
+        
+        
+        # TODO: generate imposters based on results
+        return False
+        
     
 class TextLenImposterGenerator(BaseImposterGenerator):
     def __init__(self, n_imposter: int):
@@ -230,16 +288,17 @@ class BlogImposterGenerator(BaseImposterGenerator):
        
 # Example usage
 if __name__ == "__main__":
-    artwork_name = "A_Midsummer_Nights_Dream_William_Shakespeare.txt"#"A_Lovers_Complaint_William_Shakespeare.txt"
+    artwork_name = "Frankenstein_Mary_Wollstonecraft_(Godwin)_Shelley.txt"
+    #"A_Midsummer_Nights_Dream_William_Shakespeare.txt"#"A_Lovers_Complaint_William_Shakespeare.txt"
     path2lovers_shakespeare = Path(CONFIG.PATH2GUTENBERG) / artwork_name
     with open(path2lovers_shakespeare) as f:
         input_text = f.read()
 
-    generator = GoogleSearchImposterGenerator(api_key=CONFIG.SERPAPI_KEY, num_queries=2, results_per_query=25, max_workers=2, n_min_words=3, n_max_words=5)
-    result_df = generator.generate_imposters(input_text)
-    output_dir = Path(CONFIG.PATH2GUTENBERG) / "on_the_fly_imp"
-    output_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = output_dir / f"imposter_{artwork_name.split('.')[0]}_results_{timestamp}.csv"
-    result_df.to_csv(output_path, index=False)
-    print(result_df.head())
+    # generator = GoogleSearchImposterGenerator(api_key=CONFIG.SERPAPI_KEY, num_queries=2, results_per_query=25, max_workers=2, n_min_words=3, n_max_words=5)
+    # result_df = generator.generate_imposters(input_text)
+    # output_dir = Path(CONFIG.PATH2GUTENBERG) / "on_the_fly_imp"
+    # output_dir.mkdir(parents=True, exist_ok=True)
+    # timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    # output_path = output_dir / f"imposter_{artwork_name.split('.')[0]}_results_{timestamp}.csv"
+    # result_df.to_csv(output_path, index=False)
+    # print(result_df.head())
