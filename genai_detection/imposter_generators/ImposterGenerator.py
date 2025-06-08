@@ -14,6 +14,7 @@ import pandas as pd
 import spacy
 import requests
 from bs4 import BeautifulSoup
+from datasets import load_from_disk
 import serpapi
 from dotenv import load_dotenv
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -43,6 +44,8 @@ class BaseImposterGenerator(ABC):
 class GoogleSearchImposterGenerator(BaseImposterGenerator):
     def __init__(self, api_key: str, num_queries: int = 2, results_per_query: int = 25, max_workers: int = 2, n_min_words: int = 3, n_max_words: int = 5):
         """
+        n_impostors <= num_queries * results_per_query
+
         Configuration from Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’. Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954 is:
         - num_queries: 50
         - results_per_query: 25
@@ -257,8 +260,8 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
         
     
 class TextLenImposterGenerator(BaseImposterGenerator):
-    def __init__(self, n_imposter: int):
-        self.n_imposter = n_imposter
+    def __init__(self, n_impostors: int):
+        self.n_impostors = n_impostors
 
     def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> List[str]:
         # TODO: Add path to training data
@@ -283,47 +286,83 @@ class TextLenImposterGenerator(BaseImposterGenerator):
             raise ValueError("No suitable impostor candidates found.")
         
          # select n random texts of similar length
-        selected = np.random.choice(a=candidates, p=probs, size=min(self.n_imposter, len(candidates)), replace=False)
+        selected = np.random.choice(a=candidates, p=probs, size=min(self.n_impostors, len(candidates)), replace=False)
         # create a dictionary of impostors
         return {f"impostor_{i}": selected[i] for i in range(len(selected))}
     
 
     
 class NDocsImposterGenerator(BaseImposterGenerator):
-    def __init__(self, n_imposter: int):
+    def __init__(self, n_impostors: int):
         """
         References:
         ===========
         Kocher, Mirco, and Jacques Savoy. ‘UniNE at CLEF 2015: Author Identification’, 2015.
         """
-        self.n_imposter = n_imposter
+        self.n_impostors = n_impostors
 
     def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> List[str]:
         pass
 
 
 class LLMImposterGenerator(BaseImposterGenerator):
-    def __init__(self, n_imposter: int):
-        self.n_imposter = n_imposter
+    def __init__(self, n_impostors: int):
+        self.n_impostors = n_impostors
 
     def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> List[str]:
         pass
 
 
 class FixedImposterGenerator(BaseImposterGenerator):
-    def __init__(self, n_imposter: int, imposter_file:Path):
-        self.n_imposter = n_imposter
-        self.imposter_file = imposter_file
-        if not self.imposter_file.exists():
-            raise FileNotFoundError(f"Imposter file not found at {self.imposter_file}")
+    def __init__(self, n_impostors: int, split:str='test'):
+        """
+        :param n_impostors: number of imposters to generate
+        :param split: dataset split to use (default: 'test')
 
-    def generate_imposters(self, text: str, real_time_generation:bool=False) -> List[str]:
-        pass
+        References:
+        ===========
+        Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’. Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
+        """
+        self.n_impostors = n_impostors
+        self.split = split
+ 
+
+    def generate_imposters(self, text: str, path2imp:Path=None, real_time_generation:bool=False) -> List[str]:
+        """
+        Generates imposters from a pre-defined dataset.
+        :param text: input text to generate imposters for (not used in this implementation)
+        :param path2imp: path to the dataset file containing imposters, i.e. fixed Huggingface dataset
+        :param real_time_generation: not used in this implementation, but kept for interface consistency
+        :return: dictionary of imposters with keys as ids and values as texts
+        """
+        path2imp = Path(path2imp)
+        if not path2imp.exists():
+            raise FileNotFoundError(f"Imposter file not found at {path2imp}")
+        dataset = load_from_disk(os.path.join(os.path.abspath(".."), path2imp))
+        if self.split not in dataset:
+            raise ValueError(f"Dataset {path2imp} does not contain '{self.split}' split.")
+        ds = dataset[self.split]
+        if len(ds) == 0:
+            raise ValueError("Dataset split is empty.")
+        
+        sampled = ds.shuffle().select(range(min(len(ds), self.n_impostors//2)))
+        imposters = {}
+        for i, entry in enumerate(sampled):
+            if "pair" not in entry:
+                continue
+            key = entry.get("id", f"imposter_{i}")
+            imposters[f"{key}_left"] = entry["pair"][0]
+            imposters[f"{key}_right"] = entry["pair"][1]
+
+        if not imposters:
+            raise ValueError("No imposters found with 'pair' field.")
+
+        return imposters
 
 
 class BlogImposterGenerator(BaseImposterGenerator):
-    def __init__(self, n_imposter: int):
-        self.n_imposter = n_imposter
+    def __init__(self, n_impostors: int):
+        self.n_impostors = n_impostors
 
     def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> List[str]:
         pass
