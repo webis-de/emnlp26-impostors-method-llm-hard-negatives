@@ -230,6 +230,10 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
                 path2imp = path2imp / 'imposter_A_Midsummer_Nights_Dream_William_Shakespeare_results_20250608_201352.csv'
             elif 'Frankenstein' in text:  # Frankenstein
                 path2imp = path2imp / 'imposter_Frankenstein_Mary_Wollstonecraft_(Godwin)_Shelley_results_20250608_145350.csv'
+            elif 'unlineal' in text:  # Macbeth
+                path2imp = path2imp / 'imposter_Macbeth_William_Shakespeare_results_20250608_211827.csv'
+            elif 'auld' in text:  # Orthello
+                path2imp = path2imp / 'imposter_Othello_the_Moor_of_Venice_William_Shakespeare_results_20250608_212040.csv'
             else: # A Lovers Complaint
                 path2imp = path2imp / 'imposter_A_Lovers_Complaint_William_Shakespeare_results_20250608_202134.csv'
             result_df = pd.read_csv(path2imp)
