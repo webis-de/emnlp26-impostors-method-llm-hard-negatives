@@ -40,6 +40,19 @@ class BaseImposterGenerator(ABC):
         """
         pass
 
+    def _get_dataset_split_from_path(self, path2imp:str):
+        path2imp = Path(path2imp)     
+        if not path2imp.exists():
+            raise FileNotFoundError(f"Training data not found at {path2imp}")
+        dataset = load_from_disk(os.path.join(os.path.abspath(".."), path2imp))
+        if self.split not in dataset:
+            raise ValueError(f"Dataset {path2imp} does not contain '{self.split}' split.")
+        
+        ds = dataset[self.split]
+        if len(ds) == 0:
+            raise ValueError("Dataset split is empty.")
+        return ds
+
 
 class GoogleSearchImposterGenerator(BaseImposterGenerator):
     def __init__(self, api_key: str, num_queries: int = 2, results_per_query: int = 25, max_workers: int = 2, n_min_words: int = 3, n_max_words: int = 5):
@@ -260,35 +273,36 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
         
     
 class TextLenImposterGenerator(BaseImposterGenerator):
-    def __init__(self, n_impostors: int):
+    def __init__(self, n_impostors: int, split:str='test'):
         self.n_impostors = n_impostors
+        self.split = split
 
-    def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> List[str]:
-        # TODO: Add path to training data
-        # pan23-dataset-converted/train/
-        path2_training_data = Path("../data/datasets/pan23-authorship-verification/pan23-authorship-verification-training-dataset/pairs.jsonl")  # Placeholder path
-        #path2_training_data = Path("../data/datasets/pan20-authorship-verification/pan20-authorship-verification-training-dataset/pan20-authorship-verification-training-small.jsonl")
+    def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False, valid_relative_text_len_dif:float=0.3) -> List[str]:
+        ds = self._get_dataset_split_from_path(path2imp)
+        max_subset_size = min(self.n_impostors, len(ds))  # generate around twice as many impostors as requested, to ensure diversity
+        sampled = ds.shuffle(seed=42).select(range(max_subset_size))
+        candidate_texts = []
+        for entry in sampled:
+            pair = entry.get("pair", [])
+            candidate_texts.extend(pair)
+        text_len = len(text)
+        threshold = text_len * valid_relative_text_len_dif
+        # filter candidates based on length
+        filtered_candidates = [s for s in candidate_texts if abs(len(s) - text_len) < threshold]
+        if not filtered_candidates:
+            return self.generate_imposters(text=text, path2imp=path2imp, real_time_generation=path2imp, valid_relative_text_len_dif=min(1, valid_relative_text_len_dif * 2))  # try again with a larger threshold
         
-        if not path2_training_data.exists():
-            raise FileNotFoundError(f"Training data not found at {path2_training_data}")
-        
-        # TODO: Ensure not same author as imposter (difficult, bc during inference, we don't know the author of the input text)
-        # FIXME: for PAN20 or other big datasets, this will produce OOM errors
-        with open(path2_training_data, "r", encoding="utf-8") as f:
-            # TODO: Omit enumeration an limit of 500 pairs later
-            tr_data = [json.loads(line).get('pair',[]) for i,line in enumerate(f) if i < 500] 
-            candidates = [item for sublist in tr_data for item in sublist if abs(len(item)- len(text)) < len(text) * 0.3]  # flatten and filter by length
-            probs = [1 / (1 + abs(len(s) - len(text))) for s in candidates]
-            total = sum(probs)
-            probs = [prob / total for prob in probs]
+        lengths = np.array([len(s) for s in filtered_candidates])
+        diffs = np.abs(lengths - text_len)
+        probs = 1 / (1 + diffs)
+        probs /= probs.sum()
 
-        if not candidates:
-            raise ValueError("No suitable impostor candidates found.")
-        
-         # select n random texts of similar length
-        selected = np.random.choice(a=candidates, p=probs, size=min(self.n_impostors, len(candidates)), replace=False)
-        # create a dictionary of impostors
-        return {f"impostor_{i}": selected[i] for i in range(len(selected))}
+        num_to_sample = min(self.n_impostors, len(filtered_candidates))
+        selected = np.random.choice(filtered_candidates, size=num_to_sample, replace=False, p=probs)
+
+        return {f"imposter_{i}": imp for i, imp in enumerate(selected)}
+
+
     
 
     
@@ -335,16 +349,7 @@ class FixedImposterGenerator(BaseImposterGenerator):
         :param real_time_generation: not used in this implementation, but kept for interface consistency
         :return: dictionary of imposters with keys as ids and values as texts
         """
-        path2imp = Path(path2imp)
-        if not path2imp.exists():
-            raise FileNotFoundError(f"Imposter file not found at {path2imp}")
-        dataset = load_from_disk(os.path.join(os.path.abspath(".."), path2imp))
-        if self.split not in dataset:
-            raise ValueError(f"Dataset {path2imp} does not contain '{self.split}' split.")
-        ds = dataset[self.split]
-        if len(ds) == 0:
-            raise ValueError("Dataset split is empty.")
-        
+        ds = self._get_dataset_split_from_path(path2imp)
         sampled = ds.shuffle().select(range(min(len(ds), self.n_impostors//2)))
         imposters = {}
         for i, entry in enumerate(sampled):
