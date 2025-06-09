@@ -23,7 +23,7 @@
     - [x] Unmasking  
   - [ ] **Fanfiction dataset (PAN20)**  
     - [x] Acquisition of dataset
-    - [ ] Imposter  
+    - [x] Imposter  
     - [ ] Unmasking  
   - [ ] **Koppel et al. (2014) dataset**  
     - [x] Acquisition of dataset: [Blog posts](https://www.kaggle.com/datasets/rtatman/blog-authorship-corpus?resource=download)
