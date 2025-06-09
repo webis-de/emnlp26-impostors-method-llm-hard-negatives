@@ -66,11 +66,12 @@
   - High inference/experiment cost is okay  
   - Controlled scenario is the goal  
 - [ ] Implement:
-  - Imposter via **similar content**  
-  - Koppel et al. (2014) imposter approaches (baseline for modern version)
-    [x] On-the-fly generation of imposter texts (same topic)
-    [x] Blog imposter texts (same genre)
-    [x] Fixed texts (possibly different topic, genre, register)
+    [ ] Imposter via **LLMs**
+    [x] Imposter via **similar content**  
+    - Koppel et al. (2014) imposter approaches (baseline for modern version)
+      [x] On-the-fly generation of imposter texts (same topic)
+      [x] Blog imposter texts (same genre)
+      [x] Fixed texts (possibly different topic, genre, register)
 - [ ] Implement **upsampling** for texts < 500 words (cf. [Bevendorff Paper](https://aclanthology.org/N19-1068/)) 
 - [ ] Use **exactly 500 words** per text (text length is a confounder)  
 - [ ] Use Koppel et al. (2014) datasets
