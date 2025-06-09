@@ -14,6 +14,8 @@ from datasets import Dataset, DatasetDict, ClassLabel, Features, Value
 import pandas as pd
 from tqdm import tqdm
 
+random.seed(42)
+
 # === BASE CLASS ===
 
 
@@ -53,8 +55,57 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
         df = df[df['text'].apply(lambda x: len(re.sub(r'\s+', ' ', x).strip()) > 500)]
         print("number of entries after filtering:", len(df))
       
-        topic_groups = df.groupby('topic')
-        n_pairs = 2
+        topics = df['topic'].unique().tolist()
+        random.shuffle(topics)
+
+        split_idx = int(0.8 * len(topics))
+        train_topics = set(topics[:split_idx])
+        test_topics = set(topics[split_idx:])
+
+        def generate_pairs(topic_subset, n_pairs=2):
+            topic_df = df[df['topic'].isin(topic_subset)]
+            topic_groups = topic_df.groupby('topic')
+            pairs = []
+
+            for topic, group in topic_groups:
+                data = group.to_dict(orient='records')
+
+                # Group texts by author
+                author_groups = {}
+                for item in data:
+                    author_groups.setdefault(item['id'], []).append(item)
+
+                # Same-author pairs
+                for author, texts in author_groups.items():
+                    if len(texts) < 2:
+                        continue
+                    selected = random.sample(texts, min(n_pairs*2, len(texts)))
+                    random.shuffle(selected)
+                    for i in range(0, len(selected) - 1, 2):
+                        a, b = selected[i], selected[i + 1]
+                        pairs.append({
+                            "pair": [a['text'], b['text']],
+                            "authors": [author, author],
+                            "same": True
+                        })
+
+                # Different-author pairs
+                authors = list(author_groups.keys())
+                if len(authors) > 1:
+                    sampled_authors = random.sample(authors, min(n_pairs*4, len(authors)))
+                    for i in range(0, len(sampled_authors) - 1, 2):
+                        a1, a2 = sampled_authors[i], sampled_authors[i + 1]
+                        if a1 == a2 or not author_groups[a1] or not author_groups[a2]:
+                            continue
+                        t1 = random.choice(author_groups[a1])
+                        t2 = random.choice(author_groups[a2])
+                        pairs.append({
+                            "pair": [t1['text'], t2['text']],
+                            "authors": [a1, a2],
+                            "same": False
+                        })
+            return pairs
+        
 
         features = Features({
             "pair": [Value("string")],
@@ -62,57 +113,13 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
             "same": Value("bool")
         })
 
-        all_pairs = []
+        train_pairs = generate_pairs(train_topics)
+        test_pairs = generate_pairs(test_topics)
 
-        for topic, group in topic_groups:
-            data = group.to_dict(orient='records')
-
-            # Group texts by author id
-            author_groups = {}
-            for item in data:
-                author_groups.setdefault(item['id'], []).append(item)
-
-            # One same-author pair per topic (if possible)
-            for author, texts in author_groups.items():
-                if len(texts) < 2:
-                    continue
-                text_pairs = random.sample(texts, min(n_pairs*2, len(texts)))
-                random.shuffle(text_pairs)   # avoid systematic bias
-                
-                for i in range(0, len(text_pairs) - 1, 2):
-                    a = text_pairs[i]
-                    b = text_pairs[i + 1]
-                    all_pairs.append({
-                        "pair": [a['text'], b['text']], # FIXME: maybe directly text
-                        "authors": [author, author],#[a['id'], b['id']],
-                        "same": True
-                    })
-              
-
-               
-
-            # One different-author pair per topic (if possible)
-            diff_pair = None
-            authors = list(author_groups.keys())
-            if len(authors) > 1:
-                authors = random.sample(authors, min(n_pairs*2, len(authors)))
-                for i in range(0, len(authors) - 1, 2):
-                    a1 = authors[i]
-                    a2 = authors[i + 1]
-                    if a1 == a2 or len(author_groups[a1]) < 1 or len(author_groups[a2]) < 1:
-                        continue
-                    # Randomly select one text from each author
-                    t1 = random.choice(author_groups[a1])
-                    t2 = random.choice(author_groups[a2])
-
-                    all_pairs.append({
-                        "pair": [t1['text'], t2['text']], # FIXME: maybe directly text
-                        "authors": [a1, a2],
-                        "same": False
-                    })
-                   
-
-        return DatasetDict({"train": Dataset.from_list(all_pairs, features=features)})
+        return DatasetDict({
+            "train": Dataset.from_list(train_pairs, features=features),
+            "test": Dataset.from_list(test_pairs, features=features)
+        })
 
 
 
