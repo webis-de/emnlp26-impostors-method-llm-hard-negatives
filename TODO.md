@@ -19,16 +19,17 @@
 - Sources:
   - [x] **Gutenberg books** (same vs. different author) — long text quality example  
     - [x] Acquisition of dataset: Koppel Webis dataset contains texts also present in Gutenberg
-    - [ ] Imposter  
+    - [x] Imposter  
     - [x] Unmasking  
   - [ ] **Fanfiction dataset (PAN20)**  
     - [x] Acquisition of dataset
     - [x] Imposter  
-    - [ ] Unmasking  
+    - [o] Unmasking  
   - [ ] **Koppel et al. (2014) dataset**  
     - [x] Acquisition of dataset: [Blog posts](https://www.kaggle.com/datasets/rtatman/blog-authorship-corpus?resource=download)
-      - [ ] Imposter  
+      - [x] Imposter  
       - [x] Unmasking  
+      - [ ] Add test split for Huggingface dataset
     - [ ] Acquisition of dataset _Student essays_: James W. Pennebaker is looking for it, Moshe Koppel no longer has it
       - [ ] Imposter  
       - [ ] Unmasking  
