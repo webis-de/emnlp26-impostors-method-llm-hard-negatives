@@ -67,8 +67,8 @@
   - High inference/experiment cost is okay  
   - Controlled scenario is the goal  
 - [ ] Implement:
-    [ ] Imposter via **LLMs**
-    [x] Imposter via **similar content**  
+    - [ ] Imposter via **LLMs**
+    - [x] Imposter via **similar content**  
     - Koppel et al. (2014) imposter approaches (baseline for modern version)
       [x] On-the-fly generation of imposter texts (same topic)
       [x] Blog imposter texts (same genre)
