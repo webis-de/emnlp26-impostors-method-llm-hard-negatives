@@ -4,7 +4,7 @@ import itertools
 import json
 import os
 from pathlib import Path
-from random import sample
+from random import choices, sample
 import re
 import sys
 from typing import Iterable, List, Literal
@@ -58,6 +58,8 @@ class ImpostorDetector(DetectorBase):
         imposter_technique: Literal["llm", "text_len", "n_docs", "on-the-fly", "blogs", "fixed", "content"] = "text_len",
         path2imp: str = CONFIG.PATH2GENERIC_ON_FLY_IMP,  # path to impostor file, where fixed impostors are saved or where to save generated impostors
         real_time_generation: bool = False,  # whether to generate impostors in real-time or use pre-generated ones
+        min_n_tokens: int = 500,  # minimum number of tokens to consider input sequence valid, defaults to 500
+        upsample: bool = True,  # whether to upsample short texts (default: True, i.e. upsample) or skip them 
     ):
         """
         :param rounds: number of random feature selection rounds, Koppel et Al. (2014) use 100
@@ -77,6 +79,8 @@ class ImpostorDetector(DetectorBase):
             - "blogs": use blogs to obtain same genre impostors (Koppel et. Al. (2014), not implemented yet)
         :param path2imp: path to the impostor file, where fixed impostors are saved or where to save generated impostors
         :param real_time_generation: whether to generate impostors in real-time or use pre-generated ones (default: False, i.e. use pre-generated impostors)
+        :param min_n_tokens: minimum number of tokens to consider input sequence valid, defaults to 500 (Bevendorff et Al. (2019): 500 words)
+        :param upsample: whether to upsample short texts (default: True, i.e. upsample acc. to Bevendorff (2019)) or skip them (Bevendorff et Al. (2019)/ Koppel et. Al (2014) at 500 words)
         """
 
         self.rounds = rounds
@@ -89,6 +93,9 @@ class ImpostorDetector(DetectorBase):
         self.threshold = threshold
         self.path2imp = path2imp
         self.real_time_generation = real_time_generation
+        self.min_n_tokens = min_n_tokens
+        self.upsample = upsample
+        
         if imposter_technique == "llm":
             self.imposter_generator = ImposterGenerator.LLMImposterGenerator(n_impostors=self.n_impostors)
         elif imposter_technique == "n_docs":
@@ -105,6 +112,29 @@ class ImpostorDetector(DetectorBase):
         else: 
             self.imposter_generator = ImposterGenerator.TextLenImposterGenerator(n_impostors=self.n_impostors)
     
+    @staticmethod
+    def bootstrap_tokens(tokens, n_tokens:int=500):
+        """
+         Samples `n_tokens` from the input token sequence using bootstrapping. If the desired number of tokens
+        exceeds the size of the input sequence, sampling continues with replacement. This strategy reflects 
+        the procedure outlined in Bevendorff et al. (2019).
+
+        :param tokens: sequence of tokens
+        :param n_tokens: number of tokens to sample from input sequence, defaults to 500
+        :return: list of sampled tokens
+
+        References:
+        ===========
+        Janek Bevendorff, Benno Stein, Matthias Hagen, and Martin Potthast. 2019. Generalizing Unmasking for Short Texts. In Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies, Volume 1 (Long and Short Papers), pages 654–659, Minneapolis, Minnesota. Association for Computational Linguistics.
+        """
+        if not tokens:
+            raise ValueError("Cannot bootstrap tokens from an empty sequence.")
+        tokens = list(tokens)                                   # mutable copy
+        sampled = sample(tokens, min(n_tokens, len(tokens)))    # without replacement
+        remaining = max(0, n_tokens - len(tokens))
+        sampled.extend(choices(tokens, k=remaining))             # with replacement
+
+        return sampled
 
     def get_scores(self, text: Iterable[str]) -> List[float]:
         """
@@ -150,19 +180,31 @@ class ImpostorDetector(DetectorBase):
             int
         )  # id is index of pair (i.e, length is half of the input text list)
         for i, t in enumerate(batched(text, 2, strict=True)):
-              # TODO: check text length, if too short, i.e. less than 500 `words`(unclear which unit from Koppel et. Al. (2014)), skip?
-            if len(self.tokenize_whitespace(t[0])) + len(self.tokenize_whitespace(t[1])) < 1000:
+            text_left, text_right = t[0], t[1]
+            len_ws_token_left = len(self.tokenize_whitespace(text_left))
+            len_ws_token_right = len(self.tokenize_whitespace(text_right))
+
+            # check text length, if too short, i.e. less than 500 `words` (acc. to Koppel et. Al. (2014) -> invalid; acc. to Bevendorff (2019) -> upsample)
+            if (len_ws_token_left + len_ws_token_right < 2 * self.min_n_tokens) and not self.upsample:  # skip
                 continue
+
+            # upsample short texts to the minimum number of tokens
+            if len_ws_token_left < self.min_n_tokens:
+                text_left = ' '.join(self.bootstrap_tokens(self.tokenize_whitespace(text_left), n_tokens=self.min_n_tokens))
+            if len_ws_token_right < self.min_n_tokens:
+                text_right = ' '.join(self.bootstrap_tokens(self.tokenize_whitespace(text_right), n_tokens=self.min_n_tokens))
           
             # TODO: preprocessing: remove punctuation, lowercasing, remove html tags (e.g., <nl>), etc.?
             # Koppel et Al. (2014) do not normalize text pairs, but without normalization, the results are terrible. 
             # Does not make sense, bc 	idiosyncrasies of authors are not captured when using stemmed text.
             # Kontrolliere Situation
-            tokens_left = self.tokenizer(self.normalize_text(t[0]))
-            tokens_right = self.tokenizer(self.normalize_text(t[1]))
+
+            # Koppel et Al. (2014) use documents of length 500 words exactly -> we crop at min_n_tokens
+            tokens_left = self.tokenizer(self.normalize_text(text_left))[:self.min_n_tokens]  
+            tokens_right = self.tokenizer(self.normalize_text(text_right))[:self.min_n_tokens] 
 
             if len(tokens_left) == 0 or len(tokens_right) == 0:
-                print("Skipping empty text pair: Left: {}, Right: {}".format(t[0], t[1]))
+                print("Skipping empty text pair: Left: {}, Right: {}".format(text_left, text_right))
                 continue
 
             # frequencies as Counter (subclass of defaultdict(int))
@@ -190,8 +232,8 @@ class ImpostorDetector(DetectorBase):
 
             store = {
                 # TODO: if I knew >=1 author, i could choose imposters based on similar number of documents written (like paper)
-                "left": {"tfidf": x_left, "tokens": tokens_left, "text": t[0], "author": "unknown"},
-                "right": {"tfidf": x_right, "tokens": tokens_right, "text": t[1], "author": "unknown"},
+                "left": {"tfidf": x_left, "tokens": tokens_left, "text": text_left, "author": "unknown"},
+                "right": {"tfidf": x_right, "tokens": tokens_right, "text": text_right, "author": "unknown"},
             }
 
             # two iterations, generating imposters for each candidate once
