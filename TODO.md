@@ -8,7 +8,7 @@
 
 - Control:
   - topic, genre, register  
-  - $\neq$ PAN23: Cross-Discourse Type AV (e.g. essay vs. email)
+  - $\neq$ [PAN23](https://fold.aston.ac.uk/handle/123456789/17): Cross-Discourse Type AV (e.g. essay vs. email)
 
 - Requirements:
   - [ ] No format (paragraphs, layout, title) — plain text only  
@@ -80,4 +80,4 @@
   - Find & use ~~(maybe on Ceph)~~
 - If paper unclear → make informed decisions
 - Extend the paper if needed  
-- [ ] Improve README file to include all steps to get repo running, i.e. which datasets to download, and which scripts to run to convert them to the right format (Huggingface datasets format), etc.
+- [x] Improve README file to include all steps to get repo running, i.e. which datasets to download, and which scripts to run to convert them to the right format (Huggingface datasets format), etc.
