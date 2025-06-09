@@ -29,7 +29,7 @@
     - [x] Acquisition of dataset: [Blog posts](https://www.kaggle.com/datasets/rtatman/blog-authorship-corpus?resource=download)
       - [x] Imposter  
       - [x] Unmasking  
-      - [ ] Add test split for Huggingface dataset
+      - [x] Add test split for Huggingface dataset
     - [ ] Acquisition of dataset _Student essays_: James W. Pennebaker is looking for it, Moshe Koppel no longer has it
       - [ ] Imposter  
       - [ ] Unmasking  
