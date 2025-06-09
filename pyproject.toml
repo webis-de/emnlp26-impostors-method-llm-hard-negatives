@@ -29,6 +29,7 @@ more-itertools = "^10.7.0"
 serpapi = "^0.1.5"
 spacy = "^3.8.7"
 dotenv = "^0.9.9"
+sentence-transformers = "^4.1.0"
 
 [build-system]
 requires = ["poetry-core"]
