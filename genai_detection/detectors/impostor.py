@@ -55,7 +55,7 @@ class ImpostorDetector(DetectorBase):
         tfidf_freqs=True,
         n_impostors=25,
         threshold=0.1,
-        imposter_technique: Literal["llm", "text_len", "n_docs", "on-the-fly", "blogs", "fixed"] = "text_len",
+        imposter_technique: Literal["llm", "text_len", "n_docs", "on-the-fly", "blogs", "fixed", "content"] = "text_len",
         path2imp: str = CONFIG.PATH2GENERIC_ON_FLY_IMP,  # path to impostor file, where fixed impostors are saved or where to save generated impostors
         real_time_generation: bool = False,  # whether to generate impostors in real-time or use pre-generated ones
     ):
@@ -100,6 +100,8 @@ class ImpostorDetector(DetectorBase):
             self.imposter_generator = ImposterGenerator.GoogleSearchImposterGenerator(api_key=CONFIG.SERPAPI_KEY)
         elif imposter_technique == "blogs":
             self.imposter_generator = ImposterGenerator.BlogImposterGenerator(n_impostors=self.n_impostors)
+        elif imposter_technique == "content":
+            self.imposter_generator = ImposterGenerator.ContentImposterGenerator(n_impostors=self.n_impostors)
         else: 
             self.imposter_generator = ImposterGenerator.TextLenImposterGenerator(n_impostors=self.n_impostors)
     

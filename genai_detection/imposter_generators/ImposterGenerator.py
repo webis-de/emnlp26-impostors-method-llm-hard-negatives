@@ -8,6 +8,7 @@ import sys
 from typing import List, Dict
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from sentence_transformers import SentenceTransformer, util
 import random
 import numpy as np
 import pandas as pd
@@ -52,6 +53,51 @@ class BaseImposterGenerator(ABC):
         if len(ds) == 0:
             raise ValueError("Dataset split is empty.")
         return ds
+
+
+class ContentImposterGenerator(BaseImposterGenerator):
+    def __init__(self, n_impostors: int, model_name: str = "all-MiniLM-L6-v2", split:str='test'):
+        """
+        :param n_impostors: number of impostors to generate
+        :param model_name: embedding model from sentence-transformers
+        :param split: dataset split to use (default: 'test')
+        """
+        self.n_impostors = n_impostors
+        self.model = SentenceTransformer(model_name)
+        self.split = split
+
+    def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> List[str]:
+        """
+        Generates imposters from a pre-defined dataset.
+        :param text: input text to generate imposters for (not used in this implementation)
+        :param path2imp: path to the dataset file containing imposters, i.e. fixed Huggingface dataset
+        :param real_time_generation: not used in this implementation, but kept for interface consistency
+        :return: dictionary of imposters with keys as ids and values as texts
+        """
+        ds = self._get_dataset_split_from_path(path2imp)
+        sampled = ds.shuffle().select(range(min(len(ds), self.n_impostors)))
+        # select n_impostors entries which are most similar to the input text in terms of content
+        candidate_texts = []
+        for entry in sampled:
+            pair = entry.get("pair", [])
+            candidate_texts.extend(pair)
+
+        if not candidate_texts:
+            raise ValueError("No candidate texts found.")
+
+        # compute embeddings
+        # TODO: preprocess text to remove special characters, punctuation, etc.?
+        text_embedding = self.model.encode(text, convert_to_tensor=True)
+        candidate_embeddings = self.model.encode(candidate_texts, convert_to_tensor=True)
+
+        # compute cosine similarity
+        similarities = util.cos_sim(text_embedding, candidate_embeddings)[0]
+
+        #  top-n most similar
+        top_indices = similarities.topk(self.n_impostors).indices.tolist()
+        selected_texts = [candidate_texts[i] for i in top_indices]
+
+        return {f"imposter_{i}": imp for i, imp in enumerate(selected_texts)}
 
 
 class GoogleSearchImposterGenerator(BaseImposterGenerator):
@@ -303,9 +349,6 @@ class TextLenImposterGenerator(BaseImposterGenerator):
         return {f"imposter_{i}": imp for i, imp in enumerate(selected)}
 
 
-    
-
-    
 class NDocsImposterGenerator(BaseImposterGenerator):
     def __init__(self, n_impostors: int):
         """
