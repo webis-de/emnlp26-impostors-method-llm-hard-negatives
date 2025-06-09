@@ -2,7 +2,7 @@
 name = "generative-ai-detection"
 version = "0.1.0"
 description = "Generative AI Detection Research Code"
-authors = ["Janek Bevendorff <janek.bevendorff@uni-weimar.de>"]
+authors = ["Klara M. Gutekunst <klara.gutekunst@uni-kassel.de>", "Janek Bevendorff <janek.bevendorff@uni-weimar.de>"]
 readme = "README.md"
 packages = [
     { include = "genai_detection" },
