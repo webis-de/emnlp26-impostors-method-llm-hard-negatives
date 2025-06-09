@@ -76,7 +76,7 @@
 - [ ] Implement **upsampling** for texts < 500 words (cf. [Bevendorff Paper](https://aclanthology.org/N19-1068/)) 
 - [ ] Use **exactly 500 words** per text (text length is a confounder)  
 - [ ] Use Koppel et al. (2014) datasets
-  - Find & use (maybe on Ceph)
+  - Find & use ~~(maybe on Ceph)~~
 - If paper unclear → make informed decisions
 - Extend the paper if needed  
 - [ ] Improve README file to include all steps to get repo running, i.e. which datasets to download, and which scripts to run to convert them to the right format (Huggingface datasets format), etc.
