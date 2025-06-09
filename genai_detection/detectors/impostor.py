@@ -90,7 +90,7 @@ class ImpostorDetector(DetectorBase):
         self.path2imp = path2imp
         self.real_time_generation = real_time_generation
         if imposter_technique == "llm":
-            raise NotImplementedError("LLM-based impostor generation is not implemented.")
+            self.imposter_generator = ImposterGenerator.LLMImposterGenerator(n_impostors=self.n_impostors)
         elif imposter_technique == "n_docs":
             # TODO: I need author names for this
             self.imposter_generator = ImposterGenerator.NDocsImposterGenerator(n_impostors=self.n_impostors)
@@ -101,7 +101,7 @@ class ImpostorDetector(DetectorBase):
         elif imposter_technique == "blogs":
             self.imposter_generator = ImposterGenerator.BlogImposterGenerator(n_impostors=self.n_impostors)
         else: 
-            self.imposter_generator = ImposterGenerator.TextLenImposterGenerator(n_imposter=self.n_impostors)
+            self.imposter_generator = ImposterGenerator.TextLenImposterGenerator(n_impostors=self.n_impostors)
     
 
     def get_scores(self, text: Iterable[str]) -> List[float]:
