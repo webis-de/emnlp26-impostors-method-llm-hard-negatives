@@ -73,8 +73,8 @@
       - [x] On-the-fly generation of imposter texts (same topic)
       - [x] Blog imposter texts (same genre)
       - [x] Fixed texts (possibly different topic, genre, register)
-- [ ] Implement **upsampling** for texts < 500 words (cf. [Bevendorff Paper](https://aclanthology.org/N19-1068/)) 
-- [ ] Use **exactly 500 words** per text (text length is a confounder)  
+- [x] Implement **upsampling** for texts < 500 words (cf. [Bevendorff Paper](https://aclanthology.org/N19-1068/)) 
+- [x] Use **exactly 500 words** per text (text length is a confounder)  
 - [ ] Use Koppel et al. (2014) datasets
   - Find & use ~~(maybe on Ceph)~~
 - If paper unclear → make informed decisions
