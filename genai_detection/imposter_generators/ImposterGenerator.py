@@ -26,6 +26,13 @@ load_dotenv()
 
 class BaseImposterGenerator(ABC):
     """Abstract base class for generating imposters."""
+    def __init__(self, n_impostors: int, split:str='test'):
+        """
+        :param n_impostors: number of impostors to generate
+        :param split: dataset split to use (default: 'test')
+        """
+        self.n_impostors = n_impostors
+        self.split = split
 
     @abstractmethod
     def generate_imposters(self, text:str, path2imp:str=None, real_time_generation:bool=False) -> dict:
@@ -62,9 +69,8 @@ class ContentImposterGenerator(BaseImposterGenerator):
         :param model_name: embedding model from sentence-transformers
         :param split: dataset split to use (default: 'test')
         """
-        self.n_impostors = n_impostors
+        super().__init__(n_impostors=n_impostors, split=split)
         self.model = SentenceTransformer(model_name)
-        self.split = split
 
     def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> List[str]:
         """
@@ -119,6 +125,7 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
         :param n_min_words: minimum number of words in a query (default: 3)
         :param n_max_words: maximum number of words in a query (default: 5)
         """
+        super().__init__(n_impostors=num_queries * results_per_query)
         self.api_key = api_key
         self.num_queries = num_queries
         self.results_per_query = results_per_query
@@ -320,8 +327,7 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
     
 class TextLenImposterGenerator(BaseImposterGenerator):
     def __init__(self, n_impostors: int, split:str='test'):
-        self.n_impostors = n_impostors
-        self.split = split
+        super().__init__(n_impostors=n_impostors, split=split)
 
     def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False, valid_relative_text_len_dif:float=0.3) -> List[str]:
         ds = self._get_dataset_split_from_path(path2imp)
@@ -356,7 +362,7 @@ class NDocsImposterGenerator(BaseImposterGenerator):
         ===========
         Kocher, Mirco, and Jacques Savoy. ‘UniNE at CLEF 2015: Author Identification’, 2015.
         """
-        self.n_impostors = n_impostors
+        super().__init__(n_impostors=n_impostors)
 
     def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> List[str]:
         pass
@@ -380,8 +386,7 @@ class FixedImposterGenerator(BaseImposterGenerator):
         ===========
         Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’. Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
         """
-        self.n_impostors = n_impostors
-        self.split = split
+        super().__init__(n_impostors=n_impostors, split=split)
  
 
     def generate_imposters(self, text: str, path2imp:Path=None, real_time_generation:bool=False) -> List[str]:
@@ -409,9 +414,9 @@ class FixedImposterGenerator(BaseImposterGenerator):
 
 
 class BlogImposterGenerator(FixedImposterGenerator):
-    def __init__(self, n_impostors: int):
-        super().__init__(n_impostors=n_impostors, split='train')    # Blog has only train split
-
+    def __init__(self, n_impostors: int, split:str='test'):
+        super().__init__(n_impostors=n_impostors, split=split) 
+        
     def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> List[str]:
         """Generates imposters from the Blog dataset.
         :param text: input text to generate imposters for (not used in this implementation)
