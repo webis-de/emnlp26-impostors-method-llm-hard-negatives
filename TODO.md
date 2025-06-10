@@ -21,7 +21,7 @@
     - [x] Acquisition of dataset: Koppel Webis dataset contains texts also present in Gutenberg
     - [x] Imposter  
     - [x] Unmasking  
-  - [ ] **Fanfiction dataset (PAN20)**  
+  - [x] **Fanfiction dataset (PAN20)**  
     - [x] Acquisition of dataset
     - [x] Imposter  
     - [x] Unmasking  
