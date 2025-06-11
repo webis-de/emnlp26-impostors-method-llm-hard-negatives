@@ -328,6 +328,7 @@ class Pan25DatasetLoader(BaseDatasetLoader):
 
 
 def run_pan23(base_dir:str, save_path:str):
+    base_dir = Path(__file__).resolve().parent / base_dir
     train_dir = os.path.join(base_dir, "pan23-authorship-verification-training-dataset")
     test_dir = os.path.join(base_dir, "pan23-authorship-verification-test-dataset")
     output_dir = os.path.join(save_path, "pan23-dataset-converted")
@@ -338,7 +339,7 @@ def run_pan23(base_dir:str, save_path:str):
     # print("PAN23 example:", dataset["train"][0])
 
 def run_pan20():
-    base_dir = "data/datasets/pan20-authorship-verification/"
+    base_dir = Path(__file__).resolve().parent / "data/datasets/pan20-authorship-verification/"
     train_dir = os.path.join(base_dir, "pan20-authorship-verification-training-dataset")
     test_dir = os.path.join(base_dir, "pan20-authorship-verification-test-dataset")
     output_dir = os.path.join(base_dir, "pan20-dataset-converted")
@@ -350,7 +351,7 @@ def run_pan20():
 
 
 def run_pan25():
-    base_dir = "data/datasets/dataset-extended-2025-part/"
+    base_dir = Path(__file__).resolve().parent / "data/datasets/dataset-extended-2025-part/"
     human_dir = os.path.join(base_dir, "human")
     machine_dir = os.path.join(base_dir, "machines")
     train_ids_path = os.path.join(base_dir, "ids-train.txt")
@@ -363,7 +364,7 @@ def run_pan25():
     # print("PAN25 example:", dataset["train"][0])
 
 def run_koppel_webis():
-    base_dir = "data/datasets/corpus-webis-authorship/koppel/"
+    base_dir = Path(__file__).resolve().parent / "data/datasets/corpus-webis-authorship/koppel/"
     output_dir = os.path.join(base_dir, "koppel-webis-dataset-converted")
 
     loader = KoppelWebisDatasetLoader(path=base_dir)
@@ -372,8 +373,8 @@ def run_koppel_webis():
     # print("Koppel Webis example:", dataset["train"][0])
 
 def run_blog_corpus():
-    sys.path.append(os.path.abspath(".."))
-    base_dir = Path("data/datasets/Blog_corpus/")
+    # sys.path.append(os.path.abspath(".."))
+    base_dir = Path(__file__).resolve().parent / "data/datasets/Blog_corpus/"
     output_dir = base_dir / "blog-dataset-converted"
 
     loader = BlogCorpusDatasetLoader(path=base_dir / "blogtext.csv")
