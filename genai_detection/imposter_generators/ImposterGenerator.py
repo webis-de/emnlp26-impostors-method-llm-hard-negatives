@@ -52,7 +52,7 @@ class BaseImposterGenerator(ABC):
         path2imp = Path(path2imp)     
         if not path2imp.exists():
             raise FileNotFoundError(f"Training data not found at {path2imp}")
-        dataset = load_from_disk(os.path.join(os.path.abspath(".."), path2imp))
+        dataset = load_from_disk(os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")), path2imp))  # TODO: for notebook ..
         if self.split not in dataset:
             raise ValueError(f"Dataset {path2imp} does not contain '{self.split}' split.")
         
