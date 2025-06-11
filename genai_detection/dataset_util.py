@@ -378,6 +378,8 @@ def run_blog_corpus():
     assert base_dir.exists(), f"Base directory {base_dir} does not exist. Current path: {os.getcwd()}"
     output_dir = base_dir / "blog-dataset-converted"
 
+    print(f"Elements in base_dir: {list(base_dir.iterdir())}")
+
     loader = BlogCorpusDatasetLoader(path=base_dir / "blogtext.csv")
     dataset = loader.load()
     dataset.save_to_disk(output_dir)
