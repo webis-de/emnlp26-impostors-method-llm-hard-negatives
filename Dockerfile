@@ -6,8 +6,6 @@ FROM python:3.11-slim
 COPY pyproject.toml poetry.lock README.md /opt/artificial-authorship-verification/
 WORKDIR /opt/artificial-authorship-verification
 
-COPY . /opt/artificial-authorship-verification/
-
 # Install Poetry and dependencies
 RUN --mount=type=cache,target=/root/.cache \
     pip install --upgrade pip && \
