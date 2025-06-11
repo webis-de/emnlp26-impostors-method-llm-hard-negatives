@@ -375,6 +375,7 @@ def run_koppel_webis():
 def run_blog_corpus():
     # sys.path.append(os.path.abspath(".."))
     base_dir = Path(__file__).resolve().parent / "data/datasets/Blog_corpus/"
+    assert base_dir.exists(), f"Base directory {base_dir} does not exist. Current path: {os.getcwd()}"
     output_dir = base_dir / "blog-dataset-converted"
 
     loader = BlogCorpusDatasetLoader(path=base_dir / "blogtext.csv")
