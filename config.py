@@ -20,6 +20,8 @@ class BaseConfig:
     PAN20 = "pan20"
     KOPPEL = "koppel"
     BLOG = "blog"
+    IMPOSTER = "imposter"
+    UNMASKING = "unmasking"
 
 class ServerConfig(BaseConfig):
     SERVER = True
