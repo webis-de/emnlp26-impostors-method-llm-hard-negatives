@@ -400,8 +400,8 @@ if __name__ == "__main__":
    
     args = parser.parse_args()
 
-    # run_pan23(base_dir=args.path, save_path=args.out)
+    run_pan23(base_dir=args.path, save_path=args.out)
     # run_pan25()
-    # run_pan20()
-    # run_koppel_webis()
+    run_pan20()
+    run_koppel_webis()
     run_blog_corpus()
