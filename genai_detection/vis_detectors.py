@@ -1,3 +1,4 @@
+import argparse
 import os
 from pathlib import Path
 import re
@@ -288,6 +289,60 @@ class VisDetectors:
     
 
 if __name__ == "__main__":
-    # Example usage
-    vis_det = VisDetectors(dataset=CONFIG.PAN20, imposter_args={'rounds': 5, 'top_n': 10, 'path2imp':CONFIG.PATH2PAN20, 'imposter_technique':'fixed'}, detectors=[CONFIG.IMPOSTER, CONFIG.UNMASKING])
-    vis_det.visualize(balanced=True)
+    parser = argparse.ArgumentParser(
+        description="Compare detectors."
+    )
+    parser.add_argument(
+        "--rounds",
+        type=int,
+        default=100,
+        help="Number of rounds (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--top_n",
+        type=int,
+        default=100000,
+        help="Number of top space-free ngrams to consider (default: %(default)s)",
+    )
+
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        choices=[CONFIG.PAN20, CONFIG.PAN23, CONFIG.PAN25, CONFIG.KOPPEL, CONFIG.BLOG],
+        default=CONFIG.PAN20,
+        help="Dataset to use for visualization (default: %(default)s)",
+    )
+
+    parser.add_argument(
+        "--imposter_technique",
+        type=str,
+        choices=["llm", "text_len", "n_docs", "on-the-fly", "blogs", "fixed", "content"],
+        default='fixed',
+        help="Imposter technique to use (default: %(default)s)",
+    )
+
+    parser.add_argument(
+        "--path2imp",
+        type=str,
+        default=CONFIG.PATH2PAN20,
+        help="Path to the imposter dataset (default: %(default)s)",
+    )
+
+    parser.add_argument(
+        "--balanced",
+        type=bool,
+        default=True,
+        help="Whether the number of same and different author pairs from dataset is balanced (default: %(default)s)",
+    )
+
+    parser.add_argument(
+        "--upsample",
+        type=bool,
+        default=True,
+        help="Whether texts below 500 words should be skipped or upsampled (default: %(default)s)",
+    )
+   
+    args = parser.parse_args()
+    
+    vis_det = VisDetectors(dataset=args.dataset, imposter_args={'rounds': args.rounds, 'top_n': args.top_n, 'path2imp': args.path2imp, 'imposter_technique':args.imposter_technique, 'upsample':args.upsample}, detectors=[CONFIG.IMPOSTER, CONFIG.UNMASKING])
+    vis_det.visualize(balanced=args.balanced)
