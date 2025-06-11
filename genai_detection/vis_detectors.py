@@ -27,7 +27,12 @@ class VisDetectors:
         self.savefig_base = Path.cwd() / CONFIG.SAVE_PATH
   
     def _format_title(self, base, kwargs):
-        return base + "\n" + ", ".join(f"{k}={v}" for k, v in kwargs.items() if k != 'path2imp') if kwargs else base
+        items = [f"{k}={v}" for k, v in kwargs.items() if k != 'path2imp']
+        # Insert a newline after every 2 items
+        lines = []
+        for i in range(0, len(items), 2):
+            lines.append(", ".join(items[i:i+2]))
+        return base + "\n" + "\n".join(lines)
 
 
     def visualize(self, balanced:bool = False) -> None:
@@ -213,7 +218,7 @@ class VisDetectors:
         plt.scatter(0.222, 0.902, marker='x', color='red', label=r'Koppel et. Al. (2014) for $\sigma*=0.8$, $500$ authors') 
         plt.xlabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
         plt.ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
-        title = "Precision-Recall Curve" if not title_kwargs else f"Precision-Recall Curve\n{title_kwargs}"
+        title = self._format_title(base="Precision-Recall Curve", kwargs=title_kwargs)
         plt.title(title)
         plt.legend()
         plt.tight_layout()
@@ -243,28 +248,32 @@ class VisDetectors:
         axes[0, 0].plot(thresholds, f1s)
         axes[0, 0].set_xlabel("Threshold")
         axes[0, 0].set_ylabel("F1 Score $\\frac{{2 \\cdot P \\cdot R}}{{P + R}}$", fontsize=14)
-        axes[0, 0].set_title("Threshold vs F1 Score" if not title_kwargs else f"Threshold vs F1 Score\n{title_kwargs}")
+        title = self._format_title(base="Threshold vs F1 Score", kwargs=title_kwargs)
+        axes[0, 0].set_title(title)
         axes[0, 0].grid(True)
 
         # Plot 2: Accuracy vs Threshold
         axes[0, 1].plot(thresholds, accs)
         axes[0, 1].set_xlabel("Threshold")
         axes[0, 1].set_ylabel("Accuracy Score $\\frac{{TP + TN}}{{N}}$", fontsize=14)
-        axes[0, 1].set_title("Threshold vs Accuracy Score" if not title_kwargs else f"Threshold vs Accuracy Score\n{title_kwargs}")
+        title = self._format_title(base="Threshold vs Accuracy Score", kwargs=title_kwargs)
+        axes[0, 1].set_title(title)
         axes[0, 1].grid(True)
 
         # Plot 3: Precision vs Threshold
         axes[1, 0].plot(pr_thresholds, precision[:-1])
         axes[1, 0].set_xlabel("Threshold")
         axes[1, 0].set_ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
-        axes[1, 0].set_title("Threshold vs Precision Score" if not title_kwargs else f"Threshold vs Precision Score\n{title_kwargs}")
+        title = self._format_title(base="Threshold vs Precision Score", kwargs=title_kwargs)
+        axes[1, 0].set_title(title)
         axes[1, 0].grid(True)
 
         # Plot 4: Recall vs Threshold
         axes[1, 1].plot(pr_thresholds, recall[:-1])
         axes[1, 1].set_xlabel("Threshold")
         axes[1, 1].set_ylabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
-        axes[1, 1].set_title("Threshold vs Recall Score" if not title_kwargs else f"Threshold vs Recall Score\n{title_kwargs}")
+        title = self._format_title(base="Threshold vs Recall Score", kwargs=title_kwargs)
+        axes[1, 1].set_title(title)
         axes[1, 1].grid(True)
 
 
