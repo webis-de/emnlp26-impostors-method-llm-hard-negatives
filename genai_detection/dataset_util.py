@@ -387,7 +387,7 @@ def run_blog_corpus():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Evaluate classifiers on Curlie dataset and save metrics to CSV/Parquet."
+        description="Run Dataset creation."
     )
     parser.add_argument(
         "--path",
