@@ -119,4 +119,4 @@ Then, you can build and push the image using the following command:
 `docker compose build --push` builds the image and pushes it to the Webis registry (using `docker-compose.yaml`).
 Instructions followed during the building process are specified in the `Dockerfile` and `docker-compose.yaml`.
 
-View image at registry at [gitlab project](https://git.webis.de/code-research/theses/artificial-authorship-verification/container_registry/1461).
+View image at registry at [GitLab project](https://git.webis.de/code-research/theses/artificial-authorship-verification/container_registry/1461).
