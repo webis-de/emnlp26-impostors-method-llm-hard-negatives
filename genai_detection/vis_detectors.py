@@ -46,8 +46,8 @@ class VisDetectors:
         datasets = {}
         for detector in self.detectors:
             if detector == CONFIG.IMPOSTER:
-                datasets['train'] = self.load_data(split='train')[:20]
-            datasets['test'] = self.load_data(split='test')[:20]
+                datasets['train'] = self.load_data(split='train')
+            datasets['test'] = self.load_data(split='test')
             if balanced:
                 for split, df in datasets.items():
                     size_smaller_class = df['same'].value_counts().min()
