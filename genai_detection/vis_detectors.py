@@ -83,6 +83,10 @@ class VisDetectors:
         fpr, tpr, thresholds = self.plot_decision_threshold_imposter(scores=train_dataset['imposter_score'], labels=train_dataset['same'], title_kwargs=args)
 
         # compute optimal threshold using Youden's J statistic (tpr - fpr)
+        fpr = np.nan_to_num(fpr)
+        tpr = np.nan_to_num(tpr)  # replace NaN with 0
+        fpr.clip(0, 1, out=fpr)  # ensure fpr is in [0, 1]
+        tpr.clip(0, 1, out=tpr)  # ensure tpr is in [0, 1]
         optimal_idx = np.argmax(tpr - fpr)
         optimal_threshold = thresholds[optimal_idx]
 
