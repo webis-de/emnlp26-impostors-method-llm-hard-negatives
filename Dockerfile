@@ -1,5 +1,5 @@
 # docker build -t registry.webis.de/code-research/theses/artificial-authorship-verification .
-FROM python:3.12-slim
+FROM python:3.13-slim
 
 # Copy only dependency-related files
 COPY pyproject.toml poetry.lock /src/
