@@ -7,6 +7,7 @@ from typing import Literal
 from datasets import load_from_disk
 from matplotlib import pyplot as plt
 import numpy as np
+import pandas as pd
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix, f1_score, precision_recall_curve, roc_curve, accuracy_score
 from concurrent.futures import ProcessPoolExecutor
 import seaborn as sns
@@ -17,19 +18,31 @@ from detectors.unmasking import UnmaskingDetector
 
 class VisDetectors:
     """
-    A class to handle visualization of detection results.
-    This class is currently a placeholder and does not implement any functionality.
+    A class to compare detectors on the same dataset.
+    It visualizes the detection results using ROC and Precision-Recall curves, confusion matrices, and decision thresholds.
     """
 
     def __init__(self, dataset, imposter_args=None, detectors:list = None) -> None:
+        """
+        Initializes the VisDetectors class.
+        :param dataset: The name of the dataset to use for visualization.
+        :param imposter_args: Arguments for the ImpostorDetector.
+        :param detectors: List of detectors to visualize. Currenrly implemented: Unmasking and Imposter methods.
+        """
         self.dataset = dataset
         self.imposter_args = imposter_args 
         self.detectors = detectors if detectors is not None else []
-        self.savefig_base = Path.cwd() / CONFIG.SAVE_PATH
+        self.savefig_base = Path.cwd() / CONFIG.SAVE_PATH   # save path relative to the current working directory
   
     def _format_title(self, base, kwargs):
+        """
+        Formats the title for the plots.
+        :param base: The base title.
+        :param kwargs: Additional keyword arguments to include in the title. Structured as a dictionary.
+        :return: A formatted title string excluding path2imp, because paths are too long.
+        """
         items = [f"{k}={v}" for k, v in kwargs.items() if k != 'path2imp']
-        # Insert a newline after every 2 items
+        # newline after every 2 items, for better readability
         lines = []
         for i in range(0, len(items), 2):
             lines.append(", ".join(items[i:i+2]))
@@ -40,17 +53,17 @@ class VisDetectors:
         """
         Visualizes the detection results.
 
-        Parameters:
-            detections (list): A list of detection results to visualize.
+        :param balanced: Whether the number of same and different author pairs from dataset should be balanced (i.e. sampling strategy).
         """
         datasets = {}
         for detector in self.detectors:
-            if detector == CONFIG.IMPOSTER:
+            if detector == CONFIG.IMPOSTER: # imposter finds threshold on training data
                 datasets['train'] = self.load_data(split='train')
-            datasets['test'] = self.load_data(split='test')
+            datasets['test'] = self.load_data(split='test') # scores obtained on test data
             if balanced:
                 for split, df in datasets.items():
                     size_smaller_class = df['same'].value_counts().min()
+                    # ensure target class 'same' is present after being used for grouping
                     datasets[split] = (
                         df.groupby('same', group_keys=False)
                         .apply(lambda x: x.sample(size_smaller_class, random_state=42).assign(same=x['same'].iloc[0]))
@@ -64,10 +77,45 @@ class VisDetectors:
                         raise ValueError("Train or test dataset is empty. Cannot visualize imposters.")
                     self.visualize_imposters(train_dataset, test_dataset, dataset_name=self.dataset)
                 elif detector == CONFIG.UNMASKING:
-                    #self.plot_unmasking_curves(dataset=datasets['test'], dataset_name=self.dataset)
-                    pass
+                    assert not datasets['test'].empty, "Test dataset is empty. Cannot visualize unmasking curves."
+                    self.plot_unmasking_curves(dataset=datasets['test'], dataset_name=self.dataset)
                 else:
                     raise ValueError(f"Detector {detector} is not supported for visualization.")
+    
+    def _get_opt_imp_threshold(self, fpr, tpr, thresholds):
+        """
+        Computes the optimal threshold using Youden's J statistic.
+        If none of the values are valid, it defaults to 0.5.
+
+        :param fpr: False Positive Rate.
+        :param tpr: True Positive Rate.
+        :param thresholds: Thresholds used to compute fpr and tpr.
+        :return: Optimal threshold.
+        """
+        fpr = np.asarray(fpr)
+        tpr = np.asarray(tpr)
+        thresholds = np.asarray(thresholds)
+
+        # validity mask: finite and within [0, 1]
+        valid_mask = (
+            np.isfinite(fpr) & np.isfinite(tpr) & np.isfinite(thresholds) &
+            (fpr >= 0) & (fpr <= 1) & (tpr >= 0) & (tpr <= 1)
+        )
+
+        # check if there are any valid values
+        if np.any(valid_mask):
+            fpr_valid = fpr[valid_mask]
+            tpr_valid = tpr[valid_mask]
+            thresholds_valid = thresholds[valid_mask]
+
+            youden_j = tpr_valid - fpr_valid    # TODO: reference
+            optimal_idx = np.argmax(youden_j)
+            return thresholds_valid[optimal_idx]
+        else:
+            # fallback: No valid data
+            print("Warning: No valid TPR/FPR data available. Defaulting to threshold = 0.5")
+            return 0.5  # or np.nan, depending on your use case
+
 
     def visualize_imposters(self, train_dataset, test_dataset, dataset_name:str) -> None:
         """
@@ -82,34 +130,24 @@ class VisDetectors:
         with ProcessPoolExecutor() as executor:
             train_dataset['imposter_score'] = list(executor.map(impostor_det.get_scores, train_dataset['pair']))
 
-    
         # find threshold that best separates imposters from non-imposters in the training set (targets are in the 'same' column)
         args = self.imposter_args.copy()
         args['dataset'] =  dataset_name
         fpr, tpr, thresholds = self.plot_decision_threshold_imposter(scores=train_dataset['imposter_score'], labels=train_dataset['same'], title_kwargs=args)
 
-        # compute optimal threshold using Youden's J statistic (tpr - fpr)
-        fpr = np.nan_to_num(fpr)
-        tpr = np.nan_to_num(tpr)  # replace NaN with 0
-        fpr.clip(0, 1, out=fpr)  # ensure fpr is in [0, 1]
-        tpr.clip(0, 1, out=tpr)  # ensure tpr is in [0, 1]
-        optimal_idx = np.argmax(tpr - fpr)
-        optimal_threshold = thresholds[optimal_idx]
-
-        # store threshold for later use
-        self.imposter_args['threshold'] = optimal_threshold
+        self.imposter_args['threshold'] = self._get_opt_imp_threshold(fpr, tpr, thresholds)
 
         # work with test dataset
         with ProcessPoolExecutor() as executor:
             test_dataset['imposter_score'] = list(executor.map(impostor_det.get_scores, test_dataset['pair']))
-        test_dataset['is_imposter'] = test_dataset['imposter_score'] >= self.imposter_args['threshold']
+        test_dataset['pred_same'] = test_dataset['imposter_score'] >= self.imposter_args['threshold']
 
-        # 'same' is ground truth, 'is_imposter' is prediction (invert it)
+        # 'same' is ground truth, 'pred_same' is prediction
         y_true = test_dataset['same']
-        y_pred = ~(test_dataset['is_imposter'])  # same=1 → not imposter
+        y_pred = test_dataset['pred_same']
 
         cm = confusion_matrix(y_true, y_pred)
-        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Imposter", "Same Author"])
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Different authors", "Same author"])
 
         disp.plot(cmap=plt.cm.Blues)
         title = self._format_title(base="Confusion Matrix on Test Data", kwargs=self.imposter_args)
@@ -121,13 +159,17 @@ class VisDetectors:
         plt.close()
 
     def plot_unmasking_curves(self, dataset, dataset_name:str=None):
+        """
+        Plots unmasking curves for the given dataset.
+        :param dataset: The dataset containing pairs of texts and their labels.
+        :param dataset_name: The name of the dataset for the plot title and save path.
+        """
+        unmask_det = UnmaskingDetector()
         with ProcessPoolExecutor() as executor:
-            unmask_det = UnmaskingDetector()
             curves = list(executor.map(unmask_det.get_curves, dataset['pair']))
+
         targets = dataset['same'].tolist()
-
         pal = sns.color_palette('husl', 2) 
-
         seen_labels = set()
         for c,l in zip(curves, targets):
             if len(c) == 0:
@@ -153,10 +195,11 @@ class VisDetectors:
         plt.savefig((save_path / filename).with_suffix('.png'))
         plt.close()
 
-    def load_data(self, split:Literal['train', 'test', 'val']) -> None:
+    def load_data(self, split:Literal['train', 'test', 'val']):
         """
         Loads the dataset for visualization.
 
+        :param split: The split of the dataset to load (train, test, or val).
         Returns:
             dataset: The loaded dataset.
         """
@@ -179,20 +222,35 @@ class VisDetectors:
     # ProcessPoolExecutor does not support self, so we need to use a static method
     @staticmethod
     def _metric_at_thresh(scores, targets, threshold):
-            preds = scores >= threshold
-            return (
-                f1_score(targets, preds),
-                accuracy_score(targets, preds)
-            )
+        """
+        Computes F1 and accuracy at a given threshold.
+
+        :param scores: The scores to evaluate.
+        :param targets: The true labels.
+        :param threshold: The threshold to apply.
+        :return: A tuple containing F1 score and accuracy.
+        """
+        preds = scores >= threshold
+        return (
+            f1_score(targets, preds),
+            accuracy_score(targets, preds)
+        )
     
-    def plot_decision_threshold_imposter(self, scores, labels, title_kwargs:dict=None):
-        # scores = normalize_scores(scores) # doesn't not help
+    def plot_decision_threshold_imposter(self, scores:pd.Series, labels:pd.Series, title_kwargs:dict=None):
+        """
+        Plots the decision threshold for the imposter detector using ROC and Precision-Recall curves.
+        :param scores: The imposter scores.
+        :param labels: The true labels (same or different authors).
+        :param title_kwargs: Additional keyword arguments for the plot title.
+        :return: fpr, tpr, roc_thresholds
+        """
         sys.path.append(os.path.abspath(".."))
         save_path = self.savefig_base / 'impostor_scores' / title_kwargs.get('dataset', 'unknown')
         save_path.mkdir(parents=True, exist_ok=True)
 
+        # pd.Series to numpy arrays
         labels = labels.values
-        scores = np.concatenate(scores.values)
+        scores = np.concatenate(scores.values)  # each entry in scores is a one-element list
 
         # ROC Curve: Balanced classes or when you care about TPR vs. FPR
         # displayed for different thresholds
@@ -239,7 +297,6 @@ class VisDetectors:
         
         scores_list = [scores_np] * len(thresholds)
         labels_list = [labels_np] * len(thresholds)
-       
 
         with ProcessPoolExecutor() as executor:
             results = list(executor.map(self._metric_at_thresh, scores_list, labels_list, thresholds))
