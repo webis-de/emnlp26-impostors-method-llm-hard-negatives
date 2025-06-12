@@ -89,7 +89,9 @@ class VisDetectors:
         It is the maximum vertical distance between ROC curve and diagonal line, where the idea is to maximise the difference between true positive rate (TPR) and false positive rate (FPR).
         Youden's J statistic is defined as J = TPR + TNR - 1 = TPR + (−FPR) = TPR - FPR.
         
-        For more information cf. https://www.ibm.com/docs/en/spss-statistics/30.0.0?topic=schemes-area-under-curve (12.06.2025).
+        For more information see:
+        - https://www.ibm.com/docs/en/spss-statistics/30.0.0?topic=schemes-area-under-curve (12.06.2025).
+        - https://en.wikipedia.org/wiki/Youden%27s_J_statistic (12.06.2025).
         If none of the values are valid, it defaults to 0.5.
 
         :param fpr: False Positive Rate.
