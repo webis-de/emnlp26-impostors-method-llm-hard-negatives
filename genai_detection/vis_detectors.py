@@ -85,6 +85,11 @@ class VisDetectors:
     def _get_opt_imp_threshold(self, fpr, tpr, thresholds):
         """
         Computes the optimal threshold using Youden's J statistic.
+        Youden's J statistic is used to select the optimal predicted probability cut off.
+        It is the maximum vertical distance between ROC curve and diagonal line, where the idea is to maximise the difference between true positive rate (TPR) and false positive rate (FPR).
+        Youden's J statistic is defined as J = TPR + TNR - 1 = TPR + (−FPR) = TPR - FPR.
+        
+        For more information cf. https://www.ibm.com/docs/en/spss-statistics/30.0.0?topic=schemes-area-under-curve (12.06.2025).
         If none of the values are valid, it defaults to 0.5.
 
         :param fpr: False Positive Rate.
@@ -108,7 +113,8 @@ class VisDetectors:
             tpr_valid = tpr[valid_mask]
             thresholds_valid = thresholds[valid_mask]
 
-            youden_j = tpr_valid - fpr_valid    # TODO: reference
+            # maximum vertical distance between ROC curve and diagonal line
+            youden_j = tpr_valid - fpr_valid    
             optimal_idx = np.argmax(youden_j)
             return thresholds_valid[optimal_idx]
         else:
