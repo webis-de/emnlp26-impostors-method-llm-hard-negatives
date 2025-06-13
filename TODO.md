@@ -28,6 +28,7 @@
     - paraphrase is only one heuristic for the solution, but not the only one
     - simulate how original author would have written the text
 - Paper sources: ACL Ontology cite search, OBLP title search
+- [ ] Imposter default values from Koppel et al. (2014) paper
 
 
 ### 🛠️ Implementation
