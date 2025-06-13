@@ -105,8 +105,8 @@ class UnmaskingDetector(DetectorBase):
         """
         curves = []
         for t in ichunked(text, 2, strict=self.strict):
-            tokens_left = self.tokenizer(t[0])
-            tokens_right = self.tokenizer(t[1])
+            tokens_left = self.tokenizer(self.preprocess_text(t[0]))
+            tokens_right = self.tokenizer(self.preprocess_text(t[1]))
             if len(tokens_left) == 0 or len(tokens_right) == 0:
                 print("Skipping empty text pair: Left: {}, Right: {}".format(t[0], t[1]))
                 continue
