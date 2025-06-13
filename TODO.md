@@ -31,10 +31,10 @@
 
 
 ### 🛠️ Implementation
-- [ ] Text preprocessing steps into detector approaches
-  - [ ] remove newlines etc.
-  - [ ] utf-8 to ascii, i.e. remove special characters
-  - [ ] only keep text, no additional layout or structural information
+- [x] Text preprocessing steps into detector approaches
+  - [x] remove newlines etc.
+  - [x] utf-8 to ascii, i.e. remove special characters
+  - [x] only keep text, no additional layout or structural information
 - [ ] Longer texts, do not crop at 500 words, but ensure texts of similar length
   - otherwise 100,000 most frequent words are too many for text size
 - [ ] Modular approach, i.e. pipeline gets two texts and returns similarity score

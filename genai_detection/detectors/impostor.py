@@ -200,8 +200,9 @@ class ImpostorDetector(DetectorBase):
             # Kontrolliere Situation
 
             # Koppel et Al. (2014) use documents of length 500 words exactly -> we crop at min_n_tokens
-            tokens_left = self.tokenizer(self.normalize_text(text_left))#[:self.min_n_tokens]  
-            tokens_right = self.tokenizer(self.normalize_text(text_right))#[:self.min_n_tokens] 
+            # omit all layour/ structural information to keep only style
+            tokens_left = self.tokenizer(self.preprocess_text(text_left))#[:self.min_n_tokens]  
+            tokens_right = self.tokenizer(self.preprocess_text(text_right))#[:self.min_n_tokens] 
 
             if len(tokens_left) == 0 or len(tokens_right) == 0:
                 print("Skipping empty text pair: Left: {}, Right: {}".format(text_left, text_right))

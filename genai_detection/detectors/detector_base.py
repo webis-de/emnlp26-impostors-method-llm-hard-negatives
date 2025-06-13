@@ -14,6 +14,9 @@
 
 import typing as t
 import types
+import re
+import html
+import unicodedata
 
 import torch
 import numpy as np
@@ -152,6 +155,38 @@ class DetectorBase:
             return preds[0], scores[0]
         return preds, scores
 
+    def preprocess_text(self, text: t.Union[str, t.Iterable[str]]) -> t.Union[str, t.List[str]]:
+        """
+        Preprocess input text:
+        - remove newlines
+        - utf-8 to ascii conversion, i.e. omit special characters
+        - remove layout/ structural information
+            - e.g. remove HTML tags, etc.
+            - newlines
+        """
+        def clean(single_text: str) -> str:
+            # decode any html entities (&amp; → &)
+            single_text = html.unescape(single_text)
+
+            # strip out html tags such as <p>, <br>, etc.
+            single_text = re.sub(r'<[^>]+>', '', single_text)
+
+            # collapse all whitespace (including newlines) to single spaces and trim
+            single_text = re.sub(r'\s+', ' ', single_text).strip()
+
+            # transliterate to ascii, dropping characters that can't be converted
+            single_text = unicodedata.normalize('NFKD', single_text).encode('ascii', 'ignore').decode('ascii')
+
+            # convert everything to lowercase for uniformity
+            single_text = single_text.lower()
+
+            return single_text
+
+
+        if isinstance(text, str):
+            return clean(text)
+        else:
+            return [clean(t_) for t_ in text]
 
 def _create_nan_array(n):
     return np.empty(shape=(n,)) * np.nan
