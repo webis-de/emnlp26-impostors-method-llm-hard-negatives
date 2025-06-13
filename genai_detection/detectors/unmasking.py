@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from collections import defaultdict
-from itertools import batched
+from more_itertools import ichunked
 from random import randint
 import re
 from typing import Iterable, List
@@ -104,7 +104,7 @@ class UnmaskingDetector(DetectorBase):
         :return: list of curve points (half the size of the input)
         """
         curves = []
-        for t in batched(text, 2, strict=self.strict):
+        for t in ichunked(text, 2, strict=self.strict):
             tokens_left = self.tokenizer(t[0])
             tokens_right = self.tokenizer(t[1])
             if len(tokens_left) == 0 or len(tokens_right) == 0:

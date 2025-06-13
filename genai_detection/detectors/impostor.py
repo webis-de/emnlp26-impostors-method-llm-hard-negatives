@@ -1,5 +1,5 @@
 from collections import Counter, defaultdict
-from itertools import batched
+from more_itertools import ichunked
 import itertools
 import json
 import os
@@ -179,7 +179,7 @@ class ImpostorDetector(DetectorBase):
         scores_per_pair = defaultdict(
             int
         )  # id is index of pair (i.e, length is half of the input text list)
-        for i, t in enumerate(batched(text, 2, strict=True)):
+        for i, t in enumerate(ichunked(text, 2, strict=True)):
             text_left, text_right = t[0], t[1]
             len_ws_token_left = len(self.tokenize_whitespace(text_left))
             len_ws_token_right = len(self.tokenize_whitespace(text_right))

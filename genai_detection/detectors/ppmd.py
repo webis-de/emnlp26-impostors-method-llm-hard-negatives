@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from itertools import batched
+from more_itertools import ichunked
 from typing import Iterable, List
 
 import numpy as np
@@ -48,7 +48,7 @@ class PPMdDetector(DetectorBase):
 
     def _get_score_impl(self, text: Iterable[str]) -> np.ndarray:
         scores = []
-        for t in batched(text, 2):
+        for t in ichunked(text, 2):
             if len(t) != 2:
                 if self.strict:
                     raise ValueError("Final batch is not a full pair.")
