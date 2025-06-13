@@ -1,12 +1,9 @@
 # docker build -t registry.webis.de/code-research/theses/artificial-authorship-verification .
-FROM python:3.12
+FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
 
 # Copy only dependency-related files
-COPY pyproject.toml poetry.lock /src/
 WORKDIR /src
+COPY setup.cfg setup.py ./
 
-# Install Poetry and project dependencies (without source code)
-RUN --mount=type=cache,target=/root/.cache pip install --upgrade pip 
-RUN pip install poetry 
-RUN poetry config virtualenvs.create false 
-RUN poetry install --no-root
+RUN --mount=type=cache,target=/root/.cache \
+    pip install ./

@@ -6,6 +6,8 @@
 !poetry.lock
 !pyproject.toml
 !README.md
+!setup.py
+!setup.cfg
 
 # Ignore Python byte files
 **/__pycache__/
