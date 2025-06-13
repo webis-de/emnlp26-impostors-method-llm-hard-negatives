@@ -38,7 +38,8 @@
   - [x] only keep text, no additional layout or structural information
 - [ ] Longer texts, do not crop at 500 words, but ensure texts of similar length
   - otherwise 100,000 most frequent words are too many for text size
-- [ ] Modular approach, i.e. pipeline gets two texts and returns similarity score
+- [x] Modular approach, i.e. pipeline gets two texts and returns similarity score: 
+  - DetectorBase: get_score calls _get_score_impl, which is implemented by subclasses
   - plug in different approaches, e.g. imposter, unmasking 
   - ensemble different approaches
 - [ ] Implement a stats module for dataset statistics
