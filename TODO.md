@@ -25,7 +25,7 @@
     - [x] Acquisition of dataset
     - [x] Imposter  
     - [x] Unmasking  
-  - [ ] **Koppel et al. (2014) dataset**  
+  - [ ] **[Koppel et al. (2014)](https://asistdl.onlinelibrary.wiley.com/doi/10.1002/asi.22954) dataset**  
     - [x] Acquisition of dataset: [Blog posts](https://www.kaggle.com/datasets/rtatman/blog-authorship-corpus?resource=download)
       - [x] Imposter  
       - [x] Unmasking  
