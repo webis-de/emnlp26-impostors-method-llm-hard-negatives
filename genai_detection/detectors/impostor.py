@@ -138,12 +138,10 @@ class ImpostorDetector(DetectorBase):
 
         return sampled
     
-    def _get_score_impl(self, text: t.Iterable[str]) -> t.Union[torch.Tensor, np.ndarray, t.Iterable[float]]:
-        # implement to enable usage of self.get_score() from DetectorBase
-        return self.get_scores(text)
-
-    def get_scores(self, text: Iterable[str]) -> List[float]:
+    def _get_score_impl(self, text: Iterable[str]) -> t.Union[torch.Tensor, np.ndarray, t.Iterable[float]]:
         """
+        Called by get_score from detecor_base parent class to compute the score for the input text(s).
+
         Get scores for text pairs. A higher score indicates that the input text pair is more likely to be authored by the same author.
         The algorithm stems from Koppel et Al. (2014)[, where some details are adapted from Kocher et Al. (2015)]:
         Each text from the pair is the disputed text and the candidate text once.
@@ -308,7 +306,7 @@ class ImpostorDetector(DetectorBase):
         :param text: input text or batch of input texts
         :return: boolean classifications of whether inputs are likely same author TODO: machine-generated
         """
-        scores = self.get_scores(text)
+        scores = self.get_score(text)
         return [score > self.threshold for score in scores]
 
     def tokens_to_matrix(self, tokens, top_token_list):
