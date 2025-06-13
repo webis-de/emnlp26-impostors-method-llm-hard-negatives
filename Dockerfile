@@ -1,5 +1,5 @@
 # docker build -t registry.webis.de/code-research/theses/artificial-authorship-verification .
-FROM pytorch/pytorch:2.0.0-cuda11.7-cudnn8-devel
+FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
 
 # Copy only dependency-related files
 COPY pyproject.toml poetry.lock /src/
