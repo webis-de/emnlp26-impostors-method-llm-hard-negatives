@@ -11,6 +11,7 @@ from typing import Iterable, List, Literal
 import heapq
 from nltk.stem.snowball import SnowballStemmer
 import pandas as pd
+import typing as t
 from collections import Counter
 
 import numpy as np
@@ -18,6 +19,7 @@ from nltk import ngrams
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+import torch
 
 from genai_detection.detectors.detector_base import DetectorBase
 from genai_detection.imposter_generators import ImposterGenerator
@@ -135,6 +137,10 @@ class ImpostorDetector(DetectorBase):
         sampled.extend(choices(tokens, k=remaining))             # with replacement
 
         return sampled
+    
+    def _get_score_impl(self, text: t.Iterable[str]) -> t.Union[torch.Tensor, np.ndarray, t.Iterable[float]]:
+        # implement to enable usage of self.get_score() from DetectorBase
+        return self.get_scores(text)
 
     def get_scores(self, text: Iterable[str]) -> List[float]:
         """
@@ -179,7 +185,9 @@ class ImpostorDetector(DetectorBase):
         scores_per_pair = defaultdict(
             int
         )  # id is index of pair (i.e, length is half of the input text list)
-        for i, t in enumerate(ichunked(text, 2, strict=True)):
+        for i, t in enumerate(ichunked(text, 2)):
+            t = list(t) # generator object is not subscriptable, so convert to list
+            assert len(t) == 2, "Input text must be a list of pairs of texts."
             text_left, text_right = t[0], t[1]
             len_ws_token_left = len(self.tokenize_whitespace(text_left))
             len_ws_token_right = len(self.tokenize_whitespace(text_right))
