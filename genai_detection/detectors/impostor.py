@@ -201,6 +201,7 @@ class ImpostorDetector(DetectorBase):
 
             # Koppel et Al. (2014) use documents of length 500 words exactly -> we crop at min_n_tokens
             # omit all layour/ structural information to keep only style
+            # TODO: ensure both texts have similar length
             tokens_left = self.tokenizer(self.preprocess_text(text_left))#[:self.min_n_tokens]  
             tokens_right = self.tokenizer(self.preprocess_text(text_right))#[:self.min_n_tokens] 
 
