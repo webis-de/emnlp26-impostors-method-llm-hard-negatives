@@ -17,7 +17,7 @@
   - Small dataset is **okay**
 
 - Sources:
-  - [x] **Gutenberg books** (same vs. different author) — long text quality example  
+  - [x] **[Gutenberg books](https://www.gutenberg.org/)** (same vs. different author) — long text quality example  
     - [x] Acquisition of dataset: Koppel Webis dataset contains texts also present in Gutenberg
     - [x] Imposter  
     - [x] Unmasking  
