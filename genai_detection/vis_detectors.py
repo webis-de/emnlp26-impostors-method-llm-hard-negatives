@@ -136,7 +136,7 @@ class VisDetectors:
         """
         impostor_det = ImpostorDetector(**self.imposter_args)
         with ProcessPoolExecutor() as executor:
-            train_dataset['imposter_score'] = list(executor.map(impostor_det.get_scores, train_dataset['pair']))
+            train_dataset['imposter_score'] = list(executor.map(impostor_det.get_score, train_dataset['pair']))
 
         # find threshold that best separates imposters from non-imposters in the training set (targets are in the 'same' column)
         args = self.imposter_args.copy()
@@ -147,7 +147,7 @@ class VisDetectors:
 
         # work with test dataset
         with ProcessPoolExecutor() as executor:
-            test_dataset['imposter_score'] = list(executor.map(impostor_det.get_scores, test_dataset['pair']))
+            test_dataset['imposter_score'] = list(executor.map(impostor_det.get_score, test_dataset['pair']))
         test_dataset['pred_same'] = test_dataset['imposter_score'] >= self.imposter_args['threshold']
 
         # 'same' is ground truth, 'pred_same' is prediction
