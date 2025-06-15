@@ -226,21 +226,33 @@ class BlabladorParaphraser(Paraphraser):
     
 
 
-if __name__ == "__main__":
+def generate_paraphrasing_comparison():
+    """
+    Generate a comparison of different paraphrasing models and prompts.
+    This function creates a DataFrame with the results and saves it to a CSV file.
+    """
+    # store the results in a DataFrame
     df = pd.DataFrame(columns=["model", "prompt", "parameters", "original_text", "paraphrased_text"])
+
+    # models
     paraphrasers = {'T5_ChatGPT': T5ChatGPTParaphraser(), 'T5_Google_PAWS': T5GooglePAWSParaphraser()}
     paraphrasers.update({f'Blablador_{name}': BlabladorParaphraser(model_id=name) for name in list(get_args(ModelName))})
 
-    text = "The quick brown fox jumps over the lazy dog."
-    n_responses = 1  # Number of paraphrases to generate
-    prompts = ["Paraphrase the following text and output only the paraphrased version:", 
-            #   "First, extract bullet points capturing the main ideas, then create a text based on these bullet points. Only output the final text (i.e. do not output the bullet points or any additional chain of thoughts):",
-            #   "Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
-            #   "Paraphrase the sentence using the same tone as the original with approximately the same number of words:",
-              "Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence:"]
+    # prompts, texts, and parameters
+    original_text = "The quick brown fox jumps over the lazy dog."
+    n_responses = 1  # number of paraphrases to generate
+    prompts = [
+        "Paraphrase the following text and output only the paraphrased version:", 
+        "First, extract bullet points capturing the main ideas, then create a text based on these bullet points. Only output the final text (i.e. do not output the bullet points or any additional chain of thoughts):",
+        "Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
+        "Paraphrase the sentence using the same tone as the original with approximately the same number of words:",
+        "Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence:"
+        ]
+    
+    # all combinations of paraphrasers and prompts
     for (name, paraphraser), prompt_text in tqdm(product(paraphrasers.items(), prompts), desc="Paraphrasing with all model-prompt combinations", total=len(paraphrasers) * len(prompts)):
-        paraphrased_text = paraphraser.paraphrase(text=text, n_responses=n_responses, prompt=prompt_text)
-       
+        paraphrased_text = paraphraser.paraphrase(text=original_text, n_responses=n_responses, prompt=prompt_text)
+        # TODO: Add scores (BLEU, ROUGE, BERTScore, etc.) to the DataFrame
         df = pd.concat([df, pd.DataFrame([{
             "model": name,
             "prompt": f"{prompt_text} <TEXT>",
@@ -249,11 +261,11 @@ if __name__ == "__main__":
                 "max_tokens": MAX_LENGTH,
                 "temperature": TEMPERATURE
             },
-            "original_text": text,
+            "original_text": original_text,
             "paraphrased_text": paraphrased_text
         }])], ignore_index=True)
     
-    # Save the results to a CSV file
+    # save the results to a CSV file
     save_base_path = Path(__file__).resolve().parent.parent.parent / CONFIG.SAVE_PATH
     assert save_base_path.exists(), f"Savefig base path {save_base_path} does not exist."
     save_base_path = save_base_path / 'paraphrasing' 
@@ -261,9 +273,8 @@ if __name__ == "__main__":
     save_path = save_base_path / "paraphrasing_results_comparison.csv"
     df.to_csv(save_path, index=False)
 
-
-
-
+if __name__ == "__main__":
+    generate_paraphrasing_comparison()
 
     # paraphraser = T5ChatGPTParaphraser()
     # paraphraser = T5GooglePAWSParaphraser()
