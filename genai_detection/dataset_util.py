@@ -14,6 +14,9 @@ from datasets import Dataset, DatasetDict, ClassLabel, Features, Value
 import pandas as pd
 from tqdm import tqdm
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from config import CONFIG
+
 random.seed(42)
 
 # === BASE CLASS ===
@@ -37,11 +40,27 @@ class BaseDatasetLoader(ABC):
         with open(path, "r", encoding="utf-8") as f:
             return set(line.strip() for line in f if line.strip())
         
+    def _generate_pairs(self, data):
+        """
+        Generate pairs of texts from the dataset.
+        Dataset is expected to be a list of dictionaries with 'text' and 'author' keys.
+        Each pair consists of two texts, their authors, and a boolean indicating if they are from the same author.
+        """
+        pairs = []
+        for a, b in combinations(data, 2):
+            pairs.append({
+                "pair": [a["text"], b["text"]],
+                "authors": [a["author"], b["author"]],
+                "same": a["author"] == b["author"]
+            })
+            
+        return pairs
+        
 
 # === Blog Corpus LOADER ===
         
 class BlogCorpusDatasetLoader(BaseDatasetLoader):
-    def __init__(self, path: str, name: str = "blog-corpus"):
+    def __init__(self, path: str, name: str = CONFIG.BLOG):
         """Loader for the Blog Corpus dataset.
         
         Originally dataset is available at: https://www.kaggle.com/datasets/rtatman/blog-authorship-corpus?resource=download (07.06.2025)
@@ -126,7 +145,7 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
 # === Koppel Webis LOADER ===
 
 class KoppelWebisDatasetLoader(BaseDatasetLoader):
-    def __init__(self, path: str, name: str = "koppel-webis"):
+    def __init__(self, path: str, name: str = CONFIG.KOPPEL):
         super().__init__(name=name)
         self.path = Path(path)
 
@@ -143,13 +162,7 @@ class KoppelWebisDatasetLoader(BaseDatasetLoader):
                             content = re.sub(r"\s+", " ", content)
                             content = content.strip().lower()
                             data.append({'author': author.name, 'text': content})
-        pairs = []
-        for a, b in combinations(data, 2):
-            pairs.append({
-                "pair": [a["text"], b["text"]],
-                "authors": [a["author"], b["author"]],
-                "same": a["author"] == b["author"]
-            })
+        pairs = self._generate_pairs(data)
 
         # Define the structure for Hugging Face datasets
         features = Features({
@@ -164,7 +177,7 @@ class KoppelWebisDatasetLoader(BaseDatasetLoader):
 
 
 class Pan23DatasetLoader(BaseDatasetLoader):
-    def __init__(self, train_dir: str, test_dir: str, name: str="pan23"):
+    def __init__(self, train_dir: str, test_dir: str, name: str=CONFIG.PAN23):
         super().__init__(name=name)
         self.train_dir = train_dir
         self.test_dir = test_dir
@@ -200,7 +213,7 @@ class Pan20DatasetLoader(Pan23DatasetLoader):
         =========
         Sebastian Bischoff, Niklas Deckers, Marcel Schliebs, Ben Thies, Matthias Hagen, Efstathios Stamatatos, Benno Stein, and Martin Potthast. The Importance of Suppressing Domain Style in Authorship Analysis. CoRR, abs/2005.14714, May 2020.
         """
-        super().__init__(name="pan20", train_dir=train_dir, test_dir=test_dir)
+        super().__init__(name=CONFIG.PAN20, train_dir=train_dir, test_dir=test_dir)
 
     def _load_dataset_from_directory(self, directory_path: str) -> Dataset:
         pair_name = "pan20-authorship-verification-test.jsonl"
@@ -255,7 +268,7 @@ class Pan25DatasetLoader(BaseDatasetLoader):
         More information found at https://pan.webis.de/clef25/pan25-web/generated-content-analysis.html (08.06.2025)
         The dataset from subtask 1 contains human and machine-generated texts, with IDs for training and testing.
         """
-        super().__init__("pan25")
+        super().__init__(CONFIG.PAN25)
         self.human_dir = human_dir
         self.machine_dir = machine_dir
         self.train_ids_path = train_ids_path
@@ -323,10 +336,54 @@ class Pan25DatasetLoader(BaseDatasetLoader):
             }
         )
 
+# === Gutenberg LOADER ===
+class GutenbergDatasetLoader(BaseDatasetLoader):
+    def __init__(self, path: str, name: str = CONFIG.GUTENBERG):
+        super().__init__(name=name)
+        self.path = Path(path)
+
+    def load(self, train_split_portion:float=0.8) -> Dataset:
+        """
+        Loader for the Gutenberg dataset.
+        The dataset is expected to be a directory with text files, where each file is named in the format "title_firstName_sirname.txt".
+        Each file contains the text of a book, and the author is derived from the filename.
+
+        ATTENTION: Authors can appear in both training and test sets.
+        """
+        assert train_split_portion > 0 and train_split_portion < 1, "train_split_portion must be between 0 and 1."
+        data = []
+        for file in self.path.glob("*.txt"):
+            if "Complete_Works_of_William_Shakespeare" in file.name:
+                # Skip the complete works of Shakespeare as it is way longer than other texts
+                continue
+            with open(file, "r", encoding="utf-8") as f:
+                author = file.stem.split("_")[:-2]  # filename format is "title_firstName_sirname.txt"
+                content = f.read()
+                content = unicodedata.normalize("NFKC", content)
+                content = re.sub(r"[^\x00-\x7F]+", " ", content)
+                content = re.sub(r"\s+", " ", content)
+                content = content.strip().lower()
+                data.append({"author": author, "text": content})
+
+        pairs = self._generate_pairs(data)
+        random.shuffle(pairs)
+        split_idx = int(len(pairs) * train_split_portion)
+        train_pairs = pairs[:split_idx]
+        test_pairs = pairs[split_idx:]
+
+        features = Features({
+            "pair": [Value("string")],
+            "authors": [Value("string")],
+            "same": Value("bool")
+        })
+
+        return DatasetDict({
+            "train": Dataset.from_list(train_pairs, features=features),
+            "test": Dataset.from_list(test_pairs, features=features),
+        })
+
 
 # === SYSTEM SPECIFIC USAGE ===
-
-
 def run_pan23(base_dir:str, save_path:str):
     base_dir = Path(__file__).resolve().parent / base_dir
     train_dir = os.path.join(base_dir, "pan23-authorship-verification-training-dataset")
@@ -337,6 +394,7 @@ def run_pan23(base_dir:str, save_path:str):
     dataset = loader.load()
     dataset.save_to_disk(output_dir)
     # print("PAN23 example:", dataset["train"][0])
+
 
 def run_pan20():
     base_dir = Path(__file__).resolve().parent / "data/datasets/pan20-authorship-verification/"
@@ -363,6 +421,7 @@ def run_pan25():
     dataset.save_to_disk(output_dir)
     # print("PAN25 example:", dataset["train"][0])
 
+
 def run_koppel_webis():
     base_dir = Path(__file__).resolve().parent / "data/datasets/corpus-webis-authorship/koppel/"
     output_dir = os.path.join(base_dir, "koppel-webis-dataset-converted")
@@ -372,15 +431,24 @@ def run_koppel_webis():
     dataset.save_to_disk(output_dir)
     # print("Koppel Webis example:", dataset["train"][0])
 
+
 def run_blog_corpus():
     # sys.path.append(os.path.abspath(".."))
     base_dir = Path(__file__).resolve().parent / "data/datasets/Blog_corpus/"
     assert base_dir.exists(), f"Base directory {base_dir} does not exist. Current path: {os.getcwd()}"
     output_dir = base_dir / "blog-dataset-converted"
 
-    print(f"Elements in base_dir: {list(base_dir.iterdir())}")
-
     loader = BlogCorpusDatasetLoader(path=base_dir / "blogtext.csv")
+    dataset = loader.load()
+    dataset.save_to_disk(output_dir)
+
+def run_gutenberg_corpus():
+    # sys.path.append(os.path.abspath(".."))
+    base_dir = Path(__file__).resolve().parent.parent / "data/datasets/gutenberg/"
+    assert base_dir.exists(), f"Base directory {base_dir} does not exist. Current path: {os.getcwd()}"
+    output_dir = base_dir / "gutenberg-dataset-converted"
+
+    loader = GutenbergDatasetLoader(path=base_dir)
     dataset = loader.load()
     dataset.save_to_disk(output_dir)
 
@@ -404,8 +472,9 @@ if __name__ == "__main__":
    
     args = parser.parse_args()
 
-    run_pan23(base_dir=args.path, save_path=args.out)
-    # run_pan25()
-    run_pan20()
-    run_koppel_webis()
-    run_blog_corpus()
+    # run_pan23(base_dir=args.path, save_path=args.out)
+    # # run_pan25()
+    # run_pan20()
+    # run_koppel_webis()
+    # run_blog_corpus()
+    run_gutenberg_corpus()
