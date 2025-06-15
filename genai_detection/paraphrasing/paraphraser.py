@@ -201,6 +201,7 @@ class BlabladorParaphraser(Paraphraser):
             "presence_penalty": 2.0,    # encourage diversity, new content
             "frequency_penalty": 2.0,   # discourage repetition, word-level redundancy
         }
+        # use completions endpoint for paraphrasing, bc we don't need a multi-turn role-based instruction chat
         response = requests.post(f"{self.base_url}/completions", headers={**self.headers, "Content-Type": "application/json"}, data=json.dumps(payload))
 
         if response.status_code == 200:
