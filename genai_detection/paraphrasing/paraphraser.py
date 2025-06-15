@@ -1,8 +1,34 @@
 from abc import ABC
+import json
+import os
+import sys
+from typing import Literal
+import requests
 from simpletransformers.t5 import T5Model
 import sklearn
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+from config import CONFIG
+
+ModelName = Literal[
+    "1 - Llama3 405 the best general model and big context size",
+    "1 - Ministral 8b - the fast model",
+    "1 - Teuken-7B-instruct-research-v0.4 - The OpenGPT-X model",
+    "10 Mistral-Nemo-Instruct-2407 - Our fast-experimental - with a large context size",
+    "2 - QwenLong L1 32B - A long context reasoning model from 28.05.2025",
+    "3 - DeepCoder-14B-Preview - the code model from 09.04.2025",
+    "5 - GritLM-7B - For Chat AND Text Embeddings",
+    "alias-code",
+    "alias-embeddings",
+    "alias-fast",
+    "alias-fast-experimental",
+    "alias-llama3-huge",
+    "alias-opengptx",
+    "gpt-3.5-turbo",
+    "text-davinci-003",
+    "text-embedding-ada-002",
+]
 
 class Paraphraser(ABC):
     """
@@ -120,19 +146,86 @@ class T5GooglePAWSParaphraser(Paraphraser):
 
         return res
     
+
+class BlabladorParaphraser(Paraphraser):
+    """
+    Blablador paraphrasing model hosted by Jülich/ Helmholtz AI.
+    """
+
+    def __init__(self, model_id: ModelName="1 - Llama3 405 the best general model and big context size"):
+        self.base_url = "https://api.helmholtz-blablador.fz-juelich.de/v1"
+        self.headers = {
+            "Authorization": f"Bearer {CONFIG.BLABLADOR_KEY}",
+            "Accept": "application/json"
+        }
+        assert model_id in self._get_available_models(verbose=False), f"Model {model_id} is not available. Please choose from the available models."
+        self.model_id = model_id 
+
+    def _get_available_models(self,verbose: bool = True) -> list[str]:
+        """
+        Fetch the list of available models from the Blablador API.
+
+        :return: A list of model IDs.
+        """
+        response = requests.get(f"{self.base_url}/models", headers=self.headers)
+
+        if response.status_code == 200:
+            models = [model["id"] for model in response.json()["data"]]
+            if verbose:
+                print("Available models:")
+                for model in models:
+                    print(model)
+            return models
+        else:
+            raise Exception(f"Error fetching models: {response.status_code} - {response.text}")
+
+
+    def paraphrase(self, text: str, verbose:bool=False, max_tokens:int=256, temperature:float=0.7, n_responses:int=5) -> str:
+        """
+        Generate a paraphrase of the input text.
+
+        :param text: The input text to be paraphrased.
+        :param verbose: If True, prints the paraphrased text.
+        :param max_tokens: The maximum number of tokens to generate in the paraphrase.
+        :param temperature: Controls the randomness of the output. Lower values make the output more deterministic.
+        :return: A paraphrased version of the input text.
+        """
+        payload = {
+            "model": self.model_id,  # model ID
+            "prompt": f"Paraphrase the following text and output only the paraphrased version: {text}",
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "n": n_responses,
+            "use_beam_search": True,
+            "presence_penalty": 2.0,    # encourage diversity, new content
+            "frequency_penalty": 2.0,   # discourage repetition, word-level redundancy
+        }
+        response = requests.post(f"{self.base_url}/completions", headers={**self.headers, "Content-Type": "application/json"}, data=json.dumps(payload))
+
+        if response.status_code == 200:
+            paraphrased_texts = [choice["text"] for choice in response.json()["choices"]] if n_responses > 1 else response.json()["choices"][0]["text"]
+            if verbose:
+                print("Paraphrased text(s):\n", paraphrased_texts)
+            return paraphrased_texts
+        else:
+            print("Error:", response.status_code, response.text)
+    
+    
     
 
 
 if __name__ == "__main__":
     # paraphraser = T5ChatGPTParaphraser()
-    paraphraser = T5GooglePAWSParaphraser()
+    # paraphraser = T5GooglePAWSParaphraser()
+    paraphraser = BlabladorParaphraser()
+    # paraphraser._get_available_models()
     text = "The quick brown fox jumps over the lazy dog."
-    paraphrased_text = paraphraser.paraphrase(text)
+    paraphrased_text = paraphraser.paraphrase(text, n_responses=1)
     print(f"Original: {text}")
     print(f"Paraphrased: {paraphrased_text}")
     
-    # Batch paraphrasing
-    texts = ["The sky is blue.", "I love programming.", "Artificial intelligence is fascinating."]
-    paraphrased_batch = paraphraser.paraphrase_batch(texts)
-    for original, paraphrased in zip(texts, paraphrased_batch):
-        print(f"Original: {original} | Paraphrased: {paraphrased}")
+    # # Batch paraphrasing
+    # texts = ["The sky is blue.", "I love programming.", "Artificial intelligence is fascinating."]
+    # paraphrased_batch = paraphraser.paraphrase_batch(texts)
+    # for original, paraphrased in zip(texts, paraphrased_batch):
+    #     print(f"Original: {original} | Paraphrased: {paraphrased}")
