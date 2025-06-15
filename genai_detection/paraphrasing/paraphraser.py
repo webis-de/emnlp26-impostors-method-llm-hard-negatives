@@ -42,11 +42,14 @@ class Paraphraser(ABC):
     Abstract base class for paraphrasing models.
     """
 
-    def paraphrase(self, text: str, n_responses:int=5, max_length:int=MAX_LENGTH) -> str:
+    def paraphrase(self, text: str, prompt: str, n_responses:int=5, max_length:int=MAX_LENGTH) -> str:
         """
         Generate a paraphrase of the input text.
 
         :param text: The input text to be paraphrased.
+        :param prompt: The prompt to be used for paraphrasing.
+        :param n_responses: The number of paraphrases to generate.
+        :param max_length: The maximum number of tokens to generate in the paraphrase.
         :return: A paraphrased version of the input text.
         """
         raise NotImplementedError("Subclasses must implement this method.")
@@ -92,8 +95,8 @@ class T5ChatGPTParaphraser(Paraphraser):
         self.tokenizer = AutoTokenizer.from_pretrained("humarin/chatgpt_paraphraser_on_T5_base")
         self.model = AutoModelForSeq2SeqLM.from_pretrained("humarin/chatgpt_paraphraser_on_T5_base").to(self.device)
 
-    def paraphrase(self, text: str, num_beams=5, num_beam_groups=5, n_responses:int=5, repetition_penalty=10.0, diversity_penalty=3.0, no_repeat_ngram_size=2, temperature=TEMPERATURE, max_length=MAX_LENGTH) -> str:
-        input_ids = self.tokenizer(f'Paraphrase the following text and output only the paraphrased version: {text}', return_tensors="pt", padding="longest", max_length=max_length, truncation=True).input_ids.to(self.device)
+    def paraphrase(self, text: str, prompt: str, num_beams=5, num_beam_groups=5, n_responses:int=5, repetition_penalty=10.0, diversity_penalty=3.0, no_repeat_ngram_size=2, temperature:float=TEMPERATURE, max_length:int=MAX_LENGTH) -> str:
+        input_ids = self.tokenizer(f'{prompt.strip()} {text}', return_tensors="pt", padding="longest", max_length=max_length, truncation=True).input_ids.to(self.device)
         
         outputs = self.model.generate(
             input_ids, temperature=temperature, repetition_penalty=repetition_penalty,
@@ -131,9 +134,9 @@ class T5GooglePAWSParaphraser(Paraphraser):
         self.tokenizer = AutoTokenizer.from_pretrained("Vamsi/T5_Paraphrase_Paws")
         self.model = AutoModelForSeq2SeqLM.from_pretrained("Vamsi/T5_Paraphrase_Paws").to(self.device)
 
-    def paraphrase(self, text: str, n_responses:int=5, max_length:int=MAX_LENGTH) -> str:
+    def paraphrase(self, text: str, prompt:str, n_responses:int=5, max_length:int=MAX_LENGTH) -> str:
         # TODO: no duplication penalty, and thus, there are duplicates in the output
-        encoding = self.tokenizer.encode_plus(f'Paraphrase the following text and output only the paraphrased version: {text} </s>', padding="max_length", return_tensors="pt")
+        encoding = self.tokenizer.encode_plus(f'{prompt.strip()} {text} </s>', padding="max_length", return_tensors="pt")
         
         input_ids, attention_masks = encoding["input_ids"].to(self.device), encoding["attention_mask"].to(self.device)
 
@@ -187,7 +190,7 @@ class BlabladorParaphraser(Paraphraser):
             raise Exception(f"Error fetching models: {response.status_code} - {response.text}")
 
 
-    def paraphrase(self, text: str, verbose:bool=False, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE, n_responses:int=5) -> str:
+    def paraphrase(self, text: str, prompt:str, verbose:bool=False, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE, n_responses:int=5) -> str:
         """
         Generate a paraphrase of the input text.
 
@@ -199,7 +202,7 @@ class BlabladorParaphraser(Paraphraser):
         """
         payload = {
             "model": self.model_id,  # model ID
-            "prompt": f"Paraphrase the following text and output only the paraphrased version: {text}",
+            "prompt": f"{prompt.strip()} {text}",
             "max_tokens": max_length,
             "temperature": temperature,
             "n": n_responses,
@@ -229,11 +232,12 @@ if __name__ == "__main__":
 
     text = "The quick brown fox jumps over the lazy dog."
     n_responses = 1  # Number of paraphrases to generate
+    prompt = "Paraphrase the following text and output only the paraphrased version:"
     for name, paraphraser in tqdm(paraphrasers.items(), desc="Paraphrasing with different models", total=len(paraphrasers)):
-        paraphrased_text = paraphraser.paraphrase(text, n_responses=n_responses)
+        paraphrased_text = paraphraser.paraphrase(text=text, n_responses=n_responses, prompt=prompt)
         df = pd.concat([df, pd.DataFrame([{
             "model": name,
-            "prompt": "Paraphrase the following text and output only the paraphrased version: <TEXT>",
+            "prompt": f"{prompt} <TEXT>",
             "parameters": {
                 "n_responses": n_responses,
                 "max_tokens": MAX_LENGTH,
