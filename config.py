@@ -20,6 +20,7 @@ class BaseConfig:
     PAN20 = "pan20"
     KOPPEL = "koppel"
     BLOG = "blog"
+    GUTENBERG = "gutenberg"
     IMPOSTER = "imposter"
     UNMASKING = "unmasking"
 
