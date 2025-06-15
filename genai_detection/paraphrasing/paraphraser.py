@@ -11,19 +11,20 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from config import CONFIG
 
+# cf. https://sdlaml.pages.jsc.fz-juelich.de/ai/guides/blablador_api_access/ (15.06.2025)
 ModelName = Literal[
     "1 - Llama3 405 the best general model and big context size",
     "1 - Ministral 8b - the fast model",
     "1 - Teuken-7B-instruct-research-v0.4 - The OpenGPT-X model",
     "10 Mistral-Nemo-Instruct-2407 - Our fast-experimental - with a large context size",
-    "2 - QwenLong L1 32B - A long context reasoning model from 28.05.2025",
+    "2 - QwenLong L1 32B - A long context reasoning model from 28.05.2025", # specially trained for reasoning
     "3 - DeepCoder-14B-Preview - the code model from 09.04.2025",
     "5 - GritLM-7B - For Chat AND Text Embeddings",
-    "alias-code",
-    "alias-embeddings",
-    "alias-fast",
+    "alias-code",   # specially trained for code
+    "alias-embeddings", # specially made for embeddings
+    "alias-fast",   # high throughput
     "alias-fast-experimental",
-    "alias-llama3-huge",
+    "alias-llama3-huge",    # most accurate, but slowest?
     "alias-opengptx",
     "gpt-3.5-turbo",
     "text-davinci-003",
