@@ -26,6 +26,8 @@ class BaseDatasetVisualization(ABC):
         self.dataset = self.load_dataset()
         self.savefig_base = Path(__file__).resolve().parent.parent.parent / savefig_base
         assert self.savefig_base.exists(), f"Savefig base path {self.savefig_base} does not exist."
+        self.savefig_base = self.savefig_base / 'datasets' / self.name
+        os.makedirs(self.savefig_base, exist_ok=True)
 
     def load_dataset(self) -> pd.DataFrame:
         """
@@ -36,13 +38,16 @@ class BaseDatasetVisualization(ABC):
         Returns:
             pd.DataFrame: Combined dataset as a pandas DataFrame.
         """
-        assert self.name in [CONFIG.PAN23, CONFIG.PAN20, CONFIG.BLOG, CONFIG.GUTENBERG, CONFIG.PAN25], f"Invalid dataset {self.name} provided."
         name2path = {
             CONFIG.PAN23: CONFIG.PATH2PAN23,
             CONFIG.PAN20: CONFIG.PATH2PAN20,
             CONFIG.BLOG: CONFIG.PATH2BLOG,
             CONFIG.GUTENBERG: CONFIG.PATH2GUTENBERG,
-            CONFIG.PAN25: CONFIG.PATH2PAN25}
+            CONFIG.PAN25: CONFIG.PATH2PAN25,
+            CONFIG.KOPPEL: CONFIG.PATH2KOPPEL_WEBIS,
+        }
+        assert self.name in list(name2path.keys()), f"Invalid dataset {self.name} provided."
+        
         dataset = load_from_disk(os.path.join(os.path.abspath(".."), name2path[self.name]))
         combined = concatenate_datasets([split for split in dataset.values()])
         return combined.to_pandas()
@@ -88,7 +93,9 @@ class BaseDatasetVisualization(ABC):
         stats_df = pd.DataFrame([stats])
         
         if save:
-            stats_df.to_csv(self.savefig_base / f"{self.name}_stats.csv", index=False)
+            save_path = self.savefig_base / 'statistics' 
+            save_path.mkdir(parents=True, exist_ok=True)
+            stats_df.to_csv(save_path / f"{self.name}_stats.csv", index=False, float_format="%.2f")
         
         return stats_df
 
@@ -120,7 +127,9 @@ class BaseDatasetVisualization(ABC):
         plt.ylabel('Frequency')
         plt.grid(True, linestyle='--', alpha=0.6)
         plt.tight_layout()
-        plt.savefig(self.savefig_base / f"{self.name}_text_length_histogram.png")
+        save_path = self.savefig_base / 'plots'
+        save_path.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path / f"{self.name}_text_length_histogram.png")
         plt.show()
         if not verbose:
             print(f"Average length (characters) per text: {np.mean(lengths):.2f}")
@@ -151,7 +160,9 @@ class BaseDatasetVisualization(ABC):
         plt.title(f'Average Text Length per Author\nDataset: {self.name}')
         plt.grid(axis='x', linestyle='--', alpha=0.5)
         plt.tight_layout()
-        plt.savefig(self.savefig_base / f"{self.name}_avg_text_length_per_author.png")
+        save_path = self.savefig_base / 'plots' 
+        save_path.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path / f"{self.name}_avg_text_length_per_author.png")
         plt.show()
 
 
@@ -230,7 +241,9 @@ class BaseDatasetVisualization(ABC):
         
         ax.set_ylim(0.5, 2.5)
         plt.tight_layout()
-        plt.savefig(self.savefig_base / f"{self.name}_boxplots_text_len_ngrams.png")
+        save_path = self.savefig_base / 'plots' 
+        save_path.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path / f"{self.name}_boxplots_text_len_ngrams.png")
         plt.show()
 
 
@@ -258,5 +271,9 @@ class GutenbergVisualization(BaseDatasetVisualization):
 
 class Pan25Visualization(BaseDatasetVisualization):
     def __init__(self, name: str = CONFIG.PAN25):
+        super().__init__(name=name)
+
+class KoppelWebisVisualization(BaseDatasetVisualization):
+    def __init__(self, name: str = CONFIG.KOPPEL):
         super().__init__(name=name)
  
