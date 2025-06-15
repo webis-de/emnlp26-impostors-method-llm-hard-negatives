@@ -51,21 +51,6 @@ class BaseDatasetVisualization(ABC):
         dataset = load_from_disk(os.path.join(os.path.abspath(".."), name2path[self.name]))
         combined = concatenate_datasets([split for split in dataset.values()])
         return combined.to_pandas()
- 
-
-    def _flatten_list(self, nested_list):
-        """
-        Flattens a nested list into a single list.
-        
-        Args:
-            nested_list (list): A list that may contain other lists.
-        
-        Returns:
-            list: A flattened list containing all elements.
-        """
-        return [s for item in nested_list for s in item.flatten().tolist() if isinstance(item, np.ndarray)]
-
-
 
     def dataset_stats(self, dataset=None, save:bool=True) -> pd.DataFrame:
         """
@@ -112,8 +97,6 @@ class BaseDatasetVisualization(ABC):
         if dataset is None:
             dataset = self.dataset
         text_list = chain.from_iterable(dataset['pair'])
-        # if isinstance(text_list[0], np.ndarray):
-        #     text_list = self._flatten_list(text_list)
         if preprocess_fn:
             text_list = [preprocess_fn(text) for text in text_list]
         lengths = [len(text) for text in text_list]
