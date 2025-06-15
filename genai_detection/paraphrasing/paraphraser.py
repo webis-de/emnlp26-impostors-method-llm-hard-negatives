@@ -1,12 +1,15 @@
 from abc import ABC
 import json
 import os
+from pathlib import Path
 import sys
-from typing import Literal
+from typing import Literal, get_args
+import pandas as pd
 import requests
 from simpletransformers.t5 import T5Model
 import sklearn
 import torch
+from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from config import CONFIG
@@ -31,12 +34,15 @@ ModelName = Literal[
     "text-embedding-ada-002",
 ]
 
+TEMPERATURE = 0.7
+MAX_LENGTH = 256  # Maximum length of the generated paraphrase
+
 class Paraphraser(ABC):
     """
     Abstract base class for paraphrasing models.
     """
 
-    def paraphrase(self, text: str) -> str:
+    def paraphrase(self, text: str, n_responses:int=5, max_length:int=MAX_LENGTH) -> str:
         """
         Generate a paraphrase of the input text.
 
@@ -86,12 +92,12 @@ class T5ChatGPTParaphraser(Paraphraser):
         self.tokenizer = AutoTokenizer.from_pretrained("humarin/chatgpt_paraphraser_on_T5_base")
         self.model = AutoModelForSeq2SeqLM.from_pretrained("humarin/chatgpt_paraphraser_on_T5_base").to(self.device)
 
-    def paraphrase(self, text: str, num_beams=5, num_beam_groups=5, num_return_sequences=5, repetition_penalty=10.0, diversity_penalty=3.0, no_repeat_ngram_size=2, temperature=0.7, max_length=128) -> str:
-        input_ids = self.tokenizer(f'paraphrase: {text}', return_tensors="pt", padding="longest", max_length=max_length, truncation=True).input_ids.to(self.device)
+    def paraphrase(self, text: str, num_beams=5, num_beam_groups=5, n_responses:int=5, repetition_penalty=10.0, diversity_penalty=3.0, no_repeat_ngram_size=2, temperature=TEMPERATURE, max_length=MAX_LENGTH) -> str:
+        input_ids = self.tokenizer(f'Paraphrase the following text and output only the paraphrased version: {text}', return_tensors="pt", padding="longest", max_length=max_length, truncation=True).input_ids.to(self.device)
         
         outputs = self.model.generate(
             input_ids, temperature=temperature, repetition_penalty=repetition_penalty,
-            num_return_sequences=num_return_sequences, no_repeat_ngram_size=no_repeat_ngram_size,
+            num_return_sequences=n_responses, no_repeat_ngram_size=no_repeat_ngram_size,
             num_beams=num_beams, num_beam_groups=num_beam_groups,
             max_length=max_length, diversity_penalty=diversity_penalty
         )
@@ -125,19 +131,19 @@ class T5GooglePAWSParaphraser(Paraphraser):
         self.tokenizer = AutoTokenizer.from_pretrained("Vamsi/T5_Paraphrase_Paws")
         self.model = AutoModelForSeq2SeqLM.from_pretrained("Vamsi/T5_Paraphrase_Paws").to(self.device)
 
-    def paraphrase(self, text: str) -> str:
+    def paraphrase(self, text: str, n_responses:int=5, max_length:int=MAX_LENGTH) -> str:
         # TODO: no duplication penalty, and thus, there are duplicates in the output
-        encoding = self.tokenizer.encode_plus(f'paraphrase: {text} </s>', padding="max_length", return_tensors="pt")
+        encoding = self.tokenizer.encode_plus(f'Paraphrase the following text and output only the paraphrased version: {text} </s>', padding="max_length", return_tensors="pt")
         
         input_ids, attention_masks = encoding["input_ids"].to(self.device), encoding["attention_mask"].to(self.device)
 
         outputs = self.model.generate(
             input_ids=input_ids, attention_mask=attention_masks,
-            max_length=256,
+            max_length=max_length,
             do_sample=True,
             top_k=120,
             top_p=0.95,
-            num_return_sequences=5,
+            num_return_sequences=n_responses,
         )
 
         res = []
@@ -181,20 +187,20 @@ class BlabladorParaphraser(Paraphraser):
             raise Exception(f"Error fetching models: {response.status_code} - {response.text}")
 
 
-    def paraphrase(self, text: str, verbose:bool=False, max_tokens:int=256, temperature:float=0.7, n_responses:int=5) -> str:
+    def paraphrase(self, text: str, verbose:bool=False, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE, n_responses:int=5) -> str:
         """
         Generate a paraphrase of the input text.
 
         :param text: The input text to be paraphrased.
         :param verbose: If True, prints the paraphrased text.
-        :param max_tokens: The maximum number of tokens to generate in the paraphrase.
+        :param max_length: The maximum number of tokens to generate in the paraphrase.
         :param temperature: Controls the randomness of the output. Lower values make the output more deterministic.
         :return: A paraphrased version of the input text.
         """
         payload = {
             "model": self.model_id,  # model ID
             "prompt": f"Paraphrase the following text and output only the paraphrased version: {text}",
-            "max_tokens": max_tokens,
+            "max_tokens": max_length,
             "temperature": temperature,
             "n": n_responses,
             "use_beam_search": True,
@@ -217,14 +223,46 @@ class BlabladorParaphraser(Paraphraser):
 
 
 if __name__ == "__main__":
+    df = pd.DataFrame(columns=["model", "prompt", "parameters", "original_text", "paraphrased_text"])
+    paraphrasers = {'T5_ChatGPT': T5ChatGPTParaphraser(), 'T5_Google_PAWS': T5GooglePAWSParaphraser()}
+    paraphrasers.update({f'Blablador_{name}': BlabladorParaphraser(model_id=name) for name in list(get_args(ModelName))})
+
+    text = "The quick brown fox jumps over the lazy dog."
+    n_responses = 1  # Number of paraphrases to generate
+    for name, paraphraser in tqdm(paraphrasers.items(), desc="Paraphrasing with different models", total=len(paraphrasers)):
+        paraphrased_text = paraphraser.paraphrase(text, n_responses=n_responses)
+        df = pd.concat([df, pd.DataFrame([{
+            "model": name,
+            "prompt": "Paraphrase the following text and output only the paraphrased version: <TEXT>",
+            "parameters": {
+                "n_responses": n_responses,
+                "max_tokens": MAX_LENGTH,
+                "temperature": TEMPERATURE
+            },
+            "original_text": text,
+            "paraphrased_text": paraphrased_text
+        }])], ignore_index=True)
+    
+    # Save the results to a CSV file
+    save_base_path = Path(__file__).resolve().parent.parent.parent / CONFIG.SAVE_PATH
+    assert save_base_path.exists(), f"Savefig base path {save_base_path} does not exist."
+    save_base_path = save_base_path / 'paraphrasing' 
+    os.makedirs(save_base_path, exist_ok=True)
+    save_path = save_base_path / "paraphrasing_results_comparison.csv"
+    df.to_csv(save_path, index=False)
+
+
+
+
+
     # paraphraser = T5ChatGPTParaphraser()
     # paraphraser = T5GooglePAWSParaphraser()
-    paraphraser = BlabladorParaphraser()
+    # paraphraser = BlabladorParaphraser()
     # paraphraser._get_available_models()
-    text = "The quick brown fox jumps over the lazy dog."
-    paraphrased_text = paraphraser.paraphrase(text, n_responses=1)
-    print(f"Original: {text}")
-    print(f"Paraphrased: {paraphrased_text}")
+    # text = "The quick brown fox jumps over the lazy dog."
+    # paraphrased_text = paraphraser.paraphrase(text, n_responses=1)
+    # print(f"Original: {text}")
+    # print(f"Paraphrased: {paraphrased_text}")
     
     # # Batch paraphrasing
     # texts = ["The sky is blue.", "I love programming.", "Artificial intelligence is fascinating."]
