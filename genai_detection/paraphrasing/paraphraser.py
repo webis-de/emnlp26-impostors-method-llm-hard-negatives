@@ -1,4 +1,5 @@
 from abc import ABC
+from itertools import product
 import json
 import os
 from pathlib import Path
@@ -232,12 +233,17 @@ if __name__ == "__main__":
 
     text = "The quick brown fox jumps over the lazy dog."
     n_responses = 1  # Number of paraphrases to generate
-    prompt = "Paraphrase the following text and output only the paraphrased version:"
-    for name, paraphraser in tqdm(paraphrasers.items(), desc="Paraphrasing with different models", total=len(paraphrasers)):
-        paraphrased_text = paraphraser.paraphrase(text=text, n_responses=n_responses, prompt=prompt)
+    prompts = ["Paraphrase the following text and output only the paraphrased version:", 
+            #   "First, extract bullet points capturing the main ideas, then create a text based on these bullet points. Only output the final text (i.e. do not output the bullet points or any additional chain of thoughts):",
+            #   "Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
+            #   "Paraphrase the sentence using the same tone as the original with approximately the same number of words:",
+              "Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence:"]
+    for (name, paraphraser), prompt_text in tqdm(product(paraphrasers.items(), prompts), desc="Paraphrasing with all model-prompt combinations", total=len(paraphrasers) * len(prompts)):
+        paraphrased_text = paraphraser.paraphrase(text=text, n_responses=n_responses, prompt=prompt_text)
+       
         df = pd.concat([df, pd.DataFrame([{
             "model": name,
-            "prompt": f"{prompt} <TEXT>",
+            "prompt": f"{prompt_text} <TEXT>",
             "parameters": {
                 "n_responses": n_responses,
                 "max_tokens": MAX_LENGTH,
