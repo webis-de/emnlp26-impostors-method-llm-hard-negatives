@@ -1,11 +1,13 @@
 from abc import ABC, abstractmethod
+from itertools import chain
+from pathlib import Path
 import os, sys
-from typing import Union
+from typing import Callable, Optional, Union
 from nltk.stem.snowball import SnowballStemmer
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-from datasets import load_from_disk
+from datasets import load_from_disk, concatenate_datasets
 sys.path.append(os.path.abspath(".."))
 from config import CONFIG
 from genai_detection.detectors.impostor import ImpostorDetector
@@ -14,12 +16,37 @@ from datasets import Dataset, DatasetDict, ClassLabel, Features, Value
 
 
 class BaseDatasetVisualization(ABC):
-    def __init__(self, name: str):
+    def __init__(self, name: str, savefig_base: Union[str, os.PathLike] = CONFIG.SAVE_PATH):
+        """
+        Initializes dataset visualiztion for specific dataset.
+        
+        :param name (str): Name of the dataset to load.
+        """
         self.name = name
+        self.dataset = self.load_dataset()
+        self.savefig_base = Path(__file__).resolve().parent.parent.parent / savefig_base
+        assert self.savefig_base.exists(), f"Savefig base path {self.savefig_base} does not exist."
 
-    @abstractmethod
-    def load_dataset(self) -> Union[Dataset, DatasetDict]:
-        pass
+    def load_dataset(self) -> pd.DataFrame:
+        """
+        Loads and combines datasets from the specified path.
+        
+        :param dataset_name (str): Name of the dataset to load.
+        
+        Returns:
+            pd.DataFrame: Combined dataset as a pandas DataFrame.
+        """
+        assert self.name in [CONFIG.PAN23, CONFIG.PAN20, CONFIG.BLOG, CONFIG.GUTENBERG, CONFIG.PAN25], f"Invalid dataset {self.name} provided."
+        name2path = {
+            CONFIG.PAN23: CONFIG.PATH2PAN23,
+            CONFIG.PAN20: CONFIG.PATH2PAN20,
+            CONFIG.BLOG: CONFIG.PATH2BLOG,
+            CONFIG.GUTENBERG: CONFIG.PATH2GUTENBERG,
+            CONFIG.PAN25: CONFIG.PATH2PAN25}
+        dataset = load_from_disk(os.path.join(os.path.abspath(".."), name2path[self.name]))
+        combined = concatenate_datasets([split for split in dataset.values()])
+        return combined.to_pandas()
+ 
 
     def _flatten_list(self, nested_list):
         """
@@ -34,7 +61,38 @@ class BaseDatasetVisualization(ABC):
         return [s for item in nested_list for s in item.flatten().tolist() if isinstance(item, np.ndarray)]
 
 
-    def plot_text_length_histogram(self, text_list, bins=10, preprocessed:bool = False, verbose:bool = False):
+
+    def dataset_stats(self, dataset=None, save:bool=True) -> pd.DataFrame:
+        """
+        Prints the dataset statistics.
+        :param save: Whether to save the statistics to a CSV file.
+        :return: A DataFrame containing the dataset statistics.
+        """
+        if dataset is None:
+            dataset = self.dataset
+        text_lengths = [len(text) for text in chain.from_iterable(dataset['pair'])]
+        text_lengths = np.array(text_lengths)
+        stats = {
+            'dataset': self.name,
+            'num_pairs': len(dataset),
+            'num_authors': len(set(chain.from_iterable(dataset['authors']))),
+            'num_same_pairs': dataset['same'].sum(),
+            'num_different_pairs': len(dataset) - dataset['same'].sum(),
+            'avg_text_len': text_lengths.mean(),
+            'min_text_len': text_lengths.min(),
+            'max_text_len': text_lengths.max(),
+            'std_text_len': text_lengths.std(),
+            'median_text_len': np.median(text_lengths),
+          }
+        
+        stats_df = pd.DataFrame([stats])
+        
+        if save:
+            stats_df.to_csv(self.savefig_base / f"{self.name}_stats.csv", index=False)
+        
+        return stats_df
+
+    def plot_text_length_histogram(self, dataset=None, bins=10, preprocess_fn: Optional[Callable[[str], str]] = None, verbose:bool = False):
         """
         Plots a histogram of text lengths (in characters) for a list of strings.
 
@@ -44,42 +102,42 @@ class BaseDatasetVisualization(ABC):
             preprocessed (bool): If True, indicates that the text has been stemmed.
             unit (str): Unit of measurement for text length, either 'characters' or 'ngrams'.
         """
-        if isinstance(text_list[0], np.ndarray):
-            text_list = self._flatten_list(text_list)
+        if dataset is None:
+            dataset = self.dataset
+        text_list = chain.from_iterable(dataset['pair'])
+        # if isinstance(text_list[0], np.ndarray):
+        #     text_list = self._flatten_list(text_list)
+        if preprocess_fn:
+            text_list = [preprocess_fn(text) for text in text_list]
         lengths = [len(text) for text in text_list]
         unit = 'characters' if type(lengths[0]) is str else 'ngrams'
         
         plt.figure(figsize=(10, 6))
         plt.hist(lengths, bins=bins, color='skyblue', edgecolor='black')
-        title = 'Histogram of Text Lengths (Stemmed)' if preprocessed else 'Histogram of Text Lengths'
+        title = f'Histogram of Text Lengths (preproc={preprocess_fn != None})\nDataset: {self.name}'
         plt.title(title)
         plt.xlabel(f'Text Length ({unit})')
         plt.ylabel('Frequency')
         plt.grid(True, linestyle='--', alpha=0.6)
         plt.tight_layout()
+        plt.savefig(self.savefig_base / f"{self.name}_text_length_histogram.png")
         plt.show()
         if not verbose:
             print(f"Average length (characters) per text: {np.mean(lengths):.2f}")
 
-   
-
-class Pan23Visualization(BaseDatasetVisualization):
-    def __init__(self, name: str = "pan23"):
-        super().__init__(name=name)
-
-    def load_dataset(self) -> DatasetDict:
-        ds_pan = load_from_disk(os.path.join(os.path.abspath(".."), CONFIG.PATH2PAN23))['train'].to_pandas()
-        return ds_pan
-    
-    def plot_avg_text_length_per_author(self, df, unit='characters'):
+       
+    def plot_avg_text_length_per_author(self, dataset=None, unit='characters'):
         """
         Plots a bar chart of average text length per author.
 
-        Args:
-            df (pd.DataFrame): DataFrame with 'author' and 'text' columns.
+        :param dataset: Huggingsface Dataset with 'authors' and 'pair' columns.
         """
+        if dataset is None:
+            dataset = self.dataset
+        df = self._extract_authors_and_texts(dataset)
+
         if unit == 'ngrams':
-            impostor_det = ImpostorDetector(df, top_n=250, portion_delete=0.5, shared_vocab_only=True, strict=True)
+            impostor_det = ImpostorDetector(df, top_n=250, portion_delete=0.5, shared_vocab_only=True)
             df['text_length'] = df['text'].apply(lambda text: len(impostor_det.tokenize_char_ngrams(text, n=4, normalize_ws=True, space_free=True)))
         else:
             # Default to characters
@@ -87,26 +145,44 @@ class Pan23Visualization(BaseDatasetVisualization):
         avg_len = df.groupby('author')['text_length'].mean().sort_values()
 
         # Plot
-        plt.figure(figsize=(10, 8))
+        plt.figure(figsize=(10, max(10, len(df['author'].unique()) * 0.15)))
         avg_len.plot(kind='barh', color='mediumseagreen', edgecolor='black')
         plt.xlabel(f'Average Text Length ({unit})')
-        plt.title('Average Text Length per Author')
+        plt.title(f'Average Text Length per Author\nDataset: {self.name}')
         plt.grid(axis='x', linestyle='--', alpha=0.5)
         plt.tight_layout()
+        plt.savefig(self.savefig_base / f"{self.name}_avg_text_length_per_author.png")
         plt.show()
 
-    def boxplots_text_len_ngrams(self, df):
+
+    def _extract_authors_and_texts(self, dataset):
+        """
+        Extracts authors and texts from the dataset and returns them as a DataFrame.
+        :param dataset: Huggingsface Dataset with 'authors' and 'pair' columns.
+        :return: DataFrame with 'author' and 'text'
+        """
+        authors = dataset['authors'].tolist()
+        authors = [s for item in authors for s in item.flatten().tolist() if isinstance(item, np.ndarray)]
+        pairs = dataset['pair'].tolist()
+        texts = [s for item in pairs for s in item.flatten().tolist() if isinstance(item, np.ndarray)]
+        df = pd.DataFrame({'author':authors, 'text':texts})
+        return df
+    
+
+    def boxplots_text_len_ngrams(self, dataset=None):
         """
         Plot two boxplots side by side in the same plot:
         1) Average text length per author
         2) All text lengths
         Outliers on average lengths are annotated.
 
-        Args:
-            df (pd.DataFrame): DataFrame with 'author' and 'text' columns.
+        :param dataset: Huggingsface Dataset with 'authors' and 'pair' columns.
         """
+        if dataset is None:
+            dataset = self.dataset
+        df = self._extract_authors_and_texts(dataset)
 
-        impostor_det = ImpostorDetector(df, top_n=250, portion_delete=0.5, shared_vocab_only=True, strict=True)
+        impostor_det = ImpostorDetector(df, top_n=250, portion_delete=0.5, shared_vocab_only=True)
         df['n_ngram'] = df['text'].apply(lambda text: len(impostor_det.tokenize_char_ngrams(text, n=4, normalize_ws=True, space_free=True)))
         df['text_length'] = df['text'].str.len()
         
@@ -129,7 +205,7 @@ class Pan23Visualization(BaseDatasetVisualization):
         ax.set_yticks(positions)
         ax.set_yticklabels(['Avg Text Length per Author', 'Avg ngram Count per Author'])
         ax.set_xlabel('Value')
-        ax.set_title('Boxplots of Average Text Length and ngram Count per Author')
+        ax.set_title(f'Boxplots of Average Text Length and ngram Count per Author\nDataset: {self.name}')
         
         # Function to find and annotate outliers
         def annotate_outliers(variable, pos, color):
@@ -154,14 +230,33 @@ class Pan23Visualization(BaseDatasetVisualization):
         
         ax.set_ylim(0.5, 2.5)
         plt.tight_layout()
+        plt.savefig(self.savefig_base / f"{self.name}_boxplots_text_len_ngrams.png")
         plt.show()
 
-    
 
-class Pan20Visualization(Pan23Visualization):
-    def __init__(self, name: str = "pan20"):
+   
+
+class Pan23Visualization(BaseDatasetVisualization):
+    def __init__(self, name: str = CONFIG.PAN23):
         super().__init__(name=name)
 
-    def load_dataset(self) -> DatasetDict:
-        ds_pan = load_from_disk(os.path.join(os.path.abspath(".."), CONFIG.PATH2PAN20))['train'].to_pandas()
-        return ds_pan
+
+class Pan20Visualization(Pan23Visualization):
+    def __init__(self, name: str = CONFIG.PAN20):
+        super().__init__(name=name)
+ 
+    
+class BlogVisualization(BaseDatasetVisualization):
+    def __init__(self, name: str = CONFIG.BLOG):
+        super().__init__(name=name)
+
+    
+class GutenbergVisualization(BaseDatasetVisualization):
+    def __init__(self, name: str = CONFIG.GUTENBERG):
+        super().__init__(name=name)
+
+
+class Pan25Visualization(BaseDatasetVisualization):
+    def __init__(self, name: str = CONFIG.PAN25):
+        super().__init__(name=name)
+ 
