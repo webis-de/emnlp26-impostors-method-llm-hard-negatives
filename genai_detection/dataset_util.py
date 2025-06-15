@@ -357,7 +357,7 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
                 # Skip the complete works of Shakespeare as it is way longer than other texts
                 continue
             with open(file, "r", encoding="utf-8") as f:
-                author = file.stem.split("_")[:-2]  # filename format is "title_firstName_sirname.txt"
+                author = ' '.join(file.stem.split("_")[-2:])  # filename format is "title_firstName_sirname.txt"
                 content = f.read()
                 content = unicodedata.normalize("NFKC", content)
                 content = re.sub(r"[^\x00-\x7F]+", " ", content)
