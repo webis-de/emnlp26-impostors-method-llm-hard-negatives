@@ -11,7 +11,7 @@ class BaseConfig:
     PATH2PAN23 = "data/datasets/pan23-authorship-verification/pan23-dataset-converted"
     PATH2PAN20 = "data/datasets/pan20-authorship-verification/pan20-dataset-converted"
     PATH2KOPPEL_WEBIS = "data/datasets/corpus-webis-authorship/koppel/koppel-webis-dataset-converted"
-    PATH2GUTENBERG = "data/datasets/gutenberg"
+    PATH2GUTENBERG = "data/datasets/gutenberg/gutenberg-dataset-converted"
     PATH2BLOG = "data/datasets/Blog_corpus/blog-dataset-converted"
     PATH2GENERIC_ON_FLY_IMP = "data/datasets/google-on-the-fly-imposters"
     SAVE_PATH = "results/"
