@@ -42,11 +42,11 @@
   - DetectorBase: get_score calls _get_score_impl, which is implemented by subclasses
   - plug in different approaches, e.g. imposter, unmasking 
   - ensemble different approaches
-- [ ] Implement a stats module for dataset statistics
-  - [ ] average text length
-  - [ ] number of texts
-  - [ ] number of authors
-  - [ ] min/max extreme and standard deviation
+- [x] Implement a stats module for dataset statistics
+  - [x] average text length
+  - [x] number of texts
+  - [x] number of authors
+  - [x] min/max extreme and standard deviation
 - [ ] LLM imposter generation
   - control: Topic, genre, register
   - open: Style
