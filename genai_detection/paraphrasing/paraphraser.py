@@ -230,11 +230,25 @@ class BlabladorParaphraser(Paraphraser):
     
 
 class ParaphrasingEvaluator:
-    def __init__(self, paraphrasers, prompts, original_text, n_responses=3, max_length=TEMPERATURE, temperature=TEMPERATURE):
+    def __init__(self, paraphrasers:dict, prompts:List[str], original_text:str, n_responses:int=3, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE):
+        """
+        Initializes the ParaphrasingEvaluator with the given paraphrasers and prompts.
+        :param paraphrasers: A dictionary of paraphraser instances with their names as keys.
+        :param prompts: A list of prompts to be used for paraphrasing.
+        :param original_text: The original text to be paraphrased.
+        :param n_responses: The number of paraphrases to generate for each paraphraser.
+        :param max_length: The maximum length of the generated paraphrase.
+        :param temperature: Controls the randomness of the output. Lower values make the output more deterministic.
+        """
+        assert isinstance(paraphrasers, dict) and all(isinstance(p, Paraphraser) for p in paraphrasers.values()), "paraphrasers must be a dictionary of Paraphraser instances."
         self.paraphrasers = paraphrasers
+        assert isinstance(prompts, list) and all(isinstance(p, str) for p in prompts), "prompts must be a list of strings."
         self.prompts = prompts
+        assert isinstance(original_text, str) and original_text.strip(), "original_text must be a non-empty string."
         self.original_text = original_text
+        assert isinstance(n_responses, int) and n_responses > 0, "n_responses must be a positive integer."
         self.n_responses = n_responses
+        assert isinstance(max_length, int) and max_length > 0, "max_length must be a positive integer."
         self.max_length = max_length
         self.temperature = temperature
 
@@ -243,6 +257,11 @@ class ParaphrasingEvaluator:
 
 
     def evaluate(self, save_to_disk:bool=True):
+        """
+        Evaluate the paraphrasers using BERTScore, BLEU and ROUGE metrics.
+        :param save_to_disk: If True, saves the results to a CSV file.
+        :return: A pandas DataFrame containing the evaluation results.
+        """
         results = []
         references = [self.original_text] * self.n_responses
         original_split = self.original_text.split()
@@ -288,10 +307,22 @@ class ParaphrasingEvaluator:
             os.makedirs(save_base_path, exist_ok=True)
             save_path = save_base_path / f"paraphrasing_results_comparison_temp{self.temperature}_maxLength{self.max_length}.csv"
             df.to_csv(save_path, index=False, float_format="%.4f")
+            print(f"Results saved to {save_path}")
 
         return df
 
-    def _build_result_row(self, name, prompt, paraphrase, original_split, bert_scores, rouge_score, idx):
+    def _build_result_row(self, name:str, prompt:str, paraphrase:str, original_split:List[str], bert_scores:dict, rouge_score:dict, idx:int) -> dict:
+        """
+        Build a result row for the DataFrame.
+        :param name: Name of the paraphraser.
+        :param prompt: The prompt used for paraphrasing excluding the text to paraphrase and tailoring whitespaces, but including bulletpoints etc.
+        :param paraphrase: One of the generated paraphrase.
+        :param original_split: The original text split into tokens.
+        :param bert_scores: BERTScore results.  
+        :param rouge_score: ROUGE scores for the paraphrase.
+        :param idx: Index of the paraphrase in the list of BERTScores.
+        :return: A dictionary representing the result row.
+        """
         return {
             "model": name,
             "prompt": f"{prompt} <TEXT>",
@@ -320,78 +351,6 @@ class ParaphrasingEvaluator:
             "bertscore_hash": bert_scores["hashcode"],
         }
 
-
-    # def generate_paraphrasing_comparison(self,):
-    #     """
-    #     Generate a comparison of different paraphrasing models and prompts.
-    #     This function creates a DataFrame with the results and saves it to a CSV file.
-    #     """
-    #     results = []
-
-    #     # models
-    #     paraphrasers = {}#'T5_ChatGPT': T5ChatGPTParaphraser(), 'T5_Google_PAWS': T5GooglePAWSParaphraser()}
-    #     paraphrasers.update({f'Blablador_{name}': BlabladorParaphraser(model_id=name) for name in list(get_args(ModelName))})
-
-    #     # prompts, texts, and parameters
-    #     original_text = "The quick brown fox jumps over the lazy dog."
-    #     original_split = original_text.split()
-    #     references = [original_text] * n_responses
-    #     n_responses = 1  # number of paraphrases to generate
-    #     prompts = [
-    #         "Paraphrase the following text and output only the paraphrased version:", 
-    #         # "First, extract bullet points capturing the main ideas, then create a text based on these bullet points. Only output the final text (i.e. do not output the bullet points or any additional chain of thoughts):",
-    #         # "Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
-    #         # "Paraphrase the sentence using the same tone as the original with approximately the same number of words:",
-    #         "Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence:"
-    #         ]
-        
-    #     # all combinations of paraphrasers and prompts
-    #     for (name, paraphraser), prompt_text in tqdm(product(paraphrasers.items(), prompts), desc="Paraphrasing with all model-prompt combinations", total=len(paraphrasers) * len(prompts)):
-    #         try:
-    #             paraphrased_texts = paraphraser.paraphrase(text=original_text, n_responses=n_responses, prompt=prompt_text)
-    #             if not paraphrased_texts:
-    #                 continue
-    #         except Exception as e:
-    #             print(f"[ERROR] {name} with prompt '{prompt_text}': {e}")
-    #             continue
-            
-    #         bertscores = bertscore.compute(predictions=paraphrased_texts, references=references)
-    #         rouge_scores = [rouge_score.score(o, p, use_stemmer=True) for o,p in zip(references, paraphrased_texts)]
-            
-    #         # one row per paraphrase
-    #         for i, paraphrase in enumerate(paraphrased_texts):
-    #             scores = rouge_scores[i]
-    #             results.append({
-    #                 "model": name,
-    #                 "prompt": f"{prompt_text} <TEXT>",
-    #                 "parameters": {"n_responses": n_responses, "max_tokens": MAX_LENGTH, "temperature": TEMPERATURE},
-    #                 "original_text": original_text,
-    #                 "paraphrased_text": paraphrase,
-    #                 "bleu_score": bleu_score.sentence_bleu(original_split, paraphrase.split()),
-    #                 "meteor_score": meteor_score.single_meteor_score(original_text, paraphrase),
-    #                 "rouge1_precision": scores["rouge1"]["precision"],
-    #                 "rouge1_recall": scores["rouge1"]["recall"],
-    #                 "rouge1_fmeasure": scores["rouge1"]["fmeasure"],
-    #                 "rouge2_precision": scores["rouge2"]["precision"],
-    #                 "rouge2_recall": scores["rouge2"]["recall"],
-    #                 "rouge2_fmeasure": scores["rouge2"]["fmeasure"],
-    #                 "rougeL_precision": scores["rougeL"]["precision"],
-    #                 "rougeL_recall": scores["rougeL"]["recall"],
-    #                 "rougeL_fmeasure": scores["rougeL"]["fmeasure"],
-    #                 "bertscore_precision": bertscores["precision"][i],
-    #                 "bertscore_recall": bertscores["recall"][i],
-    #                 "bertscore_f1": bertscores["f1"][i]
-    #             })
-
-    #     df = pd.DataFrame(results)
-        
-    #     # save the results to a CSV file
-    #     save_base_path = Path(__file__).resolve().parent.parent.parent / CONFIG.SAVE_PATH
-    #     assert save_base_path.exists(), f"Savefig base path {save_base_path} does not exist."
-    #     save_base_path = save_base_path / 'paraphrasing' 
-    #     os.makedirs(save_base_path, exist_ok=True)
-    #     save_path = save_base_path / "paraphrasing_results_comparison.csv"
-    #     df.to_csv(save_path, index=False)
 
 if __name__ == "__main__":
     # models
