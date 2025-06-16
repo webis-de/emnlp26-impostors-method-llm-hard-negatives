@@ -58,6 +58,11 @@
     - choose generation approach based on genre, i.e. simulate how original author would have written the text
       - e.g. student essay: Task description and sources → generate text
   - [ ] test on [Ollama](https://github.com/ollama/ollama) hosted by Webis
+  - [x] test on [Blablador](https://helmholtz-blablador.fz-juelich.de/) hosted by FZ Jülich
+  - [x] Implement paraphrase comparison approach
+    - metrics (e.g. BLEU, ROUGE, BERTScore) to compare paraphrase quality
+    - qualitative comparison
+    - different LLMs (Blablador hosted ones, local T5 Huggingface isntances)
 
 
 ## 📅 06.06.2025- 13.06.2025
