@@ -33,6 +33,8 @@ dotenv = "^0.9.9"
 cmake = "3.31.6"
 sentencepiece = "^0.2.0"
 # simpletransformers = "^0.70.1"
+evaluate = "^0.4.3"
+bert-score = "^0.3.13"
 
 [build-system]
 requires = ["poetry-core"]
