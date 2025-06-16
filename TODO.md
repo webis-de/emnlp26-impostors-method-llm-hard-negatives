@@ -57,7 +57,7 @@
       - [ ] plain text → outline/ bullet points → text
     - choose generation approach based on genre, i.e. simulate how original author would have written the text
       - e.g. student essay: Task description and sources → generate text
-  - [ ] test on [Ollama](https://github.com/ollama/ollama) hosted by Webis
+  - [ ] test on [Ollama](https://github.com/ollama/ollama) ~~hosted by [Webis](http://llm.web.webis.de)~~
   - [x] test on [Blablador](https://helmholtz-blablador.fz-juelich.de/) hosted by FZ Jülich
   - [x] Implement paraphrase comparison approach
     - metrics (e.g. BLEU, ROUGE, BERTScore) to compare paraphrase quality
