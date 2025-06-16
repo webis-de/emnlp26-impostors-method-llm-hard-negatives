@@ -26,7 +26,7 @@ ModelName = Literal[
     "1 - Ministral 8b - the fast model",
     "1 - Teuken-7B-instruct-research-v0.4 - The OpenGPT-X model",
     "10 Mistral-Nemo-Instruct-2407 - Our fast-experimental - with a large context size",
-    "2 - QwenLong L1 32B - A long context reasoning model from 28.05.2025", # specially trained for reasoning
+    #"2 - QwenLong L1 32B - A long context reasoning model from 28.05.2025", # specially trained for reasoning, not available om 16.06.2025
     "3 - DeepCoder-14B-Preview - the code model from 09.04.2025",
     "5 - GritLM-7B - For Chat AND Text Embeddings",
     "alias-code",   # specially trained for code
@@ -355,18 +355,18 @@ class ParaphrasingEvaluator:
 if __name__ == "__main__":
     # models
     paraphrasers = {'T5_ChatGPT': T5ChatGPTParaphraser(), 'T5_Google_PAWS': T5GooglePAWSParaphraser()}
-    #paraphrasers.update({f'Blablador_{name}': BlabladorParaphraser(model_id=name) for name in list(get_args(ModelName))})
+    paraphrasers.update({f'Blablador_{name}': BlabladorParaphraser(model_id=name) for name in list(get_args(ModelName))})
 
     prompts = [
             "Paraphrase the following text and output only the paraphrased version:", 
-            # "First, extract bullet points capturing the main ideas, then create a text based on these bullet points. Only output the final text (i.e. do not output the bullet points or any additional chain of thoughts):",
-            # "Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
-            # "Paraphrase the sentence using the same tone as the original with approximately the same number of words:",
+            "First, extract bullet points capturing the main ideas, then create a text based on these bullet points. Only output the final text (i.e. do not output the bullet points or any additional chain of thoughts):",
+            "Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
+            "Paraphrase the sentence using the same tone as the original with approximately the same number of words:",
             "Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence:"
             ]
     
     original_text = "The quick brown fox jumps over the lazy dog."
-    n_reponses = 2  # number of paraphrases to generate
+    n_reponses = 3  # number of paraphrases to generate
     max_length = MAX_LENGTH  # Maximum length of the generated paraphrase
     temperature = TEMPERATURE  # Controls the randomness of the output. Lower values make the output more deterministic.
 
