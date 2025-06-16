@@ -1,10 +1,11 @@
 from abc import ABC
+from collections import defaultdict
 from itertools import product
 import json
 import os
 from pathlib import Path
 import sys
-from typing import Literal, get_args
+from typing import List, Literal, get_args
 import pandas as pd
 import requests
 from simpletransformers.t5 import T5Model
@@ -12,6 +13,10 @@ import sklearn
 import torch
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import nltk
+nltk.download('wordnet')    # necessary for METEOR score
+from nltk.translate import bleu_score, meteor_score
+import evaluate
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from config import CONFIG
 
@@ -43,7 +48,7 @@ class Paraphraser(ABC):
     Abstract base class for paraphrasing models.
     """
 
-    def paraphrase(self, text: str, prompt: str, n_responses:int=5, max_length:int=MAX_LENGTH) -> str:
+    def paraphrase(self, text: str, prompt: str, n_responses:int=5, max_length:int=MAX_LENGTH) -> List[str]:
         """
         Generate a paraphrase of the input text.
 
@@ -96,11 +101,11 @@ class T5ChatGPTParaphraser(Paraphraser):
         self.tokenizer = AutoTokenizer.from_pretrained("humarin/chatgpt_paraphraser_on_T5_base")
         self.model = AutoModelForSeq2SeqLM.from_pretrained("humarin/chatgpt_paraphraser_on_T5_base").to(self.device)
 
-    def paraphrase(self, text: str, prompt: str, num_beams=5, num_beam_groups=5, n_responses:int=5, repetition_penalty=10.0, diversity_penalty=3.0, no_repeat_ngram_size=2, temperature:float=TEMPERATURE, max_length:int=MAX_LENGTH) -> str:
+    def paraphrase(self, text: str, prompt: str, num_beams=5, num_beam_groups=5, n_responses:int=5, repetition_penalty=10.0, diversity_penalty=3.0, no_repeat_ngram_size=2, max_length:int=MAX_LENGTH) -> List[str]:
         input_ids = self.tokenizer(f'{prompt.strip()} {text}', return_tensors="pt", padding="longest", max_length=max_length, truncation=True).input_ids.to(self.device)
         
         outputs = self.model.generate(
-            input_ids, temperature=temperature, repetition_penalty=repetition_penalty,
+            input_ids, repetition_penalty=repetition_penalty,
             num_return_sequences=n_responses, no_repeat_ngram_size=no_repeat_ngram_size,
             num_beams=num_beams, num_beam_groups=num_beam_groups,
             max_length=max_length, diversity_penalty=diversity_penalty
@@ -135,7 +140,7 @@ class T5GooglePAWSParaphraser(Paraphraser):
         self.tokenizer = AutoTokenizer.from_pretrained("Vamsi/T5_Paraphrase_Paws")
         self.model = AutoModelForSeq2SeqLM.from_pretrained("Vamsi/T5_Paraphrase_Paws").to(self.device)
 
-    def paraphrase(self, text: str, prompt:str, n_responses:int=5, max_length:int=MAX_LENGTH) -> str:
+    def paraphrase(self, text: str, prompt:str, n_responses:int=5, max_length:int=MAX_LENGTH) -> List[str]:
         # TODO: no duplication penalty, and thus, there are duplicates in the output
         encoding = self.tokenizer.encode_plus(f'{prompt.strip()} {text} </s>', padding="max_length", return_tensors="pt")
         
@@ -191,7 +196,7 @@ class BlabladorParaphraser(Paraphraser):
             raise Exception(f"Error fetching models: {response.status_code} - {response.text}")
 
 
-    def paraphrase(self, text: str, prompt:str, verbose:bool=False, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE, n_responses:int=5) -> str:
+    def paraphrase(self, text: str, prompt:str, verbose:bool=False, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE, n_responses:int=5) -> List[str]:
         """
         Generate a paraphrase of the input text.
 
@@ -215,7 +220,7 @@ class BlabladorParaphraser(Paraphraser):
         response = requests.post(f"{self.base_url}/completions", headers={**self.headers, "Content-Type": "application/json"}, data=json.dumps(payload))
 
         if response.status_code == 200:
-            paraphrased_texts = [choice["text"] for choice in response.json()["choices"]] if n_responses > 1 else response.json()["choices"][0]["text"]
+            paraphrased_texts = [choice["text"] for choice in response.json()["choices"]] if n_responses > 1 else [response.json()["choices"][0]["text"]]
             if verbose:
                 print("Paraphrased text(s):\n", paraphrased_texts)
             return paraphrased_texts
@@ -223,58 +228,191 @@ class BlabladorParaphraser(Paraphraser):
             print("Error:", response.status_code, response.text)
     
     
-    
+
+class ParaphrasingEvaluator:
+    def __init__(self, paraphrasers, prompts, original_text, n_responses=3, max_length=TEMPERATURE, temperature=TEMPERATURE):
+        self.paraphrasers = paraphrasers
+        self.prompts = prompts
+        self.original_text = original_text
+        self.n_responses = n_responses
+        self.max_length = max_length
+        self.temperature = temperature
+
+        self.rouge_score = evaluate.load("rouge")
+        self.bertscore = evaluate.load("bertscore") 
 
 
-def generate_paraphrasing_comparison():
-    """
-    Generate a comparison of different paraphrasing models and prompts.
-    This function creates a DataFrame with the results and saves it to a CSV file.
-    """
-    # store the results in a DataFrame
-    df = pd.DataFrame(columns=["model", "prompt", "parameters", "original_text", "paraphrased_text"])
+    def evaluate(self, save_to_disk:bool=True):
+        results = []
+        references = [self.original_text] * self.n_responses
+        original_split = self.original_text.split()
 
-    # models
-    paraphrasers = {'T5_ChatGPT': T5ChatGPTParaphraser(), 'T5_Google_PAWS': T5GooglePAWSParaphraser()}
-    paraphrasers.update({f'Blablador_{name}': BlabladorParaphraser(model_id=name) for name in list(get_args(ModelName))})
+        for (name, paraphraser), prompt in tqdm(
+            product(self.paraphrasers.items(), self.prompts),
+            desc="Evaluating Paraphrasers",
+            total=len(self.paraphrasers) * len(self.prompts)
+        ):
+            try:
+                paraphrases = paraphraser.paraphrase(
+                    text=self.original_text,
+                    n_responses=self.n_responses,
+                    prompt=prompt
+                )
+                if not paraphrases:
+                    raise ValueError("Empty paraphrase list.")
 
-    # prompts, texts, and parameters
-    original_text = "The quick brown fox jumps over the lazy dog."
-    n_responses = 1  # number of paraphrases to generate
-    prompts = [
-        "Paraphrase the following text and output only the paraphrased version:", 
-        "First, extract bullet points capturing the main ideas, then create a text based on these bullet points. Only output the final text (i.e. do not output the bullet points or any additional chain of thoughts):",
-        "Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
-        "Paraphrase the sentence using the same tone as the original with approximately the same number of words:",
-        "Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence:"
-        ]
-    
-    # all combinations of paraphrasers and prompts
-    for (name, paraphraser), prompt_text in tqdm(product(paraphrasers.items(), prompts), desc="Paraphrasing with all model-prompt combinations", total=len(paraphrasers) * len(prompts)):
-        paraphrased_text = paraphraser.paraphrase(text=original_text, n_responses=n_responses, prompt=prompt_text)
-        # TODO: Add scores (BLEU, ROUGE, BERTScore, etc.) to the DataFrame
-        df = pd.concat([df, pd.DataFrame([{
+            except Exception as e:
+                print(f"[ERROR] Paraphraser '{name}' with prompt '{prompt}' failed: {e}")
+                continue
+
+            try:
+                # input is list of strings, each string is a paraphrase/ reference
+                bert_scores = self.bertscore.compute(predictions=paraphrases, references=references, model_type="distilbert-base-uncased")
+                # rouge returns one value for all paraphrases, hence: list comprehension
+                rouge_scores = [self.rouge_score.compute(predictions=[p], references=[self.original_text]) for p in paraphrases]
+                               
+                for i, paraphrase in enumerate(paraphrases):
+                    results.append(self._build_result_row(
+                        name, prompt, paraphrase, original_split, bert_scores, rouge_scores[i], i
+                    ))
+
+            except Exception as e:
+                print(f"[ERROR] Scoring failed for '{name}' with prompt '{prompt}': {e}")
+                continue
+
+        df = pd.DataFrame(results)
+        if save_to_disk:
+            save_base_path = Path(__file__).resolve().parent.parent.parent / CONFIG.SAVE_PATH
+            assert save_base_path.exists(), f"Savefig base path {save_base_path} does not exist."
+            save_base_path = save_base_path / 'paraphrasing' 
+            os.makedirs(save_base_path, exist_ok=True)
+            save_path = save_base_path / f"paraphrasing_results_comparison_temp{self.temperature}_maxLength{self.max_length}.csv"
+            df.to_csv(save_path, index=False, float_format="%.4f")
+
+        return df
+
+    def _build_result_row(self, name, prompt, paraphrase, original_split, bert_scores, rouge_score, idx):
+        return {
             "model": name,
-            "prompt": f"{prompt_text} <TEXT>",
+            "prompt": f"{prompt} <TEXT>",
             "parameters": {
-                "n_responses": n_responses,
-                "max_tokens": MAX_LENGTH,
-                "temperature": TEMPERATURE
+                "n_responses": self.n_responses,
+                "max_tokens": self.max_length,
+                "temperature": self.temperature
             },
-            "original_text": original_text,
-            "paraphrased_text": paraphrased_text
-        }])], ignore_index=True)
-    
-    # save the results to a CSV file
-    save_base_path = Path(__file__).resolve().parent.parent.parent / CONFIG.SAVE_PATH
-    assert save_base_path.exists(), f"Savefig base path {save_base_path} does not exist."
-    save_base_path = save_base_path / 'paraphrasing' 
-    os.makedirs(save_base_path, exist_ok=True)
-    save_path = save_base_path / "paraphrasing_results_comparison.csv"
-    df.to_csv(save_path, index=False)
+            "original_text": self.original_text,
+            "paraphrased_text": paraphrase,
+            # avoid division by zero using smoothing
+            "bleu_score": bleu_score.sentence_bleu(
+                references=[original_split],
+                hypothesis=paraphrase.split(),
+                smoothing_function=bleu_score.SmoothingFunction().method1
+            ),
+            # METEOR requires tokens as input
+            "meteor_score": meteor_score.single_meteor_score(original_split, paraphrase.split()),
+            "rouge1": rouge_score["rouge1"],
+            "rouge2": rouge_score["rouge2"],
+            "rougeL": rouge_score["rougeL"],
+            "rougeLsum": rouge_score["rougeLsum"],
+            "bertscore_precision": bert_scores["precision"][idx],
+            "bertscore_recall": bert_scores["recall"][idx],
+            "bertscore_f1": bert_scores["f1"][idx],
+            "bertscore_hash": bert_scores["hashcode"],
+        }
+
+
+    # def generate_paraphrasing_comparison(self,):
+    #     """
+    #     Generate a comparison of different paraphrasing models and prompts.
+    #     This function creates a DataFrame with the results and saves it to a CSV file.
+    #     """
+    #     results = []
+
+    #     # models
+    #     paraphrasers = {}#'T5_ChatGPT': T5ChatGPTParaphraser(), 'T5_Google_PAWS': T5GooglePAWSParaphraser()}
+    #     paraphrasers.update({f'Blablador_{name}': BlabladorParaphraser(model_id=name) for name in list(get_args(ModelName))})
+
+    #     # prompts, texts, and parameters
+    #     original_text = "The quick brown fox jumps over the lazy dog."
+    #     original_split = original_text.split()
+    #     references = [original_text] * n_responses
+    #     n_responses = 1  # number of paraphrases to generate
+    #     prompts = [
+    #         "Paraphrase the following text and output only the paraphrased version:", 
+    #         # "First, extract bullet points capturing the main ideas, then create a text based on these bullet points. Only output the final text (i.e. do not output the bullet points or any additional chain of thoughts):",
+    #         # "Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
+    #         # "Paraphrase the sentence using the same tone as the original with approximately the same number of words:",
+    #         "Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence:"
+    #         ]
+        
+    #     # all combinations of paraphrasers and prompts
+    #     for (name, paraphraser), prompt_text in tqdm(product(paraphrasers.items(), prompts), desc="Paraphrasing with all model-prompt combinations", total=len(paraphrasers) * len(prompts)):
+    #         try:
+    #             paraphrased_texts = paraphraser.paraphrase(text=original_text, n_responses=n_responses, prompt=prompt_text)
+    #             if not paraphrased_texts:
+    #                 continue
+    #         except Exception as e:
+    #             print(f"[ERROR] {name} with prompt '{prompt_text}': {e}")
+    #             continue
+            
+    #         bertscores = bertscore.compute(predictions=paraphrased_texts, references=references)
+    #         rouge_scores = [rouge_score.score(o, p, use_stemmer=True) for o,p in zip(references, paraphrased_texts)]
+            
+    #         # one row per paraphrase
+    #         for i, paraphrase in enumerate(paraphrased_texts):
+    #             scores = rouge_scores[i]
+    #             results.append({
+    #                 "model": name,
+    #                 "prompt": f"{prompt_text} <TEXT>",
+    #                 "parameters": {"n_responses": n_responses, "max_tokens": MAX_LENGTH, "temperature": TEMPERATURE},
+    #                 "original_text": original_text,
+    #                 "paraphrased_text": paraphrase,
+    #                 "bleu_score": bleu_score.sentence_bleu(original_split, paraphrase.split()),
+    #                 "meteor_score": meteor_score.single_meteor_score(original_text, paraphrase),
+    #                 "rouge1_precision": scores["rouge1"]["precision"],
+    #                 "rouge1_recall": scores["rouge1"]["recall"],
+    #                 "rouge1_fmeasure": scores["rouge1"]["fmeasure"],
+    #                 "rouge2_precision": scores["rouge2"]["precision"],
+    #                 "rouge2_recall": scores["rouge2"]["recall"],
+    #                 "rouge2_fmeasure": scores["rouge2"]["fmeasure"],
+    #                 "rougeL_precision": scores["rougeL"]["precision"],
+    #                 "rougeL_recall": scores["rougeL"]["recall"],
+    #                 "rougeL_fmeasure": scores["rougeL"]["fmeasure"],
+    #                 "bertscore_precision": bertscores["precision"][i],
+    #                 "bertscore_recall": bertscores["recall"][i],
+    #                 "bertscore_f1": bertscores["f1"][i]
+    #             })
+
+    #     df = pd.DataFrame(results)
+        
+    #     # save the results to a CSV file
+    #     save_base_path = Path(__file__).resolve().parent.parent.parent / CONFIG.SAVE_PATH
+    #     assert save_base_path.exists(), f"Savefig base path {save_base_path} does not exist."
+    #     save_base_path = save_base_path / 'paraphrasing' 
+    #     os.makedirs(save_base_path, exist_ok=True)
+    #     save_path = save_base_path / "paraphrasing_results_comparison.csv"
+    #     df.to_csv(save_path, index=False)
 
 if __name__ == "__main__":
-    generate_paraphrasing_comparison()
+    # models
+    paraphrasers = {'T5_ChatGPT': T5ChatGPTParaphraser(), 'T5_Google_PAWS': T5GooglePAWSParaphraser()}
+    #paraphrasers.update({f'Blablador_{name}': BlabladorParaphraser(model_id=name) for name in list(get_args(ModelName))})
+
+    prompts = [
+            "Paraphrase the following text and output only the paraphrased version:", 
+            # "First, extract bullet points capturing the main ideas, then create a text based on these bullet points. Only output the final text (i.e. do not output the bullet points or any additional chain of thoughts):",
+            # "Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
+            # "Paraphrase the sentence using the same tone as the original with approximately the same number of words:",
+            "Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence:"
+            ]
+    
+    original_text = "The quick brown fox jumps over the lazy dog."
+    n_reponses = 2  # number of paraphrases to generate
+    max_length = MAX_LENGTH  # Maximum length of the generated paraphrase
+    temperature = TEMPERATURE  # Controls the randomness of the output. Lower values make the output more deterministic.
+
+    paraphrase_evaluator = ParaphrasingEvaluator(paraphrasers=paraphrasers, prompts=prompts, original_text=original_text, n_responses=n_reponses, max_length=max_length, temperature=temperature)
+    paraphrase_evaluator.evaluate()
 
     # paraphraser = T5ChatGPTParaphraser()
     # paraphraser = T5GooglePAWSParaphraser()
