@@ -1,9 +1,22 @@
 # ✅ TODOs
 
-## 📅 14.06.2025- 20.06.2025
+## 📅 21.06.2025- 27.06.2025
 
 ### 📚 Dataset
----
+- Requirements:
+  - [ ] No format (paragraphs, layout, title) — plain text only  
+  - [ ] No confounders (topic, genre, register, text length influence style)  
+  - Constructed situations with manually rephrased texts are **okay**  
+  - Small dataset is **okay**
+- [ ] Dataset should already be preprocessed
+  - i.e. no newlines, utf-8 to ascii, etc.
+- [ ] Plugin to view arrow (Huggingface) datasets in IDE *or* second saved dataset with viewable texts
+- [ ] Statistic on preprocessed dataset
+- [ ] Pick pairs more carefully, i.e. same register (e.g., Shakespearean play vs. Dickens novel not same register), genre, time period, etc.
+  - only plain text (not play headers etc.) have style
+- [ ] don't scale to big data, prepare two examples where (pre)processing steps are visible
+  - [ ] Koppel scenario
+  - [ ] Our LLM scenario
 
 ### ✍️ Written Work
 - [ ] control dataset in terms of topic, genre, register
@@ -21,32 +34,25 @@
   - [ ] number of authors
   - [ ] min/max extreme and standard deviation
 - [ ] slides with this specific task
+  - Koppel task (old)
+  - Our task (new)
+  - controlled/ uncontrolled variables
+- [ ] don't scale to big data, prepare (controlled) two examples where (pre)processing steps are visible: Motivate with [Bevendorff et. Al. 2025](https://downloads.webis.de/publications/papers/bevendorff_2025a.pdf) "existing data is bad"
+  - [ ] specify constraints to data
+- [ ] slides with dataset discussion
+  - controlled variables: topic, genre (e.g., play, fiction, non-fiction), register, time period denoted "Textgattungvariablen"
 - [ ] LLM imposter generation
   - [ ] control: Topic, genre, register
   - [ ] open: Style
   - [ ] generate text for same topic (!= paraphrasing)
     - paraphrase is only one heuristic for the solution, but not the only one
     - simulate how original author would have written the text
-- Paper sources: ACL Ontology cite search, OBLP title search
+- Paper sources: ACL Ontology site search (_paraphrase model site:aclanthology.org_), [DBLP title search](https://dblp.org/search?q=paraphrase%20generation), Semantic Scholar search
 - [ ] Imposter default values from Koppel et al. (2014) paper
 
-
 ### 🛠️ Implementation
-- [x] Text preprocessing steps into detector approaches
-  - [x] remove newlines etc.
-  - [x] utf-8 to ascii, i.e. remove special characters
-  - [x] only keep text, no additional layout or structural information
 - [ ] Longer texts, do not crop at 500 words, but ensure texts of similar length
   - otherwise 100,000 most frequent words are too many for text size
-- [x] Modular approach, i.e. pipeline gets two texts and returns similarity score: 
-  - DetectorBase: get_score calls _get_score_impl, which is implemented by subclasses
-  - plug in different approaches, e.g. imposter, unmasking 
-  - ensemble different approaches
-- [x] Implement a stats module for dataset statistics
-  - [x] average text length
-  - [x] number of texts
-  - [x] number of authors
-  - [x] min/max extreme and standard deviation
 - [ ] LLM imposter generation
   - control: Topic, genre, register
   - open: Style
@@ -57,7 +63,30 @@
       - [ ] plain text → outline/ bullet points → text
     - choose generation approach based on genre, i.e. simulate how original author would have written the text
       - e.g. student essay: Task description and sources → generate text
-  - [ ] test on [Ollama](https://github.com/ollama/ollama) ~~hosted by [Webis](http://llm.web.webis.de)~~
+
+## 📅 14.06.2025- 20.06.2025
+
+### 📚 Dataset
+---
+
+### ✍️ Written Work
+---
+
+### 🛠️ Implementation
+- [x] Text preprocessing steps into detector approaches
+  - [x] remove newlines etc.
+  - [x] utf-8 to ascii, i.e. remove special characters
+  - [x] only keep text, no additional layout or structural information
+- [x] Modular approach, i.e. pipeline gets two texts and returns similarity score: 
+  - DetectorBase: get_score calls _get_score_impl, which is implemented by subclasses
+  - plug in different approaches, e.g. imposter, unmasking 
+  - ensemble different approaches
+- [x] Implement a stats module for dataset statistics
+  - [x] average text length
+  - [x] number of texts
+  - [x] number of authors
+  - [x] min/max extreme and standard deviation
+- [ ] LLM imposter generation
   - [x] test on [Blablador](https://helmholtz-blablador.fz-juelich.de/) hosted by FZ Jülich
   - [x] Implement paraphrase comparison approach
     - metrics (e.g. BLEU, ROUGE, BERTScore) to compare paraphrase quality
@@ -74,12 +103,6 @@
 - Control:
   - topic, genre, register  
   - $\neq$ [PAN23](https://fold.aston.ac.uk/handle/123456789/17): Cross-Discourse Type AV (e.g. essay vs. email)
-
-- Requirements:
-  - [ ] No format (paragraphs, layout, title) — plain text only  
-  - [ ] No confounders (topic, genre, register, text length influence style)  
-  - Constructed situations with manually rephrased texts are **okay**  
-  - Small dataset is **okay**
 
 - Sources:
   - [x] **[Gutenberg books](https://www.gutenberg.org/)** (same vs. different author) — long text quality example  
