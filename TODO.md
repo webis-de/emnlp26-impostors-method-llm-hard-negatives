@@ -47,7 +47,7 @@
   - [ ] generate text for same topic (!= paraphrasing)
     - paraphrase is only one heuristic for the solution, but not the only one
     - simulate how original author would have written the text
-- Paper sources: ACL Ontology site search (_paraphrase model site:aclanthology.org_), [DBLP title search](https://dblp.org/search?q=paraphrase%20generation), Semantic Scholar search
+- Paper sources: ACL Ontology site search (_paraphrase model site:aclanthology.org_ on Google), [DBLP title search](https://dblp.org/search?q=paraphrase%20generation), Semantic Scholar search
 - [ ] Imposter default values from Koppel et al. (2014) paper
 
 ### 🛠️ Implementation
