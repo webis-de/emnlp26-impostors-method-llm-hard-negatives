@@ -195,6 +195,7 @@ class OllamaParaphraser(Paraphraser):
         """
         Generate paraphrased versions of the input text.
         """
+        print('prompt:', prompt)
         response = self.client.chat.completions.create(
             model = "default:latest",
             messages = [{"role": "user", "content": f"{prompt.strip()} {text}"}],
@@ -202,7 +203,11 @@ class OllamaParaphraser(Paraphraser):
             max_tokens = max_length,
             temperature = temperature,
         )
-        return response.choices[0].message.content
+        print(f"[DEBUG] Response from Ollama: {response.choices[0].message.content}")
+        # responses = [resp.message.content for resp in response.choices]
+        # for i, resp in enumerate(responses):
+        #     print(f"[DEBUG] Response {i+1}: {resp}")
+        # return responses
 
 
 
@@ -523,7 +528,8 @@ if __name__ == "__main__":
     
     original_text = "The quick brown fox jumps over the lazy dog."
     ollama_paraphraser = OllamaParaphraser(model_id="default:latest")
-    print("Ollama Paraphrasing Example:", ollama_paraphraser.paraphrase(text=original_text, prompt="Paraphrase the following text:", n_responses=1, max_length=MAX_LENGTH))
+    prompt = 'Paraphrase the following text. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","paraphrase":"<paraphrased version of the text>"} Text to paraphrase:'
+    print("Ollama Paraphrasing Example:", ollama_paraphraser.paraphrase(text=original_text, prompt=prompt, n_responses=3, max_length=MAX_LENGTH))
 
     # FIXME
     # original_text = 'Vice President JD Vance, in his first public comments since President Donald Trump authorized US strikes on Iranian nuclear sites, emphasized that the US is “not at war” with Iran as he laid out the president’s decision-making process. “We’re not at war with Iran. We’re at war with Iran’s nuclear program,” Vance said in an interview with NBC’s “Meet the Press with Kristen Welker,” calling the strikes a “testament to the power of the American military.”Asked what intelligence led to the decision, Vance described a “narrow window of opportunity.” “We had a narrow window of opportunity. We might not have been able to carry out this attack six months down the road. … We have a narrow window in which we can set that program back a very long time. It would have been irresponsible, I think, for the president not to take the action that he did,” he said. Vance added, “Of course we trust our intelligence community, but we also trust our instincts. … The Iranians stopped negotiating in good faith – that was the real catalyst.” The vice president also suggested that Trump arrived at the conclusion to authorize the strikes after issuing what he described as “private ultimatums” to Iran. He declined to detail those ultimatums. CNN has previously reported that Trump offered Iran a 60-day window in April to negotiate, asking Israeli Prime Minister Benjamin Netanyahu to hold off on striking the country to allow those talks to progress.'
