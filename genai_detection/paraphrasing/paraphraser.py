@@ -195,19 +195,30 @@ class OllamaParaphraser(Paraphraser):
         """
         Generate paraphrased versions of the input text.
         """
-        print('prompt:', prompt)
-        response = self.client.chat.completions.create(
-            model = "default:latest",
-            messages = [{"role": "user", "content": f"{prompt.strip()} {text}"}],
-            n = n_responses,
-            max_tokens = max_length,
-            temperature = temperature,
-        )
-        print(f"[DEBUG] Response from Ollama: {response.choices[0].message.content}")
-        # responses = [resp.message.content for resp in response.choices]
-        # for i, resp in enumerate(responses):
-        #     print(f"[DEBUG] Response {i+1}: {resp}")
-        # return responses
+        # print('prompt:', prompt)
+        responses = []
+        for i in range(n_responses):    # directly using parameter n does not return n responses, but only one response
+            response = self.client.chat.completions.create(
+                model = "default:latest",
+                messages = [{"role": "user", "content": f"{prompt.strip()} {text}"}],
+                n = 1,
+                max_tokens = max_length,
+                temperature = temperature,
+            )
+            resp = response.choices[0].message.content
+            resp = re.sub("'", ' ', resp)  # replace single quotes with double quotes
+            resp = re.sub(r'\s+', ' ', resp)  # remove excessive whitespaces
+            
+            try: 
+                data = json.loads(resp)
+                responses.append(data) 
+            except json.JSONDecodeError:
+                responses.append(response.choices[0].message.content)
+
+        for i, resp in enumerate(responses):
+            print(f"[DEBUG] Response {i+1}: {resp.keys()}")
+    
+        return responses
 
 
 
@@ -528,7 +539,7 @@ if __name__ == "__main__":
     
     original_text = "The quick brown fox jumps over the lazy dog."
     ollama_paraphraser = OllamaParaphraser(model_id="default:latest")
-    prompt = 'Paraphrase the following text. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","paraphrase":"<paraphrased version of the text>"} Text to paraphrase:'
+    prompt = 'Paraphrase the following text. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","paraphrase":"<paraphrased version of the text>"}. Text to paraphrase:'
     print("Ollama Paraphrasing Example:", ollama_paraphraser.paraphrase(text=original_text, prompt=prompt, n_responses=3, max_length=MAX_LENGTH))
 
     # FIXME
