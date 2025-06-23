@@ -8,6 +8,7 @@ class BaseConfig:
     SERVER = False
     SERPAPI_KEY = os.getenv("SERPAPI_KEY")
     BLABLADOR_KEY = os.getenv("BLABLADOR_KEY")
+    OPENAI_KEY = os.getenv("OPENAI_KEY")
     PATH2PAN25 = "data/datasets/pan25-genai-identification/pan25-dataset-converted"
     PATH2PAN23 = "data/datasets/pan23-authorship-verification/pan23-dataset-converted"
     PATH2PAN20 = "data/datasets/pan20-authorship-verification/pan20-dataset-converted"
