@@ -215,8 +215,8 @@ class OllamaParaphraser(Paraphraser):
             except json.JSONDecodeError:
                 responses.append(response.choices[0].message.content)
 
-        for i, resp in enumerate(responses):
-            print(f"[DEBUG] Response {i+1}: {resp.keys()}")
+        # for i, resp in enumerate(responses):
+        #     print(f"[DEBUG] Response {i+1}: {resp.keys()}")
     
         return responses
 
