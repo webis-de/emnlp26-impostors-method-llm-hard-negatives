@@ -188,7 +188,6 @@ class OllamaParaphraser(Paraphraser):
         self,
         text: str,
         prompt: str,
-        verbose: bool = False,
         max_length: int = MAX_LENGTH,
         temperature: float = TEMPERATURE,
         n_responses: int = 1,
@@ -198,10 +197,12 @@ class OllamaParaphraser(Paraphraser):
         """
         response = self.client.chat.completions.create(
             model = "default:latest",
-            messages = [{"role": "user", "content": "Was ist 40+2?"}],
+            messages = [{"role": "user", "content": f"{prompt.strip()} {text}"}],
+            n = n_responses,
+            max_tokens = max_length,
+            temperature = temperature,
         )
-        print(response)
-        return response
+        return response.choices[0].message.content
 
 
 
