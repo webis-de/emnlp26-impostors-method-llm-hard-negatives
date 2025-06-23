@@ -187,13 +187,20 @@ class OllamaParaphraser(Paraphraser):
     def paraphrase(
         self,
         text: str,
-        prompt: str,
+        prompt: str='Paraphrase the following text. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","paraphrase":"<paraphrased version of the text>"}. Text to paraphrase:',
         max_length: int = MAX_LENGTH,
         temperature: float = TEMPERATURE,
         n_responses: int = 1,
     ) -> List[str]:
         """
         Generate paraphrased versions of the input text.
+
+        :param text: The input text to be paraphrased. 
+        :param prompt: The prompt to be used for paraphrasing. This model allows for JSON structured ouput, hence, specify here the prompt to be used for paraphrasing.
+        :param max_length: The maximum number of tokens to generate in the paraphrase.
+        :param temperature: Controls the randomness of the output. Lower values make the output more deterministic
+        :param n_responses: The number of paraphrases to generate.
+        :return: A list of paraphrased versions of the input text.
         """
         # print('prompt:', prompt)
         responses = []
