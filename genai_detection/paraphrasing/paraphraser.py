@@ -1,4 +1,5 @@
 from abc import ABC
+import ast
 from collections import defaultdict
 from itertools import product
 import json
@@ -293,7 +294,7 @@ class BlabladorParaphraser(Paraphraser):
         else:
             print("Error:", response.status_code, response.text)
 
-# FIXME:
+
 class BulletPointParaphraser(Paraphraser):
     """
     A paraphrasing model that first extracts bullet points, tone and genre from the input text using one LLM and then generates a paraphrase based on this information.
@@ -358,17 +359,17 @@ class BulletPointParaphraser(Paraphraser):
         """
         assert self.text_extractor is not None, "Text extractor must be provided."
         if prompt is None:
-            prompt = "Summarize the following text in five to six short bullet points and give an overall description of the genre and tone of the text. Return only one JSON object with keys 'bullet_points' (values is list of bullet points where each bullet point is an element of the list), 'tone' (value is text tone), and 'genre' (value is text genre). Return only one valid JSON. Do not escape all quotes inside strings. Use double quotes only. Do not return any chain of thought or instructions.\n\nText:\n"
+            prompt = 'Summarize the following text in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","bullet_points":"<list of bullet points>"}. Text to summarize:'
+            # prompt = "Summarize the following text in five to six short bullet points and give an overall description of the genre and tone of the text. Return only one JSON object with keys 'bullet_points' (values is list of bullet points where each bullet point is an element of the list), 'tone' (value is text tone), and 'genre' (value is text genre). Return only one valid JSON. Do not escape all quotes inside strings. Use double quotes only. Do not return any chain of thought or instructions.\n\nText:\n"
             # prompt = "Summarize the following text in five to six short bullet points and give an overall description of the genre and tone of the text." + text
     
-        res = self.text_extractor.paraphrase(text=text, prompt=prompt, n_responses=1, max_length=MAX_LENGTH)
-        
-        parsed_dict = self._extract_dict(res[0])    
-        print(f"[DEBUG] Extracted bullet points, tone and genre: {parsed_dict}")
-        bp, tone, genre = parsed_dict.get('bullet_points', []), parsed_dict.get('tone', ''), parsed_dict.get('genre', '')
+        res = self.text_extractor.paraphrase(text=text, prompt=prompt, n_responses=1, max_length=MAX_LENGTH)[0]
+        assert isinstance(res, dict), f"Expected a Dictionary response, got {type(res)}"
+        print(f"\n[DEBUG] Extracted bullet points, tone and genre: {res}\n")
+        bp, tone, genre = res.get('bullet_points', []), res.get('tone', ''), res.get('genre', '')    
         return bp, tone, genre
     
-    def _generate_paraphrase_from_bullet_points(self, bullet_points, tone, genre, prompt: Optional[str]) -> tuple[List[str], str, str]:
+    def _generate_paraphrase_from_bullet_points(self, bullet_points, tone, genre, prompt: Optional[str], n_responses:int=3) -> tuple[List[str], str, str]:
         """
         Generate a paraphrase using the extracted bullet points, tone, and genre.
 
@@ -387,7 +388,7 @@ class BulletPointParaphraser(Paraphraser):
             )
             # PAN24:
             #f"Write a text of about {len(text)} words which covers the following items:"
-        return self.text_generator.paraphrase(text='', prompt=prompt, n_responses=1, max_length=MAX_LENGTH)
+        return self.text_generator.paraphrase(text='', prompt=prompt, n_responses=n_responses, max_length=MAX_LENGTH)
 
 
     def paraphrase(self, text: str, prompt:Optional[str], n_responses:int=5, max_length:int=MAX_LENGTH) -> List[str]:
@@ -400,8 +401,8 @@ class BulletPointParaphraser(Paraphraser):
         :param max_length: The maximum number of tokens to generate in the paraphrase.
         :return: A paraphrased version of the input text.
         """
-        bullet_points, tone, genre = self._extract_bullet_points(text, prompt)
-        paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points, tone, genre, prompt, n_responses)
+        bullet_points, tone, genre = self._extract_bullet_points(text=text, prompt=prompt)
+        paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points=bullet_points, tone=tone, genre=genre, prompt=prompt, n_responses=n_responses)
 
         # Placeholder implementation
         return paraphrased_texts
@@ -544,20 +545,31 @@ if __name__ == "__main__":
     #         "Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence:"
     #         ]
     
-    original_text = "The quick brown fox jumps over the lazy dog."
-    ollama_paraphraser = OllamaParaphraser(model_id="default:latest")
-    prompt = 'Paraphrase the following text. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","paraphrase":"<paraphrased version of the text>"}. Text to paraphrase:'
-    print("Ollama Paraphrasing Example:", ollama_paraphraser.paraphrase(text=original_text, prompt=prompt, n_responses=3, max_length=MAX_LENGTH))
+    # original_text = "The quick brown fox jumps over the lazy dog."
+    # ollama_paraphraser = OllamaParaphraser(model_id="default:latest")
+    # prompt = 'Paraphrase the following text. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","paraphrase":"<paraphrased version of the text>"}. Text to paraphrase:'
+    # print("Ollama Paraphrasing Example:", ollama_paraphraser.paraphrase(text=original_text, prompt=prompt, n_responses=3, max_length=MAX_LENGTH))
 
     # FIXME
-    # original_text = 'Vice President JD Vance, in his first public comments since President Donald Trump authorized US strikes on Iranian nuclear sites, emphasized that the US is “not at war” with Iran as he laid out the president’s decision-making process. “We’re not at war with Iran. We’re at war with Iran’s nuclear program,” Vance said in an interview with NBC’s “Meet the Press with Kristen Welker,” calling the strikes a “testament to the power of the American military.”Asked what intelligence led to the decision, Vance described a “narrow window of opportunity.” “We had a narrow window of opportunity. We might not have been able to carry out this attack six months down the road. … We have a narrow window in which we can set that program back a very long time. It would have been irresponsible, I think, for the president not to take the action that he did,” he said. Vance added, “Of course we trust our intelligence community, but we also trust our instincts. … The Iranians stopped negotiating in good faith – that was the real catalyst.” The vice president also suggested that Trump arrived at the conclusion to authorize the strikes after issuing what he described as “private ultimatums” to Iran. He declined to detail those ultimatums. CNN has previously reported that Trump offered Iran a 60-day window in April to negotiate, asking Israeli Prime Minister Benjamin Netanyahu to hold off on striking the country to allow those talks to progress.'
-    # n_reponses = 3  # number of paraphrases to generate
-    # max_length = MAX_LENGTH  # Maximum length of the generated paraphrase
-    # temperature = TEMPERATURE  # Controls the randomness of the output. Lower values make the output more deterministic.
+    path2datasets = Path(__file__).resolve().parent.parent.parent / "data" / "datasets" / "custom_texts"
+    assert path2datasets.exists(), f"Path to datasets {path2datasets} does not exist."
+    file_name = "cnn_230625"
+    original_text = open(path2datasets / f"{file_name}.txt").read()
+    n_reponses = 3  # number of paraphrases to generate
+    max_length = MAX_LENGTH  # Maximum length of the generated paraphrase
+    temperature = TEMPERATURE  # Controls the randomness of the output. Lower values make the output more deterministic.
 
-    # bullet_point_paraphraser = BulletPointParaphraser(text_extractor=BlabladorParaphraser(model_id="1 - Llama3 405 the best general model and big context size",), text_generator=BlabladorParaphraser(model_id="1 - Ministral 8b - the fast model"))
-    # print("Bullet Point Paraphrasing Example:", bullet_point_paraphraser.paraphrase(
-    #     text=original_text, prompt=None, n_responses=1, max_length=max_length))
+    models = {'text_extractor': {'name':'Ollama-latest', 'model':OllamaParaphraser(model_id="default:latest")},
+              'text_generator': {'name':'Blablador-Ministral8b', 'model':BlabladorParaphraser(model_id="1 - Ministral 8b - the fast model")}}
+    bullet_point_paraphraser = BulletPointParaphraser(text_extractor=models["text_extractor"]['model'], text_generator=models["text_generator"]['model'])
+    paraphrases = bullet_point_paraphraser.paraphrase(
+        text=original_text, prompt=None, n_responses=n_reponses, max_length=max_length)
+    for i, paraphrase in enumerate(paraphrases):
+        print(f"Paraphrase {i+1}:\n{paraphrase}\n")
+        # save to file
+        with open(path2datasets / f"paraphrase_{file_name}_e={models["text_extractor"]['name']}_g={models["text_generator"]['name']}_{i+1}.txt", "w") as f:
+            f.write(paraphrase)
+
 
     # paraphrase_evaluator = ParaphrasingEvaluator(paraphrasers=paraphrasers, prompts=prompts, original_text=original_text, n_responses=n_reponses, max_length=max_length, temperature=temperature)
     # paraphrase_evaluator.evaluate()
