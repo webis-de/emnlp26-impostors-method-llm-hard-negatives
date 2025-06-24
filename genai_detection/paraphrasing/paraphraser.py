@@ -50,7 +50,6 @@ class Paraphraser(ABC):
     """
     Abstract base class for paraphrasing models.
     """
-
     def paraphrase(self, text: str, prompt: str, n_responses:int=5, max_length:int=MAX_LENGTH) -> List[str]:
         """
         Generate a paraphrase of the input text.
@@ -72,8 +71,44 @@ class Paraphraser(ABC):
         """
         return [self.paraphrase(text) for text in texts]
     
+    def get_tone(self, text: str) -> str:
+        """
+        Extract the tone of the input text.
+        
+        :param text: The input text from which to extract the tone.
+        :return: The tone of the text as a string.
+        """
+        resp = self.paraphrase(text=text, n_responses=1, prompt="Extract the tone (i.e. quality in the voice that expresses the speaker's feelings or thoughts) of the text. Respond ONLY with a JSON object (i.e. no chain-of-thought, no explanations) in the following format: {'tone':'<tone>'}. Text to extract tone from:")[0]
+        try:
+            return ast.literal_eval(resp).get('tone', '') 
+        except Exception as e:
+            print(f"[ERROR] Failed to decode JSON from response: {resp}\nWith error: {e}")
+            return {'tone': ''} 
+    
+    def get_genre(self, text: str) -> str:
+        """
+        Extract the genre of the input text.
+        
+        :param text: The input text from which to extract the genre.
+        :return: The genre of the text as a string.
+        """
+        resp = self.paraphrase(text=text, n_responses=1, prompt="Extract the genre (i.e. subject or style of literature) of the text. Respond ONLY with a JSON object (i.e. no chain-of-thought, no explanations) in the following format: {'genre':'<genre>'}. Text to extract genre from:")[0]
+        
+        try:
+            return ast.literal_eval(resp).get('genre', '')
+        except Exception as e:
+            print(f"[ERROR] Failed to decode JSON from response: {resp}\nWith error: {e}")
+            return {'genre': ''} 
+    
 
-class T5ChatGPTParaphraser(Paraphraser):
+class NaiveParaphraser(Paraphraser):
+    """
+    A naive paraphrasing model that cannot extract tone or genre at the same time as paraphrasing, since models inherenting from the class proved unable to consistently return a valid JSON object.
+    This class is a placeholder and does not implement actual paraphrasing logic.
+    """
+    
+
+class T5ChatGPTParaphraser(NaiveParaphraser):
     """
     A paraphrasing model based on the T5 architecture.
     """
@@ -104,6 +139,7 @@ class T5ChatGPTParaphraser(Paraphraser):
         self.tokenizer = AutoTokenizer.from_pretrained("humarin/chatgpt_paraphraser_on_T5_base")
         self.model = AutoModelForSeq2SeqLM.from_pretrained("humarin/chatgpt_paraphraser_on_T5_base").to(self.device)
 
+ 
     def paraphrase(self, text: str, prompt: str, num_beams=5, num_beam_groups=5, n_responses:int=5, repetition_penalty=10.0, diversity_penalty=3.0, no_repeat_ngram_size=2, max_length:int=MAX_LENGTH) -> List[str]:
         input_ids = self.tokenizer(f'{prompt.strip()} {text}', return_tensors="pt", padding="longest", max_length=max_length, truncation=True).input_ids.to(self.device)
         
@@ -119,7 +155,7 @@ class T5ChatGPTParaphraser(Paraphraser):
         return res
     
 
-class T5GooglePAWSParaphraser(Paraphraser):
+class T5GooglePAWSParaphraser(NaiveParaphraser):
     """
     A paraphrasing model based on the T5 architecture.
     """
@@ -145,6 +181,7 @@ class T5GooglePAWSParaphraser(Paraphraser):
 
     def paraphrase(self, text: str, prompt:str, n_responses:int=5, max_length:int=MAX_LENGTH) -> List[str]:
         # TODO: no duplication penalty, and thus, there are duplicates in the output
+        print(f"[DEBUG] Using T5GooglePAWSParaphraser with prompt: {prompt}")
         encoding = self.tokenizer.encode_plus(f'{prompt.strip()} {text} </s>', padding="max_length", return_tensors="pt")
         
         input_ids, attention_masks = encoding["input_ids"].to(self.device), encoding["attention_mask"].to(self.device)
@@ -230,7 +267,7 @@ class OllamaParaphraser(Paraphraser):
 
 
 
-class BlabladorParaphraser(Paraphraser):
+class BlabladorParaphraser(NaiveParaphraser):
     """
     Blablador paraphrasing model hosted by Jülich/ Helmholtz AI.
     """
@@ -534,7 +571,12 @@ class ParaphrasingEvaluator:
 
 if __name__ == "__main__":
     # models
-    # paraphrasers = {'T5_ChatGPT': T5ChatGPTParaphraser(), 'T5_Google_PAWS': T5GooglePAWSParaphraser()}
+    paraphrasers = {
+        # 'T5_ChatGPT': T5ChatGPTParaphraser(), 
+    #                 'T5_Google_PAWS': T5GooglePAWSParaphraser(), 
+    #                 'Blablador': BlabladorParaphraser(model_id="1 - Llama3 405 the best general model and big context size"), 
+                    'Ollama': OllamaParaphraser(model_id="default:latest")
+                    }
     # paraphrasers.update({f'Blablador_{name}': BlabladorParaphraser(model_id=name) for name in list(get_args(ModelName))})
 
     # prompts = [
@@ -559,16 +601,22 @@ if __name__ == "__main__":
     max_length = MAX_LENGTH  # Maximum length of the generated paraphrase
     temperature = TEMPERATURE  # Controls the randomness of the output. Lower values make the output more deterministic.
 
-    models = {'text_extractor': {'name':'Ollama-latest', 'model':OllamaParaphraser(model_id="default:latest")},
-              'text_generator': {'name':'Blablador-Ministral8b', 'model':BlabladorParaphraser(model_id="1 - Ministral 8b - the fast model")}}
-    bullet_point_paraphraser = BulletPointParaphraser(text_extractor=models["text_extractor"]['model'], text_generator=models["text_generator"]['model'])
-    paraphrases = bullet_point_paraphraser.paraphrase(
-        text=original_text, prompt=None, n_responses=n_reponses, max_length=max_length)
-    for i, paraphrase in enumerate(paraphrases):
-        print(f"Paraphrase {i+1}:\n{paraphrase}\n")
-        # save to file
-        with open(path2datasets / f"paraphrase_{file_name}_e={models["text_extractor"]['name']}_g={models["text_generator"]['name']}_{i+1}.txt", "w") as f:
-            f.write(paraphrase)
+    for name, paraphraser in paraphrasers.items():
+        print(f"\n\n[INFO] Using paraphraser: {name}")
+     
+        print(paraphraser.get_genre(text=original_text))
+        print(paraphraser.get_tone(text=original_text))
+
+    # models = {'text_extractor': {'name':'Ollama-latest', 'model':OllamaParaphraser(model_id="default:latest")},
+    #           'text_generator': {'name':'Blablador-Ministral8b', 'model':BlabladorParaphraser(model_id="1 - Ministral 8b - the fast model")}}
+    # bullet_point_paraphraser = BulletPointParaphraser(text_extractor=models["text_extractor"]['model'], text_generator=models["text_generator"]['model'])
+    # paraphrases = bullet_point_paraphraser.paraphrase(
+    #     text=original_text, prompt=None, n_responses=n_reponses, max_length=max_length)
+    # for i, paraphrase in enumerate(paraphrases):
+    #     print(f"Paraphrase {i+1}:\n{paraphrase}\n")
+    #     # save to file
+    #     with open(path2datasets / f"paraphrase_{file_name}_e={models["text_extractor"]['name']}_g={models["text_generator"]['name']}_{i+1}.txt", "w") as f:
+    #         f.write(paraphrase)
 
 
     # paraphrase_evaluator = ParaphrasingEvaluator(paraphrasers=paraphrasers, prompts=prompts, original_text=original_text, n_responses=n_reponses, max_length=max_length, temperature=temperature)
