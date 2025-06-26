@@ -512,7 +512,7 @@ class ParaphrasingEvaluator:
             total=len(self.paraphrasers) * len(self.prompts)
         ):
             if isinstance(paraphraser, BulletPointParaphraser):
-                if bp_counts > 0:
+                if bp_counts == 0:
                     prompt = None # BulletPointParaphraser has specific prompt, which extracts bullet points, tone and genre from the text
                     bp_counts += 1
                 else:
@@ -677,52 +677,14 @@ if __name__ == "__main__":
     #         "Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence:"
     #         ]
     
-    # original_text = "The quick brown fox jumps over the lazy dog."
-    # ollama_paraphraser = OllamaParaphraser(model_id="default:latest")
-    # prompt = 'Paraphrase the following text. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","paraphrase":"<paraphrased version of the text>"}. Text to paraphrase:'
-    # print("Ollama Paraphrasing Example:", ollama_paraphraser.paraphrase(text=original_text, prompt=prompt, n_responses=3, max_length=MAX_LENGTH))
-
-    # FIXME
-    path2datasets = Path(__file__).resolve().parent.parent.parent / "data" / "datasets" / "custom_texts"
-    assert path2datasets.exists(), f"Path to datasets {path2datasets} does not exist."
-    file_name = "cnn_230625"
-    original_text = open(path2datasets / f"{file_name}.txt").read()
+    # path2datasets = Path(__file__).resolve().parent.parent.parent / "data" / "datasets" / "custom_texts"
+    # assert path2datasets.exists(), f"Path to datasets {path2datasets} does not exist."
+    # file_name = "cnn_230625"
+    # original_text = open(path2datasets / f"{file_name}.txt").read()
     n_responses = 3  # number of paraphrases to generate
     max_length = MAX_LENGTH  # Maximum length of the generated paraphrase
     temperature = TEMPERATURE  # Controls the randomness of the output. Lower values make the output more deterministic.
 
-    for name, paraphraser in paraphrasers.items():
-        print(f"\n\n[INFO] Using paraphraser: {name}")
-     
-        print(paraphraser.get_genre(text=original_text))
-        print(paraphraser.get_tone(text=original_text))
-
-    # models = {'text_extractor': {'name':'Ollama-latest', 'model':OllamaParaphraser(model_id="default:latest")},
-    #           'text_generator': {'name':'Blablador-Ministral8b', 'model':BlabladorParaphraser(model_id="1 - Ministral 8b - the fast model")}}
-    # bullet_point_paraphraser = BulletPointParaphraser(text_extractor=models["text_extractor"]['model'], text_generator=models["text_generator"]['model'])
-    # paraphrases = bullet_point_paraphraser.paraphrase(
-    #     text=original_text, prompt=None, n_responses=n_responses, max_length=max_length)
-    # for i, paraphrase in enumerate(paraphrases):
-    #     print(f"Paraphrase {i+1}:\n{paraphrase}\n")
-    #     # save to file
-    #     with open(path2datasets / f"paraphrase_{file_name}_e={models["text_extractor"]['name']}_g={models["text_generator"]['name']}_{i+1}.txt", "w") as f:
-    #         f.write(paraphrase)
-
 
     # paraphrase_evaluator = ParaphrasingEvaluator(paraphrasers=paraphrasers, prompts=prompts, original_text=original_text, n_responses=n_responses, max_length=max_length, temperature=temperature)
     # paraphrase_evaluator.evaluate()
-
-    # paraphraser = T5ChatGPTParaphraser()
-    # paraphraser = T5GooglePAWSParaphraser()
-    # paraphraser = BlabladorParaphraser()
-    # paraphraser._get_available_models()
-    # text = "The quick brown fox jumps over the lazy dog."
-    # paraphrased_text = paraphraser.paraphrase(text, n_responses=1)
-    # print(f"Original: {text}")
-    # print(f"Paraphrased: {paraphrased_text}")
-    
-    # # Batch paraphrasing
-    # texts = ["The sky is blue.", "I love programming.", "Artificial intelligence is fascinating."]
-    # paraphrased_batch = paraphraser.paraphrase_batch(texts)
-    # for original, paraphrased in zip(texts, paraphrased_batch):
-    #     print(f"Original: {original} | Paraphrased: {paraphrased}")
