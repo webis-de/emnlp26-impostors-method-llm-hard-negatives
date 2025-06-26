@@ -58,10 +58,10 @@
   - open: Style
   - generate text for same topic (!= paraphrasing)
     - paraphrase is only one heuristic for the solution, but not the only one
-    - [ ] implement modular text generation approach
-      - [ ] paraphrase
+    - [x] implement modular text generation approach
+      - [x] paraphrase
       - [x] plain text → outline/ bullet points → text
-      - [ ] additionally provide tone, genre, register for every Paraphraser class
+      - [x] additionally provide tone, genre, register for every Paraphraser class
     - choose generation approach based on genre, i.e. simulate how original author would have written the text
       - e.g. student essay: Task description and sources → generate text
 
