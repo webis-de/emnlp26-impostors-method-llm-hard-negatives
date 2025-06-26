@@ -504,11 +504,19 @@ class ParaphrasingEvaluator:
         references = [self.original_text] * self.n_responses
         original_split = self.original_text.split()
 
+        bp_counts = 0
+
         for (name, paraphraser), prompt in tqdm(
             product(self.paraphrasers.items(), self.prompts),
             desc="Evaluating Paraphrasers",
             total=len(self.paraphrasers) * len(self.prompts)
         ):
+            if isinstance(paraphraser, BulletPointParaphraser):
+                if bp_counts > 0:
+                    prompt = None # BulletPointParaphraser has specific prompt, which extracts bullet points, tone and genre from the text
+                    bp_counts += 1
+                else:
+                    continue
             try:
                 paraphrases = paraphraser.paraphrase(
                     text=self.original_text,
