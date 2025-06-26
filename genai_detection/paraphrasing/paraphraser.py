@@ -151,7 +151,7 @@ class T5ChatGPTParaphraser(NaiveParaphraser):
         self.model = AutoModelForSeq2SeqLM.from_pretrained("humarin/chatgpt_paraphraser_on_T5_base").to(self.device)
 
  
-    def paraphrase(self, text: str, prompt: str, num_beams=5, num_beam_groups=5, n_responses:int=5, repetition_penalty=10.0, diversity_penalty=3.0, no_repeat_ngram_size=2, max_length:int=MAX_LENGTH) -> List[str]:
+    def paraphrase(self, text: str, prompt: str, num_beams=5, num_beam_groups=5, n_responses:int=5, repetition_penalty=10.0, diversity_penalty=3.0, no_repeat_ngram_size=2, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE) -> List[str]:
         input_ids = self.tokenizer(f'{prompt.strip()} {text}', return_tensors="pt", padding="longest", max_length=max_length, truncation=True).input_ids.to(self.device)
         
         outputs = self.model.generate(
@@ -190,7 +190,7 @@ class T5GooglePAWSParaphraser(NaiveParaphraser):
         self.tokenizer = AutoTokenizer.from_pretrained("Vamsi/T5_Paraphrase_Paws")
         self.model = AutoModelForSeq2SeqLM.from_pretrained("Vamsi/T5_Paraphrase_Paws").to(self.device)
 
-    def paraphrase(self, text: str, prompt:str, n_responses:int=5, max_length:int=MAX_LENGTH) -> List[str]:
+    def paraphrase(self, text: str, prompt:str, n_responses:int=5, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE) -> List[str]:
         # TODO: no duplication penalty, and thus, there are duplicates in the output
         # print(f"[DEBUG] Using T5GooglePAWSParaphraser with prompt: {prompt}")
         encoding = self.tokenizer.encode_plus(f'{prompt.strip()} {text} </s>', padding="max_length", return_tensors="pt")
@@ -271,9 +271,6 @@ class OllamaParaphraser(Paraphraser):
             except json.JSONDecodeError:
                 responses.append(response.choices[0].message.content)
 
-        # for i, resp in enumerate(responses):
-        #     print(f"[DEBUG] Response {i+1}: {resp.keys()}")
-    
         return responses
 
 
@@ -397,9 +394,12 @@ class BulletPointParaphraser(Paraphraser):
             return value  # already quoted properly
         return f'"{value.strip("'").strip('"').strip()}"'
 
-    def _extract_bullet_points(self, text: str, prompt: Optional[str]) -> tuple[List[str], str, str]:
+    def _extract_bullet_points(self, text: str, prompt: Optional[str], temperature:float=TEMPERATURE) -> tuple[List[str], str, str]:
         """
         Extract bullet points, tone, and genre from the input text.
+        Currently, the text extractor is instructed to avoid direct quotes from the original text, to 
+        (1) Avoid text duplicates in the paraphrased text, and
+        (2) Because (escaping) quotes impede parsing the result using a Python library like ast.
 
         :param text: The input text.
         :param prompt: Optional custom prompt.
@@ -407,17 +407,23 @@ class BulletPointParaphraser(Paraphraser):
         """
         assert self.text_extractor is not None, "Text extractor must be provided."
         if prompt is None:
-            prompt = 'Summarize the following text in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","bullet_points":"<list of bullet points>"}. Text to summarize:'
-            # prompt = "Summarize the following text in five to six short bullet points and give an overall description of the genre and tone of the text. Return only one JSON object with keys 'bullet_points' (values is list of bullet points where each bullet point is an element of the list), 'tone' (value is text tone), and 'genre' (value is text genre). Return only one valid JSON. Do not escape all quotes inside strings. Use double quotes only. Do not return any chain of thought or instructions.\n\nText:\n"
-            # prompt = "Summarize the following text in five to six short bullet points and give an overall description of the genre and tone of the text." + text
+            prompt = 'Summarize the following text in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","bullet_points":"<list of bullet points>"}. Do not use direct quotes. Text to summarize:'
     
-        res = self.text_extractor.paraphrase(text=text, prompt=prompt, n_responses=1, max_length=MAX_LENGTH)[0]
+    
+        res = self.text_extractor.paraphrase(text=text, prompt=prompt, n_responses=1, max_length=MAX_LENGTH, temperature=temperature)[0]
+    
+        try:
+            res = ast.literal_eval(res) if isinstance(res, str) else res  # ensure res is a dictionary
+        except Exception as e:
+            print(f"[ERROR] Failed to parse text extractor response as JSON: {res}\nWith error: {e}")
+            res = {'bullet_points': str(res)}  # fallback 
         assert isinstance(res, dict), f"Expected a Dictionary response, got {type(res)}"
+
         print(f"\n[DEBUG] Extracted bullet points, tone and genre: {res}\n")
         bp, tone, genre = res.get('bullet_points', []), res.get('tone', ''), res.get('genre', '')    
         return bp, tone, genre
     
-    def _generate_paraphrase_from_bullet_points(self, bullet_points, tone, genre, prompt: Optional[str], n_responses:int=3) -> tuple[List[str], str, str]:
+    def _generate_paraphrase_from_bullet_points(self, bullet_points, tone, genre, prompt: Optional[str], n_responses:int=3, temperature:float=TEMPERATURE) -> tuple[List[str], str, str]:
         """
         Generate a paraphrase using the extracted bullet points, tone, and genre.
 
@@ -436,10 +442,10 @@ class BulletPointParaphraser(Paraphraser):
             )
             # PAN24:
             #f"Write a text of about {len(text)} words which covers the following items:"
-        return self.text_generator.paraphrase(text='', prompt=prompt, n_responses=n_responses, max_length=MAX_LENGTH)
+        return self.text_generator.paraphrase(text='', prompt=prompt, n_responses=n_responses, max_length=MAX_LENGTH, temperature=temperature)
 
 
-    def paraphrase(self, text: str, prompt:Optional[str], n_responses:int=5, max_length:int=MAX_LENGTH) -> List[str]:
+    def paraphrase(self, text: str, prompt:Optional[str], n_responses:int=5, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE) -> List[str]:
         """
         Generate a paraphrase of the input text by first extracting bullet points.
         
@@ -449,8 +455,8 @@ class BulletPointParaphraser(Paraphraser):
         :param max_length: The maximum number of tokens to generate in the paraphrase.
         :return: A paraphrased version of the input text.
         """
-        bullet_points, tone, genre = self._extract_bullet_points(text=text, prompt=prompt)
-        paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points=bullet_points, tone=tone, genre=genre, prompt=prompt, n_responses=n_responses)
+        bullet_points, tone, genre = self._extract_bullet_points(text=text, prompt=prompt, temperature=temperature)
+        paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points=bullet_points, tone=tone, genre=genre, prompt=prompt, n_responses=n_responses, temperature=temperature)
 
         # Placeholder implementation
         return paraphrased_texts
@@ -608,7 +614,7 @@ if __name__ == "__main__":
     assert path2datasets.exists(), f"Path to datasets {path2datasets} does not exist."
     file_name = "cnn_230625"
     original_text = open(path2datasets / f"{file_name}.txt").read()
-    n_reponses = 3  # number of paraphrases to generate
+    n_responses = 3  # number of paraphrases to generate
     max_length = MAX_LENGTH  # Maximum length of the generated paraphrase
     temperature = TEMPERATURE  # Controls the randomness of the output. Lower values make the output more deterministic.
 
@@ -622,7 +628,7 @@ if __name__ == "__main__":
     #           'text_generator': {'name':'Blablador-Ministral8b', 'model':BlabladorParaphraser(model_id="1 - Ministral 8b - the fast model")}}
     # bullet_point_paraphraser = BulletPointParaphraser(text_extractor=models["text_extractor"]['model'], text_generator=models["text_generator"]['model'])
     # paraphrases = bullet_point_paraphraser.paraphrase(
-    #     text=original_text, prompt=None, n_responses=n_reponses, max_length=max_length)
+    #     text=original_text, prompt=None, n_responses=n_responses, max_length=max_length)
     # for i, paraphrase in enumerate(paraphrases):
     #     print(f"Paraphrase {i+1}:\n{paraphrase}\n")
     #     # save to file
@@ -630,7 +636,7 @@ if __name__ == "__main__":
     #         f.write(paraphrase)
 
 
-    # paraphrase_evaluator = ParaphrasingEvaluator(paraphrasers=paraphrasers, prompts=prompts, original_text=original_text, n_responses=n_reponses, max_length=max_length, temperature=temperature)
+    # paraphrase_evaluator = ParaphrasingEvaluator(paraphrasers=paraphrasers, prompts=prompts, original_text=original_text, n_responses=n_responses, max_length=max_length, temperature=temperature)
     # paraphrase_evaluator.evaluate()
 
     # paraphraser = T5ChatGPTParaphraser()
