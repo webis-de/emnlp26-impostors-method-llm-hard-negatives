@@ -303,7 +303,7 @@ class BlabladorParaphraser(NaiveParaphraser):
         if response.status_code == 200:
             models = [model["id"] for model in response.json()["data"]]
             if verbose:
-                print("Available models:")
+                print("Available Blablador models:")
                 for model in models:
                     print(model)
             return models
