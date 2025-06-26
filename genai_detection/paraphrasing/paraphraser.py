@@ -1,6 +1,7 @@
 from abc import ABC
 import ast
 from collections import defaultdict
+import datetime
 from itertools import product
 import json
 import os
@@ -8,6 +9,8 @@ from pathlib import Path
 import re
 import sys
 from typing import List, Literal, Optional, get_args
+from matplotlib import pyplot as plt
+import numpy as np
 import pandas as pd
 import requests
 from simpletransformers.t5 import T5Model
@@ -62,14 +65,15 @@ class Paraphraser(ABC):
         """
         raise NotImplementedError("Subclasses must implement this method.")
     
-    def paraphrase_batch(self, texts: list[str]) -> list[str]:
+    def paraphrase_batch(self, texts: list[str], prompt:str=None) -> list[str]:
         """
         Generate paraphrases for a batch of input texts.
 
         :param texts: A list of input texts to be paraphrased.
+        :param prompt: The prompt to be used for paraphrasing. If None, a default prompt will be used.
         :return: A list of paraphrased versions of the input texts.
         """
-        return [self.paraphrase(text) for text in texts]
+        return [self.paraphrase(text=text, prompt=prompt) for text in texts]
     
     def get_tone(self, text: str) -> str:
         """
@@ -584,6 +588,67 @@ class ParaphrasingEvaluator:
             "bertscore_f1": bert_scores["f1"][idx],
             "bertscore_hash": bert_scores["hashcode"],
         }
+    
+    def get_metric_names(self) -> List[str]:
+        """
+        Get the names of the metrics used in the evaluation.
+        :return: A list of metric names.
+        """
+        return [
+            "bleu_score", "meteor_score", "rouge1", "rouge2", "rougeL", "rougeLsum",
+            "bertscore_precision", "bertscore_recall", "bertscore_f1",
+        ]
+    
+    def plot_models_metrics(self, df: pd.DataFrame, save_path: Optional[Path] = None, data_category:Optional[str]=None):
+        """
+        Plot the performance of models per metric.
+        
+        :param df: DataFrame containing the evaluation results.
+        :param metric_name: The name of the metric to plot.
+        :param save_path: Optional path to save the plot (without filename). If None, the plot will not be saved.
+        :param data_category: Optional category of the data, used for the plot title.
+        :return: A list of matplotlib figures.
+        """
+        labels = list(set(self.get_metric_names()) & set(df.columns.tolist()))
+        grouped = df.groupby('model')[labels].mean()
+
+
+        # Compute angle of each axis
+        angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
+        # Complete the loop
+        angles += angles[:1]
+
+        # Start plot
+        fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+
+        for model_name, row in grouped.iterrows():
+            values = row[labels].tolist()
+            values += values[:1]
+            ax.plot(angles, values, label=model_name)
+            ax.fill(angles, values, alpha=0.25)
+
+        # Add labels to axes
+        ax.set_xticks(angles[:-1])
+        ax.set_xticklabels(labels)
+
+        # Optional: Set value range
+        ax.set_ylim(0, 1)
+
+        # Add legend and title
+        ax.legend(loc='lower left', bbox_to_anchor=(1.1, 0.7))
+        title = f"Radar Chart: Paraphrasing Metric\non {data_category} text" if data_category else "Radar Chart: Paraphrasing Metrics"
+        plt.title(title)
+        plt.tight_layout()
+
+        if save_path:
+            save_path = Path(save_path)
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            save_path = save_path / f"paraphrasing_metrics_radar_chart_{timestamp}.png"
+            plt.savefig(save_path, bbox_inches='tight')
+            print(f"Plot saved to {save_path}")
+        plt.show()
+
 
 
 if __name__ == "__main__":
