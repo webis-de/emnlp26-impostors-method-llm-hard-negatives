@@ -79,7 +79,13 @@ class Paraphraser(ABC):
         :return: The tone of the text as a string.
         """
         resp = self.paraphrase(text=text, n_responses=1, prompt="Extract the tone (i.e. quality in the voice that expresses the speaker's feelings or thoughts) of the text. Respond ONLY with a JSON object (i.e. no chain-of-thought, no explanations) in the following format: {'tone':'<tone>'}. Text to extract tone from:")[0]
+        resp = re.sub('“', '"', resp)  # replace invalid quotes with valid ones
+        resp = re.sub('’', "'", resp)  # replace invalid quotes with valid ones
+        print(f"\n[DEBUG] Response for tone extraction: {resp}\n")
+        match = re.search(r'\{.*?\}', resp)
         try:
+            if match:
+                resp = match.group(0)
             return ast.literal_eval(resp).get('tone', '') 
         except Exception as e:
             print(f"[ERROR] Failed to decode JSON from response: {resp}\nWith error: {e}")
@@ -93,8 +99,13 @@ class Paraphraser(ABC):
         :return: The genre of the text as a string.
         """
         resp = self.paraphrase(text=text, n_responses=1, prompt="Extract the genre (i.e. subject or style of literature) of the text. Respond ONLY with a JSON object (i.e. no chain-of-thought, no explanations) in the following format: {'genre':'<genre>'}. Text to extract genre from:")[0]
-        
+        resp = re.sub('“', '"', resp)  # replace invalid quotes with valid ones
+        resp = re.sub('’', "'", resp)  # replace invalid quotes with valid ones
+        print(f"\n[DEBUG] Response for genre extraction: {resp}\n")
+        match = re.search(r'\{.*?\}', resp)
         try:
+            if match:
+                resp = match.group(0)
             return ast.literal_eval(resp).get('genre', '')
         except Exception as e:
             print(f"[ERROR] Failed to decode JSON from response: {resp}\nWith error: {e}")
@@ -181,7 +192,7 @@ class T5GooglePAWSParaphraser(NaiveParaphraser):
 
     def paraphrase(self, text: str, prompt:str, n_responses:int=5, max_length:int=MAX_LENGTH) -> List[str]:
         # TODO: no duplication penalty, and thus, there are duplicates in the output
-        print(f"[DEBUG] Using T5GooglePAWSParaphraser with prompt: {prompt}")
+        # print(f"[DEBUG] Using T5GooglePAWSParaphraser with prompt: {prompt}")
         encoding = self.tokenizer.encode_plus(f'{prompt.strip()} {text} </s>', padding="max_length", return_tensors="pt")
         
         input_ids, attention_masks = encoding["input_ids"].to(self.device), encoding["attention_mask"].to(self.device)
@@ -272,7 +283,7 @@ class BlabladorParaphraser(NaiveParaphraser):
     Blablador paraphrasing model hosted by Jülich/ Helmholtz AI.
     """
 
-    def __init__(self, model_id: ModelName="1 - Llama3 405 the best general model and big context size"):
+    def __init__(self, model_id: ModelName="1 - Ministral 8b - the fast model"):
         self.base_url = "https://api.helmholtz-blablador.fz-juelich.de/v1"
         self.headers = {
             "Authorization": f"Bearer {CONFIG.BLABLADOR_KEY}",
@@ -572,9 +583,9 @@ class ParaphrasingEvaluator:
 if __name__ == "__main__":
     # models
     paraphrasers = {
-        # 'T5_ChatGPT': T5ChatGPTParaphraser(), 
-    #                 'T5_Google_PAWS': T5GooglePAWSParaphraser(), 
-    #                 'Blablador': BlabladorParaphraser(model_id="1 - Llama3 405 the best general model and big context size"), 
+                    # 'T5_ChatGPT': T5ChatGPTParaphraser(), 
+                    # 'T5_Google_PAWS': T5GooglePAWSParaphraser(), 
+                    # 'Blablador': BlabladorParaphraser(model_id="1 - Llama3 405 the best general model and big context size"), 
                     'Ollama': OllamaParaphraser(model_id="default:latest")
                     }
     # paraphrasers.update({f'Blablador_{name}': BlabladorParaphraser(model_id=name) for name in list(get_args(ModelName))})
