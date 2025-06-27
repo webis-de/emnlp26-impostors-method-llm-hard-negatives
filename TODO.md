@@ -10,7 +10,7 @@
   - Small dataset is **okay**
 - [ ] Dataset should already be preprocessed
   - i.e. no newlines, utf-8 to ascii, etc.
-- [ ] Plugin to view arrow (Huggingface) datasets in IDE *or* second saved dataset with viewable texts
+- [x] Plugin to view [arrow (Huggingface) datasets](https://marketplace.visualstudio.com/items?itemName=w568w.datasets-viewer) in IDE *or* second saved dataset with viewable texts
 - [ ] Statistic on preprocessed dataset
 - [ ] Pick pairs more carefully, i.e. same register (e.g., Shakespearean play vs. Dickens novel not same register), genre, time period, etc.
   - only plain text (not play headers etc.) have style
