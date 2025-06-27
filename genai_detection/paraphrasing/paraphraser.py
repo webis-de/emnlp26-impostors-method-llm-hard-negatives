@@ -580,6 +580,7 @@ class ParaphrasingEvaluator:
             "original_text": self.original_text,
             "paraphrased_text": paraphrase,
             # avoid division by zero using smoothing
+            # bleu averages scores obtained from splits of paraphrase and (one of the) reference(s); here: only one reference (i.e. original text)
             "bleu_score": bleu_score.sentence_bleu(
                 references=[original_split],
                 hypothesis=paraphrase.split(),
