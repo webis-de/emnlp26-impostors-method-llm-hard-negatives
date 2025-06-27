@@ -86,7 +86,7 @@
 - [ ] radar plot: 
   - [ ] mean is line and standard deviation should be shaded area around the line (cf. Jannek's papers)
   - [ ] scores must always be at same position
-- [ ] Paraphrase scores, cf. [Marcel's paper](https://downloads.webis.de/publications/papers/gohsen_2023b.pdf)
+- [ ] Paraphrase scores, cf. [Marcel's paper](https://downloads.webis.de/publications/papers/gohsen_2023b.pdf), [Marcel's second paper](https://downloads.webis.de/publications/papers/gohsen_2024b.pdf)
 
 ## 📅 21.06.2025- 27.06.2025
 
