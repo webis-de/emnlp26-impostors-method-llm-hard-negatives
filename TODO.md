@@ -78,13 +78,14 @@
 - [ ] Longer texts, do not crop at 500 words, but ensure texts of similar length
   - otherwise 100,000 most frequent words are too many for text size
 - [ ] Use [sloppy-xml-py](https://github.com/mitsuhiko/sloppy-xml-py) to parse LLM generated JSON files
-- [ ] TaskBasedParaphraser
+  - [yaml](https://stackoverflow.com/questions/1931454/how-to-parse-somewhat-wrong-json-with-python) does not work: Breaks notebook 
+- [x] TaskBasedParaphraser
   - motivated by student essay
   - first LLM: Task description and sources → second LLM: generate text
-- [ ] TitleBasedParaphraser
+- [x] TitleBasedParaphraser
   - first LLM: (Select/Extract) Title → second LLM: generate text
 - [ ] radar plot: 
-  - [ ] mean is line and standard deviation should be shaded area around the line (cf. Jannek's papers)
+  - [x] mean is line and standard deviation should be shaded area around the line (cf. Jannek's papers)
   - [ ] scores must always be at same position
 - [ ] Paraphrase scores, cf. [Marcel's paper](https://downloads.webis.de/publications/papers/gohsen_2023b.pdf), [Marcel's second paper](https://downloads.webis.de/publications/papers/gohsen_2024b.pdf)
 

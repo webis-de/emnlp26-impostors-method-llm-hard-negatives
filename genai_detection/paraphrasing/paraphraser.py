@@ -398,7 +398,7 @@ class BulletPointParaphraser(Paraphraser):
             return value  # already quoted properly
         return f'"{value.strip("'").strip('"').strip()}"'
 
-    def _extract_bullet_points(self, text: str, prompt: Optional[str], temperature:float=TEMPERATURE) -> tuple[List[str], str, str]:
+    def _extract_bullet_points(self, text: str, prompt: Optional[str], temperature:float=TEMPERATURE, key:str='bullet_points') -> tuple[List[str], str, str]:
         """
         Extract bullet points, tone, and genre from the input text.
         Currently, the text extractor is instructed to avoid direct quotes from the original text, to 
@@ -407,6 +407,8 @@ class BulletPointParaphraser(Paraphraser):
 
         :param text: The input text.
         :param prompt: Optional custom prompt.
+        :param temperature: Controls the randomness of the output. Lower values make the output more deterministic.
+        :key: The key to extract from the response. Usually 'bullet_points', but can be customized, because some paraphraser inherent from the class.
         :return: Tuple of bullet points, tone, and genre.
         """
         assert self.text_extractor is not None, "Text extractor must be provided."
@@ -417,14 +419,16 @@ class BulletPointParaphraser(Paraphraser):
         res = self.text_extractor.paraphrase(text=text, prompt=prompt, n_responses=1, max_length=MAX_LENGTH, temperature=temperature)[0]
     
         try:
+            if isinstance(res, str) and res.startswith('json'):  # common prefix error in the response
+                res = re.search(r'\{.*\}', res).group() # keep only the JSON part
             res = ast.literal_eval(res) if isinstance(res, str) else res  # ensure res is a dictionary
         except Exception as e:
             print(f"[ERROR] Failed to parse text extractor response as JSON: {res}\nWith error: {e}")
-            res = {'bullet_points': str(res)}  # fallback 
+            res = {key: str(res)}  # fallback 
         assert isinstance(res, dict), f"Expected a Dictionary response, got {type(res)}"
 
-        print(f"\n[DEBUG] Extracted bullet points, tone and genre: {res}\n")
-        bp, tone, genre = res.get('bullet_points', []), res.get('tone', ''), res.get('genre', '')    
+        print(f"\n[DEBUG] Extracted {key}, tone and genre: {res}\n")
+        bp, tone, genre = res.get(key, []), res.get('tone', ''), res.get('genre', '')    
         return bp, tone, genre
     
     def _generate_paraphrase_from_bullet_points(self, bullet_points, tone, genre, prompt: Optional[str], n_responses:int=3, temperature:float=TEMPERATURE) -> tuple[List[str], str, str]:
@@ -462,7 +466,70 @@ class BulletPointParaphraser(Paraphraser):
         bullet_points, tone, genre = self._extract_bullet_points(text=text, prompt=prompt, temperature=temperature)
         paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points=bullet_points, tone=tone, genre=genre, prompt=prompt, n_responses=n_responses, temperature=temperature)
 
-        # Placeholder implementation
+        return paraphrased_texts
+    
+
+class TaskParaphraser(BulletPointParaphraser):
+    """
+    A paraphrasing model that first extracts the task upon which the text was generated, tone and genre from the input text using one LLM and then generates a paraphrase based on this information.
+    """
+    def __init__(self, text_extractor:Paraphraser, text_generator:Paraphraser):
+        """
+        Initializes the TaskParaphraser model.
+        :param text_extractor: A model or function to extract the task that was prompted, tone and genre from the input text.
+        :param text_generator: A model or function to generate text based on the extracted task, tone and genre.
+        """
+        super().__init__(text_extractor=text_extractor, text_generator=text_generator)
+
+    def paraphrase(self, text: str, prompt:Optional[str], n_responses:int=5, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE) -> List[str]:
+        extractor_prompt = 'Act as the author of the text. From that perspective, infer your role or identity, the topic being addressed, and the purpose or instruction behind writing the text. Combine these elements into a concise task prompt that you would give to an LLM to reproduce the text. Respond ONLY with a JSON object in the following format: {"task":"<task>","tone":"<tone>","genre":"<genre>"}. Extract the intended task (prompt), tone, and genre from the text below:'
+        task, tone, genre = self._extract_bullet_points(text=text, prompt=extractor_prompt, temperature=temperature, key='task')
+
+        generator_prompt = "Write a text of about {l} words with a {tone} tone and {genre} genre, covering the following task:\n{task}".format(l=len(text.split()), tone=tone, genre=genre, task=task)
+        paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points=task, tone=tone, genre=genre, prompt=generator_prompt, n_responses=n_responses, temperature=temperature)
+
+        return paraphrased_texts
+    
+class TopicParaphraser(BulletPointParaphraser):
+    """
+    A paraphrasing model that first extracts the topic of the text, tone and genre from the input text using one LLM and then generates a paraphrase based on this information.
+    """
+    def __init__(self, text_extractor:Paraphraser, text_generator:Paraphraser):
+        """
+        Initializes the TopicParaphraser model.
+        :param text_extractor: A model or function to extract the topic, tone and genre from the input text.
+        :param text_generator: A model or function to generate text based on the extracted topic, tone and genre.
+        """
+        super().__init__(text_extractor=text_extractor, text_generator=text_generator)
+
+    def paraphrase(self, text: str, prompt:Optional[str], n_responses:int=5, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE) -> List[str]:
+        extractor_prompt = 'Extract the topic, tone and genre from the text. Respond ONLY with a JSON object in the following format: {"topic":"<topic>","tone":"<tone>","genre":"<genre>"}. Text to extract task, tone and genre from:'
+        topic, tone, genre = self._extract_bullet_points(text=text, prompt=extractor_prompt, temperature=temperature, key='topic')
+
+        generator_prompt = "Write a text of about {l} words with a {topic} topic, {tone} tone and {genre} genre.".format(l=len(text.split()), tone=tone, genre=genre, topic=topic)
+        paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points=topic, tone=tone, genre=genre, prompt=generator_prompt, n_responses=n_responses, temperature=temperature)
+
+        return paraphrased_texts
+    
+class TitleParaphraser(BulletPointParaphraser):
+    """
+    A paraphrasing model that first extracts the title of the text, tone and genre from the input text using one LLM and then generates a paraphrase based on this information.
+    """
+    def __init__(self, text_extractor:Paraphraser, text_generator:Paraphraser):
+        """
+        Initializes the TopicParaphraser model.
+        :param text_extractor: A model or function to extract the title, tone and genre from the input text.
+        :param text_generator: A model or function to generate text based on the extracted title, tone and genre.
+        """
+        super().__init__(text_extractor=text_extractor, text_generator=text_generator)
+
+    def paraphrase(self, text: str, prompt:Optional[str], n_responses:int=5, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE) -> List[str]:
+        extractor_prompt = 'Find a concise title for the text, extract the tone and genre from the text. Respond ONLY with a JSON object in the following format: {"title":"<title>","tone":"<tone>","genre":"<genre>"}. Text to extract title, tone and genre from:'
+        title, tone, genre = self._extract_bullet_points(text=text, prompt=extractor_prompt, temperature=temperature, key='title')
+
+        generator_prompt = "Write a text of about {l} words with a {title} title, {tone} tone and {genre} genre.".format(l=len(text.split()), tone=tone, genre=genre, title=title)
+        paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points=title, tone=tone, genre=genre, prompt=generator_prompt, n_responses=n_responses, temperature=temperature)
+
         return paraphrased_texts
     
     
@@ -504,17 +571,17 @@ class ParaphrasingEvaluator:
         references = [self.original_text] * self.n_responses
         original_split = self.original_text.split()
 
-        bp_counts = 0
+        bp_counts = defaultdict(int)
 
         for (name, paraphraser), prompt in tqdm(
             product(self.paraphrasers.items(), self.prompts),
             desc="Evaluating Paraphrasers",
             total=len(self.paraphrasers) * len(self.prompts)
         ):
-            if isinstance(paraphraser, BulletPointParaphraser):
-                if bp_counts == 0:
-                    prompt = None # BulletPointParaphraser has specific prompt, which extracts bullet points, tone and genre from the text
-                    bp_counts += 1
+            if isinstance(paraphraser, BulletPointParaphraser) or isinstance(paraphraser, TaskParaphraser) or isinstance(paraphraser, TopicParaphraser) or isinstance(paraphraser, TitleParaphraser): 
+                if bp_counts[name] == 0:
+                    prompt = None # paraphrasers above have specific prompt, which extracts bullet points/task/topic, tone and genre from the text
+                    bp_counts[name] += 1
                 else:
                     continue
             try:
@@ -618,8 +685,11 @@ class ParaphrasingEvaluator:
         :param data_category: Optional category of the data, used for the plot title.
         :return: A list of matplotlib figures.
         """
-        labels = list(set(self.get_metric_names()) & set(df.columns.tolist()))
-        grouped = df.groupby('model')[labels].mean()
+        # Enforce fixed metric order
+        all_labels = self.get_metric_names()
+        labels = [metric for metric in all_labels if metric in df.columns]
+        grouped_mean = df.groupby('model')[labels].mean()
+        grouped_std = df.groupby('model')[labels].std()
 
 
         # Compute angle of each axis
@@ -630,11 +700,20 @@ class ParaphrasingEvaluator:
         # Start plot
         fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
 
-        for model_name, row in grouped.iterrows():
-            values = row[labels].tolist()
-            values += values[:1]
-            ax.plot(angles, values, label=model_name)
-            ax.fill(angles, values, alpha=0.25)
+        for model_name in grouped_mean.index:
+            mean_values = grouped_mean.loc[model_name].tolist()
+            std_values = grouped_std.loc[model_name].tolist()
+
+            # Close the loop
+            mean_values += mean_values[:1]
+            std_values += std_values[:1]
+
+            lower = np.maximum(0, np.array(mean_values) - np.array(std_values))
+            upper = np.minimum(1, np.array(mean_values) + np.array(std_values))
+
+            ax.plot(angles, mean_values, label=model_name)
+            ax.fill_between(angles, lower, upper, color=ax.get_lines()[-1].get_color(), alpha=0.2)
+
 
         # Add labels to axes
         ax.set_xticks(angles[:-1])
