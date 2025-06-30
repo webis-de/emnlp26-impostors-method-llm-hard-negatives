@@ -4094,6 +4094,33 @@ typing = ["typing-extensions ; python_version < \"3.10\""]
 xmp = ["defusedxml"]
 
 [[package]]
+name = "pip"
+version = "25.1.1"
+description = "The PyPA recommended tool for installing Python packages."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "pip-25.1.1-py3-none-any.whl", hash = "sha256:2913a38a2abf4ea6b64ab507bd9e967f3b53dc1ede74b01b0931e1ce548751af"},
+    {file = "pip-25.1.1.tar.gz", hash = "sha256:3de45d411d308d5054c2168185d8da7f9a2cd753dbac8acbfa88a8909ecd9077"},
+]
+
+[[package]]
+name = "pip-system-certs"
+version = "5.2"
+description = "Automatically configures Python to use system certificates via truststore"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "pip_system_certs-5.2-py3-none-any.whl", hash = "sha256:e6ef3e106d4d02313e33955c2bcc4c2b143b2da07ef91e28a6805a0c1c512126"},
+    {file = "pip_system_certs-5.2.tar.gz", hash = "sha256:80b776b5cf17191bf99d313699b7fce2fdb84eb7bbb225fd134109a82706406f"},
+]
+
+[package.dependencies]
+pip = ">=24.2"
+
+[[package]]
 name = "platformdirs"
 version = "4.3.8"
 description = "A small Python package for determining appropriate platform-specific dirs, e.g. a `user data dir`."
@@ -7173,4 +7200,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.14"
-content-hash = "21e27971ef0a3dd3e876e73efaa9a92d8010412b6c14e149c6bfa1f8097f48a4"
+content-hash = "bd30a40b9d302ce33a065c24f4ff7e562a1e67d0c1b8c381c105f0dfc04ff7d3"
