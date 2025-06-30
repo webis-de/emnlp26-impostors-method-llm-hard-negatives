@@ -429,16 +429,38 @@ class BlogImposterGenerator(FixedImposterGenerator):
        
 # Example usage
 if __name__ == "__main__":
+    # Literary imposters
     # artwork_name = "Frankenstein_Mary_Wollstonecraft_(Godwin)_Shelley.txt"
-    # #"A_Midsummer_Nights_Dream_William_Shakespeare.txt"#"A_Lovers_Complaint_William_Shakespeare.txt"
+    # # #"A_Midsummer_Nights_Dream_William_Shakespeare.txt"#"A_Lovers_Complaint_William_Shakespeare.txt"
     # path2lovers_shakespeare = Path(CONFIG.PATH2GUTENBERG) / artwork_name
     # with open(path2lovers_shakespeare) as f:
     #     input_text = f.read()
 
-    generator = GoogleSearchImposterGenerator(api_key='CONFIG.SERPAPI_KEY', num_queries=2, results_per_query=25, max_workers=2, n_min_words=3, n_max_words=5)
-    # imposters = generator.generate_imposters(input_text, path2imp=Path(CONFIG.PATH2GENERIC_ON_FLY_IMP) / f"imposter_{artwork_name.split('.')[0]}_results.csv")
-    # print(f"Generated {len(imposters)} imposters for {artwork_name}:")
+    # Blog imposters
+    # split = 'test'  # or 'train'
+    # ds = load_from_disk(CONFIG.PATH2BLOG)[split].to_pandas()
+    # print(f"Loaded {len(ds)} entries from the Blog dataset from {split} split.")
+    # print("ids with negative samples:", ds[ds['same'] == 0].index.tolist())
+    # ids = [164, 394, 2, 3] if split == 'train' else [1, 362]  # example ids to test with 
+    # for id in ids:
+    #     input_text_a, input_text_b = ds.loc[id, 'pair'][0], ds.loc[id, 'pair'][1]  # use the first text from the dataset as input text
+    #     same = ds.loc[id, 'same']
+    #     print(input_text_a)
+    #     print('---')
+    #     print(input_text_b)
+    #     print('---')
+    
+    #     print(f"Same author: {same}")
 
+    #     # >=10 queries does not work, api error/ maybe local cert issue
+    #     # do not stop bc some fetch errors, results are still saved for rest
+    #     generator = GoogleSearchImposterGenerator(api_key="CONFIG.SERPAPI_KEY", num_queries=5, results_per_query=25, max_workers=2, n_min_words=3, n_max_words=5)
+    #     imposters_a = generator.generate_imposters(input_text_a, real_time_generation=True, path2imp=Path(CONFIG.PATH2GENERIC_ON_FLY_IMP) / f"imposter_blog_converted_{split}_id{id}left_same{same}_results.csv")
+    #     imposters_b = generator.generate_imposters(input_text_b, real_time_generation=True, path2imp=Path(CONFIG.PATH2GENERIC_ON_FLY_IMP) / f"imposter_blog_converted_{split}_id{id}right_same{same}_results.csv")
+    #     print(f"Generated {len(imposters_a) + len(imposters_b)} imposters for Blog corpus example:")
+
+    
     # for imposter_name, imposter_text in imposters.items():
     #     print(f"Imposter {imposter_name}: {imposter_text[:100]}...")  # Print first 100 characters of each imposter
+    print("Imposter generation complete.")
 
