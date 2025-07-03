@@ -20,6 +20,8 @@ import unicodedata
 
 import torch
 import numpy as np
+sys.path.append(os.path.abspath(".."))
+from genai_detection.util import preprocess_text as _preprocess_text
 
 __all__ = ["DetectorBase"]
 
@@ -164,56 +166,7 @@ class DetectorBase:
             - e.g. remove HTML tags, etc.
             - newlines
         """
-        def clean(single_text: str) -> str:
-            # decode any html entities (&amp; → &)
-            single_text = html.unescape(single_text)
-
-            # strip out html tags such as <p>, <br>, etc.
-            single_text = re.sub(r'<[^>]+>', '', single_text)
-
-            # remove play articfacts that:
-            # - contain only uppercase letters, spaces, and optionally dots or colons at the end
-            # - e.g. "PALAMON.", "FIRST LORD:", "KING"
-            header_pattern = re.compile(r'^[A-Z\s]+[.:]?$', re.MULTILINE)
-            single_text = re.sub(header_pattern, '', single_text)
-
-            # remove chapter articfacts:
-            # ^\s*Chapter\s+\w+  — start of line, optional spaces, 'Chapter' + some word/number
-            # \s*                — optional spaces (for line endings)
-            # \n+                — one or more newlines (blank lines after header)
-            chapter_pattern = re.compile(r'^\s*Chapter\s+\w+.*\n\s*\n', re.IGNORECASE | re.MULTILINE)
-            single_text = re.sub(chapter_pattern, '', single_text)
-
-            # remove act and scene (play articfacts)
-            single_text = re.sub(r'\s*ACT\s+\w+\b\.?', '', single_text, flags=re.IGNORECASE | re.MULTILINE)
-            single_text = re.sub(r'^\s*SCENE\s+\w+\b\.?', '', single_text, flags=re.IGNORECASE | re.MULTILINE)
-
-            print(f"Half way done")
-
-            # remove brackets but keep content (play articfacts)
-            single_text = re.sub(r'\[(.*?)\]', r'\1', single_text, flags=re.DOTALL)
-            # remove underscores inside the extracted content (play articfacts)
-            single_text = re.sub(r'_+', '', single_text)
-
-            # remove trailing numbers (i.e. line numbers as play articfact); whitespace followed by digits at end of line
-            single_text = re.sub(r'\s+\d+\s*$', '', single_text, flags=re.MULTILINE)
-
-            # collapse all whitespace (including newlines) to single spaces and trim
-            single_text = re.sub(r'\s+', ' ', single_text).strip()
-
-            # transliterate to ascii, dropping characters that can't be converted
-            single_text = unicodedata.normalize('NFKD', single_text).encode('ascii', 'ignore').decode('ascii')
-
-            # convert everything to lowercase for uniformity
-            single_text = single_text.lower().strip()
-
-            return single_text
-
-
-        if isinstance(text, str):
-            return clean(text)
-        else:
-            return [clean(t_) for t_ in text]
+        return _preprocess_text(text)
 
 def _create_nan_array(n):
     return np.empty(shape=(n,)) * np.nan
