@@ -184,17 +184,10 @@ class DetectorBase:
             chapter_pattern = re.compile(r'^\s*Chapter\s+\w+.*\n\s*\n', re.IGNORECASE | re.MULTILINE)
             single_text = re.sub(chapter_pattern, '', single_text)
 
-            # act pattern analogous to chapter pattern
-            single_text = re.sub(r'^\s*ACT\s+\w+\b\.?', '', single_text, flags=re.IGNORECASE | re.MULTILINE)
-            # removes whole line
-            # re.compile(r'^\s*ACT\s+\w+.*\n\s*\n', re.IGNORECASE | re.MULTILINE)
-            # single_text = re.sub(act_pattern, '', single_text)
-
-            # scene pattern analogous to chapter pattern
+            # remove act and scene (play articfacts)
+            single_text = re.sub(r'\s*ACT\s+\w+\b\.?', '', single_text, flags=re.IGNORECASE | re.MULTILINE)
             single_text = re.sub(r'^\s*SCENE\s+\w+\b\.?', '', single_text, flags=re.IGNORECASE | re.MULTILINE)
-            # removes whole line
-            # re.compile(r'^\s*SCENE\s+\w+.*\n\s*\n', re.IGNORECASE | re.MULTILINE)
-            # single_text = re.sub(scene_pattern, '', single_text)
+
             print(f"Half way done")
 
             # remove brackets but keep content (play articfacts)
@@ -212,7 +205,7 @@ class DetectorBase:
             single_text = unicodedata.normalize('NFKD', single_text).encode('ascii', 'ignore').decode('ascii')
 
             # convert everything to lowercase for uniformity
-            single_text = single_text.lower()
+            single_text = single_text.lower().strip()
 
             return single_text
 
