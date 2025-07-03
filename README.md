@@ -23,7 +23,8 @@ It replaces tools like `pip`, `virtualenv`, and `setuptools` with a single, stre
 
 ### ✅ Requirements*
 
-- **Python ≥3.10 and <3.14**
+- **Python ≥3.10 and <3.13**
+  - Word Mover's Distance (WMD) requires Python <3.13, I use Python 3.11.9
 - **Poetry ≥1.3**
 
 Install poetry using the following command for MacOS:

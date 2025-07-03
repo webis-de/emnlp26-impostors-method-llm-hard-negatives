@@ -9,7 +9,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.14"
+python = ">=3.10,<3.13"
 transformers = "^4.48.1"
 datasets = "^3.1.0"
 accelerate = "^1.2.1"
@@ -39,6 +39,10 @@ absl-py = "^2.3.0"
 nltk = "^3.9.1"
 rouge-score = "^0.1.2"
 pip-system-certs = "^5.2"
+word-mover-distance = "^0.0.3"
+gensim = "^4.3.3"
+dirtyjson = "^1.0.8"
+sentence-transformers = "^5.0.0"
 
 [build-system]
 requires = ["poetry-core"]
