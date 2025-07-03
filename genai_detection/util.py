@@ -295,11 +295,22 @@ def model_batch_forward(
 def preprocess_text(text: t.Union[str, t.Iterable[str]]) -> t.Union[str, t.List[str]]:
     """
     Preprocess input text:
-    - remove newlines
-    - utf-8 to ascii conversion, i.e. omit special characters
     - remove layout/ structural information
         - e.g. remove HTML tags, etc.
         - newlines
+    - remove play artifacts such as:
+        - charcter names before their speech (e.g. "PALAMON.", "FIRST LORD:", "KING)
+        - chapter headers (e.g. "Chapter 1")
+        - act and scene headers (e.g. "ACT I", "SCENE II")
+        - brackets and underscores (e.g. "[some content]", "_underscores_") for character instructions
+        - trailing numbers as line numbers
+    - remove newlines
+    - utf-8 to ascii conversion, i.e. omit special characters
+    - lowercase everything 
+    - strip leading and trailing whitespace
+
+    :param text: input text or batch of input texts
+    :return: preprocessed text or batch of preprocessed texts
     """
     def clean(single_text: str) -> str:
         # decode any html entities (&amp; → &)
@@ -324,8 +335,6 @@ def preprocess_text(text: t.Union[str, t.Iterable[str]]) -> t.Union[str, t.List[
         # remove act and scene (play articfacts)
         single_text = re.sub(r'\s*ACT\s+\w+\b\.?', '', single_text, flags=re.IGNORECASE | re.MULTILINE)
         single_text = re.sub(r'^\s*SCENE\s+\w+\b\.?', '', single_text, flags=re.IGNORECASE | re.MULTILINE)
-
-        print(f"Half way done")
 
         # remove brackets but keep content (play articfacts)
         single_text = re.sub(r'\[(.*?)\]', r'\1', single_text, flags=re.DOTALL)
