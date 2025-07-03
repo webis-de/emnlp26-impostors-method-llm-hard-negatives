@@ -13,9 +13,15 @@ from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 import requests
-from simpletransformers.t5 import T5Model
 import sklearn
+# FIXME
+from word_mover_distance import model   # https://pypi.org/project/word-mover-distance/
+# import gensim.similarities
+# from gensim.similarities import WmdSimilarity
+from sentence_transformers import SentenceTransformer
+import gensim.downloader
 import torch
+import seaborn as sns
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import nltk
@@ -396,7 +402,8 @@ class BulletPointParaphraser(Paraphraser):
         value = value.strip()
         if value.startswith('"') and value.endswith('"'):
             return value  # already quoted properly
-        return f'"{value.strip("'").strip('"').strip()}"'
+        value = value.strip("'").strip('"').strip() 
+        return f'"{value}"'
 
     def _extract_bullet_points(self, text: str, prompt: Optional[str], temperature:float=TEMPERATURE, key:str='bullet_points') -> tuple[List[str], str, str]:
         """
@@ -532,7 +539,18 @@ class TitleParaphraser(BulletPointParaphraser):
 
         return paraphrased_texts
     
-    
+class WMDReadyKeyedVectors:
+    def __init__(self, keyed_vectors):
+        self.model = keyed_vectors
+
+    def __getitem__(self, key):
+        return self.model[key]
+
+    def __contains__(self, key):
+        return key in self.model
+
+    def keys(self):
+        return self.model.key_to_index.keys()
 
 class ParaphrasingEvaluator:
     def __init__(self, paraphrasers:dict, prompts:List[str], original_text:str, n_responses:int=3, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE):
@@ -559,6 +577,10 @@ class ParaphrasingEvaluator:
 
         self.rouge_score = evaluate.load("rouge")
         self.bertscore = evaluate.load("bertscore") 
+        self.sbert_model = SentenceTransformer("all-MiniLM-L6-v2")  # for cosine similarity
+        # https://pypi.org/project/word-mover-distance/ Word Mover's Distance (WMD)
+        self.pretr_word_model = WMDReadyKeyedVectors(gensim.downloader.load('glove-twitter-25'))
+        self.wmd_model = model.WordEmbedding(model=self.pretr_word_model)
 
 
     def evaluate(self, save_to_disk:bool=True):
@@ -636,7 +658,10 @@ class ParaphrasingEvaluator:
         :param idx: Index of the paraphrase in the list of BERTScores.
         :return: A dictionary representing the result row.
         """
-        return {
+        # in [-1, 1] range, where 1 is identical, 0 is no similarity, -1 is opposite
+        cos_sim = torch.cosine_similarity(self.sbert_model.encode(self.original_text, convert_to_tensor=True),
+                                                         self.sbert_model.encode(paraphrase, convert_to_tensor=True), dim=0).item()
+        res = {
             "model": name,
             "prompt": f"{prompt} <TEXT>",
             "parameters": {
@@ -648,22 +673,35 @@ class ParaphrasingEvaluator:
             "paraphrased_text": paraphrase,
             # avoid division by zero using smoothing
             # bleu averages scores obtained from splits of paraphrase and (one of the) reference(s); here: only one reference (i.e. original text)
-            "bleu_score": bleu_score.sentence_bleu(
+            "bleu_score": bleu_score.sentence_bleu( # in [0, 1]
                 references=[original_split],
                 hypothesis=paraphrase.split(),
                 smoothing_function=bleu_score.SmoothingFunction().method1
-            ),
+            ),  # syntactic similarity metric
             # METEOR requires tokens as input
-            "meteor_score": meteor_score.single_meteor_score(original_split, paraphrase.split()),
-            "rouge1": rouge_score["rouge1"],
-            "rouge2": rouge_score["rouge2"],
-            "rougeL": rouge_score["rougeL"],
-            "rougeLsum": rouge_score["rougeLsum"],
-            "bertscore_precision": bert_scores["precision"][idx],
-            "bertscore_recall": bert_scores["recall"][idx],
-            "bertscore_f1": bert_scores["f1"][idx],
+            "meteor_score": meteor_score.single_meteor_score(original_split, paraphrase.split()), # in [0, 1]
+            "rouge1": rouge_score["rouge1"], # syntactic similarity metric # in [0, 1]
+            "rouge2": rouge_score["rouge2"], # in [0, 1]
+            "rougeL": rouge_score["rougeL"], # syntactic similarity metric # in [0, 1]
+            "rougeLsum": rouge_score["rougeLsum"], # in [0, 1]
+            # bertscore metrics in range [0, 1] cf. https://docs.kolena.com/metrics/bertscore/ (03.07.2025)
+            "bertscore_precision": bert_scores["precision"][idx], # semantic similarity metric
+            "bertscore_recall": bert_scores["recall"][idx], # semantic similarity metric
+            "bertscore_f1": bert_scores["f1"][idx], # semantic similarity metric
+            # normalized (in [0, 1] by using exp) word_mover_similarity
+            "sbert_wms": np.exp(-self.wmd_model.wmdistance(list(map(str.lower, original_split)), paraphrase.lower().split())), # semantic similarity metric: exp(-distance) stable version of 1/distance
+            # normalize: (cos - (-1)) / (1 - (-1)), so that it is in [0, 1] range
+            "sbert_cos": (cos_sim + 1) / 2,   # semantic similarity metric
+            # bertscore hashcode for the paraphrase
             "bertscore_hash": bert_scores["hashcode"],
         }
+        semantic_sim_average = np.mean([res["bertscore_precision"], res["bertscore_recall"], res["bertscore_f1"], res["sbert_wms"], res["sbert_cos"]])
+        res["sem_sim_avg"] = semantic_sim_average
+        syntactic_sim_average = np.mean([res["bleu_score"], res["rouge1"], res["rougeL"]])
+        res["syn_sim_avg"] = syntactic_sim_average
+        res["gohsen_delta"] = semantic_sim_average - syntactic_sim_average
+        return res
+
     
     def get_metric_names(self) -> List[str]:
         """
@@ -673,6 +711,8 @@ class ParaphrasingEvaluator:
         return [
             "bleu_score", "meteor_score", "rouge1", "rouge2", "rougeL", "rougeLsum",
             "bertscore_precision", "bertscore_recall", "bertscore_f1",
+            "sbert_wms", "sbert_cos",
+            "sem_sim_avg", "syn_sim_avg", "gohsen_delta"
         ]
     
     def plot_models_metrics(self, df: pd.DataFrame, save_path: Optional[Path] = None, data_category:Optional[str]=None):
@@ -736,6 +776,51 @@ class ParaphrasingEvaluator:
             plt.savefig(save_path, bbox_inches='tight')
             print(f"Plot saved to {save_path}")
         plt.show()
+    
+    def plot_metric_scatter(self, df: pd.DataFrame, save_path: Optional[Path] = None, data_category: Optional[str] = None):
+        """
+        Scatter plot of semantic similarity vs syntactic similarity per model.
+
+        :param df: DataFrame with at least 'sem_sim_avg', 'syn_sim_avg', and 'model' columns.
+        :param save_path: Optional path to save the plot. If None, the plot is not saved.
+        :param data_category: Optional category of the data, used for the plot title.
+        :return: matplotlib Figure object.
+        """
+        assert ['sem_sim_avg', 'syn_sim_avg', 'model'] in df.columns, "DataFrame must contain 'sem_sim_avg', 'syn_sim_avg', and 'model' columns."
+
+        # Setup figure
+        plt.figure(figsize=(8, 6))
+        sns.scatterplot(
+            data=df,
+            x='sem_sim_avg',
+            y='syn_sim_avg',
+            hue='model',
+            palette='tab10',
+            alpha=0.7,
+            s=100,
+            edgecolor='k'
+        )
+
+        plt.xlabel('Semantic Similarity (sem_sim_avg)')
+        plt.ylabel('Syntactic Similarity (syn_sim_avg)')
+        title = f"Semantic vs Syntactic Similarity\non {data_category} Texts" if data_category else "Semantic vs Syntactic Similarity"
+        plt.title(title)
+        plt.xlim(0, 1)
+        plt.ylim(0, 1)
+        plt.legend(title='Model', bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.grid(True)
+        plt.tight_layout()
+
+        if save_path:
+            save_path = Path(save_path)
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            full_path = save_path / f"sem_syn_scatter_{timestamp}.png"
+            plt.savefig(full_path, bbox_inches='tight')
+            print(f"Plot saved to {full_path}")
+
+        plt.show()
+
 
 
 
