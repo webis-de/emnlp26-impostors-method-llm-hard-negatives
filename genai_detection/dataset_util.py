@@ -9,6 +9,7 @@ import random
 import re
 import sys
 import unicodedata
+import typing as t
 
 from datasets import Dataset, DatasetDict, ClassLabel, Features, Value
 import pandas as pd
@@ -16,6 +17,7 @@ from tqdm import tqdm
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from config import CONFIG
+from genai_detection.util import preprocess_text as _preprocess_text
 
 random.seed(42)
 
@@ -29,6 +31,10 @@ class BaseDatasetLoader(ABC):
     @abstractmethod
     def load(self) -> DatasetDict:
         pass
+
+    def preprocess(self, text: t.Union[str, t.Iterable[str]]) -> t.Union[str, t.List[str]]:
+        return _preprocess_text(text=text)
+        
 
     @staticmethod
     def _load_jsonl(path: str):
@@ -71,7 +77,8 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
     def load(self) -> Dataset:
         df = pd.read_csv(self.path)
         print("Initial number of entries:", len(df))
-        df = df[df['text'].apply(lambda x: len(re.sub(r'\s+', ' ', x).strip()) > 500)]
+        df['text'] = df['text'].apply(lambda x: _preprocess_text(x))
+        df = df[df['text'].apply(lambda x: len(x) > 500)]
         print("number of entries after filtering:", len(df))
       
         topics = df['topic'].unique().tolist()
@@ -148,6 +155,7 @@ class KoppelWebisDatasetLoader(BaseDatasetLoader):
     def __init__(self, path: str, name: str = CONFIG.KOPPEL):
         super().__init__(name=name)
         self.path = Path(path)
+        assert self.path.exists(), f"Path {self.path} does not exist. Current path: {os.getcwd()}"
 
     def load(self) -> DatasetDict:
         data = []
@@ -157,10 +165,7 @@ class KoppelWebisDatasetLoader(BaseDatasetLoader):
                     if file.is_file() and file.suffix == '.txt':
                         with open(file, 'r', encoding='utf-8', errors='replace') as f:
                             content = f.read()
-                            content = unicodedata.normalize("NFKC", content)
-                            content = re.sub(r"[^\x00-\x7F]+", " ", content)
-                            content = re.sub(r"\s+", " ", content)
-                            content = content.strip().lower()
+                            content = _preprocess_text(content)
                             data.append({'author': author.name, 'text': content})
         pairs = self._generate_pairs(data)
 
@@ -174,7 +179,6 @@ class KoppelWebisDatasetLoader(BaseDatasetLoader):
 
 
 # === PAN23 LOADER ===
-
 
 class Pan23DatasetLoader(BaseDatasetLoader):
     def __init__(self, train_dir: str, test_dir: str, name: str=CONFIG.PAN23):
@@ -233,7 +237,6 @@ class Pan20DatasetLoader(Pan23DatasetLoader):
 
 # === PAN24 LOADER ===
 
-
 class Pan24DatasetLoader(BaseDatasetLoader):
     def __init__(self, train_dir: str, test_dir: str, name: str = "pan24"):
         """
@@ -252,7 +255,6 @@ class Pan24DatasetLoader(BaseDatasetLoader):
 
 
 # === PAN25 LOADER ===
-
 
 class Pan25DatasetLoader(BaseDatasetLoader):
     def __init__(
@@ -337,10 +339,12 @@ class Pan25DatasetLoader(BaseDatasetLoader):
         )
 
 # === Gutenberg LOADER ===
+
 class GutenbergDatasetLoader(BaseDatasetLoader):
     def __init__(self, path: str, name: str = CONFIG.GUTENBERG):
         super().__init__(name=name)
         self.path = Path(path)
+        assert self.path.exists(), f"Path {self.path} does not exist. Current path: {os.getcwd()}"
 
     def load(self, train_split_portion:float=0.8) -> Dataset:
         """
@@ -359,10 +363,7 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
             with open(file, "r", encoding="utf-8") as f:
                 author = ' '.join(file.stem.split("_")[-2:])  # filename format is "title_firstName_sirname.txt"
                 content = f.read()
-                content = unicodedata.normalize("NFKC", content)
-                content = re.sub(r"[^\x00-\x7F]+", " ", content)
-                content = re.sub(r"\s+", " ", content)
-                content = content.strip().lower()
+                content = _preprocess_text(content)
                 data.append({"author": author, "text": content})
 
         pairs = self._generate_pairs(data)
@@ -423,7 +424,7 @@ def run_pan25():
 
 
 def run_koppel_webis():
-    base_dir = Path(__file__).resolve().parent / "data/datasets/corpus-webis-authorship/koppel/"
+    base_dir = Path(__file__).resolve().parent.parent / "data/datasets/corpus-webis-authorship/koppel/"
     output_dir = os.path.join(base_dir, "koppel-webis-dataset-converted")
 
     loader = KoppelWebisDatasetLoader(path=base_dir)
@@ -434,7 +435,7 @@ def run_koppel_webis():
 
 def run_blog_corpus():
     # sys.path.append(os.path.abspath(".."))
-    base_dir = Path(__file__).resolve().parent / "data/datasets/Blog_corpus/"
+    base_dir = Path(__file__).resolve().parent.parent / "data/datasets/Blog_corpus/"
     assert base_dir.exists(), f"Base directory {base_dir} does not exist. Current path: {os.getcwd()}"
     output_dir = base_dir / "blog-dataset-converted"
 
@@ -475,6 +476,6 @@ if __name__ == "__main__":
     # run_pan23(base_dir=args.path, save_path=args.out)
     # # run_pan25()
     # run_pan20()
-    # run_koppel_webis()
-    # run_blog_corpus()
+    run_koppel_webis()
+    run_blog_corpus()
     run_gutenberg_corpus()
