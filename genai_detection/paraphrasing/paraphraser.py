@@ -83,6 +83,22 @@ class Paraphraser(ABC):
         """
         return [self.paraphrase(text=text, prompt=prompt) for text in texts]
     
+    def _post_process_llm_response(self, response: str, key:str) -> str:
+        resp = unicodedata.normalize("NFKC", response)
+        print(f"\n[DEBUG] Response for {key} extraction: {resp}\n")
+        match = re.search(r'\{.*?\}', resp)
+        if match:
+            resp = match.group(0)
+        try:
+            return ast.literal_eval(resp).get(key, '') 
+        except Exception as e:
+            try:
+                return dirtyjson.loads(resp).get(key, '')  
+            except Exception as e:
+                return resp
+                print(f"[ERROR] Failed to decode JSON from response with ast.literal_eval and dirtyjson: {resp}/{type(resp)}\nWith error: {e}")
+                return resp
+    
     def get_tone(self, text: str) -> str:
         """
         Extract the tone of the input text.
@@ -91,23 +107,8 @@ class Paraphraser(ABC):
         :return: The tone of the text as a string.
         """
         resp = self.paraphrase(text=text, n_responses=1, prompt="Extract the tone (i.e. quality in the voice that expresses the speaker's feelings or thoughts) of the text. Respond ONLY with a JSON object (i.e. no chain-of-thought, no explanations) in the following format: {'tone':'<tone>'}. Text to extract tone from:")[0]
-        resp = re.sub('“', '"', resp)  # replace invalid quotes with valid ones
-        resp = re.sub('’', "'", resp)  # replace invalid quotes with valid ones
-        print(f"\n[DEBUG] Response for tone extraction: {resp}\n")
-        match = re.search(r'\{.*?\}', resp)
-        if match:
-            resp = match.group(0)
-        try:
-            return ast.literal_eval(resp).get('tone', '') 
-        except Exception as e:
-            try:
-                return dirtyjson.loads(resp).get('tone', '')  
-            except Exception as e:
-                return resp
-            # TODO: do for other as well double try with dirtyjson
-                print(f"[ERROR] Failed to decode JSON from response with ast.literal_eval and dirtyjson: {resp}/{type(resp)}\nWith error: {e}")
-                return resp
-        #{'tone': ''} 
+        return self._post_process_llm_response(resp, key='tone')
+  
     
     def get_genre(self, text: str) -> str:
         """
@@ -117,19 +118,27 @@ class Paraphraser(ABC):
         :return: The genre of the text as a string.
         """
         resp = self.paraphrase(text=text, n_responses=1, prompt="Extract the genre (i.e. subject or style of literature) of the text. Respond ONLY with a JSON object (i.e. no chain-of-thought, no explanations) in the following format: {'genre':'<genre>'}. Text to extract genre from:")[0]
-        resp = re.sub('“', '"', resp)  # replace invalid quotes with valid ones
-        resp = re.sub('’', "'", resp)  # replace invalid quotes with valid ones
-        print(f"\n[DEBUG] Response for genre extraction: {resp}\n")
-        match = re.search(r'\{.*?\}', resp)
-        try:
-            if match:
-                resp = match.group(0)
-            return ast.literal_eval(resp).get('genre', '')
-        except Exception as e:
-            resp = {'genre': dirtyjson.loads(match.group(0)) if match else dirtyjson.loads(resp)}  # fallback to dirtyjson.loads if ast.literal_eval fails
-            print(f"[ERROR] Failed to decode JSON from response with ast.literal_eval: {resp}/{type(resp)}\nWith error: {e}")
-            return resp
-        #{'genre': ''} 
+        return self._post_process_llm_response(resp, key='genre')
+
+    def get_time_period(self, text: str) -> str:
+        """
+        Extract the time period of the input text.
+        
+        :param text: The input text from which to extract the time period.
+        :return: The time period of the text as a string.
+        """
+        resp = self.paraphrase(text=text, n_responses=1, prompt="Extract the time period (i.e. when the events in the text take place) of the text. Respond ONLY with a JSON object (i.e. no chain-of-thought, no explanations) in the following format: {'time_period':'<time_period>'}. Text to extract time period from:")[0]
+        return self._post_process_llm_response(resp, key='time_period')
+
+    def get_register(self, text: str) -> str:
+        """
+        Extract the register of the input text.
+        
+        :param text: The input text from which to extract the register.
+        :return: The register of the text as a string.
+        """
+        resp = self.paraphrase(text=text, n_responses=1, prompt="Extract the register (i.e. level of formality or informality) of the text. Respond ONLY with a JSON object (i.e. no chain-of-thought, no explanations) in the following format: {'register':'<register>'}. Text to extract register from:")[0]
+        return self._post_process_llm_response(resp, key='register')
     
 
 class NaiveParaphraser(Paraphraser):
@@ -401,12 +410,11 @@ class BulletPointParaphraser(Paraphraser):
         :return: Tuple of bullet points, tone, genre, time period, and register.
         """
         assert self.text_extractor is not None, "Text extractor must be provided."
-        print(f"[DEBUG] Using BulletPointParaphraser with prompt: {prompt}")
         if prompt is None:
-            prompt = 'Summarize the following text in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","time_period":<time_period>,"register":<register>,"bullet_points":"<list of bullet points>"}. Do not use direct quotes. Text to summarize:'
+            # prompt = 'Summarize the following text in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"bullet_points":"<list of bullet points>","tone":"<tone>","time_period":<time_period>,"register":<register>,"genre":"<genre>"}. Do not use direct quotes. Text to summarize:'
             # TODO: temporarily use this prompt, because the text extractor is not able to return a valid JSON object with the default prompt
-            #prompt = 'Summarize the following text in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","bullet_points":"<list of bullet points>"}. Do not use direct quotes. Text to summarize:'
-        print(f"[DEBUG] Using BulletPointParaphraser with prompt: {prompt}")
+            prompt = 'Summarize the following text in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","bullet_points":"<list of bullet points>"}. Do not use direct quotes. Text to summarize:'
+
     
         res = self.text_extractor.paraphrase(text=text, prompt=prompt, n_responses=1, max_length=MAX_LENGTH, temperature=temperature)[0]
     
@@ -466,8 +474,10 @@ class BulletPointParaphraser(Paraphraser):
         :param max_length: The maximum number of tokens to generate in the paraphrase.
         :return: A paraphrased version of the input text.
         """
-        print(f"[DEBUG] Using BulletPointParaphraser with prompt: {prompt}")
         bullet_points, tone, genre, time_period, register = self._extract_bullet_points(text=text, prompt=prompt, temperature=temperature)
+        # time period and register breaks paraphrasing with LLM for some reason, so we do not specify them in the prompt
+        # time_period = self.get_time_period(text=text) if time_period=='' else time_period
+        # register = self.get_register(text=text) if register=='' else register
         generator_prompt = (
                 f"Write a text of about {len(text.split())} words with a {tone} tone, a {genre} genre, in the {register} register and in the {time_period} time period, covering the following points:\n"
                 + "\n".join(f"- {bp}" for bp in bullet_points)
