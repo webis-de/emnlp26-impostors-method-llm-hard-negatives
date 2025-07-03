@@ -820,6 +820,63 @@ class ParaphrasingEvaluator:
             print(f"Plot saved to {full_path}")
 
         plt.show()
+    
+    def plot_metric_distributions(self, df: pd.DataFrame, save_path: Optional[Path] = None, data_category: Optional[str] = None):
+        """
+        Plot distribution of each metric per model in subplots.
+
+        :param df: DataFrame containing metric scores and a 'model' column.
+        :param save_path: Optional path to save the plot. If None, the plot is not saved.
+        :param data_category: Optional string for plot title context.
+        :return: None
+        """
+        metric_names = [metric for metric in self.get_metric_names() if metric in df.columns]
+        assert len(metric_names) > 0, "No valid metrics found in DataFrame."
+
+        n_metrics = len(metric_names)
+        n_cols = 2
+        n_rows = (n_metrics + 1) // n_cols
+
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(6 * n_cols, 4 * n_rows))
+        axes = axes.flatten()
+
+        for i, metric in enumerate(metric_names):
+            ax = axes[i]
+            if metric not in df.columns:
+                continue
+
+            sns.kdeplot(
+                data=df,
+                x=metric,
+                hue='model',
+                fill=True,
+                common_norm=False,
+                alpha=0.4,
+                ax=ax,
+                palette='tab10'
+            )
+            ax.set_title(f"Distribution of {metric}")
+            ax.set_xlim(0, 1)  # assuming similarity metrics in [0, 1]
+            ax.set_xlabel(metric)
+            ax.set_ylabel("Density")
+
+        # Remove unused axes
+        for j in range(i + 1, len(axes)):
+            fig.delaxes(axes[j])
+
+        title = f"Metric Distributions by Model\n({data_category})" if data_category else "Metric Distributions by Model"
+        fig.suptitle(title, fontsize=16)
+        plt.tight_layout(rect=[0, 0, 1, 0.97])
+
+        if save_path:
+            save_path = Path(save_path)
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            full_path = save_path / f"metric_distributions_{timestamp}.png"
+            plt.savefig(full_path, bbox_inches='tight')
+            print(f"Plot saved to {full_path}")
+
+        plt.show()
 
 
 
