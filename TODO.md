@@ -76,10 +76,13 @@
 - [ ] Paraphrase metrics: Syntatic (BLEU, ROUGE-1, ROUGE-L), semantic (BERTScore, cosine similarity of SBERT vectors, WMS), human evaluation (TODO)
 
 ### 🛠️ Implementation
+- [x] refine preprocessing (dataset creation and in detector base) `util.py`
+- [x] visualize preprocessing result: `explore_data.ipynb`
 - [ ] Longer texts, do not crop at 500 words, but ensure texts of similar length
   - otherwise 100,000 most frequent words are too many for text size
 - [ ] Use [sloppy-xml-py](https://github.com/mitsuhiko/sloppy-xml-py) to parse LLM generated JSON files
   - [yaml](https://stackoverflow.com/questions/1931454/how-to-parse-somewhat-wrong-json-with-python) does not work: Breaks notebook 
+  - [dirtyjson](https://pypi.org/project/dirtyjson/) currently in code to try
 - [x] TaskBasedParaphraser
   - motivated by student essay
   - first LLM: Task description and sources → second LLM: generate text
@@ -88,7 +91,7 @@
 - [x] radar plot: 
   - [x] mean is line and standard deviation should be shaded area around the line (cf. Jannek's papers)
   - [x] scores must always be at same position
-- [ ] Paraphrase scores, cf. [Marcel's paper](https://downloads.webis.de/publications/papers/gohsen_2023b.pdf), [Marcel's second paper](https://downloads.webis.de/publications/papers/gohsen_2024b.pdf)
+- [o] Paraphrase scores, cf. [Marcel's paper](https://downloads.webis.de/publications/papers/gohsen_2023b.pdf), [Marcel's second paper](https://downloads.webis.de/publications/papers/gohsen_2024b.pdf)
   - [Marcel's paper](https://downloads.webis.de/publications/papers/gohsen_2023b.pdf)
     - [x] cosine similarity of [SBERT](https://github.com/UKPLab/sentence-transformers) vectors
     - [x] WMS (Word Mover's Distance) requires an embedding model
@@ -143,7 +146,7 @@
   - [x] number of texts
   - [x] number of authors
   - [x] min/max extreme and standard deviation
-- [ ] LLM imposter generation
+- [x] LLM imposter generation
   - [x] test on [Blablador](https://helmholtz-blablador.fz-juelich.de/) hosted by FZ Jülich
   - [x] Implement paraphrase comparison approach
     - metrics (e.g. BLEU, ROUGE, BERTScore) to compare paraphrase quality
@@ -212,8 +215,8 @@
 - [ ] Imposter is an **"Einzelfalllösung"**
   - High inference/experiment cost is okay  
   - Controlled scenario is the goal  
-- [ ] Implement:
-    - [ ] Imposter via **LLMs**
+- [-] Implement:
+    - [-] Imposter via **LLMs**
     - [x] Imposter via **similar content**  
     - Koppel et al. (2014) imposter approaches (baseline for modern version)
       - [x] On-the-fly generation of imposter texts (same topic)
@@ -221,7 +224,7 @@
       - [x] Fixed texts (possibly different topic, genre, register)
 - [x] Implement **upsampling** for texts < 500 words (cf. [Bevendorff Paper](https://aclanthology.org/N19-1068/)) 
 - [x] Use **exactly 500 words** per text (text length is a confounder)  
-- [ ] Use Koppel et al. (2014) datasets
+- [-] Use Koppel et al. (2014) datasets
   - Find & use ~~(maybe on Ceph)~~
 - If paper unclear → make informed decisions
 - Extend the paper if needed  
