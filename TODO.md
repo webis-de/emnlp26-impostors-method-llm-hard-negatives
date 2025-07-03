@@ -76,13 +76,14 @@
 - [ ] Paraphrase metrics: Syntatic (BLEU, ROUGE-1, ROUGE-L), semantic (BERTScore, cosine similarity of SBERT vectors, WMS), human evaluation (TODO)
 
 ### 🛠️ Implementation
+- [x] additionally control register and time period in advanced paraphrasing approaches
 - [x] refine preprocessing (dataset creation and in detector base) `util.py`
 - [x] visualize preprocessing result: `explore_data.ipynb`
-- [ ] Longer texts, do not crop at 500 words, but ensure texts of similar length
+- [x] Longer texts, do not crop at 500 words, but ensure texts of similar length
   - otherwise 100,000 most frequent words are too many for text size
-- [ ] Use [sloppy-xml-py](https://github.com/mitsuhiko/sloppy-xml-py) to parse LLM generated JSON files
+- [x] Use [sloppy-xml-py](https://github.com/mitsuhiko/sloppy-xml-py) to parse LLM generated JSON files
   - [yaml](https://stackoverflow.com/questions/1931454/how-to-parse-somewhat-wrong-json-with-python) does not work: Breaks notebook 
-  - [dirtyjson](https://pypi.org/project/dirtyjson/) currently in code to try
+  - [dirtyjson](https://pypi.org/project/dirtyjson/) currently in code to try: does not produce additional errors but unclear if it works correctly parsing
 - [x] TaskBasedParaphraser
   - motivated by student essay
   - first LLM: Task description and sources → second LLM: generate text
@@ -101,7 +102,7 @@
     - [x] ensure all paraphrase metrics normalized to [0, 1] range
     - [x] compute average syntactic and semantic scores (separate) for each paraphrase 
     - [ ] compare metric with human evaluation (correlation): Draw 300 paraphrases stratified by their $\Delta_{sem,syn}=Avg(Semantic Sim)-Avg(Syntactic Sim)$ similarity distribution, rate on a 5-point Likert scale
-- [ ] visualize syntactic and semantic scores per model over multiple texts (e.g. [heatmap from Marcel's paper](https://downloads.webis.de/publications/papers/gohsen_2023b.pdf) (don't know how this works in this case), distribution plot, etc.)
+- [x] visualize syntactic and semantic scores per model over multiple texts (e.g. [heatmap from Marcel's paper](https://downloads.webis.de/publications/papers/gohsen_2023b.pdf) (don't know how this works in this case), distribution plot, etc.)
   - high semantic score, low syntactic score → good paraphrase
 
 ## 📅 21.06.2025- 27.06.2025

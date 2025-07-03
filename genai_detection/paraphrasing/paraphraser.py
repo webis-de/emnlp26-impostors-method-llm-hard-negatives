@@ -31,6 +31,7 @@ from nltk.translate import bleu_score, meteor_score
 import evaluate
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from config import CONFIG
+from genai_detection.util import preprocess_text as _preprocess_text
 import dirtyjson
 
 # cf. https://sdlaml.pages.jsc.fz-juelich.de/ai/guides/blablador_api_access/ (15.06.2025)
@@ -94,14 +95,18 @@ class Paraphraser(ABC):
         resp = re.sub('’', "'", resp)  # replace invalid quotes with valid ones
         print(f"\n[DEBUG] Response for tone extraction: {resp}\n")
         match = re.search(r'\{.*?\}', resp)
+        if match:
+            resp = match.group(0)
         try:
-            if match:
-                resp = match.group(0)
             return ast.literal_eval(resp).get('tone', '') 
         except Exception as e:
-            resp = {'tone': dirtyjson.loads(match.group(0)) if match else dirtyjson.loads(resp)}  # fallback to dirtyjson.loads if ast.literal_eval fails
-            print(f"[ERROR] Failed to decode JSON from response with ast.literal_eval: {resp}/{type(resp)}\nWith error: {e}")
-            return resp
+            try:
+                return dirtyjson.loads(resp).get('tone', '')  
+            except Exception as e:
+                return resp
+            # TODO: do for other as well double try with dirtyjson
+                print(f"[ERROR] Failed to decode JSON from response with ast.literal_eval and dirtyjson: {resp}/{type(resp)}\nWith error: {e}")
+                return resp
         #{'tone': ''} 
     
     def get_genre(self, text: str) -> str:
@@ -375,34 +380,6 @@ class BulletPointParaphraser(Paraphraser):
         self.text_extractor = text_extractor
         self.text_generator = text_generator
 
-    def _extract_dict(self, text: str) -> dict:
-        # Match a JSON object: starts with `{` and ends with `}`
-        match = re.search(r'\{.*\}', text, re.DOTALL)
-        if not match:
-            raise ValueError("No JSON object found.")
-
-        json_str = match.group(0)
-        components_tmp = json_str.split(':')
-        components = {}
-        for i in range(1,len(components_tmp)):
-            key = components_tmp[i-1].split(',')[-1].strip().strip('{').strip('}').strip('\n').replace("’", '"').replace("\"", '"') # omit escaping backslashes
-            key = self.add_tailoring_quotes(key)
-            if key == '"':
-                continue  # skip empty keys
-            print(f"[DEBUG] Key: {key}")
-            value = ','.join(components_tmp[i].split(',')[:-1]).strip().strip('{').strip('}').strip('\n').strip("'").replace("’", '"').replace('""', '"')#.replace('\n', ' ')
-            value = re.sub(r'\s+', ' ', value)
-            if value.startswith('['):
-                values = value.strip('[]').strip().split('\n')
-                for j in range(len(values)):
-                    values[j] = self.add_tailoring_quotes(values[j])
-            else:
-                values = self.add_tailoring_quotes(value)
-            
-            print(f"[DEBUG] Value: {values}")
-            components[key] = values
-        return components
-
     def add_tailoring_quotes(self, value):
         value = value.strip()
         if value.startswith('"') and value.endswith('"'):
@@ -410,7 +387,7 @@ class BulletPointParaphraser(Paraphraser):
         value = value.strip("'").strip('"').strip() 
         return f'"{value}"'
 
-    def _extract_bullet_points(self, text: str, prompt: Optional[str], temperature:float=TEMPERATURE, key:str='bullet_points') -> tuple[List[str], str, str]:
+    def _extract_bullet_points(self, text: str, prompt: Optional[str], temperature:float=TEMPERATURE, key:str='bullet_points') -> tuple[List[str], str, str, str, str]:
         """
         Extract bullet points, tone, and genre from the input text.
         Currently, the text extractor is instructed to avoid direct quotes from the original text, to 
@@ -421,47 +398,61 @@ class BulletPointParaphraser(Paraphraser):
         :param prompt: Optional custom prompt.
         :param temperature: Controls the randomness of the output. Lower values make the output more deterministic.
         :key: The key to extract from the response. Usually 'bullet_points', but can be customized, because some paraphraser inherent from the class.
-        :return: Tuple of bullet points, tone, and genre.
+        :return: Tuple of bullet points, tone, genre, time period, and register.
         """
         assert self.text_extractor is not None, "Text extractor must be provided."
+        print(f"[DEBUG] Using BulletPointParaphraser with prompt: {prompt}")
         if prompt is None:
-            prompt = 'Summarize the following text in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","bullet_points":"<list of bullet points>"}. Do not use direct quotes. Text to summarize:'
-    
+            prompt = 'Summarize the following text in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","time_period":<time_period>,"register":<register>,"bullet_points":"<list of bullet points>"}. Do not use direct quotes. Text to summarize:'
+            # TODO: temporarily use this prompt, because the text extractor is not able to return a valid JSON object with the default prompt
+            #prompt = 'Summarize the following text in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","bullet_points":"<list of bullet points>"}. Do not use direct quotes. Text to summarize:'
+        print(f"[DEBUG] Using BulletPointParaphraser with prompt: {prompt}")
     
         res = self.text_extractor.paraphrase(text=text, prompt=prompt, n_responses=1, max_length=MAX_LENGTH, temperature=temperature)[0]
     
-        try:
-            if isinstance(res, str) and res.startswith('json'):  # common prefix error in the response
+        if isinstance(res, str):  
+            if res.endswith("/<class 'str'>"):
+                res = res.split('/<class ')[0]
+            res = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip(), flags=re.IGNORECASE)
+            try:
+                res = unicodedata.normalize("NFKC", res)  # normalize unicode characters
                 res = re.search(r'\{.*\}', res).group() # keep only the JSON part
-            res = ast.literal_eval(res) if isinstance(res, str) else res  # ensure res is a dictionary
+            except Exception as e: # NoneType has no attribute 'group'
+                if not res.endswith('}'):
+                    res += '}'
+                if not res.startswith('{'):
+                    res = '{' + res
+        try:
+            resp = ast.literal_eval(res) if isinstance(res, str) else res  # ensure res is a dictionary
         except Exception as e:
-            res = {key: dirtyjson.loads(res)}  # fallback to dirtyjson.loads if ast.literal_eval fails
-            print(f"[ERROR] Failed to parse text extractor response with ast.literal_eval as JSON: {res}/{type(res)}\nWith error: {e}")
-        assert isinstance(res, dict), f"Expected a Dictionary response, got {type(res)}"
+            try:
+                resp = dirtyjson.loads(res) # fallback to dirtyjson.loads if ast.literal_eval fails
+            except Exception as e:
+                resp = {key: [res]}
+                print(f"[ERROR] Failed to parse text extractor response with ast.literal_eval or dirtyjson as JSON: {res}/{type(res)}\nWith error: {e}")
+        assert isinstance(resp, dict), f"Expected a Dictionary response, got {type(resp)}"
 
-        print(f"\n[DEBUG] Extracted {key}, tone and genre: {res}\n")
-        bp, tone, genre = res.get(key, []), res.get('tone', ''), res.get('genre', '')    
-        return bp, tone, genre
+        print(f"\n[DEBUG] Extracted {key}, tone, genre, time period, and register: {res}\n")
+        bullet_points, tone, genre, time_period, register = resp.get(key, res), resp.get('tone', ''), resp.get('genre', ''), resp.get('time_period', ''), resp.get('register', '')
+        return bullet_points, tone, genre, time_period, register
     
-    def _generate_paraphrase_from_bullet_points(self, bullet_points, tone, genre, prompt: Optional[str], n_responses:int=3, temperature:float=TEMPERATURE) -> tuple[List[str], str, str]:
+    def _generate_paraphrase_from_bullet_points(self, bullet_points, tone, genre, time_period, register, prompt: Optional[str], n_responses:int=3, temperature:float=TEMPERATURE) -> tuple[List[str], str, str]:
         """
         Generate a paraphrase using the extracted bullet points, tone, and genre.
 
         :param bullet_points: List of key points.
         :param tone: Tone of the original text.
         :param genre: Genre of the original text.
+        :param time_period: Time period of the original text.
+        :param register: Register of the original text.
         :param prompt: Optional prompt to guide generation.
         :param n_responses: Number of paraphrased versions to generate.
         :return: List of paraphrased texts.
         """
         assert self.text_extractor is not None, "Text extractor must be provided."
         if prompt is None:
-            prompt = (
-                f"Write a text with a {tone} tone and {genre} genre, covering the following points:\n"
-                + "\n".join(f"- {bp}" for bp in bullet_points)
-            )
-            # PAN24:
-            #f"Write a text of about {len(text)} words which covers the following items:"
+            # PAN24: (fallback)
+            prompt = f"Write a text of about {len(text)} words which covers the following items:"  + "\n".join(f"- {bp}" for bp in bullet_points)
         return self.text_generator.paraphrase(text='', prompt=prompt, n_responses=n_responses, max_length=MAX_LENGTH, temperature=temperature)
 
 
@@ -470,13 +461,18 @@ class BulletPointParaphraser(Paraphraser):
         Generate a paraphrase of the input text by first extracting bullet points.
         
         :param text: The input text to be paraphrased.
-        :param prompt: The prompt to be used for paraphrasing.
+        :param prompt: The prompt to be used for extracting the bulletpoints, tone, genre, time period, register (default works well).
         :param n_responses: The number of paraphrases to generate.
         :param max_length: The maximum number of tokens to generate in the paraphrase.
         :return: A paraphrased version of the input text.
         """
-        bullet_points, tone, genre = self._extract_bullet_points(text=text, prompt=prompt, temperature=temperature)
-        paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points=bullet_points, tone=tone, genre=genre, prompt=prompt, n_responses=n_responses, temperature=temperature)
+        print(f"[DEBUG] Using BulletPointParaphraser with prompt: {prompt}")
+        bullet_points, tone, genre, time_period, register = self._extract_bullet_points(text=text, prompt=prompt, temperature=temperature)
+        generator_prompt = (
+                f"Write a text of about {len(text.split())} words with a {tone} tone, a {genre} genre, in the {register} register and in the {time_period} time period, covering the following points:\n"
+                + "\n".join(f"- {bp}" for bp in bullet_points)
+            )
+        paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points=bullet_points, tone=tone, genre=genre, time_period=time_period, register=register, prompt=generator_prompt, n_responses=n_responses, temperature=temperature)
 
         return paraphrased_texts
     
@@ -494,11 +490,11 @@ class TaskParaphraser(BulletPointParaphraser):
         super().__init__(text_extractor=text_extractor, text_generator=text_generator)
 
     def paraphrase(self, text: str, prompt:Optional[str], n_responses:int=5, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE) -> List[str]:
-        extractor_prompt = 'Act as the author of the text. From that perspective, infer your role or identity, the topic being addressed, and the purpose or instruction behind writing the text. Combine these elements into a concise task prompt that you would give to an LLM to reproduce the text. Respond ONLY with a JSON object in the following format: {"task":"<task>","tone":"<tone>","genre":"<genre>"}. Extract the intended task (prompt), tone, and genre from the text below:'
-        task, tone, genre = self._extract_bullet_points(text=text, prompt=extractor_prompt, temperature=temperature, key='task')
+        extractor_prompt = 'Act as the author of the text. From that perspective, infer your role or identity, the topic being addressed, and the purpose or instruction behind writing the text. Combine these elements into a concise task prompt that you would give to an LLM to reproduce the text. Respond ONLY with a JSON object in the following format: {"task":"<task>","tone":"<tone>","time_period":<time_period>,"register":<register>,"genre":"<genre>"}. Extract the intended task (prompt), tone, and genre from the text below:'
+        task, tone, genre, time_period, register = self._extract_bullet_points(text=text, prompt=extractor_prompt, temperature=temperature, key='task')
 
-        generator_prompt = "Write a text of about {l} words with a {tone} tone and {genre} genre, covering the following task:\n{task}".format(l=len(text.split()), tone=tone, genre=genre, task=task)
-        paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points=task, tone=tone, genre=genre, prompt=generator_prompt, n_responses=n_responses, temperature=temperature)
+        generator_prompt = "Write a text of about {l} words with a {tone} tone, a {genre} genre, in the {register} register and in the {time_period} time period, covering the following task:\n{task}".format(l=len(text.split()), tone=tone, genre=genre, task=task, time_period=time_period, register=register)
+        paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points=task, tone=tone, genre=genre, time_period=time_period, register=register, prompt=generator_prompt, n_responses=n_responses, temperature=temperature)
 
         return paraphrased_texts
     
@@ -515,11 +511,11 @@ class TopicParaphraser(BulletPointParaphraser):
         super().__init__(text_extractor=text_extractor, text_generator=text_generator)
 
     def paraphrase(self, text: str, prompt:Optional[str], n_responses:int=5, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE) -> List[str]:
-        extractor_prompt = 'Extract the topic, tone and genre from the text. Respond ONLY with a JSON object in the following format: {"topic":"<topic>","tone":"<tone>","genre":"<genre>"}. Text to extract task, tone and genre from:'
-        topic, tone, genre = self._extract_bullet_points(text=text, prompt=extractor_prompt, temperature=temperature, key='topic')
+        extractor_prompt = 'Extract the topic, tone and genre from the text. Respond ONLY with a JSON object in the following format: {"topic":"<topic>","tone":"<tone>","time_period":<time_period>,"register":<register>,"genre":"<genre>"}. Text to extract task, tone and genre from:'
+        topic, tone, genre, time_period, register = self._extract_bullet_points(text=text, prompt=extractor_prompt, temperature=temperature, key='topic')
 
-        generator_prompt = "Write a text of about {l} words with a {topic} topic, {tone} tone and {genre} genre.".format(l=len(text.split()), tone=tone, genre=genre, topic=topic)
-        paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points=topic, tone=tone, genre=genre, prompt=generator_prompt, n_responses=n_responses, temperature=temperature)
+        generator_prompt = "Write a text of about {l} words with a {topic} topic, {tone} tone, a {genre} genre, in the {register} register and in the {time_period} time period.".format(l=len(text.split()), tone=tone, genre=genre, topic=topic, time_period=time_period, register=register)
+        paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points=topic, tone=tone, genre=genre, time_period=time_period, register=register, prompt=generator_prompt, n_responses=n_responses, temperature=temperature)
 
         return paraphrased_texts
     
@@ -536,13 +532,14 @@ class TitleParaphraser(BulletPointParaphraser):
         super().__init__(text_extractor=text_extractor, text_generator=text_generator)
 
     def paraphrase(self, text: str, prompt:Optional[str], n_responses:int=5, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE) -> List[str]:
-        extractor_prompt = 'Find a concise title for the text, extract the tone and genre from the text. Respond ONLY with a JSON object in the following format: {"title":"<title>","tone":"<tone>","genre":"<genre>"}. Text to extract title, tone and genre from:'
-        title, tone, genre = self._extract_bullet_points(text=text, prompt=extractor_prompt, temperature=temperature, key='title')
+        extractor_prompt = 'Find a concise title for the text, extract the tone and genre from the text. Respond ONLY with a JSON object in the following format: {"title":"<title>","tone":"<tone>","time_period":<time_period>,"register":<register>,"genre":"<genre>"}. Text to extract title, tone and genre from:'
+        title, tone, genre, register, time_period = self._extract_bullet_points(text=text, prompt=extractor_prompt, temperature=temperature, key='title')
 
-        generator_prompt = "Write a text of about {l} words with a {title} title, {tone} tone and {genre} genre.".format(l=len(text.split()), tone=tone, genre=genre, title=title)
-        paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points=title, tone=tone, genre=genre, prompt=generator_prompt, n_responses=n_responses, temperature=temperature)
+        generator_prompt = "Write a text of about {l} words with a {title} title, {tone} tone, a {genre} genre, in the {register} register and in the {time_period} time period.".format(l=len(text.split()), tone=tone, genre=genre, title=title, time_period=time_period, register=register)
+        paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points=title, tone=tone, genre=genre, time_period=time_period, register=register, prompt=generator_prompt, n_responses=n_responses, temperature=temperature)
 
         return paraphrased_texts
+    
     
 class WMDReadyKeyedVectors:
     def __init__(self, keyed_vectors):
@@ -573,7 +570,7 @@ class ParaphrasingEvaluator:
         assert isinstance(prompts, list) and all(isinstance(p, str) for p in prompts), "prompts must be a list of strings."
         self.prompts = prompts
         assert isinstance(original_text, str) and original_text.strip(), "original_text must be a non-empty string."
-        self.original_text = original_text
+        self.original_text = _preprocess_text(original_text)
         assert isinstance(n_responses, int) and n_responses > 0, "n_responses must be a positive integer."
         self.n_responses = n_responses
         assert isinstance(max_length, int) and max_length > 0, "max_length must be a positive integer."
@@ -612,11 +609,11 @@ class ParaphrasingEvaluator:
                 else:
                     continue
             try:
-                paraphrases = paraphraser.paraphrase(
+                paraphrases = [_preprocess_text(p) for p in paraphraser.paraphrase(
                     text=self.original_text,
                     n_responses=self.n_responses,
                     prompt=prompt
-                )
+                )]
                 if not paraphrases:
                     raise ValueError("Empty paraphrase list.")
 
