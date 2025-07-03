@@ -156,7 +156,7 @@ class ImpostorDetector(DetectorBase):
         we define different techniques to generate impostors, which can be specified via the `technique` parameter in the `_get_imposters` method:
         We currently support:
         (1) `text_len`: generate impostors of similar length from a predefined dataset (default, see `_get_imposters` method).
-        (2) `llm`: use LLMs to generate impostors (TODO: not implemented yet), extension of Koppel et Al. (2014).
+        (2) `llm`: use LLMs to generate impostors, extension of Koppel et Al. (2014).
         (3) `n_docs`: generate impostors based on the number of documents written by the author (TODO: not implemented yet), cf. Kocher et Al. (2015).
         
         TODO: If the score is above a certain threshold, the input text is classified as same-author, which is not implemented yet/ not the purpose of this method.
@@ -205,11 +205,16 @@ class ImpostorDetector(DetectorBase):
             # Does not make sense, bc 	idiosyncrasies of authors are not captured when using stemmed text.
             # Kontrolliere Situation
 
-            # Koppel et Al. (2014) use documents of length 500 words exactly -> we crop at min_n_tokens
-            # omit all layour/ structural information to keep only style
-            # TODO: ensure both texts have similar length
-            tokens_left = self.tokenizer(self.preprocess_text(text_left))#[:self.min_n_tokens]  
+            # Koppel et Al. (2014) use documents of length 500 words exactly -> we DON'T crop at min_n_tokens to keep more information
+            # preprocess_text omits all layour/ structural information to keep only style
+            tokens_left = self.tokenizer(self.preprocess_text(text_left))
             tokens_right = self.tokenizer(self.preprocess_text(text_right))#[:self.min_n_tokens] 
+
+            # ensure both texts have similar length: min length of both + slack of 10% 
+            max_len_allowed = int(min(len(tokens_left), len(tokens_right)) * 1.1)
+            for tokens in [tokens_left, tokens_right]:
+                if len(tokens) > max_len_allowed:
+                    tokens[:] = tokens[:max_len_allowed]    # inplace crop, changes also other references to the same list
 
             if len(tokens_left) == 0 or len(tokens_right) == 0:
                 print("Skipping empty text pair: Left: {}, Right: {}".format(text_left, text_right))
