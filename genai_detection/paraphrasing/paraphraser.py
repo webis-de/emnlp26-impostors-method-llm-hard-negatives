@@ -31,6 +31,7 @@ from nltk.translate import bleu_score, meteor_score
 import evaluate
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from config import CONFIG
+import dirtyjson
 
 # cf. https://sdlaml.pages.jsc.fz-juelich.de/ai/guides/blablador_api_access/ (15.06.2025)
 ModelName = Literal[
@@ -98,8 +99,10 @@ class Paraphraser(ABC):
                 resp = match.group(0)
             return ast.literal_eval(resp).get('tone', '') 
         except Exception as e:
-            print(f"[ERROR] Failed to decode JSON from response: {resp}\nWith error: {e}")
-            return {'tone': ''} 
+            resp = {'tone': dirtyjson.loads(match.group(0)) if match else dirtyjson.loads(resp)}  # fallback to dirtyjson.loads if ast.literal_eval fails
+            print(f"[ERROR] Failed to decode JSON from response with ast.literal_eval: {resp}/{type(resp)}\nWith error: {e}")
+            return resp
+        #{'tone': ''} 
     
     def get_genre(self, text: str) -> str:
         """
@@ -118,8 +121,10 @@ class Paraphraser(ABC):
                 resp = match.group(0)
             return ast.literal_eval(resp).get('genre', '')
         except Exception as e:
-            print(f"[ERROR] Failed to decode JSON from response: {resp}\nWith error: {e}")
-            return {'genre': ''} 
+            resp = {'genre': dirtyjson.loads(match.group(0)) if match else dirtyjson.loads(resp)}  # fallback to dirtyjson.loads if ast.literal_eval fails
+            print(f"[ERROR] Failed to decode JSON from response with ast.literal_eval: {resp}/{type(resp)}\nWith error: {e}")
+            return resp
+        #{'genre': ''} 
     
 
 class NaiveParaphraser(Paraphraser):
@@ -430,8 +435,8 @@ class BulletPointParaphraser(Paraphraser):
                 res = re.search(r'\{.*\}', res).group() # keep only the JSON part
             res = ast.literal_eval(res) if isinstance(res, str) else res  # ensure res is a dictionary
         except Exception as e:
-            print(f"[ERROR] Failed to parse text extractor response as JSON: {res}\nWith error: {e}")
-            res = {key: str(res)}  # fallback 
+            res = {key: dirtyjson.loads(res)}  # fallback to dirtyjson.loads if ast.literal_eval fails
+            print(f"[ERROR] Failed to parse text extractor response with ast.literal_eval as JSON: {res}/{type(res)}\nWith error: {e}")
         assert isinstance(res, dict), f"Expected a Dictionary response, got {type(res)}"
 
         print(f"\n[DEBUG] Extracted {key}, tone and genre: {res}\n")
@@ -786,10 +791,22 @@ class ParaphrasingEvaluator:
         :param data_category: Optional category of the data, used for the plot title.
         :return: matplotlib Figure object.
         """
-        assert ['sem_sim_avg', 'syn_sim_avg', 'model'] in df.columns, "DataFrame must contain 'sem_sim_avg', 'syn_sim_avg', and 'model' columns."
+        required_cols = ['sem_sim_avg', 'syn_sim_avg', 'model']
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"DataFrame is missing required columns: {missing_cols}")
 
-        # Setup figure
-        plt.figure(figsize=(8, 6))
+        # Calculate min and max with padding
+        x_min, x_max = df['sem_sim_avg'].min(), df['sem_sim_avg'].max()
+        y_min, y_max = df['syn_sim_avg'].min(), df['syn_sim_avg'].max()
+
+        x_pad = (x_max - x_min) * 0.05 if (x_max - x_min) > 0 else 0.05
+        y_pad = (y_max - y_min) * 0.05 if (y_max - y_min) > 0 else 0.05
+
+        x_lim = (max(0, x_min - x_pad), min(1, x_max + x_pad))
+        y_lim = (max(0, y_min - y_pad), min(1, y_max + y_pad))
+
+        fig, ax = plt.subplots(figsize=(8, 6))
         sns.scatterplot(
             data=df,
             x='sem_sim_avg',
@@ -798,18 +815,49 @@ class ParaphrasingEvaluator:
             palette='tab10',
             alpha=0.7,
             s=100,
-            edgecolor='k'
+            edgecolor='k',
+            ax=ax
         )
 
-        plt.xlabel('Semantic Similarity (sem_sim_avg)')
-        plt.ylabel('Syntactic Similarity (syn_sim_avg)')
+        ax.set_xlabel('Semantic Similarity (sem_sim_avg)')
+        ax.set_ylabel('Syntactic Similarity (syn_sim_avg)')
         title = f"Semantic vs Syntactic Similarity\non {data_category} Texts" if data_category else "Semantic vs Syntactic Similarity"
-        plt.title(title)
-        plt.xlim(0, 1)
-        plt.ylim(0, 1)
-        plt.legend(title='Model', bbox_to_anchor=(1.05, 1), loc='upper left')
-        plt.grid(True)
-        plt.tight_layout()
+        ax.set_title(title)
+
+        ax.set_xlim(x_lim)
+        ax.set_ylim(y_lim)
+        ax.grid(True)
+
+        # Place legend outside the plot on the right
+        ax.legend(title='Model', loc='lower right', bbox_to_anchor=(1, 0), frameon=True)
+
+        # Inset with full range
+        inset_size = 0.25
+        inset_ax = fig.add_axes([0.7, 0.7, inset_size, inset_size])
+
+        sns.scatterplot(
+            data=df,
+            x='sem_sim_avg',
+            y='syn_sim_avg',
+            hue='model',
+            palette='tab10',
+            alpha=0.7,
+            s=40,
+            edgecolor='k',
+            legend=False,  # No legend on inset
+            ax=inset_ax
+        )
+
+        inset_ax.set_xlim(0, 1)
+        inset_ax.set_ylim(0, 1)
+        inset_ax.set_title('Full range')
+        inset_ax.grid(True)
+        inset_ax.set_xticks([0, 0.5, 1])
+        inset_ax.set_yticks([0, 0.5, 1])
+        inset_ax.tick_params(axis='both', which='major', labelsize=8)
+
+        # Adjust layout to leave room for legend
+        plt.tight_layout(rect=[0, 0, 0.85, 1])
 
         if save_path:
             save_path = Path(save_path)
@@ -845,16 +893,33 @@ class ParaphrasingEvaluator:
             if metric not in df.columns:
                 continue
 
-            sns.kdeplot(
-                data=df,
-                x=metric,
-                hue='model',
-                fill=True,
-                common_norm=False,
-                alpha=0.4,
-                ax=ax,
-                palette='tab10'
-            )
+            # Find models with only one data point for this metric
+            counts = df.groupby('model')[metric].count()
+
+            # Models with multiple entries (for KDE)
+            models_multi = counts[counts > 1].index
+            # Models with single entry (for scatter)
+            models_single = counts[counts == 1].index
+
+            # Plot KDE for models with multiple points
+            if len(models_multi) > 0:
+                sns.kdeplot(
+                    data=df[df['model'].isin(models_multi)],
+                    x=metric,
+                    hue='model',
+                    fill=True,
+                    common_norm=False,
+                    alpha=0.4,
+                    ax=ax,
+                    palette='tab10'
+                )
+
+            # Scatter for models with a single point
+            for model in models_single:
+                single_val = df[(df['model'] == model)][metric].values[0]
+                color = sns.color_palette('tab10')[list(df['model'].unique()).index(model) % 10]
+                ax.scatter(single_val, 0.1, label=model, color=color, s=50, edgecolor='k', zorder=5)
+
             ax.set_title(f"Distribution of {metric}")
             ax.set_xlim(0, 1)  # assuming similarity metrics in [0, 1]
             ax.set_xlabel(metric)
