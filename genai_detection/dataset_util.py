@@ -84,7 +84,7 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
     def load(self) -> Dataset:
         df = pd.read_csv(self.path)
         print("Initial number of entries:", len(df))
-        df['text'] = df['text'].apply(lambda x: _preprocess_text(x))
+        df['text'] = df['text'].apply(lambda x: self.preprocess(x))
         df = df[df['text'].apply(lambda x: len(x) > 500)]
 
         df['year'] = pd.to_datetime(df["date"], format='mixed', dayfirst=True, errors='coerce').dt.year
@@ -201,7 +201,7 @@ class KoppelWebisDatasetLoader(BaseDatasetLoader):
                     if file.is_file() and file.suffix == '.txt':
                         with open(file, 'r', encoding='utf-8', errors='replace') as f:
                             content = f.read()
-                            content = _preprocess_text(content)
+                            content = self.preprocess(content)
                             data.append({'author': author.name, 'text': content})
         pairs = self._generate_pairs(data)
 
@@ -399,7 +399,7 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
             with open(file, "r", encoding="utf-8") as f:
                 author = ' '.join(file.stem.split("_")[-2:])  # filename format is "title_firstName_sirname.txt"
                 content = f.read()
-                content = _preprocess_text(content)
+                content = self.preprocess(content)
                 data.append({"author": author, "text": content})
 
         pairs = self._generate_pairs(data)
