@@ -784,6 +784,7 @@ class ParaphrasingEvaluator:
         # Enforce fixed metric order
         all_labels = self.get_metric_names()
         labels = [metric for metric in all_labels if metric in df.columns]
+        assert group_by in df.columns, f"Group by column '{group_by}' not found in DataFrame."
         grouped_mean = df.groupby(group_by)[labels].mean()
         grouped_std = df.groupby(group_by)[labels].std()
 
@@ -939,6 +940,7 @@ class ParaphrasingEvaluator:
         """
         metric_names = [metric for metric in self.get_metric_names() if metric in df.columns]
         assert len(metric_names) > 0, "No valid metrics found in DataFrame."
+        assert group_by in df.columns, f"Group by column '{group_by}' not found in DataFrame."
 
         n_metrics = len(metric_names)
         n_cols = 2
