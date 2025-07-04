@@ -299,7 +299,6 @@ def preprocess_text(text: t.Union[str, t.Iterable[str]]) -> t.Union[str, t.List[
     Preprocess input text:
     - remove layout/ structural information
         - e.g. remove HTML tags, etc.
-        - newlines
     - remove play artifacts such as:
         - charcter names before their speech (e.g. "PALAMON.", "FIRST LORD:", "KING)
         - chapter headers (e.g. "Chapter 1")
@@ -321,26 +320,26 @@ def preprocess_text(text: t.Union[str, t.Iterable[str]]) -> t.Union[str, t.List[
         # strip out html tags such as <p>, <br>, etc.
         single_text = re.sub(r'<[^>]+>', '', single_text)
 
-        # remove play articfacts that:
+        # remove play artifacts that:
         # - contain only uppercase letters, spaces, and optionally dots or colons at the end
         # - e.g. "PALAMON.", "FIRST LORD:", "KING"
         header_pattern = re.compile(r'^[A-Z\s]+[.:]?$', re.MULTILINE)
         single_text = re.sub(header_pattern, '', single_text)
 
-        # remove chapter articfacts:
+        # remove chapter artifacts:
         # ^\s*Chapter\s+\w+  — start of line, optional spaces, 'Chapter' + some word/number
         # \s*                — optional spaces (for line endings)
         # \n+                — one or more newlines (blank lines after header)
         chapter_pattern = re.compile(r'^\s*Chapter\s+\w+.*\n\s*\n', re.IGNORECASE | re.MULTILINE)
         single_text = re.sub(chapter_pattern, '', single_text)
 
-        # remove act and scene (play articfacts)
+        # remove act and scene (play artifacts)
         single_text = re.sub(r'\s*ACT\s+\w+\b\.?', '', single_text, flags=re.IGNORECASE | re.MULTILINE)
         single_text = re.sub(r'^\s*SCENE\s+\w+\b\.?', '', single_text, flags=re.IGNORECASE | re.MULTILINE)
 
-        # remove brackets but keep content (play articfacts)
+        # remove brackets but keep content (play artifacts)
         single_text = re.sub(r'\[(.*?)\]', r'\1', single_text, flags=re.DOTALL)
-        # remove underscores inside the extracted content (play articfacts)
+        # remove underscores inside the extracted content (play artifacts)
         single_text = re.sub(r'_+', '', single_text)
 
         # remove trailing numbers (i.e. line numbers as play articfact); whitespace followed by digits at end of line
