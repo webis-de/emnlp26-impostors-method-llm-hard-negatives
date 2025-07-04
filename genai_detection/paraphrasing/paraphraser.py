@@ -8,10 +8,12 @@ import os
 from pathlib import Path
 import re
 import sys
-from typing import List, Literal, Optional, get_args
+from typing import Any, List, Literal, Optional, get_args
+import unicodedata
 from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
+from pydantic import BaseModel
 import requests
 import sklearn
 # FIXME
@@ -57,11 +59,38 @@ ModelName = Literal[
 TEMPERATURE = 0.7
 MAX_LENGTH = 512  # Maximum length of the generated paraphrase
 
+class TopicSchema(BaseModel):
+    topic: str
+    genre: str
+    tone: str
+    time_period: str
+    language_register: str
+
+class BulletSchema(BaseModel):
+    bullet_points: list[str]
+    genre: str
+    tone: str
+
+class TaskSchema(BaseModel):
+    task: str
+    genre: str
+    tone: str
+    time_period: str
+    language_register: str
+
+class TitleSchema(BaseModel):
+    title: str
+    genre: str
+    tone: str
+    time_period: str
+    language_register: str
+
+
 class Paraphraser(ABC):
     """
     Abstract base class for paraphrasing models.
     """
-    def paraphrase(self, text: str, prompt: str, n_responses:int=5, max_length:int=MAX_LENGTH) -> List[str]:
+    def paraphrase(self, text: str, prompt: str, n_responses:int=5, max_length:int=MAX_LENGTH, response_schema: Optional[dict[str, Any]] = None,) -> List[str]:
         """
         Generate a paraphrase of the input text.
 
@@ -95,8 +124,6 @@ class Paraphraser(ABC):
             try:
                 return dirtyjson.loads(resp).get(key, '')  
             except Exception as e:
-                return resp
-                print(f"[ERROR] Failed to decode JSON from response with ast.literal_eval and dirtyjson: {resp}/{type(resp)}\nWith error: {e}")
                 return resp
     
     def get_tone(self, text: str) -> str:
@@ -137,7 +164,7 @@ class Paraphraser(ABC):
         :param text: The input text from which to extract the register.
         :return: The register of the text as a string.
         """
-        resp = self.paraphrase(text=text, n_responses=1, prompt="Extract the register (i.e. level of formality or informality) of the text. Respond ONLY with a JSON object (i.e. no chain-of-thought, no explanations) in the following format: {'register':'<register>'}. Text to extract register from:")[0]
+        resp = self.paraphrase(text=text, n_responses=1, prompt="Extract the register (i.e. level of formality or informality) of the text. Respond ONLY with a JSON object (i.e. no chain-of-thought, no explanations) in the following format: {'language_register':'<register>'}. Text to extract register from:")[0]
         return self._post_process_llm_response(resp, key='register')
     
 
@@ -180,7 +207,7 @@ class T5ChatGPTParaphraser(NaiveParaphraser):
         self.model = AutoModelForSeq2SeqLM.from_pretrained("humarin/chatgpt_paraphraser_on_T5_base").to(self.device)
 
  
-    def paraphrase(self, text: str, prompt: str, num_beams=5, num_beam_groups=5, n_responses:int=5, repetition_penalty=10.0, diversity_penalty=3.0, no_repeat_ngram_size=2, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE) -> List[str]:
+    def paraphrase(self, text: str, prompt: str, num_beams=5, num_beam_groups=5, n_responses:int=5, repetition_penalty=10.0, diversity_penalty=3.0, no_repeat_ngram_size=2, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE, response_schema: Optional[dict[str, Any]] = None,) -> List[str]:
         input_ids = self.tokenizer(f'{prompt.strip()} {text}', return_tensors="pt", padding="longest", max_length=max_length, truncation=True).input_ids.to(self.device)
         
         outputs = self.model.generate(
@@ -219,7 +246,7 @@ class T5GooglePAWSParaphraser(NaiveParaphraser):
         self.tokenizer = AutoTokenizer.from_pretrained("Vamsi/T5_Paraphrase_Paws")
         self.model = AutoModelForSeq2SeqLM.from_pretrained("Vamsi/T5_Paraphrase_Paws").to(self.device)
 
-    def paraphrase(self, text: str, prompt:str, n_responses:int=5, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE) -> List[str]:
+    def paraphrase(self, text: str, prompt:str, n_responses:int=5, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE, response_schema: Optional[dict[str, Any]] = None,) -> List[str]:
         # TODO: no duplication penalty, and thus, there are duplicates in the output
         # print(f"[DEBUG] Using T5GooglePAWSParaphraser with prompt: {prompt}")
         encoding = self.tokenizer.encode_plus(f'{prompt.strip()} {text} </s>', padding="max_length", return_tensors="pt")
@@ -269,6 +296,7 @@ class OllamaParaphraser(Paraphraser):
         max_length: int = MAX_LENGTH,
         temperature: float = TEMPERATURE,
         n_responses: int = 1,
+        response_schema: Optional[dict[str, Any]] = None,  # optional pydantic schema to validate the response
     ) -> List[str]:
         """
         Generate paraphrased versions of the input text.
@@ -280,16 +308,22 @@ class OllamaParaphraser(Paraphraser):
         :param n_responses: The number of paraphrases to generate.
         :return: A list of paraphrased versions of the input text.
         """
-        # print('prompt:', prompt)
+        # if response_schema is None:
+        #     print("[WARNING] No response format specified. Using default JSON object format.")
+        # print(f"[DEBUG] paraphrase of Ollama: Response format: {format.model_json_schema()}/{type(format)}")
         responses = []
         for i in range(n_responses):    # directly using parameter n does not return n responses, but only one response
-            response = self.client.chat.completions.create(
-                model = "default:latest",
-                messages = [{"role": "user", "content": f"{prompt.strip()} {text}"}],
-                n = 1,
-                max_tokens = max_length,
-                temperature = temperature,
-            )
+            body = {  "model" : "default:latest",
+                "messages" : [{"role": "user", "content": f"{prompt.strip()} {text}"}],
+                "n" : 1,
+                "max_tokens" : max_length,
+                "temperature" : temperature,}
+            # if response_schema:
+            #      # text={"format": {"type": "json_object"}},  # FIXME: keyword unknwon even though: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#json-mode
+            #     body['response_format'] = {"type": "json_schema", "json_schema": response_schema}  # use pydantic schema to validate the response, https://ollama.com/blog/structured-outputs
+            response = self.client.chat.completions.create(**body)
+            # print(f"[DEBUG] Response from Ollama paraphraser: {response.choices[0].message.content}")
+            # print(f"[DEBUG] Response format: {format.model_json_schema()}/{type(format)}")
             resp = response.choices[0].message.content
             resp = re.sub("'", ' ', resp)  # replace single quotes with double quotes
             resp = re.sub(r'\s+', ' ', resp)  # remove excessive whitespaces
@@ -337,7 +371,7 @@ class BlabladorParaphraser(NaiveParaphraser):
             raise Exception(f"Error fetching models: {response.status_code} - {response.text}")
 
 
-    def paraphrase(self, text: str, prompt:str, verbose:bool=False, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE, n_responses:int=5) -> List[str]:
+    def paraphrase(self, text: str, prompt:str, verbose:bool=False, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE, n_responses:int=5, response_schema: Optional[dict[str, Any]] = None,) -> List[str]:
         """
         Generate a paraphrase of the input text.
 
@@ -396,7 +430,7 @@ class BulletPointParaphraser(Paraphraser):
         value = value.strip("'").strip('"').strip() 
         return f'"{value}"'
 
-    def _extract_bullet_points(self, text: str, prompt: Optional[str], temperature:float=TEMPERATURE, key:str='bullet_points') -> tuple[List[str], str, str, str, str]:
+    def _extract_bullet_points(self, text: str, prompt: Optional[str], temperature:float=TEMPERATURE, key:str='bullet_points', response_schema: Optional[dict[str, Any]] = None,) -> tuple[List[str], str, str, str, str]:
         """
         Extract bullet points, tone, and genre from the input text.
         Currently, the text extractor is instructed to avoid direct quotes from the original text, to 
@@ -411,16 +445,15 @@ class BulletPointParaphraser(Paraphraser):
         """
         assert self.text_extractor is not None, "Text extractor must be provided."
         if prompt is None:
-            # prompt = 'Summarize the following text in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"bullet_points":"<list of bullet points>","tone":"<tone>","time_period":<time_period>,"register":<register>,"genre":"<genre>"}. Do not use direct quotes. Text to summarize:'
+            prompt = 'Summarize the following text in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"bullet_points":"<list of bullet points>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"genre":"<genre>"}. Do not use direct quotes. Text to summarize:'
             # TODO: temporarily use this prompt, because the text extractor is not able to return a valid JSON object with the default prompt
-            prompt = 'Summarize the following text in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","bullet_points":"<list of bullet points>"}. Do not use direct quotes. Text to summarize:'
+            # prompt = 'Summarize the following text in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","bullet_points":"<list of bullet points>"}. Do not use direct quotes. Text to summarize:'
 
-    
-        res = self.text_extractor.paraphrase(text=text, prompt=prompt, n_responses=1, max_length=MAX_LENGTH, temperature=temperature)[0]
+        # print(f"[DEBUG] Using text extractor with prompt: {prompt}")
+        # print(f"[DEBUG] reponse schema: ", response_schema, type(response_schema))
+        res = self.text_extractor.paraphrase(text=text, prompt=prompt, n_responses=1, max_length=MAX_LENGTH, temperature=temperature, response_schema=response_schema)[0]
     
         if isinstance(res, str):  
-            if res.endswith("/<class 'str'>"):
-                res = res.split('/<class ')[0]
             res = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip(), flags=re.IGNORECASE)
             try:
                 res = unicodedata.normalize("NFKC", res)  # normalize unicode characters
@@ -436,12 +469,14 @@ class BulletPointParaphraser(Paraphraser):
             try:
                 resp = dirtyjson.loads(res) # fallback to dirtyjson.loads if ast.literal_eval fails
             except Exception as e:
-                resp = {key: [res]}
-                print(f"[ERROR] Failed to parse text extractor response with ast.literal_eval or dirtyjson as JSON: {res}/{type(res)}\nWith error: {e}")
+                # resp = {key: [res]}
+                # TODO: try again, until valid JSON is returned
+                return self._extract_bullet_points(text=text, prompt=prompt, temperature=temperature, key=key, response_schema=response_schema)
+                print(f"[ERROR] [{key}] Failed to parse text extractor response with ast.literal_eval or dirtyjson as JSON: {res}/{type(res)}\nWith error: {e}\nFor prompt: {prompt}")
         assert isinstance(resp, dict), f"Expected a Dictionary response, got {type(resp)}"
 
         print(f"\n[DEBUG] Extracted {key}, tone, genre, time period, and register: {res}\n")
-        bullet_points, tone, genre, time_period, register = resp.get(key, res), resp.get('tone', ''), resp.get('genre', ''), resp.get('time_period', ''), resp.get('register', '')
+        bullet_points, tone, genre, time_period, register = resp.get(key, res), resp.get('tone', ''), resp.get('genre', ''), resp.get('time_period', ''), resp.get('language_register', '')
         return bullet_points, tone, genre, time_period, register
     
     def _generate_paraphrase_from_bullet_points(self, bullet_points, tone, genre, time_period, register, prompt: Optional[str], n_responses:int=3, temperature:float=TEMPERATURE) -> tuple[List[str], str, str]:
@@ -460,11 +495,12 @@ class BulletPointParaphraser(Paraphraser):
         assert self.text_extractor is not None, "Text extractor must be provided."
         if prompt is None:
             # PAN24: (fallback)
+            text = bullet_points[0] * 5 # TODO: only bc currently no access to text in this function
             prompt = f"Write a text of about {len(text)} words which covers the following items:"  + "\n".join(f"- {bp}" for bp in bullet_points)
         return self.text_generator.paraphrase(text='', prompt=prompt, n_responses=n_responses, max_length=MAX_LENGTH, temperature=temperature)
 
 
-    def paraphrase(self, text: str, prompt:Optional[str], n_responses:int=5, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE) -> List[str]:
+    def paraphrase(self, text: str, prompt:Optional[str], n_responses:int=5, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE, response_schema: Optional[dict[str, Any]] = None,) -> List[str]:
         """
         Generate a paraphrase of the input text by first extracting bullet points.
         
@@ -474,12 +510,12 @@ class BulletPointParaphraser(Paraphraser):
         :param max_length: The maximum number of tokens to generate in the paraphrase.
         :return: A paraphrased version of the input text.
         """
-        bullet_points, tone, genre, time_period, register = self._extract_bullet_points(text=text, prompt=prompt, temperature=temperature)
+        bullet_points, tone, genre, time_period, register = self._extract_bullet_points(text=text, prompt=prompt, temperature=temperature, response_schema=BulletSchema.model_json_schema())
         # time period and register breaks paraphrasing with LLM for some reason, so we do not specify them in the prompt
         # time_period = self.get_time_period(text=text) if time_period=='' else time_period
         # register = self.get_register(text=text) if register=='' else register
         generator_prompt = (
-                f"Write a text of about {len(text.split())} words with a {tone} tone, a {genre} genre, in the {register} register and in the {time_period} time period, covering the following points:\n"
+                f"Do not use asterisks. Write a text of about {len(text.split())} words with a {tone} tone, a {genre} genre, in the {register} register and in the {time_period} time period, covering the following points:\n"
                 + "\n".join(f"- {bp}" for bp in bullet_points)
             )
         paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points=bullet_points, tone=tone, genre=genre, time_period=time_period, register=register, prompt=generator_prompt, n_responses=n_responses, temperature=temperature)
@@ -499,11 +535,13 @@ class TaskParaphraser(BulletPointParaphraser):
         """
         super().__init__(text_extractor=text_extractor, text_generator=text_generator)
 
-    def paraphrase(self, text: str, prompt:Optional[str], n_responses:int=5, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE) -> List[str]:
-        extractor_prompt = 'Act as the author of the text. From that perspective, infer your role or identity, the topic being addressed, and the purpose or instruction behind writing the text. Combine these elements into a concise task prompt that you would give to an LLM to reproduce the text. Respond ONLY with a JSON object in the following format: {"task":"<task>","tone":"<tone>","time_period":<time_period>,"register":<register>,"genre":"<genre>"}. Extract the intended task (prompt), tone, and genre from the text below:'
-        task, tone, genre, time_period, register = self._extract_bullet_points(text=text, prompt=extractor_prompt, temperature=temperature, key='task')
+    def paraphrase(self, text: str, prompt:Optional[str], n_responses:int=5, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE, response_schema: Optional[dict[str, Any]] = None,) -> List[str]:
+        extractor_prompt = 'Act as the author of the text. From that perspective, infer your role or identity, the topic being addressed, and the purpose or instruction behind writing the text. Combine these elements into a concise task prompt that you would give to an LLM to reproduce the text. Respond ONLY with a JSON object in the following format: {"task":"<task>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"genre":"<genre>"}. Text to extract the intended task (prompt), tone, genre, time period and register from:'
+        # FIXME: time_period and register breaks often
+        # extractor_prompt = 'Act as the author of the text. From that perspective, infer your role or identity, the topic being addressed, and the purpose or instruction behind writing the text. Combine these elements into a concise task prompt that you would give to an LLM to reproduce the text. Respond ONLY with a JSON object in the following format: {"task":"<task>","tone":"<tone>","genre":"<genre>"}. Text to extract the intended task (prompt), tone, and genre from:'
+        task, tone, genre, time_period, register = self._extract_bullet_points(text=text, prompt=extractor_prompt, temperature=temperature, key='task', response_schema=TaskSchema.model_json_schema())
 
-        generator_prompt = "Write a text of about {l} words with a {tone} tone, a {genre} genre, in the {register} register and in the {time_period} time period, covering the following task:\n{task}".format(l=len(text.split()), tone=tone, genre=genre, task=task, time_period=time_period, register=register)
+        generator_prompt = "Do not use asterisks. Write a text of about {l} words with a {tone} tone, a {genre} genre, in the {register} register and in the {time_period} time period, covering the following task:\n{task}".format(l=len(text.split()), tone=tone, genre=genre, task=task, time_period=time_period, register=register)
         paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points=task, tone=tone, genre=genre, time_period=time_period, register=register, prompt=generator_prompt, n_responses=n_responses, temperature=temperature)
 
         return paraphrased_texts
@@ -521,10 +559,12 @@ class TopicParaphraser(BulletPointParaphraser):
         super().__init__(text_extractor=text_extractor, text_generator=text_generator)
 
     def paraphrase(self, text: str, prompt:Optional[str], n_responses:int=5, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE) -> List[str]:
-        extractor_prompt = 'Extract the topic, tone and genre from the text. Respond ONLY with a JSON object in the following format: {"topic":"<topic>","tone":"<tone>","time_period":<time_period>,"register":<register>,"genre":"<genre>"}. Text to extract task, tone and genre from:'
-        topic, tone, genre, time_period, register = self._extract_bullet_points(text=text, prompt=extractor_prompt, temperature=temperature, key='topic')
+        extractor_prompt = 'Extract the topic, tone, time period, register and genre from the text. Respond ONLY with a JSON object in the following format: {"topic":"<topic>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"genre":"<genre>"}. Text to extract task, tone, genre, time period and register from:'
+        # FIXME: time_period and register breaks often
+        # extractor_prompt = 'Extract the topic, tone and genre from the text. Respond ONLY with a JSON object in the following format: {"topic":"<topic>","tone":"<tone>","genre":"<genre>"}. Text to extract task, tone, and genre from:'
+        topic, tone, genre, time_period, register = self._extract_bullet_points(text=text, prompt=extractor_prompt, temperature=temperature, key='topic', response_schema=TopicSchema.model_json_schema())
 
-        generator_prompt = "Write a text of about {l} words with a {topic} topic, {tone} tone, a {genre} genre, in the {register} register and in the {time_period} time period.".format(l=len(text.split()), tone=tone, genre=genre, topic=topic, time_period=time_period, register=register)
+        generator_prompt = "Do not use asterisks. Write a text of about {l} words with a {topic} topic, {tone} tone, a {genre} genre, in the {register} register and in the {time_period} time period.".format(l=len(text.split()), tone=tone, genre=genre, topic=topic, time_period=time_period, register=register)
         paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points=topic, tone=tone, genre=genre, time_period=time_period, register=register, prompt=generator_prompt, n_responses=n_responses, temperature=temperature)
 
         return paraphrased_texts
@@ -541,11 +581,13 @@ class TitleParaphraser(BulletPointParaphraser):
         """
         super().__init__(text_extractor=text_extractor, text_generator=text_generator)
 
-    def paraphrase(self, text: str, prompt:Optional[str], n_responses:int=5, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE) -> List[str]:
-        extractor_prompt = 'Find a concise title for the text, extract the tone and genre from the text. Respond ONLY with a JSON object in the following format: {"title":"<title>","tone":"<tone>","time_period":<time_period>,"register":<register>,"genre":"<genre>"}. Text to extract title, tone and genre from:'
-        title, tone, genre, register, time_period = self._extract_bullet_points(text=text, prompt=extractor_prompt, temperature=temperature, key='title')
+    def paraphrase(self, text: str, prompt:Optional[str], n_responses:int=5, max_length:int=MAX_LENGTH, temperature:float=TEMPERATURE, response_schema: Optional[dict[str, Any]] = None,) -> List[str]:
+        extractor_prompt = 'Find a concise title for the text, extract the tone, time period, register and genre from the text. Respond ONLY with a JSON object in the following format: {"title":"<title>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"genre":"<genre>"}. Text to extract title, tone, genre, time period and register from:'
+        # FIXME: time_period and register breaks often
+        # extractor_prompt = 'Find a concise title for the text, extract the tone and genre from the text. Respond ONLY with a JSON object in the following format: {"title":"<title>","tone":"<tone>","genre":"<genre>"}. Text to extract title, tone, and genre from:'
+        title, tone, genre, time_period, register = self._extract_bullet_points(text=text, prompt=extractor_prompt, temperature=temperature, key='title', response_schema=TitleSchema.model_json_schema())
 
-        generator_prompt = "Write a text of about {l} words with a {title} title, {tone} tone, a {genre} genre, in the {register} register and in the {time_period} time period.".format(l=len(text.split()), tone=tone, genre=genre, title=title, time_period=time_period, register=register)
+        generator_prompt = "Do not use asterisks. Write a text of about {l} words with a {title} title, {tone} tone, a {genre} genre, in the {register} register and in the {time_period} time period.".format(l=len(text.split()), tone=tone, genre=genre, title=title, time_period=time_period, register=register)
         paraphrased_texts = self._generate_paraphrase_from_bullet_points(bullet_points=title, tone=tone, genre=genre, time_period=time_period, register=register, prompt=generator_prompt, n_responses=n_responses, temperature=temperature)
 
         return paraphrased_texts
@@ -619,6 +661,7 @@ class ParaphrasingEvaluator:
                 else:
                     continue
             try:
+                print(f"[DEBUG] Using paraphraser '{name}' with prompt '{prompt}'")
                 paraphrases = [_preprocess_text(p) for p in paraphraser.paraphrase(
                     text=self.original_text,
                     n_responses=self.n_responses,
@@ -727,7 +770,7 @@ class ParaphrasingEvaluator:
             "sem_sim_avg", "syn_sim_avg", "gohsen_delta"
         ]
     
-    def plot_models_metrics(self, df: pd.DataFrame, save_path: Optional[Path] = None, data_category:Optional[str]=None):
+    def plot_models_metrics(self, df: pd.DataFrame, save_path: Optional[Path] = None, data_category:Optional[str]=None, group_by:Optional[str]='model'):
         """
         Plot the performance of models per metric.
         
@@ -735,13 +778,14 @@ class ParaphrasingEvaluator:
         :param metric_name: The name of the metric to plot.
         :param save_path: Optional path to save the plot (without filename). If None, the plot will not be saved.
         :param data_category: Optional category of the data, used for the plot title.
+        :param group_by: The column to group the data by (default is 'model'). Alternatives could be 'prompt'.
         :return: A list of matplotlib figures.
         """
         # Enforce fixed metric order
         all_labels = self.get_metric_names()
         labels = [metric for metric in all_labels if metric in df.columns]
-        grouped_mean = df.groupby('model')[labels].mean()
-        grouped_std = df.groupby('model')[labels].std()
+        grouped_mean = df.groupby(group_by)[labels].mean()
+        grouped_std = df.groupby(group_by)[labels].std()
 
 
         # Compute angle of each axis
@@ -776,7 +820,7 @@ class ParaphrasingEvaluator:
 
         # Add legend and title
         ax.legend(loc='lower left', bbox_to_anchor=(1.1, 0.7))
-        title = f"Radar Chart: Paraphrasing Metric\non {data_category} text" if data_category else "Radar Chart: Paraphrasing Metrics"
+        title = f"Radar Chart: Paraphrasing Metric\non {data_category} text, grouped by {group_by}" if data_category else f"Radar Chart: Paraphrasing Metrics\ngrouped by {group_by}"
         plt.title(title)
         plt.tight_layout()
 
@@ -784,21 +828,22 @@ class ParaphrasingEvaluator:
             save_path = Path(save_path)
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            save_path = save_path / f"paraphrasing_metrics_radar_chart_{timestamp}.png"
+            save_path = save_path / f"paraphrasing_metrics_grouped_by_{group_by}_radar_chart_{timestamp}.png"
             plt.savefig(save_path, bbox_inches='tight')
             print(f"Plot saved to {save_path}")
         plt.show()
     
-    def plot_metric_scatter(self, df: pd.DataFrame, save_path: Optional[Path] = None, data_category: Optional[str] = None):
+    def plot_metric_scatter(self, df: pd.DataFrame, save_path: Optional[Path] = None, data_category: Optional[str] = None, group_by:Optional[str]='model'):
         """
         Scatter plot of semantic similarity vs syntactic similarity per model.
 
         :param df: DataFrame with at least 'sem_sim_avg', 'syn_sim_avg', and 'model' columns.
         :param save_path: Optional path to save the plot. If None, the plot is not saved.
         :param data_category: Optional category of the data, used for the plot title.
+        :param group_by: The column to group the data by (default is 'model'). Alternatives could be 'prompt'.
         :return: matplotlib Figure object.
         """
-        required_cols = ['sem_sim_avg', 'syn_sim_avg', 'model']
+        required_cols = ['sem_sim_avg', 'syn_sim_avg', group_by]
         missing_cols = [col for col in required_cols if col not in df.columns]
         if missing_cols:
             raise ValueError(f"DataFrame is missing required columns: {missing_cols}")
@@ -813,12 +858,12 @@ class ParaphrasingEvaluator:
         x_lim = (max(0, x_min - x_pad), min(1, x_max + x_pad))
         y_lim = (max(0, y_min - y_pad), min(1, y_max + y_pad))
 
-        fig, ax = plt.subplots(figsize=(8, 6))
+        fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
         sns.scatterplot(
             data=df,
             x='sem_sim_avg',
             y='syn_sim_avg',
-            hue='model',
+            hue=group_by,
             palette='tab10',
             alpha=0.7,
             s=100,
@@ -828,7 +873,7 @@ class ParaphrasingEvaluator:
 
         ax.set_xlabel('Semantic Similarity (sem_sim_avg)')
         ax.set_ylabel('Syntactic Similarity (syn_sim_avg)')
-        title = f"Semantic vs Syntactic Similarity\non {data_category} Texts" if data_category else "Semantic vs Syntactic Similarity"
+        title = f"Semantic vs Syntactic Similarity\non {data_category} Texts, grouped by {group_by}" if data_category else f"Semantic vs Syntactic Similarity\ngrouped by {group_by}"
         ax.set_title(title)
 
         ax.set_xlim(x_lim)
@@ -836,17 +881,23 @@ class ParaphrasingEvaluator:
         ax.grid(True)
 
         # Place legend outside the plot on the right
-        ax.legend(title='Model', loc='lower right', bbox_to_anchor=(1, 0), frameon=True)
+        ax.legend(
+            title=group_by,
+            loc='upper left',
+            bbox_to_anchor=(1.03, 1),
+            borderaxespad=0.,
+            frameon=True
+        )
 
         # Inset with full range
         inset_size = 0.25
-        inset_ax = fig.add_axes([0.7, 0.7, inset_size, inset_size])
+        inset_ax = fig.add_axes([0.9, 0.1, inset_size, inset_size])
 
         sns.scatterplot(
             data=df,
             x='sem_sim_avg',
             y='syn_sim_avg',
-            hue='model',
+            hue=group_by,
             palette='tab10',
             alpha=0.7,
             s=40,
@@ -863,26 +914,27 @@ class ParaphrasingEvaluator:
         inset_ax.set_yticks([0, 0.5, 1])
         inset_ax.tick_params(axis='both', which='major', labelsize=8)
 
-        # Adjust layout to leave room for legend
-        plt.tight_layout(rect=[0, 0, 0.85, 1])
+        # Adjust layout to leave 25% room for legend/inset on the right
+        #plt.tight_layout(rect=[0, 0, 0.75, 1])
 
         if save_path:
             save_path = Path(save_path)
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            full_path = save_path / f"sem_syn_scatter_{timestamp}.png"
+            full_path = save_path / f"sem_syn_scatter_grouped_by_{group_by}_{timestamp}.png"
             plt.savefig(full_path, bbox_inches='tight')
             print(f"Plot saved to {full_path}")
 
         plt.show()
     
-    def plot_metric_distributions(self, df: pd.DataFrame, save_path: Optional[Path] = None, data_category: Optional[str] = None):
+    def plot_metric_distributions(self, df: pd.DataFrame, save_path: Optional[Path] = None, data_category: Optional[str] = None, group_by:Optional[str]='model'):
         """
         Plot distribution of each metric per model in subplots.
 
         :param df: DataFrame containing metric scores and a 'model' column.
         :param save_path: Optional path to save the plot. If None, the plot is not saved.
         :param data_category: Optional string for plot title context.
+        :param group_by: The column to group the data by (default is 'model'). Alternatives could be 'prompt'.
         :return: None
         """
         metric_names = [metric for metric in self.get_metric_names() if metric in df.columns]
@@ -901,7 +953,7 @@ class ParaphrasingEvaluator:
                 continue
 
             # Find models with only one data point for this metric
-            counts = df.groupby('model')[metric].count()
+            counts = df.groupby(group_by)[metric].count()
 
             # Models with multiple entries (for KDE)
             models_multi = counts[counts > 1].index
@@ -911,9 +963,9 @@ class ParaphrasingEvaluator:
             # Plot KDE for models with multiple points
             if len(models_multi) > 0:
                 sns.kdeplot(
-                    data=df[df['model'].isin(models_multi)],
+                    data=df[df[group_by].isin(models_multi)],
                     x=metric,
-                    hue='model',
+                    hue=group_by,
                     fill=True,
                     common_norm=False,
                     alpha=0.4,
@@ -923,8 +975,8 @@ class ParaphrasingEvaluator:
 
             # Scatter for models with a single point
             for model in models_single:
-                single_val = df[(df['model'] == model)][metric].values[0]
-                color = sns.color_palette('tab10')[list(df['model'].unique()).index(model) % 10]
+                single_val = df[(df[group_by] == model)][metric].values[0]
+                color = sns.color_palette('tab10')[list(df[group_by].unique()).index(model) % 10]
                 ax.scatter(single_val, 0.1, label=model, color=color, s=50, edgecolor='k', zorder=5)
 
             ax.set_title(f"Distribution of {metric}")
@@ -936,7 +988,7 @@ class ParaphrasingEvaluator:
         for j in range(i + 1, len(axes)):
             fig.delaxes(axes[j])
 
-        title = f"Metric Distributions by Model\n({data_category})" if data_category else "Metric Distributions by Model"
+        title = f"Metric Distributions by Model\non {data_category} data, grouped by {group_by}" if data_category else f"Metric Distributions by Model\ngrouped by {group_by}"
         fig.suptitle(title, fontsize=16)
         plt.tight_layout(rect=[0, 0, 1, 0.97])
 
@@ -944,7 +996,7 @@ class ParaphrasingEvaluator:
             save_path = Path(save_path)
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            full_path = save_path / f"metric_distributions_{timestamp}.png"
+            full_path = save_path / f"metric_distributions_grouped_by_{group_by}_{timestamp}.png"
             plt.savefig(full_path, bbox_inches='tight')
             print(f"Plot saved to {full_path}")
 
