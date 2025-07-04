@@ -35,6 +35,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")
 from config import CONFIG
 from genai_detection.util import preprocess_text as _preprocess_text
 import dirtyjson
+import matplotlib.patches as mpatches
 
 # cf. https://sdlaml.pages.jsc.fz-juelich.de/ai/guides/blablador_api_access/ (15.06.2025)
 ModelName = Literal[
@@ -949,6 +950,12 @@ class ParaphrasingEvaluator:
         fig, axes = plt.subplots(n_rows, n_cols, figsize=(6 * n_cols, 4 * n_rows))
         axes = axes.flatten()
 
+        unique_labels = df[group_by].unique()
+        max_words_in_label = max(len(str(label).split()) for label in unique_labels)
+        use_shared_legend = max_words_in_label > 3
+        palette = sns.color_palette('tab10', n_colors=len(unique_labels))
+        label_to_color = {label: palette[i % len(palette)] for i, label in enumerate(unique_labels)}
+
         for i, metric in enumerate(metric_names):
             ax = axes[i]
             if metric not in df.columns:
@@ -972,14 +979,16 @@ class ParaphrasingEvaluator:
                     common_norm=False,
                     alpha=0.4,
                     ax=ax,
-                    palette='tab10'
+                    palette=label_to_color,
+                    legend=not use_shared_legend
                 )
 
             # Scatter for models with a single point
             for model in models_single:
                 single_val = df[(df[group_by] == model)][metric].values[0]
-                color = sns.color_palette('tab10')[list(df[group_by].unique()).index(model) % 10]
-                ax.scatter(single_val, 0.1, label=model, color=color, s=50, edgecolor='k', zorder=5)
+                label = model if not use_shared_legend else None
+                color = label_to_color[model]
+                ax.scatter(single_val, 0.1, label=label, color=color, s=50, edgecolor='k', zorder=5)
 
             ax.set_title(f"Distribution of {metric}")
             ax.set_xlim(0, 1)  # assuming similarity metrics in [0, 1]
@@ -990,9 +999,29 @@ class ParaphrasingEvaluator:
         for j in range(i + 1, len(axes)):
             fig.delaxes(axes[j])
 
+        def wrap_label(label: str, words_per_line: int = 6) -> str:
+            words = str(label).split()
+            return '\n'.join([' '.join(words[i:i+words_per_line]) for i in range(0, len(words), words_per_line)])
+
+
+        if use_shared_legend:
+            legend_patches = [
+                mpatches.Patch(color=color, label=wrap_label(label)) for label, color in label_to_color.items()
+            ]
+            fig.legend(
+                handles=legend_patches,
+                loc='upper left',
+                bbox_to_anchor=(1.02, 1),  # outside the plot on right
+                title=group_by.capitalize(),
+                frameon=True,
+                borderaxespad=0,
+                fontsize=10,
+                title_fontsize=12
+            )
+
         title = f"Metric Distributions by Model\non {data_category} data, grouped by {group_by}" if data_category else f"Metric Distributions by Model\ngrouped by {group_by}"
         fig.suptitle(title, fontsize=16)
-        plt.tight_layout(rect=[0, 0, 1, 0.97])
+        plt.tight_layout(rect=[0, 0, 0.85, 0.95])
 
         if save_path:
             save_path = Path(save_path)
