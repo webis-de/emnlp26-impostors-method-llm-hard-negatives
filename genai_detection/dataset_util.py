@@ -68,6 +68,13 @@ class BaseDatasetLoader(ABC):
 class BlogCorpusDatasetLoader(BaseDatasetLoader):
     def __init__(self, path: str, name: str = CONFIG.BLOG):
         """Loader for the Blog Corpus dataset.
+        Contains blog posts with dates from 01 January 1999 to 23 August 2006.
+        When pairing texts, it is important to control confounders (i.e. pair similar external situations).
+        Confounders can be:
+        - topic 
+        - time period (e.g. 1999 vs. 2006)
+        - age (?!)
+        - gender (?!)
         
         Originally dataset is available at: https://www.kaggle.com/datasets/rtatman/blog-authorship-corpus?resource=download (07.06.2025)
         """
@@ -79,6 +86,8 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
         print("Initial number of entries:", len(df))
         df['text'] = df['text'].apply(lambda x: _preprocess_text(x))
         df = df[df['text'].apply(lambda x: len(x) > 500)]
+
+        df['year'] = pd.to_datetime(df["date"], format='mixed', dayfirst=True, errors='coerce').dt.year
         print("number of entries after filtering:", len(df))
       
         topics = df['topic'].unique().tolist()
@@ -88,12 +97,23 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
         train_topics = set(topics[:split_idx])
         test_topics = set(topics[split_idx:])
 
-        def generate_pairs(topic_subset, n_pairs=2):
+        def generate_pairs(topic_subset, n_pairs=2, groupby_cols:list = ['topic']):
+            """ 
+            Generate pairs of texts from the dataset based on the specified topic subset.
+            :param topic_subset: Set of topics to filter the dataset.
+            :param n_pairs: Number of pairs to generate per group.
+            :param groupby_cols: Columns to group by, should include 'topic'.
+            :return: List of pairs with their authors and a boolean indicating if they are from the
+            same author.
+            """
             topic_df = df[df['topic'].isin(topic_subset)]
-            topic_groups = topic_df.groupby('topic')
+            assert 'topic' in groupby_cols, "The 'topic' should be one of the columns to group by."
+
+
+            grouped = topic_df.groupby(groupby_cols)
             pairs = []
 
-            for topic, group in topic_groups:
+            for group_values, group in grouped:
                 data = group.to_dict(orient='records')
 
                 # Group texts by author
@@ -139,8 +159,10 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
             "same": Value("bool")
         })
 
-        train_pairs = generate_pairs(train_topics)
-        test_pairs = generate_pairs(test_topics)
+        # define the columns to group by
+        groupby_cols=['topic', 'year', 'gender', 'age']
+        train_pairs = generate_pairs(train_topics, groupby_cols=groupby_cols)
+        test_pairs = generate_pairs(test_topics, groupby_cols=groupby_cols)
 
         return DatasetDict({
             "train": Dataset.from_list(train_pairs, features=features),
@@ -476,6 +498,6 @@ if __name__ == "__main__":
     # run_pan23(base_dir=args.path, save_path=args.out)
     # # run_pan25()
     # run_pan20()
-    run_koppel_webis()
+    # run_koppel_webis()
     run_blog_corpus()
-    run_gutenberg_corpus()
+    # run_gutenberg_corpus()
