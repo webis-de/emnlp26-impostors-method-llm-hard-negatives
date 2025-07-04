@@ -81,6 +81,7 @@
 - [x] visualize preprocessing result: `explore_data.ipynb`
 - [x] Longer texts, do not crop at 500 words, but ensure texts of similar length
   - otherwise 100,000 most frequent words are too many for text size
+  - crop to 110% of smaller text
 - [x] Use [sloppy-xml-py](https://github.com/mitsuhiko/sloppy-xml-py) to parse LLM generated JSON files
   - [yaml](https://stackoverflow.com/questions/1931454/how-to-parse-somewhat-wrong-json-with-python) does not work: Breaks notebook 
   - [dirtyjson](https://pypi.org/project/dirtyjson/) currently in code to try: does not produce additional errors but unclear if it works correctly parsing
