@@ -122,6 +122,7 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
                     author_groups.setdefault(item['id'], []).append(item)
 
                 # Same-author pairs
+                same_author_pairs = []
                 for author, texts in author_groups.items():
                     if len(texts) < 2:
                         continue
@@ -129,19 +130,29 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
                     random.shuffle(selected)
                     for i in range(0, len(selected) - 1, 2):
                         a, b = selected[i], selected[i + 1]
-                        pairs.append({
+                        same_author_pairs.append({
                             "pair": [a['text'], b['text']],
                             "authors": [author, author],
                             "same": True
                         })
+                pairs.extend(same_author_pairs)
 
-                # Different-author pairs
+                # Different-author pairs, balanced to same author pairs count
                 authors = list(author_groups.keys())
-                if len(authors) > 1:
-                    sampled_authors = random.sample(authors, min(n_pairs*4, len(authors)))
-                    for i in range(0, len(sampled_authors) - 1, 2):
-                        a1, a2 = sampled_authors[i], sampled_authors[i + 1]
-                        if a1 == a2 or not author_groups[a1] or not author_groups[a2]:
+                diff_author_pairs = []
+                if len(authors) > 1 and same_author_pairs:
+                    n_diff_pairs_target = len(same_author_pairs)    # goal: match number of different-author pairs to same-author pairs
+                    author_pairs = []
+                    for i in range(len(authors)):
+                        for j in range(i+1, len(authors)):
+                            author_pairs.append((authors[i], authors[j]))
+                    random.shuffle(author_pairs)
+
+                    count = 0
+                    for a1, a2 in author_pairs:
+                        if count >= n_diff_pairs_target:    # generate enough different-author pairs
+                            break
+                        if not author_groups[a1] or not author_groups[a2]:  # ensured above that authors are different
                             continue
                         t1 = random.choice(author_groups[a1])
                         t2 = random.choice(author_groups[a2])
@@ -150,6 +161,9 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
                             "authors": [a1, a2],
                             "same": False
                         })
+                        count += 1
+
+                pairs.extend(diff_author_pairs)
             return pairs
         
 
