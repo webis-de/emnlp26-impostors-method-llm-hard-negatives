@@ -4,18 +4,18 @@
 
 ### 📚 Dataset
 - Requirements:
-  - [ ] No format (paragraphs, layout, title) — plain text only  
-  - [ ] No confounders (topic, genre, register, text length influence style)  
+  - [x] No format (paragraphs, layout, title) — plain text only  
+  - [x] No confounders (topic, genre, register, text length influence style)  
   - Constructed situations with manually rephrased texts are **okay**  
   - Small dataset is **okay**
-- [ ] Dataset should already be preprocessed
+- [o] Dataset should already be preprocessed
   - i.e. no newlines, utf-8 to ascii, etc.
-- [ ] Statistic on preprocessed dataset
+- [x] Statistic on preprocessed dataset
 - [ ] Pick pairs more carefully, i.e. same register (e.g., Shakespearean play vs. Dickens novel not same register), genre, time period, etc.
   - only plain text (not play headers etc.) have style
-- [ ] don't scale to big data, prepare two examples where (pre)processing steps are visible
+- [o] don't scale to big data, prepare two examples where (pre)processing steps are visible
   - [ ] Koppel scenario
-  - [ ] Our LLM scenario
+  - [x] Our LLM scenario (cf. explore_data.ipynb)
 
 ### ✍️ Written Work
 - [ ] control dataset in terms of topic, genre, register
@@ -76,6 +76,13 @@
 - [ ] Paraphrase metrics: Syntatic (BLEU, ROUGE-1, ROUGE-L), semantic (BERTScore, cosine similarity of SBERT vectors, WMS), human evaluation (TODO)
 
 ### 🛠️ Implementation
+- [x] Blog arrow dataset: Finer pair selection not only on topic, but also year (TODO:, gender, age?- currently yes) + similar number of same and different author pairs
+- [ ] Gutenberg arrow dataset: Finer pair selection not only on random (!), but based on time period, genre, register, etc.
+- [ ] PAN20 Webis arrow dataset: Finer pair selection not only preexting pairs
+- [ ] PAN20 arrow dataset: preprocess data
+- [ ] strip layout information from all arrow datasets using preprocess method
+  - Blog, Gutenberg, Koppel already done
+- [ ] strip layout information texts in detectors using preprocess method 
 - [x] additionally control register and time period in advanced paraphrasing approaches
 - [x] refine preprocessing (dataset creation and in detector base) `util.py`
 - [x] visualize preprocessing result: `explore_data.ipynb`
