@@ -20,6 +20,8 @@ import unicodedata
 
 import torch
 import numpy as np
+import sys
+import os
 sys.path.append(os.path.abspath(".."))
 from genai_detection.util import preprocess_text as _preprocess_text
 
