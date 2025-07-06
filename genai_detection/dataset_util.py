@@ -3,7 +3,7 @@ from itertools import combinations
 import os
 import json
 from pathlib import Path
-from collections import Counter
+from collections import Counter, defaultdict
 from abc import ABC, abstractmethod
 import random
 import re
@@ -48,7 +48,7 @@ class BaseDatasetLoader(ABC):
         
     def _generate_pairs(self, data):
         """
-        Generate pairs of texts from the dataset.
+        Generate pairs of texts from the dataset irrespective of confounders (i.e. naive combinations).
         Dataset is expected to be a list of dictionaries with 'text' and 'author' keys.
         Each pair consists of two texts, their authors, and a boolean indicating if they are from the same author.
         """
@@ -381,7 +381,82 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
         super().__init__(name=name)
         self.path = Path(path)
         assert self.path.exists(), f"Path {self.path} does not exist. Current path: {os.getcwd()}"
+        self.path2metadata = self.path / "file_metadata.xlsx"
+        assert self.path2metadata.exists(), f"Metadata file {self.path2metadata} does not exist. Current path: {os.getcwd()}"
 
+    def generate_pairs(self, df, n_pairs=2, groupby_cols:list = ['genre']):
+            """ 
+            Generate pairs of texts from the dataset based on the specified groupby columns.
+            :param df: DataFrame containing the dataset with at least 'text' and 'author' columns.
+            :param n_pairs: Number of pairs to generate per group.
+            :param groupby_cols: Columns to group by, should include 'genre'.
+            :return: List of pairs with their authors and a boolean indicating if they are from the
+            same author.
+            """
+            for col in groupby_cols:
+                assert col in df.columns, f"Column '{col}' not found in DataFrame."
+
+            grouped = df.groupby(groupby_cols)
+            print(f"Total groups: {len(grouped)}")
+            pairs = []
+
+            for group_values, group in grouped:
+                print(f"Processing group: {group_values}, size: {len(group)}")
+                data = group.to_dict(orient='records')
+                print(group['title'])
+
+                # Group texts by author
+                author_groups = {}
+                for item in data:
+                    author_groups.setdefault(item['author'], []).append(item)
+
+                # Same-author pairs
+                same_author_pairs = []
+                for author, texts in author_groups.items():
+                    if len(texts) < 2:
+                        continue
+                    selected = random.sample(texts, min(n_pairs*2, len(texts)))
+                    random.shuffle(selected)
+                    for i in range(0, len(selected) - 1, 2):
+                        a, b = selected[i], selected[i + 1]
+                        same_author_pairs.append({
+                            "pair": [a['text'], b['text']],
+                            "authors": [author, author],
+                            "same": True
+                        })
+                pairs.extend(same_author_pairs)
+
+                # Different-author pairs, balanced to same author pairs count
+                authors = list(author_groups.keys())
+                diff_author_pairs = []
+                if len(authors) > 1 and same_author_pairs:
+                    n_diff_pairs_target = len(same_author_pairs)    # goal: match number of different-author pairs to same-author pairs
+                    author_pairs = []
+                    for i in range(len(authors)):
+                        for j in range(i+1, len(authors)):
+                            author_pairs.append((authors[i], authors[j]))
+                    random.shuffle(author_pairs)
+
+                    count = 0
+                     # TODO: currently highly imbalanced bc text is chosen once and not paired with all others
+                     # TODO: think whether to copy author pairs or try exactly n_diff_pairs_target pair combinations if possible
+                    for a1, a2 in author_pairs:
+                        if count >= n_diff_pairs_target:    # generate enough different-author pairs
+                            break
+                        if not author_groups[a1] or not author_groups[a2]:  # ensured above that authors are different
+                            continue
+                        t1 = random.choice(author_groups[a1])
+                        t2 = random.choice(author_groups[a2])
+                        pairs.append({
+                            "pair": [t1['text'], t2['text']],
+                            "authors": [a1, a2],
+                            "same": False
+                        })
+                        count += 1
+
+                pairs.extend(diff_author_pairs)
+            return pairs
+    
     def load(self, train_split_portion:float=0.8) -> Dataset:
         """
         Loader for the Gutenberg dataset.
@@ -392,6 +467,7 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
         """
         assert train_split_portion > 0 and train_split_portion < 1, "train_split_portion must be between 0 and 1."
         data = []
+        # obtain texts
         for file in self.path.glob("*.txt"):
             if "Complete_Works_of_William_Shakespeare" in file.name:
                 # Skip the complete works of Shakespeare as it is way longer than other texts
@@ -400,13 +476,58 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
                 author = ' '.join(file.stem.split("_")[-2:])  # filename format is "title_firstName_sirname.txt"
                 content = f.read()
                 content = self.preprocess(content)
-                data.append({"author": author, "text": content})
+                data.append({"author": author, "text": content, "filename":file.stem})
 
-        pairs = self._generate_pairs(data)
-        random.shuffle(pairs)
-        split_idx = int(len(pairs) * train_split_portion)
-        train_pairs = pairs[:split_idx]
-        test_pairs = pairs[split_idx:]
+        df = pd.DataFrame(data)
+        # obtain metadata: contains time_period, author, topic (incomplete), summary, genre, century etc.
+        metadata = pd.read_excel(self.path2metadata)
+        # join on data's filename column and metadata's index (always 'others' index)
+        df = df.join(metadata.set_index('filename'), on='filename', how='left', rsuffix='_meta')
+
+        groupyby_cols = ['genre', 'century']
+        assert all(col in df.columns for col in groupyby_cols), "Missing required metadata columns."
+
+        # Group authors by (genre, century)
+        author_meta = df.groupby('author').first().reset_index()    # keep only first occurrence of each author
+        group_map = defaultdict(list)  # {(genre, century): [author1, author2, ...]}
+        for _, row in author_meta.iterrows():
+            key = (row['genre'], row['century'])
+            # TODO: no perfect match possible, bc entries are not the same (e.g. drama, but also different genres), hence perfect matching does not work -> make it robuster or alter excel file
+            group_map[key].append(row['author'])
+
+        # Shuffle and split groups
+        all_groups = list(group_map.items())
+        random.shuffle(all_groups)
+        print(f"Total groups: {all_groups}\n\n")
+
+        train_authors = set()
+        test_authors = set()
+        train_count = 0
+        total_authors = sum(len(authors) for _, authors in all_groups)
+        author_limit = int(train_split_portion * total_authors)
+
+        for key, authors in all_groups:
+            if train_count + len(authors) <= author_limit:  # adds multiple authors from the same group at once
+                train_authors.update(authors)
+                train_count += len(authors)
+            else:
+                test_authors.update(authors)
+
+        # Final sanity check
+        assert train_authors.isdisjoint(test_authors), "Author overlap between train and test."
+        train_df = df[df['author'].isin(train_authors)].sample(frac=1, random_state=42).reset_index(drop=True)
+        test_df = df[df['author'].isin(test_authors)].sample(frac=1, random_state=42).reset_index(drop=True)
+        print(f"Train authors: {train_authors}, Test authors: {test_authors}\n\n")
+
+
+        # TODO: add similarity on summary sbert?
+        # TODO: column content is not the same (i.e. includes drama but also different genres), hence perfect matching does not work -> make it robuster or alter excel file
+        train_pairs = self.generate_pairs(df=train_df, groupby_cols=groupyby_cols)
+        test_pairs = self.generate_pairs(df=test_df, groupby_cols=groupyby_cols)
+        # FIXME: 0 returned pairs, probably bc no match due to different style of cell entries
+        print(f"Generated {len(train_pairs)} training pairs and {len(test_pairs)} test pairs.")
+        print("training pairs:", [train_pairs[i]['authors'] for i in range(len(train_pairs))]if train_pairs else "No training pairs generated.")
+        print("test pairs:", [test_pairs[i]['authors'] for i in range(len(test_pairs))] if test_pairs else "No test pairs generated.")
 
         features = Features({
             "pair": [Value("string")],
@@ -487,7 +608,8 @@ def run_gutenberg_corpus():
 
     loader = GutenbergDatasetLoader(path=base_dir)
     dataset = loader.load()
-    dataset.save_to_disk(output_dir)
+    # TODO: uncomment
+    # dataset.save_to_disk(output_dir)
 
 
 if __name__ == "__main__":
@@ -513,5 +635,5 @@ if __name__ == "__main__":
     # # run_pan25()
     # run_pan20()
     # run_koppel_webis()
-    run_blog_corpus()
-    # run_gutenberg_corpus()
+    # run_blog_corpus()
+    run_gutenberg_corpus()
