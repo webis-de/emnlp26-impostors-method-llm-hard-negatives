@@ -77,8 +77,8 @@
 
 ### 🛠️ Implementation
 - [x] Blog arrow dataset: Finer pair selection not only on topic, but also year (TODO:, gender, age?- currently yes) + similar number of same and different author pairs
-- [ ] Gutenberg arrow dataset: Finer pair selection not only on random (!), but based on time period, genre, register, etc.
-- [ ] PAN20 Webis arrow dataset: Finer pair selection not only preexting pairs
+- [x] Gutenberg arrow dataset: Finer pair selection not only on random (!), but based on ~~time period~~, century, genre, ~~register~~, etc.
+- [ ] PAN20 Webis arrow dataset: Finer pair selection not only pre-existing pairs
 - [ ] PAN20 arrow dataset: preprocess data
 - [ ] strip layout information from all arrow datasets using preprocess method
   - Blog, Gutenberg, Koppel already done
