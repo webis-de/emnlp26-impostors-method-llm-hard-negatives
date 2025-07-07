@@ -516,7 +516,6 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
         group_map = defaultdict(list)  # {(genre, century): [author1, author2, ...]}
         for _, row in author_meta.iterrows():
             key = (row['genre'], row['century'])
-            # TODO: no perfect match possible, bc entries are not the same (e.g. drama, but also different genres), hence perfect matching does not work -> make it robuster or alter excel file
             group_map[key].append(row['author'])
 
         # Shuffle and split groups
