@@ -1,25 +1,36 @@
 # ✅ TODOs
 
-## 📅 28.06.2025- 04.07.2025
+## 📅 08.07.2025- 11.07.2025
 
 ### 📚 Dataset
-- Requirements:
-  - [x] No format (paragraphs, layout, title) — plain text only  
-  - [x] No confounders (topic, genre, register, text length influence style)  
-  - Constructed situations with manually rephrased texts are **okay**  
-  - Small dataset is **okay**
-- [o] Dataset should already be preprocessed
-  - i.e. no newlines, utf-8 to ascii, etc.
-- [x] Statistic on preprocessed dataset
-- [ ] Pick pairs more carefully, i.e. same register (e.g., Shakespearean play vs. Dickens novel not same register), genre, time period, etc.
-  - only plain text (not play headers etc.) have style
-- [o] don't scale to big data, prepare two examples where (pre)processing steps are visible
-  - [ ] Koppel scenario
-  - [x] Our LLM scenario (cf. explore_data.ipynb)
 
 ### ✍️ Written Work
+- [ ] Use [Webis Thesis Template](https://git.webis.de/code-generic/code-webis-thesis/)
 - [ ] control dataset in terms of topic, genre, register
+- [ ] Difference register and tone (find literature of categories, cf. ceph)
 - [ ] imposter: random projection (i.e. random set of features set to zero is a projection to lower dimensional space)
+- [ ] our method:
+  - we can (1) generate texts, as many as we want, i.e. change seed and temperature
+  - (2) we work on **single case solutions** (i.e. trained on each dataset individually), no generalized solution (i.e. trained once on dataset and then used for all texts)
+    - specificity (!) rather than generality
+    - in-domain classification/ detection
+    - produce scenarios where we can control all variables (train new model for each dataset)
+    - generalization impossible
+- [ ] related work on LLM AA (ad hoc generation of imposter texts/ candidates for AA)
+  - [Janek Bevendorff's paper](https://downloads.webis.de/publications/papers/bevendorff_2025a.pdf) 
+  - ceph
+- [ ] related work: Model variability of author LLMs
+- [ ] Does AA/ AV profit from LLM generations?
+  - we can ask an LLM generate as many (imposter) texts as we want (i.e. seed and temperature)
+- we have two tasks:
+  - [ ] Klassisches AV: generative approaches (i.e. our imposter) vs. normal approaches (i.e. Koppel et al. 2014's imposter)
+  - [ ] LLM detection: 
+    - (1) LLM detection as open set AA problem
+    - (2) model AA as multiple AV problems 
+    - (3) one solutiion for AV is imposter approach
+    - (4) we generalize imposter approach by LLM generation
+    - (5) generative imposter approach gives evidence for generation by machine
+    - is generative Imposter approach only LLM attribution, i.e. AA? risk: Other must've already used LLM to generate text for AA
 - frequency in German: Häufigkeit (not Frequenz)
 - [ ] explain what min-max similarity is and does
 - [ ] contribution of this work:  
@@ -76,12 +87,73 @@
 - [ ] Paraphrase metrics: Syntatic (BLEU, ROUGE-1, ROUGE-L), semantic (BERTScore, cosine similarity of SBERT vectors, WMS), human evaluation (TODO)
 
 ### 🛠️ Implementation
+- [ ] new baseline for imposter approach (AV) / LLM AA: [Perplexity](https://huggingface.co/docs/transformers/perplexity)
+  - [ ] research meaning/definition of perplexity
+  - [ ] implement perplexity as baseline for imposter approach (approx PPL)
+    - (1) Tokenize text
+    - (2) Compute perplexity of text using a language model (Wikipedia/ Huggingface formula)
+    - (3) exp(value)
+  - [ ] Problems:
+    - LHF ????
+    - Prompt unknown
+    - if perplexity is the best metric, can our attribution be even better? Our AA models variability of author LLM
+  - Perplexity is a measure of how well a probability distribution predicts a sample
+- [ ] look at min text length text (i.e. 500 words)
+- [ ] look at max text length text 
+- [ ] strip layout information texts in **detectors** using preprocess method 
+- [ ] PAN20 Webis arrow dataset: Finer pair selection not only pre-existing pairs (compare to PAN approaches possible?)
+- [ ] Paraphrase metrics: compare metric with human evaluation (correlation): Draw 300 paraphrases stratified by their $\Delta_{sem,syn}=Avg(Semantic Sim)-Avg(Syntactic Sim)$ similarity distribution, rate on a 5-point Likert scale
+  - [Marcel's paper](https://downloads.webis.de/publications/papers/gohsen_2023b.pdf)
+- [ ] Paraphrase metrics: compare best to worst paraphrases
+  - is worst paraphrase already good enough?
+  - [ ] include analysis of worst paraphrases in thesis (ggf. in appendix)
+- [ ] Experiment: Paraphrase (1) paragraphs, (2) chunks
+  - (1) Paragraphs is not ideal, because I omitted all layout information, i.e. no paragraphs → save two versions of the dataset, one with paragraphs as newlines and one without any paragraphs
+  - (2) Chunks: Split text into chunks of X words, paraphrase
+  - Hypothesis: chunk-to-chunk paraphrasing has better control compared to text-to-text paraphrasing
+- [ ] Experiment: 
+  - (1) chunks from text of unknown authorship
+  - (2) classify chunks to most similar LLM (if any)
+  - (3) if most text chunks belong to same class → high probability text is generated by this LLM
+- [ ] compare LLM extractors to reality (ground truth)
+  - extract_bulletpoints function
+  - Blog and Gutenberg datasets
+  - things to compare:
+    - [ ] time period/ century
+    - [ ] titles
+    - [ ] genre
+- [ ] compare LLM generators to reality (ground truth)
+  - generate function
+  - Blog and Gutenberg datasets
+    - [ ] text length
+
+
+
+## 📅 28.06.2025- 07.07.2025
+
+### 📚 Dataset
+- Requirements:
+  - [x] No format (paragraphs, layout, title) — plain text only  
+  - [x] No confounders (topic, genre, register, text length influence style)  
+  - Constructed situations with manually rephrased texts are **okay**  
+  - Small dataset is **okay**
+- [x] Dataset should already be preprocessed
+  - i.e. no newlines, utf-8 to ascii, etc.
+- [x] Statistic on preprocessed dataset
+- [x] Pick pairs more carefully, i.e. same register (e.g., Shakespearean play vs. Dickens novel not same register), genre, time period, etc.
+  - only plain text (not play headers etc.) have style
+- [o] don't scale to big data, prepare two examples where (pre)processing steps are visible
+  - [ ] Koppel scenario
+  - [x] Our LLM scenario (cf. explore_data.ipynb)
+
+### ✍️ Written Work
+---
+
+### 🛠️ Implementation
 - [x] Blog arrow dataset: Finer pair selection not only on topic, but also year (TODO:, gender, age?- currently yes) + similar number of same and different author pairs, at least 500 words per text
 - [x] Gutenberg arrow dataset: Finer pair selection not only on random (!), but based on ~~time period~~, century, genre, ~~register~~, etc.
-- [ ] PAN20 Webis arrow dataset: Finer pair selection not only pre-existing pairs (compare to PAN approaches possible?)
 - [x] strip layout information from all **arrow datasets** using preprocess method
   - Blog, Gutenberg, Koppel, PAN20 
-- [ ] strip layout information texts in **detectors** using preprocess method 
 - [x] additionally control register and time period in advanced paraphrasing approaches
 - [x] refine preprocessing (dataset creation and in detector base) `util.py`
 - [x] visualize preprocessing result: `explore_data.ipynb`
@@ -99,7 +171,7 @@
 - [x] radar plot: 
   - [x] mean is line and standard deviation should be shaded area around the line (cf. Jannek's papers)
   - [x] scores must always be at same position
-- [o] Paraphrase scores, cf. [Marcel's paper](https://downloads.webis.de/publications/papers/gohsen_2023b.pdf), [Marcel's second paper](https://downloads.webis.de/publications/papers/gohsen_2024b.pdf)
+- [x] Paraphrase scores, cf. [Marcel's paper](https://downloads.webis.de/publications/papers/gohsen_2023b.pdf), [Marcel's second paper](https://downloads.webis.de/publications/papers/gohsen_2024b.pdf)
   - [Marcel's paper](https://downloads.webis.de/publications/papers/gohsen_2023b.pdf)
     - [x] cosine similarity of [SBERT](https://github.com/UKPLab/sentence-transformers) vectors
     - [x] WMS (Word Mover's Distance) requires an embedding model
@@ -108,7 +180,6 @@
       - unclear were to get original metric implementation, I use [this WMD implementation](https://pypi.org/project/word-mover-distance/)
     - [x] ensure all paraphrase metrics normalized to [0, 1] range
     - [x] compute average syntactic and semantic scores (separate) for each paraphrase 
-    - [ ] compare metric with human evaluation (correlation): Draw 300 paraphrases stratified by their $\Delta_{sem,syn}=Avg(Semantic Sim)-Avg(Syntactic Sim)$ similarity distribution, rate on a 5-point Likert scale
 - [x] visualize syntactic and semantic scores per model over multiple texts (e.g. [heatmap from Marcel's paper](https://downloads.webis.de/publications/papers/gohsen_2023b.pdf) (don't know how this works in this case), distribution plot, etc.)
   - high semantic score, low syntactic score → good paraphrase
 
