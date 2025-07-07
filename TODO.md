@@ -78,11 +78,10 @@
 ### 🛠️ Implementation
 - [x] Blog arrow dataset: Finer pair selection not only on topic, but also year (TODO:, gender, age?- currently yes) + similar number of same and different author pairs, at least 500 words per text
 - [x] Gutenberg arrow dataset: Finer pair selection not only on random (!), but based on ~~time period~~, century, genre, ~~register~~, etc.
-- [ ] PAN20 Webis arrow dataset: Finer pair selection not only pre-existing pairs
-- [ ] PAN20 arrow dataset: preprocess data
-- [ ] strip layout information from all arrow datasets using preprocess method
-  - Blog, Gutenberg, Koppel already done
-- [ ] strip layout information texts in detectors using preprocess method 
+- [ ] PAN20 Webis arrow dataset: Finer pair selection not only pre-existing pairs (compare to PAN approaches possible?)
+- [x] strip layout information from all **arrow datasets** using preprocess method
+  - Blog, Gutenberg, Koppel, PAN20 
+- [ ] strip layout information texts in **detectors** using preprocess method 
 - [x] additionally control register and time period in advanced paraphrasing approaches
 - [x] refine preprocessing (dataset creation and in detector base) `util.py`
 - [x] visualize preprocessing result: `explore_data.ipynb`
