@@ -54,25 +54,31 @@ class BaseDatasetVisualization(ABC):
 
     def dataset_stats(self, dataset=None, save:bool=True) -> pd.DataFrame:
         """
-        Prints the dataset statistics.
+        Prints the dataset statistics. Text length is calculated in characters and number of words.
         :param save: Whether to save the statistics to a CSV file.
         :return: A DataFrame containing the dataset statistics.
         """
         if dataset is None:
             dataset = self.dataset
         text_lengths = [len(text) for text in chain.from_iterable(dataset['pair'])]
+        num_words = [len(text.split()) for text in chain.from_iterable(dataset['pair'])]
         text_lengths = np.array(text_lengths)
+        num_words = np.array(num_words)
         stats = {
             'dataset': self.name,
             'num_pairs': len(dataset),
             'num_authors': len(set(chain.from_iterable(dataset['authors']))),
             'num_same_pairs': dataset['same'].sum(),
             'num_different_pairs': len(dataset) - dataset['same'].sum(),
-            'avg_text_len': text_lengths.mean(),
-            'min_text_len': text_lengths.min(),
-            'max_text_len': text_lengths.max(),
-            'std_text_len': text_lengths.std(),
-            'median_text_len': np.median(text_lengths),
+            'avg_text_len_chars': round(text_lengths.mean(), 2),
+            'min_text_len_chars': text_lengths.min(),
+            'max_text_len_chars': text_lengths.max(),
+            'std_text_len_chars': round(text_lengths.std(),2),
+            'avg_text_len_words': round(num_words.mean(), 2),
+            'min_text_len_words': num_words.min(),
+            'max_text_len_words': num_words.max(),
+            'std_text_len_words': round(num_words.std(),2),
+            'median_text_len_words': int(np.median(num_words)),
           }
         
         stats_df = pd.DataFrame([stats])
