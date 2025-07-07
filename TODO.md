@@ -87,6 +87,7 @@
 - [ ] Paraphrase metrics: Syntatic (BLEU, ROUGE-1, ROUGE-L), semantic (BERTScore, cosine similarity of SBERT vectors, WMS), human evaluation (TODO)
 
 ### 🛠️ Implementation
+- Look at actual [Gohsen paraphrasing code](https://github.com/webis-de/coling24-task-oriented-paraphrase-analytics)
 - [ ] new baseline for imposter approach (AV) / LLM AA: [Perplexity](https://huggingface.co/docs/transformers/perplexity)
   - [ ] research meaning/definition of perplexity
   - [ ] [implement perplexity](https://huggingface.co/spaces/evaluate-metric/perplexity) as baseline for imposter approach (approx PPL)
