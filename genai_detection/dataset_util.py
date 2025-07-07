@@ -396,20 +396,19 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
 
             for col in groupby_cols:
                 num_nans = df[col].isna().sum()
-                print(f"Column '{col}' has {num_nans} NaN values.")
-                print(f"Rows with NaN in '{col}':\n{df[df[col].isna()]}\n")
-                print(df.iloc[1])
+                if num_nans > 0:
+                    print(f"Column '{col}' has {num_nans} NaN values.")
+                    print(f"Rows with NaN in '{col}':\n{df[df[col].isna()]}\n")
 
 
             grouped = df.groupby(groupby_cols)
-            print(f"\nTotal groups: {len(grouped)}")
-            print(f"Groups: {list(grouped.groups.keys())}\n\n")
+            # print(f"\nTotal groups: {len(grouped)}")
+            # print(f"Groups: {list(grouped.groups.keys())}\n\n")
             pairs = []
 
             for group_values, group in grouped:
                 print(f"Processing group: {group_values}, size: {len(group)}")
                 data = group.to_dict(orient='records')
-                print(group['title'])
 
                 # Group texts by author
                 author_groups = {}
@@ -511,7 +510,6 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
         # Shuffle and split groups
         all_groups = list(group_map.items())
         random.shuffle(all_groups)
-        print(f"Total groups: {all_groups}\n\n")
 
         train_authors = set()
         test_authors = set()
@@ -532,17 +530,12 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
         test_df = df[df['author'].isin(test_authors)].sample(frac=1, random_state=42).reset_index(drop=True)
         print(f"Train authors: {train_authors}, Test authors: {test_authors}\n\n")
 
-        #print(f"Texts by Oscar Wilde: {df[df['author'] == 'Oscar Wilde'].shape[0]}")
-
-
         # TODO: add similarity on summary sbert?
-        # TODO: column content is not the same (i.e. includes drama but also different genres), hence perfect matching does not work -> make it robuster or alter excel file
         train_pairs = self.generate_pairs(df=train_df, groupby_cols=groupyby_cols)
         test_pairs = self.generate_pairs(df=test_df, groupby_cols=groupyby_cols)
-        # FIXME: 0 returned pairs, probably bc no match due to different style of cell entries
         print(f"Generated {len(train_pairs)} training pairs and {len(test_pairs)} test pairs.")
-        print("training pairs:", [train_pairs[i]['authors'] for i in range(len(train_pairs))]if train_pairs else "No training pairs generated.")
-        print("test pairs:", [test_pairs[i]['authors'] for i in range(len(test_pairs))] if test_pairs else "No test pairs generated.")
+        # print("training pairs:", [train_pairs[i]['authors'] for i in range(len(train_pairs))]if train_pairs else "No training pairs generated.")
+        # print("test pairs:", [test_pairs[i]['authors'] for i in range(len(test_pairs))] if test_pairs else "No test pairs generated.")
 
         features = Features({
             "pair": [Value("string")],
@@ -623,8 +616,7 @@ def run_gutenberg_corpus():
 
     loader = GutenbergDatasetLoader(path=base_dir)
     dataset = loader.load()
-    # TODO: uncomment
-    # dataset.save_to_disk(output_dir)
+    dataset.save_to_disk(output_dir)
 
 
 if __name__ == "__main__":
