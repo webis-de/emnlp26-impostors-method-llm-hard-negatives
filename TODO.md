@@ -5,7 +5,7 @@
 ### 📚 Dataset
 
 ### ✍️ Written Work
-- [ ] Use [Webis Thesis Template](https://git.webis.de/code-generic/code-webis-thesis/)
+- [x] Use [Webis Thesis Template](https://git.webis.de/code-generic/code-webis-thesis/)
 - [ ] control dataset in terms of topic, genre, register
 - [ ] Difference register and tone (find literature of categories, cf. ceph)
 - [ ] imposter: random projection (i.e. random set of features set to zero is a projection to lower dimensional space)
@@ -89,9 +89,9 @@
 ### 🛠️ Implementation
 - [ ] new baseline for imposter approach (AV) / LLM AA: [Perplexity](https://huggingface.co/docs/transformers/perplexity)
   - [ ] research meaning/definition of perplexity
-  - [ ] implement perplexity as baseline for imposter approach (approx PPL)
+  - [ ] [implement perplexity](https://huggingface.co/spaces/evaluate-metric/perplexity) as baseline for imposter approach (approx PPL)
     - (1) Tokenize text
-    - (2) Compute perplexity of text using a language model (Wikipedia/ Huggingface formula)
+    - (2) Compute perplexity of text using a language model ([Wikipedia](https://en.wikipedia.org/wiki/Perplexity)/ [Huggingface](https://huggingface.co/docs/transformers/perplexity) formula)
     - (3) exp(value)
   - [ ] Problems:
     - LHF ????
