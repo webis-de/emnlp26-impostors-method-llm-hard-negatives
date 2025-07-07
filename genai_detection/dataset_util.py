@@ -85,7 +85,7 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
         df = pd.read_csv(self.path)
         print("Initial number of entries:", len(df))
         df['text'] = df['text'].apply(lambda x: self.preprocess(x))
-        df = df[df['text'].apply(lambda x: len(x.split()) > 500)]  # filter out text with less than 500 words (not characters, bc there are 501 characters one-word entries)
+        df = df[df['text'].apply(lambda x: len(x.split()) >= 500)]  # filter out text with less than 500 words (not characters, bc there are 501 characters one-word entries)
 
         df['year'] = pd.to_datetime(df["date"], format='mixed', dayfirst=True, errors='coerce').dt.year
         print("number of entries after filtering:", len(df))
@@ -266,7 +266,19 @@ class Pan20DatasetLoader(Pan23DatasetLoader):
         merged_data = []
         for item in tqdm(pairs, desc=f"Processing {directory_path}"):
             merged_data.append({**item, **truth_map.get(item["id"], {})})
-        return Dataset.from_list(merged_data)
+        
+        merged_data = pd.DataFrame(merged_data)
+        merged_data['pair'] = merged_data['pair'].apply(
+            lambda pair: [self.preprocess(text) for text in pair]
+        )
+        # Keep only pairs with at least 500 words in each text, bc there are one-word entries
+        merged_data = merged_data[
+            merged_data['pair'].apply(
+                lambda pair: all(len(text.split()) >= 500 for text in pair)
+            )
+        ]
+
+        return Dataset.from_list(merged_data.to_dict(orient='records'))
 
 
 # === PAN24 LOADER ===
@@ -563,7 +575,7 @@ def run_pan23(base_dir:str, save_path:str):
 
 
 def run_pan20():
-    base_dir = Path(__file__).resolve().parent / "data/datasets/pan20-authorship-verification/"
+    base_dir = Path(__file__).resolve().parent.parent / "data/datasets/pan20-authorship-verification/"
     train_dir = os.path.join(base_dir, "pan20-authorship-verification-training-dataset")
     test_dir = os.path.join(base_dir, "pan20-authorship-verification-test-dataset")
     output_dir = os.path.join(base_dir, "pan20-dataset-converted")
