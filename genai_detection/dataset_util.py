@@ -1,5 +1,5 @@
 import argparse
-from itertools import combinations
+from itertools import combinations, product
 import os
 import json
 from pathlib import Path
@@ -139,7 +139,6 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
 
                 # Different-author pairs, balanced to same author pairs count
                 authors = list(author_groups.keys())
-                diff_author_pairs = []
                 if len(authors) > 1 and same_author_pairs:
                     n_diff_pairs_target = len(same_author_pairs)    # goal: match number of different-author pairs to same-author pairs
                     author_pairs = []
@@ -163,7 +162,6 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
                         })
                         count += 1
 
-                pairs.extend(diff_author_pairs)
             return pairs
         
 
@@ -396,8 +394,16 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
             for col in groupby_cols:
                 assert col in df.columns, f"Column '{col}' not found in DataFrame."
 
+            for col in groupby_cols:
+                num_nans = df[col].isna().sum()
+                print(f"Column '{col}' has {num_nans} NaN values.")
+                print(f"Rows with NaN in '{col}':\n{df[df[col].isna()]}\n")
+                print(df.iloc[1])
+
+
             grouped = df.groupby(groupby_cols)
-            print(f"Total groups: {len(grouped)}")
+            print(f"\nTotal groups: {len(grouped)}")
+            print(f"Groups: {list(grouped.groups.keys())}\n\n")
             pairs = []
 
             for group_values, group in grouped:
@@ -428,7 +434,6 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
 
                 # Different-author pairs, balanced to same author pairs count
                 authors = list(author_groups.keys())
-                diff_author_pairs = []
                 if len(authors) > 1 and same_author_pairs:
                     n_diff_pairs_target = len(same_author_pairs)    # goal: match number of different-author pairs to same-author pairs
                     author_pairs = []
@@ -438,23 +443,31 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
                     random.shuffle(author_pairs)
 
                     count = 0
-                     # TODO: currently highly imbalanced bc text is chosen once and not paired with all others
-                     # TODO: think whether to copy author pairs or try exactly n_diff_pairs_target pair combinations if possible
+                    # Calculate max number of pairs to sample per author pair (reduce class (i.e. different-author) imbalance introdoced prior when only one pair per author pair was sampled)
+                    max_pairs_per_pair = max(n_diff_pairs_target // len(author_pairs), 1)
                     for a1, a2 in author_pairs:
-                        if count >= n_diff_pairs_target:    # generate enough different-author pairs
-                            break
-                        if not author_groups[a1] or not author_groups[a2]:  # ensured above that authors are different
-                            continue
-                        t1 = random.choice(author_groups[a1])
-                        t2 = random.choice(author_groups[a2])
-                        pairs.append({
-                            "pair": [t1['text'], t2['text']],
-                            "authors": [a1, a2],
-                            "same": False
-                        })
-                        count += 1
+                        texts_a1 = author_groups[a1]
+                        texts_a2 = author_groups[a2]
 
-                pairs.extend(diff_author_pairs)
+                        if not texts_a1 or not texts_a2:
+                            continue
+
+                        # All possible combinations between texts from different authors
+                        all_combinations = list(product(texts_a1, texts_a2))
+                        random.shuffle(all_combinations)  # Shuffle to introduce randomness
+
+                        num_to_sample = min(len(all_combinations), max_pairs_per_pair)
+                        for t1, t2 in all_combinations[:num_to_sample]:
+                            pairs.append({
+                                "pair": [t1['text'], t2['text']],
+                                "authors": [a1, a2],
+                                "same": False
+                            })
+                            count += 1
+
+                        if count >= n_diff_pairs_target:
+                            break
+
             return pairs
     
     def load(self, train_split_portion:float=0.8) -> Dataset:
@@ -463,7 +476,7 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
         The dataset is expected to be a directory with text files, where each file is named in the format "title_firstName_sirname.txt".
         Each file contains the text of a book, and the author is derived from the filename.
 
-        ATTENTION: Authors can appear in both training and test sets.
+        Authors cannot appear in both training and test sets.
         """
         assert train_split_portion > 0 and train_split_portion < 1, "train_split_portion must be between 0 and 1."
         data = []
@@ -518,6 +531,8 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
         train_df = df[df['author'].isin(train_authors)].sample(frac=1, random_state=42).reset_index(drop=True)
         test_df = df[df['author'].isin(test_authors)].sample(frac=1, random_state=42).reset_index(drop=True)
         print(f"Train authors: {train_authors}, Test authors: {test_authors}\n\n")
+
+        #print(f"Texts by Oscar Wilde: {df[df['author'] == 'Oscar Wilde'].shape[0]}")
 
 
         # TODO: add similarity on summary sbert?
