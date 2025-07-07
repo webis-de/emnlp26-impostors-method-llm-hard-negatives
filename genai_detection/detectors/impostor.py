@@ -210,8 +210,8 @@ class ImpostorDetector(DetectorBase):
             tokens_left = self.tokenizer(self.preprocess_text(text_left))
             tokens_right = self.tokenizer(self.preprocess_text(text_right))#[:self.min_n_tokens] 
 
-            # ensure both texts have similar length: min length of both + slack of 10% 
-            max_len_allowed = int(min(len(tokens_left), len(tokens_right)) * 1.1)
+            # ensure both texts have same length (control confounder text length): min length of both
+            max_len_allowed = min(len(tokens_left), len(tokens_right))
             for tokens in [tokens_left, tokens_right]:
                 if len(tokens) > max_len_allowed:
                     tokens[:] = tokens[:max_len_allowed]    # inplace crop, changes also other references to the same list
