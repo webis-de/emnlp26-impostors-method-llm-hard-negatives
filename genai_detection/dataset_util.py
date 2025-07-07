@@ -85,7 +85,7 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
         df = pd.read_csv(self.path)
         print("Initial number of entries:", len(df))
         df['text'] = df['text'].apply(lambda x: self.preprocess(x))
-        df = df[df['text'].apply(lambda x: len(x) > 500)]
+        df = df[df['text'].apply(lambda x: len(x.split()) > 500)]  # filter out text with less than 500 words (not characters, bc there are 501 characters one-word entries)
 
         df['year'] = pd.to_datetime(df["date"], format='mixed', dayfirst=True, errors='coerce').dt.year
         print("number of entries after filtering:", len(df))
@@ -642,5 +642,5 @@ if __name__ == "__main__":
     # # run_pan25()
     # run_pan20()
     # run_koppel_webis()
-    # run_blog_corpus()
-    run_gutenberg_corpus()
+    run_blog_corpus()
+    # run_gutenberg_corpus()

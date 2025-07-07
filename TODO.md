@@ -76,7 +76,7 @@
 - [ ] Paraphrase metrics: Syntatic (BLEU, ROUGE-1, ROUGE-L), semantic (BERTScore, cosine similarity of SBERT vectors, WMS), human evaluation (TODO)
 
 ### 🛠️ Implementation
-- [x] Blog arrow dataset: Finer pair selection not only on topic, but also year (TODO:, gender, age?- currently yes) + similar number of same and different author pairs
+- [x] Blog arrow dataset: Finer pair selection not only on topic, but also year (TODO:, gender, age?- currently yes) + similar number of same and different author pairs, at least 500 words per text
 - [x] Gutenberg arrow dataset: Finer pair selection not only on random (!), but based on ~~time period~~, century, genre, ~~register~~, etc.
 - [ ] PAN20 Webis arrow dataset: Finer pair selection not only pre-existing pairs
 - [ ] PAN20 arrow dataset: preprocess data
