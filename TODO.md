@@ -92,6 +92,9 @@
   - both imposter and DetectGPT approaches sample from "source" distribution, i.e. LLMs
   - different similarity measures
 - [ ] new baseline for imposter approach (AV) / LLM AA: [Perplexity](https://huggingface.co/docs/transformers/perplexity)
+- [ ] [MirrorMinds-LLMDetector](https://github.com/shubhamgpt007/MirrorMinds-LLMDetector) Baseline
+  - similar to our approach
+  - steps: extract query from text, generate 2 paraphrases using 2 LLMs, compute (BLEU, METEOR) similarity between query and paraphrase, use max similarity as score pair, threshold for classification
 - [ ] [Perplexity](https://huggingface.co/docs/transformers/perplexity) as baseline for imposter approach (approx PPL)  
   - [ ] [LLMDet:](https://github.com/TrustedLLM/LLMDet) Existing proxy to Perplexity
     - LLMDet is a proxy for perplexity, uses probability of next token based on previous n-grams rather than normal probability
