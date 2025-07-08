@@ -92,6 +92,11 @@
   - both imposter and DetectGPT approaches sample from "source" distribution, i.e. LLMs
   - different similarity measures
 - [ ] new baseline for imposter approach (AV) / LLM AA: [Perplexity](https://huggingface.co/docs/transformers/perplexity)
+- [ ] [Perplexity](https://huggingface.co/docs/transformers/perplexity) as baseline for imposter approach (approx PPL)  
+  - [ ] [LLMDet:](https://github.com/TrustedLLM/LLMDet) Existing proxy to Perplexity
+    - LLMDet is a proxy for perplexity, uses probability of next token based on previous n-grams rather than normal probability
+    - probability is precomputed in dictionary for k most frequent n-grams in texts of LLMs
+    - require access to LLM parameters to build a dictionary of perplexity scores for each n-gram
   - [ ] research meaning/definition of perplexity
   - [ ] [implement perplexity](https://huggingface.co/spaces/evaluate-metric/perplexity) as baseline for imposter approach (approx PPL)
     - (1) Tokenize text
