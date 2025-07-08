@@ -88,6 +88,9 @@
 
 ### 🛠️ Implementation
 - Look at actual [Gohsen paraphrasing code](https://github.com/webis-de/coling24-task-oriented-paraphrase-analytics)
+- [ ] [DetectGPT Baseline](https://github.com/eric-mitchell/detect-gpt): Use T5 to generate pertubations, score them using LLM, threshold 0.1 for classification
+  - both imposter and DetectGPT approaches sample from "source" distribution, i.e. LLMs
+  - different similarity measures
 - [ ] new baseline for imposter approach (AV) / LLM AA: [Perplexity](https://huggingface.co/docs/transformers/perplexity)
   - [ ] research meaning/definition of perplexity
   - [ ] [implement perplexity](https://huggingface.co/spaces/evaluate-metric/perplexity) as baseline for imposter approach (approx PPL)
