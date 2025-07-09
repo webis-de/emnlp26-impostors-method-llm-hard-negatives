@@ -95,20 +95,19 @@
 - [ ] [MirrorMinds-LLMDetector](https://github.com/shubhamgpt007/MirrorMinds-LLMDetector) Baseline
   - similar to our approach
   - steps: extract query from text, generate 2 paraphrases using 2 LLMs, compute (BLEU, METEOR) similarity between query and paraphrase, use max similarity as score pair, threshold for classification
-- [ ] [Perplexity](https://huggingface.co/docs/transformers/perplexity) as baseline for imposter approach (approx PPL)  
-  - [ ] [LLMDet:](https://github.com/TrustedLLM/LLMDet) Existing proxy to Perplexity
-    - LLMDet is a proxy for perplexity, uses probability of next token based on previous n-grams rather than normal probability
+- [x] [Perplexity](https://huggingface.co/docs/transformers/perplexity) as baseline for imposter approach (approx PPL)  
+  - [x] [LLMDet:](https://github.com/TrustedLLM/LLMDet) Existing proxy to Perplexity
+    - LLMDet is a proxy for perplexity, uses probability of next token based on previous n-grams rather than tokens 
     - probability is precomputed in dictionary for k most frequent n-grams in texts of LLMs
     - require access to LLM parameters to build a dictionary of perplexity scores for each n-gram
-  - [ ] research meaning/definition of perplexity
-  - [ ] [implement perplexity](https://huggingface.co/spaces/evaluate-metric/perplexity) as baseline for imposter approach (approx PPL)
-    - (1) Tokenize text
-    - (2) Compute perplexity of text using a language model ([Wikipedia](https://en.wikipedia.org/wiki/Perplexity)/ [Huggingface](https://huggingface.co/docs/transformers/perplexity) formula)
-    - (3) exp(value)
+    - [ ] Wait until [`__init__` issue](https://github.com/TrustedLLM/LLMDet/issues/14) is resolved
+  - [x] research meaning/definition of perplexity
+  - [x] implement perplexity as baseline for imposter approach (approx PPL)
+    - using [Huggingface Perplexity](https://huggingface.co/spaces/evaluate-metric/perplexity) metric
   - [ ] Problems:
     - LHF ????
     - Prompt unknown
-    - if perplexity is the best metric, can our attribution be even better? Our AA models variability of author LLM
+    - [x] if perplexity is the best metric, can our attribution be even better? Our AA models variability of author LLM -> **Perplexity is not feasible: Requires access to LLMs + costly**
   - Perplexity is a measure of how well a probability distribution predicts a sample
 - [ ] look at min text length text (i.e. 500 words)
 - [ ] look at max text length text 

@@ -10,7 +10,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
-transformers = "^4.48.1"
+transformers = {git = "https://github.com/huggingface/transformers.git"}
 datasets = "^3.1.0"
 accelerate = "^1.2.1"
 peft = "^0.14.0"
@@ -44,6 +44,8 @@ gensim = "^4.3.3"
 dirtyjson = "^1.0.8"
 sentence-transformers = "^5.0.0"
 openpyxl = "^3.1.5"
+unilm = {git = "https://github.com/Liadrinz/transformers-unilm.git"}
+llmdet = {git = "https://github.com/TrustedLLM/LLMDet.git"}
 
 [build-system]
 requires = ["poetry-core"]

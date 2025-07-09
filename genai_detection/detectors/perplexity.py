@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from genai_detection.detectors.detector_base import DetectorBase
 from evaluate import load
+# import llmdet.detector as llmdet  # FIXME: Wait until https://github.com/TrustedLLM/LLMDet/issues/14 is resolved
 
 class PerplexityDetector(DetectorBase):
     def __init__(self):
@@ -99,9 +100,38 @@ class PerplexityDetector(DetectorBase):
         # first text access via predictions[0]
         return predictions, model_names
     
+    
+# FIXME: Wait until https://github.com/TrustedLLM/LLMDet/issues/14 is resolved
+# class ProxyPerplexityDetector(PerplexityDetector):
+#     def __init__(self):
+#         """
+#         LLMDet is a text detection tool that can identify which generated sources the text came from (e.g. large language model or human-write). 
+#         The core idea of the detection algorithm is to use the n-grams probability sampled from specified language model to calculate proxy perplexity of large language models, and use the proxy perplexity as a feature to train a text classifier.
+#         For more information, see https://github.com/TrustedLLM/LLMDet (09.07.2025).
+#         """
+#         super().__init__()
+#         llmdet.load_probability()
+        
+#     def _get_score_impl(self, text: Iterable[str]) -> t.Union[torch.Tensor, np.ndarray, t.Iterable[float]]:
+#         """
+#         :param text: input text to score (batch is also possible), if list we assume it is tokenized.
+#         :return: Average (over n-grams) perplexity score for the input text, in the form of a dictionary with model names as keys
+
+#         Reference: https://github.com/TrustedLLM/LLMDet (09.07.2025)
+#         """
+#         return llmdet.detect(text)
+
+#     def get_score(
+#         self, text: t.Union[str, t.Iterable[str]], normalize: bool = False
+#         ) -> t.Union[np.float32, np.ndarray, np.nan]:
+#         return self._get_score_impl(text)
+    
+#     def get_prediction(self, text, threshold=0.5) -> List[bool]:
+#         return super().get_prediction(text, threshold)
 
 if __name__ == "__main__":
-    detector = PerplexityDetector()
+    # detector = PerplexityDetector()
+    detector = ProxyPerplexityDetector()
     text = ["This is a test sentence.", "Another example of text to analyze."]
     scores = detector.get_score(text)
     print("Scores:", scores)
