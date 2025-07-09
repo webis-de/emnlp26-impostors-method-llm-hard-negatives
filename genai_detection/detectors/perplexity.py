@@ -18,7 +18,9 @@ class PerplexityDetector(DetectorBase):
         perplexity = e**(sum(losses) / num_tokenized_tokens)
         where losses are the negative log-likelihood losses, which are the negative log probabilities of the tokens
         given the previous tokens in the text in the original formula.
+
         :param text: input text to score (no batch!), if list we assume it is tokenized.
+        :return: Average (over token) perplexity score for the input text, in the form of a dictionary with model names as keys
 
         Reference: https://huggingface.co/spaces/evaluate-metric/perplexity (09.07.2025)
         """
@@ -43,7 +45,7 @@ class PerplexityDetector(DetectorBase):
         necessarily comparable. If ``normalize`` is ``False`` (the default), unnormalized raw scores are returned
         instead. Interpretation of these raw scores is entirely implementation-dependent.
 
-        :param text: input text or batch of input texts, do not tokenize prior
+        :param text: input text or batch of input texts (as string or list of strings)
         :param normalize: normalize scores to represent probabilities in the range [0, 1]
         :return: score indicating whether the input text being machine-generated
         """
@@ -54,18 +56,18 @@ class PerplexityDetector(DetectorBase):
             scores_matrix = np.array([list(s.values()) for s in scores])
             scores_matrix = [self._normalize_scores(scores_matrix[i] for i in range(len(scores_matrix)))]
 
-            scores = [{model_name:scores_matrix[j][i] for i, model_name in enumerate(list(scores[0].keys()))} for j in range(len(scores_matrix))]
+            scores = [{model_name: scores_matrix[j][i] for i, model_name in enumerate(list(scores[0].keys()))} for j in range(len(scores_matrix))]
         return scores
     
     def get_prediction(self, text: Iterable[str], threshold=0.5) -> List[bool]:
         """
-        Predict if the input text(s) were written by a the same author TODO: machine.
+        Predict if the input text(s) were written by any of the LLMs.
 
         :param text: input text or batch of input texts
-        :return: boolean classifications of whether inputs are likely same author TODO: machine-generated
+        :return: boolean classifications of whether inputs are likely machine-generated
         """
-        # TODO: find out whether word/token/sentence level perplexity is better 
-        scores = self.get_score(text)  # [Dict[str, List[float]]] each upper element is for a text
+        # perplexity on token level
+        scores = self.get_score(text)  # [Dict[str, List[float]]]; upper elements are texts, containing dicts with their scores for different models
         model_names = list(scores[0].keys())
         model_names.append("unclear")  # Always include 'unclear' at the end
 
@@ -74,11 +76,11 @@ class PerplexityDetector(DetectorBase):
 
         predictions = []
         for row in score_matrix:
-            max_score = np.min(row)
-            print(f"Max score: {max_score}, Threshold: {threshold}")
+            min_score = np.min(row)
+            print(f"Max score: {min_score}, Threshold: {threshold}")
             one_hot = [0] * len(model_names)
             # TODO: find threshold: https://thegradient.pub/understanding-evaluation-metrics-for-language-models/
-            if max_score < threshold:
+            if min_score < threshold:
                 one_hot[-1] = 1  # Set 'unclear'
             else:
                 best_index = int(np.argmax(row))
