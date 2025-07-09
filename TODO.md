@@ -88,9 +88,14 @@
 
 ### 🛠️ Implementation
 - Look at actual [Gohsen paraphrasing code](https://github.com/webis-de/coling24-task-oriented-paraphrase-analytics)
-- [ ] [DetectGPT Baseline](https://github.com/eric-mitchell/detect-gpt): Use T5 to generate pertubations, score them using LLM, threshold 0.1 for classification
+- [x] [DetectGPT Baseline](https://github.com/eric-mitchell/detect-gpt): Use T5 to generate pertubations, score them using LLM, threshold 0.1 for classification
   - both imposter and DetectGPT approaches sample from "source" distribution, i.e. LLMs
   - different similarity measures
+  - no own dataset tutorial, but seems to require [arrow dataset format](https://github.com/eric-mitchell/detect-gpt/blob/main/run.py#L627) with texts rather than pairs if I understand correctly
+    - I can specify the key where the text is stored, i.e. `text` key and dataset is input to `load_dataset` function
+    - However, `load_dataset` does not work with local arrow files, i.e. I need to upload the dataset to Huggingface first OR
+    - `load_dataset` works with [local CSV files](https://huggingface.co/docs/datasets/v1.11.0/loading_datasets.html): `dataset = load_dataset('csv', data_files=['my_file_1.csv', 'my_file_2.csv', 'my_file_3.csv'])`
+  - **Does not work without using CLI, making it incompatible with our repo**: Created [issue](https://github.com/eric-mitchell/detect-gpt/issues/20)
 - [ ] new baseline for imposter approach (AV) / LLM AA: [Perplexity](https://huggingface.co/docs/transformers/perplexity)
 - [ ] [MirrorMinds-LLMDetector](https://github.com/shubhamgpt007/MirrorMinds-LLMDetector) Baseline
   - similar to our approach
