@@ -528,6 +528,8 @@ class BulletPointParaphraser(Paraphraser):
         self.text_extractor = text_extractor
         self.text_generator = text_generator
 
+        self.extractor_prompt = 'Summarize the following text in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"bullet_points":"<list of bullet points>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"genre":"<genre>"}. Do not use direct quotes. Text to summarize:'
+
     def add_tailoring_quotes(self, value):
         value = value.strip()
         if value.startswith('"') and value.endswith('"'):
@@ -557,12 +559,8 @@ class BulletPointParaphraser(Paraphraser):
         """
         assert self.text_extractor is not None, "Text extractor must be provided."
         if prompt is None:
-            prompt = 'Summarize the following text in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"bullet_points":"<list of bullet points>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"genre":"<genre>"}. Do not use direct quotes. Text to summarize:'
-            # TODO: temporarily use this prompt, because the text extractor is not able to return a valid JSON object with the default prompt
-            # prompt = 'Summarize the following text in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","bullet_points":"<list of bullet points>"}. Do not use direct quotes. Text to summarize:'
+            prompt = self.extractor_prompt
 
-        # print(f"[DEBUG] Using text extractor with prompt: {prompt}")
-        # print(f"[DEBUG] reponse schema: ", response_schema, type(response_schema))
         res = self.text_extractor.paraphrase(
             text=text,
             prompt=prompt,
@@ -687,9 +685,6 @@ class BulletPointParaphraser(Paraphraser):
             temperature=temperature,
             response_schema=BulletSchema.model_json_schema(),
         )
-        # time period and register breaks paraphrasing with LLM for some reason, so we do not specify them in the prompt
-        # time_period = self.get_time_period(text=text) if time_period=='' else time_period
-        # register = self.get_register(text=text) if register=='' else register
         generator_prompt = (
             f"Do not use asterisks. Write a text of about {len(text.split())} words with a {tone} tone, a {genre} genre, in the {register} register and in the {time_period} time period, covering the following points:\n"
             + "\n".join(f"- {bp}" for bp in bullet_points)
@@ -720,6 +715,7 @@ class TaskParaphraser(BulletPointParaphraser):
         :param text_generator: A model or function to generate text based on the extracted task, tone and genre.
         """
         super().__init__(text_extractor=text_extractor, text_generator=text_generator)
+        self.extractor_prompt = 'Act as the author of the text. From that perspective, infer your role or identity, the topic being addressed, and the purpose or instruction behind writing the text. Combine these elements into a concise task prompt that you would give to an LLM to reproduce the text. Respond ONLY with a JSON object in the following format: {"task":"<task>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"genre":"<genre>"}. Text to extract the intended task (prompt), tone, genre, time period and register from:'
 
     def paraphrase(
         self,
@@ -730,12 +726,9 @@ class TaskParaphraser(BulletPointParaphraser):
         temperature: float = TEMPERATURE,
         response_schema: Optional[dict[str, Any]] = None,
     ) -> List[str]:
-        extractor_prompt = 'Act as the author of the text. From that perspective, infer your role or identity, the topic being addressed, and the purpose or instruction behind writing the text. Combine these elements into a concise task prompt that you would give to an LLM to reproduce the text. Respond ONLY with a JSON object in the following format: {"task":"<task>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"genre":"<genre>"}. Text to extract the intended task (prompt), tone, genre, time period and register from:'
-        # FIXME: time_period and register breaks often
-        # extractor_prompt = 'Act as the author of the text. From that perspective, infer your role or identity, the topic being addressed, and the purpose or instruction behind writing the text. Combine these elements into a concise task prompt that you would give to an LLM to reproduce the text. Respond ONLY with a JSON object in the following format: {"task":"<task>","tone":"<tone>","genre":"<genre>"}. Text to extract the intended task (prompt), tone, and genre from:'
         task, tone, genre, time_period, register = self._extract_bullet_points(
             text=text,
-            prompt=extractor_prompt,
+            prompt=self.extractor_prompt,
             temperature=temperature,
             key="task",
             response_schema=TaskSchema.model_json_schema(),
@@ -827,6 +820,7 @@ class TitleParaphraser(BulletPointParaphraser):
         :param text_generator: A model or function to generate text based on the extracted title, tone and genre.
         """
         super().__init__(text_extractor=text_extractor, text_generator=text_generator)
+        self.extractor_prompt = 'Find a concise title for the text, extract the tone, time period, register and genre from the text. Respond ONLY with a JSON object in the following format: {"title":"<title>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"genre":"<genre>"}. Text to extract title, tone, genre, time period and register from:'
 
     def paraphrase(
         self,
@@ -837,12 +831,9 @@ class TitleParaphraser(BulletPointParaphraser):
         temperature: float = TEMPERATURE,
         response_schema: Optional[dict[str, Any]] = None,
     ) -> List[str]:
-        extractor_prompt = 'Find a concise title for the text, extract the tone, time period, register and genre from the text. Respond ONLY with a JSON object in the following format: {"title":"<title>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"genre":"<genre>"}. Text to extract title, tone, genre, time period and register from:'
-        # FIXME: time_period and register breaks often
-        # extractor_prompt = 'Find a concise title for the text, extract the tone and genre from the text. Respond ONLY with a JSON object in the following format: {"title":"<title>","tone":"<tone>","genre":"<genre>"}. Text to extract title, tone, and genre from:'
         title, tone, genre, time_period, register = self._extract_bullet_points(
             text=text,
-            prompt=extractor_prompt,
+            prompt=self.extractor_prompt,
             temperature=temperature,
             key="title",
             response_schema=TitleSchema.model_json_schema(),
@@ -978,6 +969,11 @@ class ParaphrasingEvaluator:
                 )
 
         gutenberg_df = pd.DataFrame(gutenberg_data)
+        metadata = pd.read_excel(path2metadata)
+        # join on data's filename column and metadata's index (always 'others' index)
+        gutenberg_df = gutenberg_df.join(
+            metadata.set_index("filename"), on="filename", how="left", rsuffix="_meta"
+        )
         print("[INFO] Loaded data and metadata.")
         print(gutenberg_df.head())
 
@@ -1002,29 +998,40 @@ class ParaphrasingEvaluator:
             ):
                 text = row.text
                 try:
-                    extra, _, genre, time_period, _ = (
-                        paraphraser._extract_bullet_points(
-                            text=text,
-                            prompt=paraphraser.extractor_prompt,
-                            response_schema=TopicSchema.model_json_schema(),
-                        )
-                    )
+                    extra, _, genre, time_period, _ = ("19",) * 5  # default values
+                    #     paraphraser._extract_bullet_points(
+                    #         text=text,
+                    #         prompt=paraphraser.extractor_prompt,
+                    #         response_schema=TopicSchema.model_json_schema(),
+                    #     )
+                    # )
+                    time_period = int(time_period)
+                    if time_period > 100:
+                        century = time_period // 100  # obtain century
+                        if time_period % 100 != 0:
+                            century += 1
+                    else:
+                        century = time_period
+
                 except Exception as e:
                     print(f"[WARNING] Extraction failed for file '{row.filename}': {e}")
                     continue
 
                 print(
-                    f"[DEBUG] Extracted from '{row.filename}': Genre: '{genre}', Time Period: '{time_period}', Extra: '{extra}'"
+                    f"[DEBUG] Extracted from '{row.filename}': Genre: '{genre}', Time Period/century: '{century}', Extra: '{extra}'"
                 )
+                print(row._fields)
 
                 # Ground truth
                 gt_genre = getattr(row, "genre", "")
-                gt_century = getattr(row, "century", "")
+                gt_century = int(getattr(row, "century", 0))
                 gt_topic = getattr(row, "topic", "")
 
                 # Compare results
-                genre_match = genre.strip().lower() == str(gt_genre).strip().lower()
-                time_match = similar(time_period, gt_century)
+                genre_match = similar(
+                    genre.strip().lower(), str(gt_genre).strip().lower()
+                )
+                time_match = similar(century, gt_century)
                 topic_match = similar(extra, gt_topic)
 
                 results[model_name]["genre_match"] += int(genre_match)
@@ -1057,9 +1064,17 @@ class ParaphrasingEvaluator:
 
         # Optional: save to disk
         if save_to_disk:
-            out_path = Path("extractor_eval_results.csv")
-            pd.DataFrame.from_dict(results, orient="index").to_csv(out_path)
-            print(f"[INFO] Results saved to {out_path}")
+            save_base_path = (
+                Path(__file__).resolve().parent.parent.parent / CONFIG.SAVE_PATH
+            )
+            assert (
+                save_base_path.exists()
+            ), f"Savefig base path {save_base_path} does not exist."
+            save_base_path = save_base_path / "paraphrasing"
+            os.makedirs(save_base_path, exist_ok=True)
+            save_path = save_base_path / "extractor_eval_results.csv"
+            pd.DataFrame.from_dict(results, orient="index").to_csv(save_path)
+            print(f"[INFO] Results saved to {save_path}")
 
     def evaluate(self, save_to_disk: bool = True):
         """
