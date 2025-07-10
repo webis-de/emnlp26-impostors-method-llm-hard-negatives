@@ -108,9 +108,11 @@ class UnmaskingDetector(DetectorBase):
             tokens_left = self.tokenizer(self.preprocess_text(t[0]))
             tokens_right = self.tokenizer(self.preprocess_text(t[1]))
             if len(tokens_left) == 0 or len(tokens_right) == 0:
-                print("Skipping empty text pair: Left: {}, Right: {}".format(t[0], t[1]))
+                print(
+                    "Skipping empty text pair: Left: {}, Right: {}".format(t[0], t[1])
+                )
                 continue
-            
+
             chunks_left = self.create_chunks(
                 tokens_left, self.chunk_size, self.bootstrap, self.n_chunks
             )
@@ -235,7 +237,6 @@ class UnmaskingDetector(DetectorBase):
                 "Cannot bootstrap tokens from empty sequence. "
                 "Please check your input data."
                 "len(tokens) = {}.".format(len(tokens))
-
             ) from e
         return t
 

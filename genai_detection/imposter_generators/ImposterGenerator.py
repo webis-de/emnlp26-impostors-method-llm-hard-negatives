@@ -18,15 +18,17 @@ from bs4 import BeautifulSoup
 from datasets import load_from_disk
 import serpapi
 from dotenv import load_dotenv
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from config import CONFIG
 
-load_dotenv() 
+load_dotenv()
 
 
 class BaseImposterGenerator(ABC):
     """Abstract base class for generating imposters."""
-    def __init__(self, n_impostors: int, split:str='test'):
+
+    def __init__(self, n_impostors: int, split: str = "test"):
         """
         :param n_impostors: number of impostors to generate
         :param split: dataset split to use (default: 'test')
@@ -35,9 +37,11 @@ class BaseImposterGenerator(ABC):
         self.split = split
 
     @abstractmethod
-    def generate_imposters(self, text:str, path2imp:str=None, real_time_generation:bool=False) -> dict:
+    def generate_imposters(
+        self, text: str, path2imp: str = None, real_time_generation: bool = False
+    ) -> dict:
         """Get a dictionary of impostor texts for the given input text.
-        
+
         References:
         ===========
         Kocher, Mirco, and Jacques Savoy. ‘UniNE at CLEF 2015: Author Identification’, 2015.
@@ -48,14 +52,21 @@ class BaseImposterGenerator(ABC):
         """
         pass
 
-    def _get_dataset_split_from_path(self, path2imp:str):
-        path2imp = Path(path2imp)     
+    def _get_dataset_split_from_path(self, path2imp: str):
+        path2imp = Path(path2imp)
         if not path2imp.exists():
             raise FileNotFoundError(f"Training data not found at {path2imp}")
-        dataset = load_from_disk(os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")), path2imp))  # TODO: for notebook ..
+        dataset = load_from_disk(
+            os.path.join(
+                os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")),
+                path2imp,
+            )
+        )  # TODO: for notebook ..
         if self.split not in dataset:
-            raise ValueError(f"Dataset {path2imp} does not contain '{self.split}' split.")
-        
+            raise ValueError(
+                f"Dataset {path2imp} does not contain '{self.split}' split."
+            )
+
         ds = dataset[self.split]
         if len(ds) == 0:
             raise ValueError("Dataset split is empty.")
@@ -63,7 +74,12 @@ class BaseImposterGenerator(ABC):
 
 
 class ContentImposterGenerator(BaseImposterGenerator):
-    def __init__(self, n_impostors: int, model_name: str = "all-MiniLM-L6-v2", split:str='test'):
+    def __init__(
+        self,
+        n_impostors: int,
+        model_name: str = "all-MiniLM-L6-v2",
+        split: str = "test",
+    ):
         """
         :param n_impostors: number of impostors to generate
         :param model_name: embedding model from sentence-transformers
@@ -72,7 +88,9 @@ class ContentImposterGenerator(BaseImposterGenerator):
         super().__init__(n_impostors=n_impostors, split=split)
         self.model = SentenceTransformer(model_name)
 
-    def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> List[str]:
+    def generate_imposters(
+        self, text: str, path2imp: str = None, real_time_generation: bool = False
+    ) -> List[str]:
         """
         Generates imposters from a pre-defined dataset.
         :param text: input text to generate imposters for (not used in this implementation)
@@ -94,7 +112,9 @@ class ContentImposterGenerator(BaseImposterGenerator):
         # compute embeddings
         # TODO: preprocess text to remove special characters, punctuation, etc.?
         text_embedding = self.model.encode(text, convert_to_tensor=True)
-        candidate_embeddings = self.model.encode(candidate_texts, convert_to_tensor=True)
+        candidate_embeddings = self.model.encode(
+            candidate_texts, convert_to_tensor=True
+        )
 
         # compute cosine similarity
         similarities = util.cos_sim(text_embedding, candidate_embeddings)[0]
@@ -107,7 +127,15 @@ class ContentImposterGenerator(BaseImposterGenerator):
 
 
 class GoogleSearchImposterGenerator(BaseImposterGenerator):
-    def __init__(self, api_key: str, num_queries: int = 2, results_per_query: int = 25, max_workers: int = 2, n_min_words: int = 3, n_max_words: int = 5):
+    def __init__(
+        self,
+        api_key: str,
+        num_queries: int = 2,
+        results_per_query: int = 25,
+        max_workers: int = 2,
+        n_min_words: int = 3,
+        n_max_words: int = 5,
+    ):
         """
         n_impostors <= num_queries * results_per_query
 
@@ -117,7 +145,7 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
         - max_workers: -
         - n_min_words: 3
         - n_max_words: 5
-        
+
         :param api_key: API key for SerpAPI Google Search API
         :param num_queries: number of queries to generate (default: 2)
         :param results_per_query: number of results to fetch per query (default: 25)
@@ -132,10 +160,14 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
         self.max_workers = max_workers
         self.n_min_words = n_min_words
         self.n_max_words = n_max_words
-        assert self.n_min_words < self.n_max_words, "n_min_words must be less than n_max_words"
+        assert (
+            self.n_min_words < self.n_max_words
+        ), "n_min_words must be less than n_max_words"
         self.nlp = spacy.load("en_core_web_sm")
 
-    def get_medium_frequency_words(self, text: str, lower_pct: int = 30, upper_pct: int = 70) -> List[str]:
+    def get_medium_frequency_words(
+        self, text: str, lower_pct: int = 30, upper_pct: int = 70
+    ) -> List[str]:
         """
         Extracts medium frequency words from the input text.
         Medium frequency words are defined as those that fall between the lower and upper percentiles of word frequencies in the text.
@@ -145,51 +177,74 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
         :return: list of medium frequency words
         """
         doc = self.nlp(text.lower())
-        words = [token.text for token in doc if token.is_alpha and not token.is_stop]   # filter out stop words and non-alphabetic tokens
+        words = [
+            token.text for token in doc if token.is_alpha and not token.is_stop
+        ]  # filter out stop words and non-alphabetic tokens
         freq_counter = Counter(words)
         freqs = np.array(list(freq_counter.values()))
-    
+
         # Compute dynamic thresholds
         low_thresh = np.percentile(freqs, lower_pct)
         high_thresh = np.percentile(freqs, upper_pct)
-        return [word for word, count in freq_counter.items() if low_thresh <= count <= high_thresh]   # medium frequency words
+        return [
+            word
+            for word, count in freq_counter.items()
+            if low_thresh <= count <= high_thresh
+        ]  # medium frequency words
 
-    def _generate_queries_based_on_candidate_words(self, candidate_words: List[str]) -> List[str]:
+    def _generate_queries_based_on_candidate_words(
+        self, candidate_words: List[str]
+    ) -> List[str]:
         """
         Generates a list of queries using random combinations of candidate words. Each query is a string and will have a random number of words between n_min_words and n_max_words separated by whitespaces.
         :param candidate_words: list of candidate words to use for generating queries
         :return: list of generated queries
         """
         queries = []
-        assert len(candidate_words) >= self.n_min_words, f"Not enough candidate words to generate queries, at {self.n_min_words} necessary."
+        assert (
+            len(candidate_words) >= self.n_min_words
+        ), f"Not enough candidate words to generate queries, at {self.n_min_words} necessary."
         for _ in range(self.num_queries):
-            n_words = min(len(candidate_words), random.randint(self.n_min_words, self.n_max_words))
+            n_words = min(
+                len(candidate_words), random.randint(self.n_min_words, self.n_max_words)
+            )
             query_words = random.sample(candidate_words, n_words)
             queries.append(" ".join(query_words))
         return queries
 
-    def _extract_text_from_url(self, url:str) -> str:
+    def _extract_text_from_url(self, url: str) -> str:
         """
         Extracts and cleans main textual content from a webpage.
 
-        This function fetches the content of a given URL, removes non-informative 
-        HTML elements such as <script>, <style>, <header>, <footer>, and normalizes 
-        the text by collapsing all whitespace (tabs, newlines, multiple spaces) into 
+        This function fetches the content of a given URL, removes non-informative
+        HTML elements such as <script>, <style>, <header>, <footer>, and normalizes
+        the text by collapsing all whitespace (tabs, newlines, multiple spaces) into
         single spaces. It only keeps the text found within paragraph <p> tags.
 
-        Punctuation is preserved, but all sequences of whitespace are reduced to a 
-        single space to make the text layout-agnostic and suitable for further 
+        Punctuation is preserved, but all sequences of whitespace are reduced to a
+        single space to make the text layout-agnostic and suitable for further
         processing.
 
         :param url: The URL of the webpage to fetch and process.
-        :return: Cleaned textual content from the webpage, with only useful body text 
+        :return: Cleaned textual content from the webpage, with only useful body text
              preserved and whitespace normalized.
         """
         try:
             response = requests.get(url, timeout=5)
             soup = BeautifulSoup(response.text, "html.parser")
             # Remove unwanted tags
-            for tag in soup(["script", "style", "header", "footer", "nav", "aside", "form", "noscript"]):
+            for tag in soup(
+                [
+                    "script",
+                    "style",
+                    "header",
+                    "footer",
+                    "nav",
+                    "aside",
+                    "form",
+                    "noscript",
+                ]
+            ):
                 tag.decompose()
 
             # Extract paragraph text
@@ -202,7 +257,6 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
             print(f"Error fetching from URL {url}: {e}")
             return ""
 
-
     def fetch_results(self, query: str) -> List[Dict]:
         """
         Fetches search results for a given query using the SerpAPI Google Search API.
@@ -214,19 +268,27 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
             raise ValueError("API key for SerpAPI is not provided.")
         try:
             params = {
-                "q": query, # the search query, eg. "coffee"
+                "q": query,  # the search query, eg. "coffee"
                 "num": self.results_per_query,  # default: 10
                 "api_key": self.api_key,
-                "engine": "google_light",   # might return fewer results than 'google' engine, but is faster
-                "safe": "off", # disbale filtering out adult content
-                "nfpr": 0, # include results from auto-corrected query for misspellings
+                "engine": "google_light",  # might return fewer results than 'google' engine, but is faster
+                "safe": "off",  # disbale filtering out adult content
+                "nfpr": 0,  # include results from auto-corrected query for misspellings
                 "devices": "desktop",  # use desktop results
             }
             search = serpapi.search(params)
             results = search.as_dict()
             return [
-                {"query": query, "title": res.get("title"), "url": res.get("link"), "snippet": res.get("snippet"), "rich_snippet": res.get("rich_snippet", ""),
-                 "author": res.get("author", "unknown"), "position": res.get("position"), "full_text": self._extract_text_from_url(res.get("link")),}
+                {
+                    "query": query,
+                    "title": res.get("title"),
+                    "url": res.get("link"),
+                    "snippet": res.get("snippet"),
+                    "rich_snippet": res.get("rich_snippet", ""),
+                    "author": res.get("author", "unknown"),
+                    "position": res.get("position"),
+                    "full_text": self._extract_text_from_url(res.get("link")),
+                }
                 for res in results.get("organic_results", [])
             ]
         except Exception as e:
@@ -241,12 +303,16 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
         """
         all_results = []
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = {executor.submit(self.fetch_results, query): query for query in queries}
+            futures = {
+                executor.submit(self.fetch_results, query): query for query in queries
+            }
             for future in as_completed(futures):
                 all_results.extend(future.result())
         return all_results
 
-    def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> pd.DataFrame:
+    def generate_imposters(
+        self, text: str, path2imp: str = None, real_time_generation: bool = False
+    ) -> pd.DataFrame:
         """
         Generates imposters for the given input text using Google search results.
 
@@ -271,17 +337,18 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
             raise ValueError("Input text must be a non-empty string.")
         if real_time_generation:
             medium_frequency_words = self.get_medium_frequency_words(text)
-            queries = self._generate_queries_based_on_candidate_words(medium_frequency_words)
+            queries = self._generate_queries_based_on_candidate_words(
+                medium_frequency_words
+            )
             result_df = pd.DataFrame(self._parallel_fetch(queries))
             result_df.drop_duplicates(subset="url", inplace=True)
-
 
             if result_df.empty:
                 print("Warning: No results fetched. CSV not saved.")
                 return result_df
-        
+
             if path2imp is None:
-                path2imp = Path(CONFIG.PATH2GENERIC_ON_FLY_IMP) 
+                path2imp = Path(CONFIG.PATH2GENERIC_ON_FLY_IMP)
             else:
                 path2imp = Path(path2imp)
             if path2imp.suffix != ".csv" or path2imp.is_dir():
@@ -289,49 +356,74 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
                     path2imp = path2imp.with_suffix(".csv")
                 else:
                     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                    path2imp = path2imp / f"google_on_fly_imposter_results_{timestamp}.csv"
+                    path2imp = (
+                        path2imp / f"google_on_fly_imposter_results_{timestamp}.csv"
+                    )
 
             path2imp.parent.mkdir(parents=True, exist_ok=True)
             result_df.to_csv(path2imp, index=False)
-        else:   # use precomputed results
+        else:  # use precomputed results
             # TODO for debugging purposes, delete later:
-            if 'PUCK' in text:  # Midsummer Night's Dream
-                path2imp = path2imp / 'imposter_A_Midsummer_Nights_Dream_William_Shakespeare_results_20250608_201352.csv'
-            elif 'Frankenstein' in text:  # Frankenstein
-                path2imp = path2imp / 'imposter_Frankenstein_Mary_Wollstonecraft_(Godwin)_Shelley_results_20250608_145350.csv'
-            elif 'unlineal' in text:  # Macbeth
-                path2imp = path2imp / 'imposter_Macbeth_William_Shakespeare_results_20250608_211827.csv'
-            elif 'auld' in text:  # Orthello
-                path2imp = path2imp / 'imposter_Othello_the_Moor_of_Venice_William_Shakespeare_results_20250608_212040.csv'
-            else: # A Lovers Complaint
-                path2imp = path2imp / 'imposter_A_Lovers_Complaint_William_Shakespeare_results_20250608_202134.csv'
+            if "PUCK" in text:  # Midsummer Night's Dream
+                path2imp = (
+                    path2imp
+                    / "imposter_A_Midsummer_Nights_Dream_William_Shakespeare_results_20250608_201352.csv"
+                )
+            elif "Frankenstein" in text:  # Frankenstein
+                path2imp = (
+                    path2imp
+                    / "imposter_Frankenstein_Mary_Wollstonecraft_(Godwin)_Shelley_results_20250608_145350.csv"
+                )
+            elif "unlineal" in text:  # Macbeth
+                path2imp = (
+                    path2imp
+                    / "imposter_Macbeth_William_Shakespeare_results_20250608_211827.csv"
+                )
+            elif "auld" in text:  # Orthello
+                path2imp = (
+                    path2imp
+                    / "imposter_Othello_the_Moor_of_Venice_William_Shakespeare_results_20250608_212040.csv"
+                )
+            else:  # A Lovers Complaint
+                path2imp = (
+                    path2imp
+                    / "imposter_A_Lovers_Complaint_William_Shakespeare_results_20250608_202134.csv"
+                )
             result_df = pd.read_csv(path2imp)
 
-        
         # aggregate results' texts, preferably using full_text, if empty use snippet and return a list of texts
         imposter_texts = {
-            f"{re.sub(' ', '_', string=row['query'])}_{row['position']}": row['full_text']
+            f"{re.sub(' ', '_', string=row['query'])}_{row['position']}": row[
+                "full_text"
+            ]
             for _, row in result_df.iterrows()
-            if pd.notnull(row.get('full_text'))
+            if pd.notnull(row.get("full_text"))
         }
 
         # full_text is missing but snippet is present
         for _, row in result_df.iterrows():
-            if pd.isna(row.get('full_text')) and pd.notnull(row.get('snippet')):
+            if pd.isna(row.get("full_text")) and pd.notnull(row.get("snippet")):
                 key = f"{re.sub(' ', '_', row['query'])}_{row['position']}"
-                imposter_texts[key] = row['snippet']
-
+                imposter_texts[key] = row["snippet"]
 
         return imposter_texts
-        
-    
+
+
 class TextLenImposterGenerator(BaseImposterGenerator):
-    def __init__(self, n_impostors: int, split:str='test'):
+    def __init__(self, n_impostors: int, split: str = "test"):
         super().__init__(n_impostors=n_impostors, split=split)
 
-    def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False, valid_relative_text_len_dif:float=0.3) -> List[str]:
+    def generate_imposters(
+        self,
+        text: str,
+        path2imp: str = None,
+        real_time_generation: bool = False,
+        valid_relative_text_len_dif: float = 0.3,
+    ) -> List[str]:
         ds = self._get_dataset_split_from_path(path2imp)
-        max_subset_size = min(self.n_impostors, len(ds))  # generate around twice as many impostors as requested, to ensure diversity
+        max_subset_size = min(
+            self.n_impostors, len(ds)
+        )  # generate around twice as many impostors as requested, to ensure diversity
         sampled = ds.shuffle(seed=42).select(range(max_subset_size))
         candidate_texts = []
         for entry in sampled:
@@ -340,17 +432,26 @@ class TextLenImposterGenerator(BaseImposterGenerator):
         text_len = len(text)
         threshold = text_len * valid_relative_text_len_dif
         # filter candidates based on length
-        filtered_candidates = [s for s in candidate_texts if abs(len(s) - text_len) < threshold]
+        filtered_candidates = [
+            s for s in candidate_texts if abs(len(s) - text_len) < threshold
+        ]
         if not filtered_candidates:
-            return self.generate_imposters(text=text, path2imp=path2imp, real_time_generation=path2imp, valid_relative_text_len_dif=min(1, valid_relative_text_len_dif * 2))  # try again with a larger threshold
-        
+            return self.generate_imposters(
+                text=text,
+                path2imp=path2imp,
+                real_time_generation=path2imp,
+                valid_relative_text_len_dif=min(1, valid_relative_text_len_dif * 2),
+            )  # try again with a larger threshold
+
         lengths = np.array([len(s) for s in filtered_candidates])
         diffs = np.abs(lengths - text_len)
         probs = 1 / (1 + diffs)
         probs /= probs.sum()
 
         num_to_sample = min(self.n_impostors, len(filtered_candidates))
-        selected = np.random.choice(filtered_candidates, size=num_to_sample, replace=False, p=probs)
+        selected = np.random.choice(
+            filtered_candidates, size=num_to_sample, replace=False, p=probs
+        )
 
         return {f"imposter_{i}": imp for i, imp in enumerate(selected)}
 
@@ -364,7 +465,9 @@ class NDocsImposterGenerator(BaseImposterGenerator):
         """
         super().__init__(n_impostors=n_impostors)
 
-    def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> List[str]:
+    def generate_imposters(
+        self, text: str, path2imp: str = None, real_time_generation: bool = False
+    ) -> List[str]:
         pass
 
 
@@ -372,12 +475,14 @@ class LLMImposterGenerator(BaseImposterGenerator):
     def __init__(self, n_impostors: int):
         self.n_impostors = n_impostors
 
-    def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> List[str]:
+    def generate_imposters(
+        self, text: str, path2imp: str = None, real_time_generation: bool = False
+    ) -> List[str]:
         pass
 
 
 class FixedImposterGenerator(BaseImposterGenerator):
-    def __init__(self, n_impostors: int, split:str='test'):
+    def __init__(self, n_impostors: int, split: str = "test"):
         """
         :param n_impostors: number of imposters to generate
         :param split: dataset split to use (default: 'test')
@@ -387,9 +492,10 @@ class FixedImposterGenerator(BaseImposterGenerator):
         Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’. Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
         """
         super().__init__(n_impostors=n_impostors, split=split)
- 
 
-    def generate_imposters(self, text: str, path2imp:Path=None, real_time_generation:bool=False) -> List[str]:
+    def generate_imposters(
+        self, text: str, path2imp: Path = None, real_time_generation: bool = False
+    ) -> List[str]:
         """
         Generates imposters from a pre-defined dataset.
         :param text: input text to generate imposters for (not used in this implementation)
@@ -398,7 +504,7 @@ class FixedImposterGenerator(BaseImposterGenerator):
         :return: dictionary of imposters with keys as ids and values as texts
         """
         ds = self._get_dataset_split_from_path(path2imp)
-        sampled = ds.shuffle().select(range(min(len(ds), self.n_impostors//2)))
+        sampled = ds.shuffle().select(range(min(len(ds), self.n_impostors // 2)))
         imposters = {}
         for i, entry in enumerate(sampled):
             if "pair" not in entry:
@@ -414,19 +520,24 @@ class FixedImposterGenerator(BaseImposterGenerator):
 
 
 class BlogImposterGenerator(FixedImposterGenerator):
-    def __init__(self, n_impostors: int, split:str='test'):
-        super().__init__(n_impostors=n_impostors, split=split) 
-        
-    def generate_imposters(self, text: str, path2imp:str=None, real_time_generation:bool=False) -> List[str]:
+    def __init__(self, n_impostors: int, split: str = "test"):
+        super().__init__(n_impostors=n_impostors, split=split)
+
+    def generate_imposters(
+        self, text: str, path2imp: str = None, real_time_generation: bool = False
+    ) -> List[str]:
         """Generates imposters from the Blog dataset.
         :param text: input text to generate imposters for (not used in this implementation)
         :param path2imp: not used in this implementation, but kept for interface consistency
         :param real_time_generation: not used in this implementation, but kept for interface consistency
         :return: dictionary of imposters with keys as ids and values as texts"""
-        return super().generate_imposters(text=text, path2imp=os.path.join(os.path.abspath(".."), CONFIG.PATH2BLOG), real_time_generation=real_time_generation)
+        return super().generate_imposters(
+            text=text,
+            path2imp=os.path.join(os.path.abspath(".."), CONFIG.PATH2BLOG),
+            real_time_generation=real_time_generation,
+        )
 
-        
-       
+
 # Example usage
 if __name__ == "__main__":
     # Literary imposters
@@ -441,7 +552,7 @@ if __name__ == "__main__":
     # ds = load_from_disk(CONFIG.PATH2BLOG)[split].to_pandas()
     # print(f"Loaded {len(ds)} entries from the Blog dataset from {split} split.")
     # print("ids with negative samples:", ds[ds['same'] == 0].index.tolist())
-    # ids = [164, 394, 2, 3] if split == 'train' else [1, 362]  # example ids to test with 
+    # ids = [164, 394, 2, 3] if split == 'train' else [1, 362]  # example ids to test with
     # for id in ids:
     #     input_text_a, input_text_b = ds.loc[id, 'pair'][0], ds.loc[id, 'pair'][1]  # use the first text from the dataset as input text
     #     same = ds.loc[id, 'same']
@@ -449,7 +560,7 @@ if __name__ == "__main__":
     #     print('---')
     #     print(input_text_b)
     #     print('---')
-    
+
     #     print(f"Same author: {same}")
 
     #     # >=10 queries does not work, api error/ maybe local cert issue
@@ -459,8 +570,6 @@ if __name__ == "__main__":
     #     imposters_b = generator.generate_imposters(input_text_b, real_time_generation=True, path2imp=Path(CONFIG.PATH2GENERIC_ON_FLY_IMP) / f"imposter_blog_converted_{split}_id{id}right_same{same}_results.csv")
     #     print(f"Generated {len(imposters_a) + len(imposters_b)} imposters for Blog corpus example:")
 
-    
     # for imposter_name, imposter_text in imposters.items():
     #     print(f"Imposter {imposter_name}: {imposter_text[:100]}...")  # Print first 100 characters of each imposter
     print("Imposter generation complete.")
-

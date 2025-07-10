@@ -294,6 +294,7 @@ def model_batch_forward(
             encoding.attention_mask[b : b + batch_size],
         )
 
+
 def preprocess_text(text: t.Union[str, t.Iterable[str]]) -> t.Union[str, t.List[str]]:
     """
     Preprocess input text:
@@ -307,55 +308,65 @@ def preprocess_text(text: t.Union[str, t.Iterable[str]]) -> t.Union[str, t.List[
         - trailing numbers as line numbers
     - remove newlines
     - utf-8 to ascii conversion, i.e. omit special characters
-    - lowercase everything 
+    - lowercase everything
     - strip leading and trailing whitespace
 
     :param text: input text or batch of input texts
     :return: preprocessed text or batch of preprocessed texts
     """
+
     def clean(single_text: str) -> str:
         # decode any html entities (&amp; → &)
         single_text = html.unescape(single_text)
 
         # strip out html tags such as <p>, <br>, etc.
-        single_text = re.sub(r'<[^>]+>', '', single_text)
+        single_text = re.sub(r"<[^>]+>", "", single_text)
 
         # remove play artifacts that:
         # - contain only uppercase letters, spaces, and optionally dots or colons at the end
         # - e.g. "PALAMON.", "FIRST LORD:", "KING"
-        header_pattern = re.compile(r'^[A-Z\s]+[.:]?$', re.MULTILINE)
-        single_text = re.sub(header_pattern, '', single_text)
+        header_pattern = re.compile(r"^[A-Z\s]+[.:]?$", re.MULTILINE)
+        single_text = re.sub(header_pattern, "", single_text)
 
         # remove chapter artifacts:
         # ^\s*Chapter\s+\w+  — start of line, optional spaces, 'Chapter' + some word/number
         # \s*                — optional spaces (for line endings)
         # \n+                — one or more newlines (blank lines after header)
-        chapter_pattern = re.compile(r'^\s*Chapter\s+\w+.*\n\s*\n', re.IGNORECASE | re.MULTILINE)
-        single_text = re.sub(chapter_pattern, '', single_text)
+        chapter_pattern = re.compile(
+            r"^\s*Chapter\s+\w+.*\n\s*\n", re.IGNORECASE | re.MULTILINE
+        )
+        single_text = re.sub(chapter_pattern, "", single_text)
 
         # remove act and scene (play artifacts)
-        single_text = re.sub(r'\s*ACT\s+\w+\b\.?', '', single_text, flags=re.IGNORECASE | re.MULTILINE)
-        single_text = re.sub(r'^\s*SCENE\s+\w+\b\.?', '', single_text, flags=re.IGNORECASE | re.MULTILINE)
+        single_text = re.sub(
+            r"\s*ACT\s+\w+\b\.?", "", single_text, flags=re.IGNORECASE | re.MULTILINE
+        )
+        single_text = re.sub(
+            r"^\s*SCENE\s+\w+\b\.?", "", single_text, flags=re.IGNORECASE | re.MULTILINE
+        )
 
         # remove brackets but keep content (play artifacts)
-        single_text = re.sub(r'\[(.*?)\]', r'\1', single_text, flags=re.DOTALL)
+        single_text = re.sub(r"\[(.*?)\]", r"\1", single_text, flags=re.DOTALL)
         # remove underscores inside the extracted content (play artifacts)
-        single_text = re.sub(r'_+', '', single_text)
+        single_text = re.sub(r"_+", "", single_text)
 
         # remove trailing numbers (i.e. line numbers as play articfact); whitespace followed by digits at end of line
-        single_text = re.sub(r'\s+\d+\s*$', '', single_text, flags=re.MULTILINE)
+        single_text = re.sub(r"\s+\d+\s*$", "", single_text, flags=re.MULTILINE)
 
         # collapse all whitespace (including newlines) to single spaces and trim
-        single_text = re.sub(r'\s+', ' ', single_text).strip()
+        single_text = re.sub(r"\s+", " ", single_text).strip()
 
         # transliterate to ascii, dropping characters that can't be converted
-        single_text = unicodedata.normalize('NFKD', single_text).encode('ascii', 'ignore').decode('ascii')
+        single_text = (
+            unicodedata.normalize("NFKD", single_text)
+            .encode("ascii", "ignore")
+            .decode("ascii")
+        )
 
         # convert everything to lowercase for uniformity
         single_text = single_text.lower().strip()
 
         return single_text
-
 
     if isinstance(text, str):
         return clean(text)

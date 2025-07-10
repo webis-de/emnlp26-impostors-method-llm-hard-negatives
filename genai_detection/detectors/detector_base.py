@@ -22,6 +22,7 @@ import torch
 import numpy as np
 import sys
 import os
+
 sys.path.append(os.path.abspath(".."))
 from genai_detection.util import preprocess_text as _preprocess_text
 
@@ -159,7 +160,9 @@ class DetectorBase:
             return preds[0], scores[0]
         return preds, scores
 
-    def preprocess_text(self, text: t.Union[str, t.Iterable[str]]) -> t.Union[str, t.List[str]]:
+    def preprocess_text(
+        self, text: t.Union[str, t.Iterable[str]]
+    ) -> t.Union[str, t.List[str]]:
         """
         Preprocess input text:
         - remove newlines
@@ -169,6 +172,7 @@ class DetectorBase:
             - newlines
         """
         return _preprocess_text(text)
+
 
 def _create_nan_array(n):
     return np.empty(shape=(n,)) * np.nan

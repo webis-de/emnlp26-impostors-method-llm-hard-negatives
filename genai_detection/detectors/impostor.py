@@ -23,6 +23,7 @@ import torch
 
 from genai_detection.detectors.detector_base import DetectorBase
 from genai_detection.imposter_generators import ImposterGenerator
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from config import CONFIG
 
@@ -32,7 +33,7 @@ __all__ = ["ImpostorDetector"]
 class ImpostorDetector(DetectorBase):
     """
     The Imposter method extends the ngram-unmasking method.
-    It uses saves the most similar author to the disputed text for each of multiple random feature selection rounds, 
+    It uses saves the most similar author to the disputed text for each of multiple random feature selection rounds,
     where the disputed text is compared not only to the candidate text, but alos to a set of imposter texts.
     The final prediction is made based on of how often an author is predicted after each feature-elimination step.
 
@@ -57,11 +58,13 @@ class ImpostorDetector(DetectorBase):
         tfidf_freqs=True,
         n_impostors=25,
         threshold=0.1,
-        imposter_technique: Literal["llm", "text_len", "n_docs", "on-the-fly", "blogs", "fixed", "content"] = "text_len",
+        imposter_technique: Literal[
+            "llm", "text_len", "n_docs", "on-the-fly", "blogs", "fixed", "content"
+        ] = "text_len",
         path2imp: str = CONFIG.PATH2GENERIC_ON_FLY_IMP,  # path to impostor file, where fixed impostors are saved or where to save generated impostors
         real_time_generation: bool = False,  # whether to generate impostors in real-time or use pre-generated ones
         min_n_tokens: int = 500,  # minimum number of tokens to consider input sequence valid, defaults to 500
-        upsample: bool = True,  # whether to upsample short texts (default: True, i.e. upsample) or skip them 
+        upsample: bool = True,  # whether to upsample short texts (default: True, i.e. upsample) or skip them
     ):
         """
         :param rounds: number of random feature selection rounds, Koppel et Al. (2014) use 100
@@ -97,28 +100,42 @@ class ImpostorDetector(DetectorBase):
         self.real_time_generation = real_time_generation
         self.min_n_tokens = min_n_tokens
         self.upsample = upsample
-        
+
         if imposter_technique == "llm":
-            self.imposter_generator = ImposterGenerator.LLMImposterGenerator(n_impostors=self.n_impostors)
+            self.imposter_generator = ImposterGenerator.LLMImposterGenerator(
+                n_impostors=self.n_impostors
+            )
         elif imposter_technique == "n_docs":
             # TODO: I need author names for this
-            self.imposter_generator = ImposterGenerator.NDocsImposterGenerator(n_impostors=self.n_impostors)
+            self.imposter_generator = ImposterGenerator.NDocsImposterGenerator(
+                n_impostors=self.n_impostors
+            )
         elif imposter_technique == "fixed":
-            self.imposter_generator = ImposterGenerator.FixedImposterGenerator(n_impostors=self.n_impostors)
+            self.imposter_generator = ImposterGenerator.FixedImposterGenerator(
+                n_impostors=self.n_impostors
+            )
         elif imposter_technique == "on-the-fly":
-            self.imposter_generator = ImposterGenerator.GoogleSearchImposterGenerator(api_key=CONFIG.SERPAPI_KEY)
+            self.imposter_generator = ImposterGenerator.GoogleSearchImposterGenerator(
+                api_key=CONFIG.SERPAPI_KEY
+            )
         elif imposter_technique == "blogs":
-            self.imposter_generator = ImposterGenerator.BlogImposterGenerator(n_impostors=self.n_impostors)
+            self.imposter_generator = ImposterGenerator.BlogImposterGenerator(
+                n_impostors=self.n_impostors
+            )
         elif imposter_technique == "content":
-            self.imposter_generator = ImposterGenerator.ContentImposterGenerator(n_impostors=self.n_impostors)
-        else: 
-            self.imposter_generator = ImposterGenerator.TextLenImposterGenerator(n_impostors=self.n_impostors)
-    
+            self.imposter_generator = ImposterGenerator.ContentImposterGenerator(
+                n_impostors=self.n_impostors
+            )
+        else:
+            self.imposter_generator = ImposterGenerator.TextLenImposterGenerator(
+                n_impostors=self.n_impostors
+            )
+
     @staticmethod
-    def bootstrap_tokens(tokens, n_tokens:int=500):
+    def bootstrap_tokens(tokens, n_tokens: int = 500):
         """
          Samples `n_tokens` from the input token sequence using bootstrapping. If the desired number of tokens
-        exceeds the size of the input sequence, sampling continues with replacement. This strategy reflects 
+        exceeds the size of the input sequence, sampling continues with replacement. This strategy reflects
         the procedure outlined in Bevendorff et al. (2019).
 
         :param tokens: sequence of tokens
@@ -131,14 +148,16 @@ class ImpostorDetector(DetectorBase):
         """
         if not tokens:
             raise ValueError("Cannot bootstrap tokens from an empty sequence.")
-        tokens = list(tokens)                                   # mutable copy
-        sampled = sample(tokens, min(n_tokens, len(tokens)))    # without replacement
+        tokens = list(tokens)  # mutable copy
+        sampled = sample(tokens, min(n_tokens, len(tokens)))  # without replacement
         remaining = max(0, n_tokens - len(tokens))
-        sampled.extend(choices(tokens, k=remaining))             # with replacement
+        sampled.extend(choices(tokens, k=remaining))  # with replacement
 
         return sampled
-    
-    def _get_score_impl(self, text: Iterable[str]) -> t.Union[torch.Tensor, np.ndarray, t.Iterable[float]]:
+
+    def _get_score_impl(
+        self, text: Iterable[str]
+    ) -> t.Union[torch.Tensor, np.ndarray, t.Iterable[float]]:
         """
         Called by get_score from detecor_base parent class to compute the score for the input text(s).
 
@@ -150,21 +169,21 @@ class ImpostorDetector(DetectorBase):
         The final score is the number of rounds where the candidate text was the most similar to the disputed text.
         The final score for a pair is the average of the scores for both directions (disputed text vs. candidate text and vice versa).
 
-        While Koppel et Al. (2014) use (1) a fixed set of imposter documents without realtion to document pair, 
-        (2) on-the-fly generated same content imposter via Google search, 
+        While Koppel et Al. (2014) use (1) a fixed set of imposter documents without realtion to document pair,
+        (2) on-the-fly generated same content imposter via Google search,
         (3) Blogs to obtain same genre imposters, and Kocher et Al. (2015) use (4) a set of imposter documents based on the number of documents written by the author,
         we define different techniques to generate impostors, which can be specified via the `technique` parameter in the `_get_imposters` method:
         We currently support:
         (1) `text_len`: generate impostors of similar length from a predefined dataset (default, see `_get_imposters` method).
         (2) `llm`: use LLMs to generate impostors, extension of Koppel et Al. (2014).
         (3) `n_docs`: generate impostors based on the number of documents written by the author (TODO: not implemented yet), cf. Kocher et Al. (2015).
-        
+
         TODO: If the score is above a certain threshold, the input text is classified as same-author, which is not implemented yet/ not the purpose of this method.
 
         Koppel et Al. (2014) exclude texts shorter than 500 words.
         Kocher et Al. (2015) exclude words appearing only once to prevent overfitting to words occuring only once.
-        Koppel et Al. (2014) select m most similar imposters in terms of min-max similarity as imposter candidates and then, 
-        randomly select n actual imposters among potential imposters (because it has proven superior to using the top n imposters). 
+        Koppel et Al. (2014) select m most similar imposters in terms of min-max similarity as imposter candidates and then,
+        randomly select n actual imposters among potential imposters (because it has proven superior to using the top n imposters).
         They claim the approach is not sensitive to the choice of m and n.
         Koppel et Al. (2014) compare using min-max and cosine simialrity.
 
@@ -184,40 +203,58 @@ class ImpostorDetector(DetectorBase):
             int
         )  # id is index of pair (i.e, length is half of the input text list)
         for i, t in enumerate(ichunked(text, 2)):
-            t = list(t) # generator object is not subscriptable, so convert to list
+            t = list(t)  # generator object is not subscriptable, so convert to list
             assert len(t) == 2, "Input text must be a list of pairs of texts."
             text_left, text_right = t[0], t[1]
             len_ws_token_left = len(self.tokenize_whitespace(text_left))
             len_ws_token_right = len(self.tokenize_whitespace(text_right))
 
             # check text length, if too short, i.e. less than 500 `words` (acc. to Koppel et. Al. (2014) -> invalid; acc. to Bevendorff (2019) -> upsample)
-            if (len_ws_token_left + len_ws_token_right < 2 * self.min_n_tokens) and not self.upsample:  # skip
+            if (
+                len_ws_token_left + len_ws_token_right < 2 * self.min_n_tokens
+            ) and not self.upsample:  # skip
                 continue
 
             # upsample short texts to the minimum number of tokens
             if len_ws_token_left < self.min_n_tokens:
-                text_left = ' '.join(self.bootstrap_tokens(self.tokenize_whitespace(text_left), n_tokens=self.min_n_tokens))
+                text_left = " ".join(
+                    self.bootstrap_tokens(
+                        self.tokenize_whitespace(text_left), n_tokens=self.min_n_tokens
+                    )
+                )
             if len_ws_token_right < self.min_n_tokens:
-                text_right = ' '.join(self.bootstrap_tokens(self.tokenize_whitespace(text_right), n_tokens=self.min_n_tokens))
-          
+                text_right = " ".join(
+                    self.bootstrap_tokens(
+                        self.tokenize_whitespace(text_right), n_tokens=self.min_n_tokens
+                    )
+                )
+
             # TODO: preprocessing: remove punctuation, lowercasing, remove html tags (e.g., <nl>), etc.?
-            # Koppel et Al. (2014) do not normalize text pairs, but without normalization, the results are terrible. 
+            # Koppel et Al. (2014) do not normalize text pairs, but without normalization, the results are terrible.
             # Does not make sense, bc 	idiosyncrasies of authors are not captured when using stemmed text.
             # Kontrolliere Situation
 
             # Koppel et Al. (2014) use documents of length 500 words exactly -> we DON'T crop at min_n_tokens to keep more information
             # preprocess_text omits all layour/ structural information to keep only style
             tokens_left = self.tokenizer(self.preprocess_text(text_left))
-            tokens_right = self.tokenizer(self.preprocess_text(text_right))#[:self.min_n_tokens] 
+            tokens_right = self.tokenizer(
+                self.preprocess_text(text_right)
+            )  # [:self.min_n_tokens]
 
             # ensure both texts have same length (control confounder text length): min length of both
             max_len_allowed = min(len(tokens_left), len(tokens_right))
             for tokens in [tokens_left, tokens_right]:
                 if len(tokens) > max_len_allowed:
-                    tokens[:] = tokens[:max_len_allowed]    # inplace crop, changes also other references to the same list
+                    tokens[:] = tokens[
+                        :max_len_allowed
+                    ]  # inplace crop, changes also other references to the same list
 
             if len(tokens_left) == 0 or len(tokens_right) == 0:
-                print("Skipping empty text pair: Left: {}, Right: {}".format(text_left, text_right))
+                print(
+                    "Skipping empty text pair: Left: {}, Right: {}".format(
+                        text_left, text_right
+                    )
+                )
                 continue
 
             # frequencies as Counter (subclass of defaultdict(int))
@@ -232,11 +269,9 @@ class ImpostorDetector(DetectorBase):
                 shared_tokens = freqs_left.keys() & freqs_right.keys()
             else:
                 shared_tokens = freqs_left.keys() | freqs_right.keys()
-           
+
             top_tokens = heapq.nlargest(
-                self.top_n,
-                shared_tokens,
-                key=lambda x: freqs_left[x] + freqs_right[x]
+                self.top_n, shared_tokens, key=lambda x: freqs_left[x] + freqs_right[x]
             )
 
             # TODO: muss man TFIDF gemeinsam (left, right, imposters) berechnen, wegen Dataset Normalierung?
@@ -245,8 +280,18 @@ class ImpostorDetector(DetectorBase):
 
             store = {
                 # TODO: if I knew >=1 author, i could choose imposters based on similar number of documents written (like paper)
-                "left": {"tfidf": x_left, "tokens": tokens_left, "text": text_left, "author": "unknown"},
-                "right": {"tfidf": x_right, "tokens": tokens_right, "text": text_right, "author": "unknown"},
+                "left": {
+                    "tfidf": x_left,
+                    "tokens": tokens_left,
+                    "text": text_left,
+                    "author": "unknown",
+                },
+                "right": {
+                    "tfidf": x_right,
+                    "tokens": tokens_right,
+                    "text": text_right,
+                    "author": "unknown",
+                },
             }
 
             # two iterations, generating imposters for each candidate once
@@ -255,8 +300,12 @@ class ImpostorDetector(DetectorBase):
             ):
                 scores_over_different_rounds = 0
                 # get imposters for the candidate text, NOT the disputed text
-                impostor_candidates =  self.imposter_generator.generate_imposters(store[candidate]["text"], real_time_generation=self.real_time_generation, path2imp=self.path2imp)
- 
+                impostor_candidates = self.imposter_generator.generate_imposters(
+                    store[candidate]["text"],
+                    real_time_generation=self.real_time_generation,
+                    path2imp=self.path2imp,
+                )
+
                 tmp_store = {
                     impostor_name: {
                         "tfidf": self.tokens_to_matrix(
@@ -278,7 +327,9 @@ class ImpostorDetector(DetectorBase):
                     )
                     scores = {
                         c: self.minmax_similarity(
-                            store[unknown]["tfidf"][:, rand_feat_to_keep_ids],  # disputed text
+                            store[unknown]["tfidf"][
+                                :, rand_feat_to_keep_ids
+                            ],  # disputed text
                             tmp_store[c]["tfidf"][:, rand_feat_to_keep_ids],
                         )
                         for c in list(tmp_store.keys())
@@ -294,15 +345,15 @@ class ImpostorDetector(DetectorBase):
         # TODO: threshold is in [0,1], maybe normalize by rounds?
         return list(scores_per_pair.values())
         # return [v / self.rounds for v in scores_per_pair.values()]
-    
+
     def normalize_text(self, text):
         """
         Normalize input text by lowercasing and stemming.
         Koppel et Al. (2014) do (explicitly) not normalize text pairs, but without normalization, the results are terrible.
         Kocher et Al. (2015) use isolated words without stemming but with punctuation symbols.
         """
-        stemmer = SnowballStemmer('english')
-        return ' '.join(stemmer.stem(w) for w in text.lower().split())
+        stemmer = SnowballStemmer("english")
+        return " ".join(stemmer.stem(w) for w in text.lower().split())
 
     def get_prediction(self, text: Iterable[str]) -> List[bool]:
         """
@@ -328,11 +379,15 @@ class ImpostorDetector(DetectorBase):
         :return: Numpy array of term tfidf values, `shape = (len(tokens), len(top_token_list))`
         """
         if len(top_token_list) == 0:
-            return np.zeros((1, self.top_n), dtype=np.float32)  # return empty matrix if no top tokens
-        
+            return np.zeros(
+                (1, self.top_n), dtype=np.float32
+            )  # return empty matrix if no top tokens
+
         # avoid fitting a new vectorizer every time (costly)
         if not hasattr(self, "_vectorizer") or self._vectorizer_vocab != top_token_list:
-            self._vectorizer = TfidfVectorizer(vocabulary=top_token_list, input="content", dtype=np.float32)
+            self._vectorizer = TfidfVectorizer(
+                vocabulary=top_token_list, input="content", dtype=np.float32
+            )
             self._vectorizer_vocab = top_token_list
 
         tfidf_matrix = self._vectorizer.fit_transform(
@@ -373,7 +428,7 @@ class ImpostorDetector(DetectorBase):
         numerator = np.minimum(vec1, vec2).sum()
         denominator = np.maximum(vec1, vec2).sum()
         return 0.0 if denominator == 0 else numerator / denominator
-    
+
     @staticmethod
     def tokenize_whitespace(text: str, normalize_ws: bool = True):
         """
@@ -390,7 +445,7 @@ class ImpostorDetector(DetectorBase):
         """
         if normalize_ws:
             text = re.sub(r"\s+", " ", text)
-        return text.split() 
+        return text.split()
 
     @staticmethod
     def tokenize_char_ngrams(
