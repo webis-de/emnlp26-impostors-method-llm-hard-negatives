@@ -16,10 +16,7 @@ import pandas as pd
 from pydantic import BaseModel
 import requests
 import sklearn
-# FIXME
 from word_mover_distance import model   # https://pypi.org/project/word-mover-distance/
-# import gensim.similarities
-# from gensim.similarities import WmdSimilarity
 from sentence_transformers import SentenceTransformer
 import gensim.downloader
 import torch
