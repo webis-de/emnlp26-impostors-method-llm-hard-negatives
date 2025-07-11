@@ -1027,7 +1027,10 @@ class ParaphrasingEvaluator:
                             response_schema=TopicSchema.model_json_schema(),
                         )
                     )
-                    time_period = int(time_period)
+                    if "present" in time_period.lower():
+                        time_period = 21
+                    else:
+                        time_period = int(re.sub(r"[^\d]", "", time_period))
                     if time_period > 100:
                         century = time_period // 100  # obtain century
                         if time_period % 100 != 0:
@@ -1042,7 +1045,7 @@ class ParaphrasingEvaluator:
                 # print(
                 #     f"[DEBUG] Extracted from '{row.filename}': Genre: '{genre}', Time Period/century: '{century}', Extra: '{extra}'"
                 # )
-                # print(row._fields)
+                print(row._fields)
 
                 # Ground truth
                 gt_genre = getattr(row, "genre", "")
@@ -1052,11 +1055,6 @@ class ParaphrasingEvaluator:
                 for gt in [gt_genre, gt_century, gt_topic]:
                     if pd.isna(gt):  # default is only used if column does not exist
                         gt = ""  # replace NaN with empty string
-                gt_century = (
-                    int(re.sub(r"[^\d]", "", gt_century))
-                    if gt_century != ""
-                    else 0  # keep only digits
-                )
 
                 # Compare results
                 genre_match = similar(
@@ -1073,16 +1071,16 @@ class ParaphrasingEvaluator:
                 results[model_name]["total"] += 1
 
                 # Debug output
-                print(f"[DEBUG] File: {row.filename}")
-                print(
-                    f"  Extracted -> Genre: '{genre}', Time: '{time_period}', Topic: '{extra}'"
-                )
-                print(
-                    f"  GroundTruth -> Genre: '{gt_genre}', Century: '{gt_century}', Topic: '{gt_topic}'"
-                )
-                print(
-                    f"  Matches -> Genre: {genre_match}, Time: {time_match}, Topic: {topic_match}\n"
-                )
+                # print(f"[DEBUG] File: {row.filename}")
+                # print(
+                #     f"  Extracted -> Genre: '{genre}', Time: '{time_period}', Topic: '{extra}'"
+                # )
+                # print(
+                #     f"  GroundTruth -> Genre: '{gt_genre}', Century: '{gt_century}', Topic: '{gt_topic}'"
+                # )
+                # print(
+                #     f"  Matches -> Genre: {genre_match}, Time: {time_match}, Topic: {topic_match}\n"
+                # )
 
                 # text length check
                 paraphrase = paraphraser.paraphrase(text=text)
