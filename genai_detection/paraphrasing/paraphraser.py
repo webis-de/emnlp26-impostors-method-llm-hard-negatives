@@ -1016,12 +1016,6 @@ class ParaphrasingEvaluator:
                 text = row.text
                 try:
                     extra, _, genre, time_period, _ = (
-                        #     "Youth",
-                        #     "19",
-                        #     "Drama",
-                        #     "19",
-                        #     "19",
-                        # )  # default values
                         paraphraser._extract_bullet_points(
                             text=text,
                             prompt=paraphraser.extractor_prompt,
@@ -1043,11 +1037,6 @@ class ParaphrasingEvaluator:
                     print(f"[WARNING] Extraction failed for file '{row.filename}': {e}")
                     continue
 
-                # print(
-                #     f"[DEBUG] Extracted from '{row.filename}': Genre: '{genre}', Time Period/century: '{century}', Extra: '{extra}'"
-                # )
-                print(row._fields)
-
                 # Ground truth
                 gt_genre = getattr(row, "genre", "")
                 gt_century = getattr(row, "century", 0)
@@ -1067,9 +1056,6 @@ class ParaphrasingEvaluator:
                 time_match = similar(century, gt_century)
                 print(f"[DEBUG] Comparing '{extra}' with '{gt_topic}'")
                 topic_match = _degree_of_similarity(str(gt_topic).lower(), extra)
-                # any(
-                #     [similar(extra, gt_t) for gt_t in str(gt_topic).lower().split(",")]
-                # )
 
                 results[model_name]["genre_match"] += int(genre_match)
                 results[model_name]["time_match"] += int(time_match)
