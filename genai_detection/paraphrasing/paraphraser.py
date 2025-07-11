@@ -1057,12 +1057,15 @@ class ParaphrasingEvaluator:
                         gt = ""  # replace NaN with empty string
 
                 # Compare results
-                genre_match = similar(
-                    genre.strip().lower(), str(gt_genre).strip().lower()
+                genre_match = any(
+                    [
+                        similar(extr_g.strip().lower(), gt_genre)
+                        for extr_g in re.split(r"[ /,]+", str(genre).lower())
+                    ]
                 )
                 time_match = similar(century, gt_century)
                 topic_match = any(
-                    [similar(extra, gt_t) for gt_t in str(gt_topic).split(",")]
+                    [similar(extra, gt_t) for gt_t in str(gt_topic).lower().split(",")]
                 )
 
                 results[model_name]["genre_match"] += int(genre_match)
@@ -1071,24 +1074,24 @@ class ParaphrasingEvaluator:
                 results[model_name]["total"] += 1
 
                 # Debug output
-                # print(f"[DEBUG] File: {row.filename}")
-                # print(
-                #     f"  Extracted -> Genre: '{genre}', Time: '{time_period}', Topic: '{extra}'"
-                # )
-                # print(
-                #     f"  GroundTruth -> Genre: '{gt_genre}', Century: '{gt_century}', Topic: '{gt_topic}'"
-                # )
-                # print(
-                #     f"  Matches -> Genre: {genre_match}, Time: {time_match}, Topic: {topic_match}\n"
-                # )
+                print(f"[DEBUG] File: {row.filename}")
+                print(
+                    f"  Extracted -> Genre: '{genre}', Time: '{time_period}', Topic: '{extra}'"
+                )
+                print(
+                    f"  GroundTruth -> Genre: '{gt_genre}', Century: '{gt_century}', Topic: '{gt_topic}'"
+                )
+                print(
+                    f"  Matches -> Genre: {genre_match}, Time: {time_match}, Topic: {topic_match}\n"
+                )
 
                 # text length check
-                paraphrase = paraphraser.paraphrase(text=text)
-                lengths[model_name]["original"].append(len(text.split()))
-                lengths[model_name]["paraphrase"].append(len(paraphrase[0].split()))
+                # paraphrase = paraphraser.paraphrase(text=text)
+                # lengths[model_name]["original"].append(len(text.split()))
+                # lengths[model_name]["paraphrase"].append(len(paraphrase[0].split()))
 
-        print("\n[INFO] Lengths of paraphrases:")
-        print(lengths)
+        # print("\n[INFO] Lengths of paraphrases:")
+        # print(lengths)
         # TODO: given original length as base (100%) calculate the percentual difference to the paraphrase length for each entry and display in distribution plot
 
         # Report results
