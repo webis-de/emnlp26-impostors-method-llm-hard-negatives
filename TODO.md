@@ -6,6 +6,9 @@
 
 ### ✍️ Written Work
 - [x] Use [Webis Thesis Template](https://git.webis.de/code-generic/code-webis-thesis/)
+- [ ] hypothesis: Text_extractor information will produce similar text to original text even though information is wrong because extractor/ generator LLM think alike
+  - [ ] experiment to test this hypothesis
+- [ ] Why we opted to not use perplexity
 - [ ] control dataset in terms of topic, genre, register
 - [ ] Difference register and tone (find literature of categories, cf. ceph)
 - [ ] imposter: random projection (i.e. random set of features set to zero is a projection to lower dimensional space)
@@ -143,6 +146,11 @@
   - generate function
   - Blog and Gutenberg datasets
     - [ ] text length
+    - [ ] titles
+    - [x] genre
+    - [x] time period/ century
+- [ ] Fix paraphrasing (at least TopicParaphraser) on Gutenberg dataset
+  - infinite loop of retrying
 
 
 
