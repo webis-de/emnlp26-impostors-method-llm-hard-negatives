@@ -991,12 +991,13 @@ class ParaphrasingEvaluator:
         print("[INFO] Loaded data and metadata.")
         print(gutenberg_df.head())
 
+        def _degree_of_similarity(a: str, b: str) -> float:
+            """Returns the degree of similarity between two strings."""
+            return difflib.SequenceMatcher(None, str(a).lower(), str(b).lower()).ratio()
+
         def similar(a: str, b: str) -> bool:
             """Returns True if strings are sufficiently similar."""
-            return (
-                difflib.SequenceMatcher(None, str(a).lower(), str(b).lower()).ratio()
-                > 0.7
-            )
+            return _degree_of_similarity(a, b) > 0.7
 
         # Evaluate models
         results = defaultdict(
@@ -1064,13 +1065,15 @@ class ParaphrasingEvaluator:
                     ]
                 )
                 time_match = similar(century, gt_century)
-                topic_match = any(
-                    [similar(extra, gt_t) for gt_t in str(gt_topic).lower().split(",")]
-                )
+                print(f"[DEBUG] Comparing '{extra}' with '{gt_topic}'")
+                topic_match = _degree_of_similarity(str(gt_topic).lower(), extra)
+                # any(
+                #     [similar(extra, gt_t) for gt_t in str(gt_topic).lower().split(",")]
+                # )
 
                 results[model_name]["genre_match"] += int(genre_match)
                 results[model_name]["time_match"] += int(time_match)
-                results[model_name]["topic_match"] += int(topic_match)
+                results[model_name]["topic_match"] += topic_match
                 results[model_name]["total"] += 1
 
                 # Debug output
