@@ -540,7 +540,7 @@ class BulletPointParaphraser(Paraphraser):
     def _extract_bullet_points(
         self,
         text: str,
-        prompt: Optional[str],
+        prompt: Optional[str] = None,
         temperature: float = TEMPERATURE,
         key: str = "bullet_points",
         response_schema: Optional[dict[str, Any]] = None,
@@ -561,14 +561,16 @@ class BulletPointParaphraser(Paraphraser):
         if prompt is None:
             prompt = self.extractor_prompt
 
+        print(f"\n[DEBUG] Using text extractor with prompt: {prompt}")
         res = self.text_extractor.paraphrase(
             text=text,
             prompt=prompt,
             n_responses=1,
             max_length=MAX_LENGTH,
-            temperature=temperature,
+            temperature=0,  # temperature,
             response_schema=response_schema,
         )[0]
+        print(f"\n[DEBUG] Response from text extractor: {res}\n")
 
         if isinstance(res, str):
             res = re.sub(
@@ -594,6 +596,7 @@ class BulletPointParaphraser(Paraphraser):
             except Exception as e:
                 # resp = {key: [res]}
                 # TODO: try again, until valid JSON is returned
+                print("Again")
                 return self._extract_bullet_points(
                     text=text,
                     prompt=prompt,
@@ -627,7 +630,7 @@ class BulletPointParaphraser(Paraphraser):
         genre,
         time_period,
         register,
-        prompt: Optional[str],
+        prompt: Optional[str] = None,
         n_responses: int = 3,
         temperature: float = TEMPERATURE,
     ) -> tuple[List[str], str, str]:
@@ -664,7 +667,7 @@ class BulletPointParaphraser(Paraphraser):
     def paraphrase(
         self,
         text: str,
-        prompt: Optional[str],
+        prompt: Optional[str] = None,
         n_responses: int = 5,
         max_length: int = MAX_LENGTH,
         temperature: float = TEMPERATURE,
@@ -720,7 +723,7 @@ class TaskParaphraser(BulletPointParaphraser):
     def paraphrase(
         self,
         text: str,
-        prompt: Optional[str],
+        prompt: Optional[str] = None,
         n_responses: int = 5,
         max_length: int = MAX_LENGTH,
         temperature: float = TEMPERATURE,
@@ -773,11 +776,12 @@ class TopicParaphraser(BulletPointParaphraser):
     def paraphrase(
         self,
         text: str,
-        prompt: Optional[str],
+        prompt: Optional[str] = None,
         n_responses: int = 5,
         max_length: int = MAX_LENGTH,
         temperature: float = TEMPERATURE,
     ) -> List[str]:
+        print(f"\n[DEBUG] Using TopicParaphraser with prompt: {self.extractor_prompt}")
         topic, tone, genre, time_period, register = self._extract_bullet_points(
             text=text,
             prompt=self.extractor_prompt,
@@ -785,6 +789,7 @@ class TopicParaphraser(BulletPointParaphraser):
             key="topic",
             response_schema=TopicSchema.model_json_schema(),
         )
+        print(f"\n[DEBUG] Extracted topic, tone, genre, time period, and register:")
 
         generator_prompt = "Do not use asterisks. Write a text of about {l} words with a {topic} topic, {tone} tone, a {genre} genre, in the {register} register and in the {time_period} time period.".format(
             l=len(text.split()),
@@ -804,6 +809,7 @@ class TopicParaphraser(BulletPointParaphraser):
             n_responses=n_responses,
             temperature=temperature,
         )
+        print(f"\n[DEBUG] Generated paraphrased texts: {paraphrased_texts}")
 
         return paraphrased_texts
 
@@ -825,7 +831,7 @@ class TitleParaphraser(BulletPointParaphraser):
     def paraphrase(
         self,
         text: str,
-        prompt: Optional[str],
+        prompt: Optional[str] = None,
         n_responses: int = 5,
         max_length: int = MAX_LENGTH,
         temperature: float = TEMPERATURE,
@@ -940,9 +946,14 @@ class ParaphrasingEvaluator:
             if not isinstance(v, NaiveParaphraser)
         }
 
+        # FIXME: Paraphrasers (at least TopicParaphraser) are extremly bad at following instructions on Gutenberg dataset. Infinite loop of retrying
         # Gutenberg arrow dataset does not contain metadata. Hence, use original text files and match them with metadata
+        # gutenberg_base_dir = (
+        #     Path(__file__).resolve().parent.parent.parent / "data/datasets/gutenberg/"
+        # )
         gutenberg_base_dir = (
-            Path(__file__).resolve().parent.parent.parent / "data/datasets/gutenberg/"
+            Path(__file__).resolve().parent.parent.parent
+            / "data/datasets/custom_texts/"
         )
         assert (
             gutenberg_base_dir.exists()
@@ -972,8 +983,11 @@ class ParaphrasingEvaluator:
         metadata = pd.read_excel(path2metadata)
         # join on data's filename column and metadata's index (always 'others' index)
         gutenberg_df = gutenberg_df.join(
-            metadata.set_index("filename"), on="filename", how="left", rsuffix="_meta"
+            metadata.set_index("filename"), on="filename", how="right", rsuffix="_meta"
         )
+        gutenberg_df.dropna(
+            axis="index", how="all", inplace=True
+        )  # drop rows with all NaN values
         print("[INFO] Loaded data and metadata.")
         print(gutenberg_df.head())
 
@@ -988,9 +1002,11 @@ class ParaphrasingEvaluator:
         results = defaultdict(
             lambda: {"genre_match": 0, "time_match": 0, "topic_match": 0, "total": 0}
         )
+        lengths = {}  # to store lengths of paraphrases per model
 
         for model_name, paraphraser in models.items():
             print(f"[INFO] Evaluating '{model_name}'...")
+            lengths[model_name] = {"original": [], "paraphrase": []}
             for row in tqdm(
                 gutenberg_df.itertuples(),
                 total=len(gutenberg_df),
@@ -998,13 +1014,19 @@ class ParaphrasingEvaluator:
             ):
                 text = row.text
                 try:
-                    extra, _, genre, time_period, _ = ("19",) * 5  # default values
-                    #     paraphraser._extract_bullet_points(
-                    #         text=text,
-                    #         prompt=paraphraser.extractor_prompt,
-                    #         response_schema=TopicSchema.model_json_schema(),
-                    #     )
-                    # )
+                    extra, _, genre, time_period, _ = (
+                        #     "Youth",
+                        #     "19",
+                        #     "Drama",
+                        #     "19",
+                        #     "19",
+                        # )  # default values
+                        paraphraser._extract_bullet_points(
+                            text=text,
+                            prompt=paraphraser.extractor_prompt,
+                            response_schema=TopicSchema.model_json_schema(),
+                        )
+                    )
                     time_period = int(time_period)
                     if time_period > 100:
                         century = time_period // 100  # obtain century
@@ -1017,22 +1039,33 @@ class ParaphrasingEvaluator:
                     print(f"[WARNING] Extraction failed for file '{row.filename}': {e}")
                     continue
 
-                print(
-                    f"[DEBUG] Extracted from '{row.filename}': Genre: '{genre}', Time Period/century: '{century}', Extra: '{extra}'"
-                )
-                print(row._fields)
+                # print(
+                #     f"[DEBUG] Extracted from '{row.filename}': Genre: '{genre}', Time Period/century: '{century}', Extra: '{extra}'"
+                # )
+                # print(row._fields)
 
                 # Ground truth
                 gt_genre = getattr(row, "genre", "")
-                gt_century = int(getattr(row, "century", 0))
+                gt_century = getattr(row, "century", 0)
                 gt_topic = getattr(row, "topic", "")
+                # no GT data for title, bullet points, task, tone, register
+                for gt in [gt_genre, gt_century, gt_topic]:
+                    if pd.isna(gt):  # default is only used if column does not exist
+                        gt = ""  # replace NaN with empty string
+                gt_century = (
+                    int(re.sub(r"[^\d]", "", gt_century))
+                    if gt_century != ""
+                    else 0  # keep only digits
+                )
 
                 # Compare results
                 genre_match = similar(
                     genre.strip().lower(), str(gt_genre).strip().lower()
                 )
                 time_match = similar(century, gt_century)
-                topic_match = similar(extra, gt_topic)
+                topic_match = any(
+                    [similar(extra, gt_t) for gt_t in str(gt_topic).split(",")]
+                )
 
                 results[model_name]["genre_match"] += int(genre_match)
                 results[model_name]["time_match"] += int(time_match)
@@ -1050,6 +1083,15 @@ class ParaphrasingEvaluator:
                 print(
                     f"  Matches -> Genre: {genre_match}, Time: {time_match}, Topic: {topic_match}\n"
                 )
+
+                # text length check
+                paraphrase = paraphraser.paraphrase(text=text)
+                lengths[model_name]["original"].append(len(text.split()))
+                lengths[model_name]["paraphrase"].append(len(paraphrase[0].split()))
+
+        print("\n[INFO] Lengths of paraphrases:")
+        print(lengths)
+        # TODO: given original length as base (100%) calculate the percentual difference to the paraphrase length for each entry and display in distribution plot
 
         # Report results
         print("\n[RESULTS]")
@@ -1619,18 +1661,18 @@ if __name__ == "__main__":
             text_extractor=OllamaParaphraser(model_id="default:latest"),
             text_generator=OllamaParaphraser(model_id="default:latest"),
         ),
-        "TaskParaphraser": TaskParaphraser(
-            text_extractor=OllamaParaphraser(model_id="default:latest"),
-            text_generator=OllamaParaphraser(model_id="default:latest"),
-        ),
-        "TitleParaphraser": TitleParaphraser(
-            text_extractor=OllamaParaphraser(model_id="default:latest"),
-            text_generator=OllamaParaphraser(model_id="default:latest"),
-        ),
-        "BulletPointParaphraser": BulletPointParaphraser(
-            text_extractor=OllamaParaphraser(model_id="default:latest"),
-            text_generator=OllamaParaphraser(model_id="default:latest"),
-        ),
+        # "TaskParaphraser": TaskParaphraser(
+        #     text_extractor=OllamaParaphraser(model_id="default:latest"),
+        #     text_generator=OllamaParaphraser(model_id="default:latest"),
+        # ),
+        # "TitleParaphraser": TitleParaphraser(
+        #     text_extractor=OllamaParaphraser(model_id="default:latest"),
+        #     text_generator=OllamaParaphraser(model_id="default:latest"),
+        # ),
+        # "BulletPointParaphraser": BulletPointParaphraser(
+        #     text_extractor=OllamaParaphraser(model_id="default:latest"),
+        #     text_generator=OllamaParaphraser(model_id="default:latest"),
+        # ),
     }
     # paraphrasers.update({f'Blablador_{name}': BlabladorParaphraser(model_id=name) for name in list(get_args(ModelName))})
 
