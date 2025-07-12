@@ -144,8 +144,8 @@
     - [ ] genre
 - [ ] compare LLM generators to reality (ground truth)
   - generate function
-  - Blog and Gutenberg datasets
-    - [ ] text length
+  - Custom, Blog and Gutenberg datasets
+    - [x] text length
     - [ ] titles
     - [x] genre
     - [x] time period/ century
