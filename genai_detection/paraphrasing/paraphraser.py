@@ -1004,6 +1004,7 @@ class ParaphrasingEvaluator:
             lambda: {"genre_match": 0, "time_match": 0, "topic_match": 0, "total": 0}
         )
         lengths = {}  # to store lengths of paraphrases per model
+        length_differences = {}  # to store length differences per model
 
         for model_name, paraphraser in models.items():
             print(f"[INFO] Evaluating '{model_name}'...")
@@ -1054,7 +1055,6 @@ class ParaphrasingEvaluator:
                     ]
                 )
                 time_match = similar(century, gt_century)
-                print(f"[DEBUG] Comparing '{extra}' with '{gt_topic}'")
                 topic_match = _degree_of_similarity(str(gt_topic).lower(), extra)
 
                 results[model_name]["genre_match"] += int(genre_match)
@@ -1063,26 +1063,29 @@ class ParaphrasingEvaluator:
                 results[model_name]["total"] += 1
 
                 # Debug output
-                print(f"[DEBUG] File: {row.filename}")
-                print(
-                    f"  Extracted -> Genre: '{genre}', Time: '{time_period}', Topic: '{extra}'"
-                )
-                print(
-                    f"  GroundTruth -> Genre: '{gt_genre}', Century: '{gt_century}', Topic: '{gt_topic}'"
-                )
-                print(
-                    f"  Matches -> Genre: {genre_match}, Time: {time_match}, Topic: {topic_match}\n"
-                )
+                # print(f"[DEBUG] File: {row.filename}")
+                # print(
+                #     f"  Extracted -> Genre: '{genre}', Time: '{time_period}', Topic: '{extra}'"
+                # )
+                # print(
+                #     f"  GroundTruth -> Genre: '{gt_genre}', Century: '{gt_century}', Topic: '{gt_topic}'"
+                # )
+                # print(
+                #     f"  Matches -> Genre: {genre_match}, Time: {time_match}, Topic: {topic_match}\n"
+                # )
 
                 # text length check
-                # paraphrase = paraphraser.paraphrase(text=text)
-                # lengths[model_name]["original"].append(len(text.split()))
-                # lengths[model_name]["paraphrase"].append(len(paraphrase[0].split()))
+                paraphrase = paraphraser.paraphrase(text=text)
+                lengths[model_name]["original"].append(len(text.split()))
+                lengths[model_name]["paraphrase"].append(len(paraphrase[0].split()))
 
-        # print("\n[INFO] Lengths of paraphrases:")
-        # print(lengths)
-        # TODO: given original length as base (100%) calculate the percentual difference to the paraphrase length for each entry and display in distribution plot
-
+            percent_diffs = [
+                ((p - o) / o) * 100 if o > 0 else 0
+                for o, p in zip(
+                    lengths[model_name]["original"], lengths[model_name]["paraphrase"]
+                )
+            ]
+            length_differences[model_name] = percent_diffs
         # Report results
         print("\n[RESULTS]")
         for model_name, metrics in results.items():
@@ -1093,6 +1096,9 @@ class ParaphrasingEvaluator:
             print(f"  Genre Accuracy: {metrics['genre_match'] / total:.2%}")
             print(f"  Time Accuracy (approx): {metrics['time_match'] / total:.2%}")
             print(f"  Topic Accuracy (approx): {metrics['topic_match'] / total:.2%}")
+            print(
+                f"  Length Difference (mean): {np.mean(length_differences[model_name]):.2f}%"
+            )
 
         # Optional: save to disk
         if save_to_disk:
