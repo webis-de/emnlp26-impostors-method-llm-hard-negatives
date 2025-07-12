@@ -3,7 +3,7 @@ import ast
 from collections import defaultdict
 import datetime
 import difflib
-from itertools import product
+from itertools import chain, product
 import json
 import os
 from pathlib import Path
@@ -573,13 +573,18 @@ class BulletPointParaphraser(Paraphraser):
         print(f"\n[DEBUG] Response from text extractor: {res}\n")
 
         if isinstance(res, str):
-            res = re.sub(
-                r"^```(?:json)?\s*|\s*```$", "", text.strip(), flags=re.IGNORECASE
-            )
-            try:
-                res = unicodedata.normalize("NFKC", res)  # normalize unicode characters
-                res = re.search(r"\{.*\}", res).group()  # keep only the JSON part
-            except Exception as e:  # NoneType has no attribute 'group'
+            # res = re.sub(
+            #     r"^```(?:json)?\s*|\s*```$", "", text.strip(), flags=re.IGNORECASE
+            # )
+
+            res = unicodedata.normalize("NFKC", res)  # normalize unicode characters
+            match = re.search(
+                r"\{.*?\}", res, flags=re.DOTALL
+            )  # keep only the JSON part
+            if match:
+                res = match.group()
+            else:
+                res = res.strip()
                 if not res.endswith("}"):
                     res += "}"
                 if not res.startswith("{"):
@@ -933,11 +938,34 @@ class ParaphrasingEvaluator:
         )
         self.wmd_model = model.WordEmbedding(model=self.pretr_word_model)
 
+    def _degree_of_similarity(self, a: str, b: str) -> float:
+        """Returns the degree of similarity between two strings."""
+        return difflib.SequenceMatcher(None, str(a).lower(), str(b).lower()).ratio()
+
+    def _similar(self, a: str, b: str, sim_thres: float = 0.7) -> bool:
+        """Returns True if strings are sufficiently similar."""
+        return self._degree_of_similarity(a, b) > sim_thres
+
+    def _get_century(self, time_period) -> int:
+        """Returns the century of a given date."""
+        if isinstance(time_period, str):
+            if "present" in time_period.lower():
+                time_period = 21
+            else:
+                time_period = int(re.sub(r"[^\d]", "", time_period))
+        if time_period > 100:
+            century = time_period // 100  # obtain century
+            if time_period % 100 != 0:
+                century += 1
+        else:
+            century = time_period
+        return int(century) if time_period > 0 else 0
+
     def evaluate_extractors(self, save_to_disk: bool = True):
         """
         Non-naive paraphrasers extract information from the original text, such as bullet points, task, topic, title, tone, genre, time period and register.
         Some datasets provide some of this information,
-        e.g. Blog (id,gender,age,topic,sign,date,text) and
+        e.g. Blog (id, gender, age, topic, sign, date, text) and
         Gutenberg (title, filename, author, time_period, genre, author_time, summary, fine_genre, century).
         """
         models = {
@@ -945,174 +973,193 @@ class ParaphrasingEvaluator:
             for k, v in self.paraphrasers.items()
             if not isinstance(v, NaiveParaphraser)
         }
+        # Blog: topic & date
+        blog_base_dir = (
+            Path(__file__).resolve().parent.parent.parent / "data/datasets/Blog_corpus/"
+        )
 
         # FIXME: Paraphrasers (at least TopicParaphraser) are extremly bad at following instructions on Gutenberg dataset. Infinite loop of retrying
         # Gutenberg arrow dataset does not contain metadata. Hence, use original text files and match them with metadata
-        # gutenberg_base_dir = (
-        #     Path(__file__).resolve().parent.parent.parent / "data/datasets/gutenberg/"
-        # )
         gutenberg_base_dir = (
+            Path(__file__).resolve().parent.parent.parent / "data/datasets/gutenberg/"
+        )
+        custom_base_dir = (
             Path(__file__).resolve().parent.parent.parent
             / "data/datasets/custom_texts/"
         )
-        assert (
-            gutenberg_base_dir.exists()
-        ), f"Base directory {gutenberg_base_dir} does not exist. Current path: {os.getcwd()}"
-        path2metadata = gutenberg_base_dir / "file_metadata.xlsx"
-        assert (
-            path2metadata.exists()
-        ), f"Metadata file {path2metadata} does not exist. Current path: {os.getcwd()}"
-
-        gutenberg_data = []
-        # obtain texts
-        for file in gutenberg_base_dir.glob("*.txt"):
-            if "Complete_Works_of_William_Shakespeare" in file.name:
-                # Skip the complete works of Shakespeare as it is way longer than other texts
-                continue
-            with open(file, "r", encoding="utf-8") as f:
-                author = " ".join(
-                    file.stem.split("_")[-2:]
-                )  # filename format is "title_firstName_sirname.txt"
-                content = f.read()
-                content = _preprocess_text(content)
-                gutenberg_data.append(
-                    {"author": author, "text": content, "filename": file.stem}
-                )
-
-        gutenberg_df = pd.DataFrame(gutenberg_data)
-        metadata = pd.read_excel(path2metadata)
-        # join on data's filename column and metadata's index (always 'others' index)
-        gutenberg_df = gutenberg_df.join(
-            metadata.set_index("filename"), on="filename", how="right", rsuffix="_meta"
-        )
-        gutenberg_df.dropna(
-            axis="index", how="all", inplace=True
-        )  # drop rows with all NaN values
-        print("[INFO] Loaded data and metadata.")
-        print(gutenberg_df.head())
-
-        def _degree_of_similarity(a: str, b: str) -> float:
-            """Returns the degree of similarity between two strings."""
-            return difflib.SequenceMatcher(None, str(a).lower(), str(b).lower()).ratio()
-
-        def similar(a: str, b: str) -> bool:
-            """Returns True if strings are sufficiently similar."""
-            return _degree_of_similarity(a, b) > 0.7
-
-        # Evaluate models
-        results = defaultdict(
-            lambda: {"genre_match": 0, "time_match": 0, "topic_match": 0, "total": 0}
-        )
-        lengths = {}  # to store lengths of paraphrases per model
-        length_differences = {}  # to store length differences per model
-
-        for model_name, paraphraser in models.items():
-            print(f"[INFO] Evaluating '{model_name}'...")
-            lengths[model_name] = {"original": [], "paraphrase": []}
-            for row in tqdm(
-                gutenberg_df.itertuples(),
-                total=len(gutenberg_df),
-                desc=f"Evaluating {model_name}",
-            ):
-                text = row.text
-                try:
-                    extra, _, genre, time_period, _ = (
-                        paraphraser._extract_bullet_points(
-                            text=text,
-                            prompt=paraphraser.extractor_prompt,
-                            response_schema=TopicSchema.model_json_schema(),
-                        )
-                    )
-                    if "present" in time_period.lower():
-                        time_period = 21
-                    else:
-                        time_period = int(re.sub(r"[^\d]", "", time_period))
-                    if time_period > 100:
-                        century = time_period // 100  # obtain century
-                        if time_period % 100 != 0:
-                            century += 1
-                    else:
-                        century = time_period
-
-                except Exception as e:
-                    print(f"[WARNING] Extraction failed for file '{row.filename}': {e}")
-                    continue
-
-                # Ground truth
-                gt_genre = getattr(row, "genre", "")
-                gt_century = getattr(row, "century", 0)
-                gt_topic = getattr(row, "topic", "")
-                # no GT data for title, bullet points, task, tone, register
-                for gt in [gt_genre, gt_century, gt_topic]:
-                    if pd.isna(gt):  # default is only used if column does not exist
-                        gt = ""  # replace NaN with empty string
-
-                # Compare results
-                genre_match = any(
-                    [
-                        similar(extr_g.strip().lower(), gt_genre)
-                        for extr_g in re.split(r"[ /,]+", str(genre).lower())
-                    ]
-                )
-                time_match = similar(century, gt_century)
-                topic_match = _degree_of_similarity(str(gt_topic).lower(), extra)
-
-                results[model_name]["genre_match"] += int(genre_match)
-                results[model_name]["time_match"] += int(time_match)
-                results[model_name]["topic_match"] += topic_match
-                results[model_name]["total"] += 1
-
-                # Debug output
-                # print(f"[DEBUG] File: {row.filename}")
-                # print(
-                #     f"  Extracted -> Genre: '{genre}', Time: '{time_period}', Topic: '{extra}'"
-                # )
-                # print(
-                #     f"  GroundTruth -> Genre: '{gt_genre}', Century: '{gt_century}', Topic: '{gt_topic}'"
-                # )
-                # print(
-                #     f"  Matches -> Genre: {genre_match}, Time: {time_match}, Topic: {topic_match}\n"
-                # )
-
-                # text length check
-                paraphrase = paraphraser.paraphrase(text=text)
-                lengths[model_name]["original"].append(len(text.split()))
-                lengths[model_name]["paraphrase"].append(len(paraphrase[0].split()))
-
-            percent_diffs = [
-                ((p - o) / o) * 100 if o > 0 else 0
-                for o, p in zip(
-                    lengths[model_name]["original"], lengths[model_name]["paraphrase"]
-                )
-            ]
-            length_differences[model_name] = percent_diffs
-        # Report results
-        print("\n[RESULTS]")
-        for model_name, metrics in results.items():
-            total = metrics["total"]
-            if total == 0:
-                continue
-            print(f"\nModel: {model_name}")
-            print(f"  Genre Accuracy: {metrics['genre_match'] / total:.2%}")
-            print(f"  Time Accuracy (approx): {metrics['time_match'] / total:.2%}")
-            print(f"  Topic Accuracy (approx): {metrics['topic_match'] / total:.2%}")
-            print(
-                f"  Length Difference (mean): {np.mean(length_differences[model_name]):.2f}%"
-            )
-
-        # Optional: save to disk
-        if save_to_disk:
-            save_base_path = (
-                Path(__file__).resolve().parent.parent.parent / CONFIG.SAVE_PATH
-            )
+        for base_dir in [blog_base_dir, gutenberg_base_dir, custom_base_dir]:
             assert (
-                save_base_path.exists()
-            ), f"Savefig base path {save_base_path} does not exist."
-            save_base_path = save_base_path / "paraphrasing"
-            os.makedirs(save_base_path, exist_ok=True)
-            save_path = save_base_path / "extractor_eval_results.csv"
-            pd.DataFrame.from_dict(results, orient="index").to_csv(save_path)
-            print(f"[INFO] Results saved to {save_path}")
+                base_dir.exists()
+            ), f"Base directory {base_dir} does not exist. Current path: {os.getcwd()}"
+            if base_dir != blog_base_dir:
+                path2metadata = base_dir / "file_metadata.xlsx"
+                assert (
+                    path2metadata.exists()
+                ), f"Metadata file {path2metadata} does not exist. Current path: {os.getcwd()}"
+
+            data = []
+            print(f"[INFO] Loading data from {str(base_dir).split('/')[-2]}...")
+            # obtain texts
+            for file in chain(base_dir.glob("*.txt"), base_dir.glob("*.csv")):
+                if (
+                    base_dir == gutenberg_base_dir
+                    and "Complete_Works_of_William_Shakespeare" in file.name
+                ):
+                    # Skip the complete works of Shakespeare as it is way longer than other texts
+                    continue
+                if file.suffix == ".csv":  # Blog dataset
+                    df = pd.read_csv(file)
+                    df["text"] = df["text"].apply(lambda x: _preprocess_text(x))
+                    df = df[
+                        df["text"].apply(lambda x: len(x.split()) >= 500)
+                    ]  # filter out text with less than 500 words (not characters, bc there are 501 characters one-word entries)
+
+                    df["year"] = pd.to_datetime(
+                        df["date"], format="mixed", dayfirst=True, errors="coerce"
+                    ).dt.year
+                    df["century"] = df["year"].apply(self._get_century)
+
+                else:  # Gutenberg & custom dataset
+                    with open(file, "r", encoding="utf-8") as f:
+                        author = " ".join(
+                            file.stem.split("_")[-2:]
+                        )  # filename format is "title_firstName_sirname.txt"
+                        content = f.read()
+                        content = _preprocess_text(content)
+                        if len(content.split()) >= 500:
+                            data.append(
+                                {
+                                    "author": author,
+                                    "text": content,
+                                    "filename": file.stem,
+                                }
+                            )
+            if base_dir != blog_base_dir:
+                df = pd.DataFrame(data)
+                metadata = pd.read_excel(path2metadata)
+                # join on data's filename column and metadata's index (always 'others' index)
+                df = df.join(
+                    metadata.set_index("filename"),
+                    on="filename",
+                    how="right",
+                    rsuffix="_meta",
+                )
+            df.dropna(
+                axis="index", how="all", inplace=True
+            )  # drop rows with all NaN values
+            print("[INFO] Loaded data and metadata.")
+            # TODO: for debugging purposes, only use first two rows
+            df = df.head(2)
+            print(df.head())
+
+            # Evaluate models
+            results = defaultdict(
+                lambda: {
+                    "genre_match": 0,
+                    "time_match": 0,
+                    "topic_match": 0,
+                    "total": 0,
+                }
+            )
+            lengths = {}  # to store lengths of paraphrases per model
+            length_differences = {}  # to store length differences per model
+
+            for model_name, paraphraser in models.items():
+                print(f"[INFO] Evaluating '{model_name}'...")
+                lengths[model_name] = {"original": [], "paraphrase": []}
+                for row in tqdm(
+                    df.itertuples(),
+                    total=len(df),
+                    desc=f"Evaluating {model_name}",
+                ):
+                    text = row.text
+                    try:
+                        extra, _, genre, time_period, _ = (
+                            paraphraser._extract_bullet_points(
+                                text=text,
+                                prompt=paraphraser.extractor_prompt,
+                                response_schema=TopicSchema.model_json_schema(),
+                            )
+                        )
+                        century = self._get_century(time_period)
+
+                    except Exception as e:
+                        print(
+                            f"[WARNING] Extraction failed for file '{row.filename}': {e}"
+                        )
+                        continue
+
+                    # Ground truth
+                    gt_genre = getattr(row, "genre", "")
+                    gt_century = getattr(row, "century", 0)
+                    gt_topic = getattr(row, "topic", "")
+                    # no GT data for title, bullet points, task, tone, register
+                    for gt in [gt_genre, gt_century, gt_topic]:
+                        if pd.isna(gt):  # default is only used if column does not exist
+                            gt = ""  # replace NaN with empty string
+
+                    # Compare results
+                    genre_match = any(
+                        [
+                            self._similar(extr_g.strip().lower(), gt_genre)
+                            for extr_g in re.split(r"[ /,]+", str(genre).lower())
+                        ]
+                    )
+                    time_match = self._similar(century, gt_century)
+                    print(
+                        f"[DEBUG] Comparing '{century}' with '{gt_century}': {time_match}"
+                    )
+                    topic_match = self._degree_of_similarity(
+                        str(gt_topic).lower(), extra
+                    )
+
+                    results[model_name]["genre_match"] += int(genre_match)
+                    results[model_name]["time_match"] += int(time_match)
+                    results[model_name]["topic_match"] += topic_match
+                    results[model_name]["total"] += 1
+
+                    # text length check
+                    paraphrase = paraphraser.paraphrase(text=text)
+                    lengths[model_name]["original"].append(len(text.split()))
+                    lengths[model_name]["paraphrase"].append(len(paraphrase[0].split()))
+
+                percent_diffs = [
+                    ((p - o) / o) * 100 if o > 0 else 0
+                    for o, p in zip(
+                        lengths[model_name]["original"],
+                        lengths[model_name]["paraphrase"],
+                    )
+                ]
+                length_differences[model_name] = percent_diffs
+            # Report results
+            print("\n[RESULTS]")
+            for model_name, metrics in results.items():
+                total = metrics["total"]
+                if total == 0:
+                    continue
+                print(f"\nModel: {model_name}")
+                print(f"  Genre Accuracy: {metrics['genre_match'] / total:.2%}")
+                print(f"  Time Accuracy (approx): {metrics['time_match'] / total:.2%}")
+                print(
+                    f"  Topic Accuracy (approx): {metrics['topic_match'] / total:.2%}"
+                )
+                print(
+                    f"  Length Difference (mean): {np.mean(length_differences[model_name]):.2f}%"
+                )
+
+            # Optional: save to disk
+            if save_to_disk:
+                save_base_path = (
+                    Path(__file__).resolve().parent.parent.parent / CONFIG.SAVE_PATH
+                )
+                assert (
+                    save_base_path.exists()
+                ), f"Savefig base path {save_base_path} does not exist."
+                save_base_path = save_base_path / "paraphrasing"
+                os.makedirs(save_base_path, exist_ok=True)
+                save_path = save_base_path / "extractor_eval_results.csv"
+                pd.DataFrame.from_dict(results, orient="index").to_csv(save_path)
+                print(f"[INFO] Results saved to {save_path}")
 
     def evaluate(self, save_to_disk: bool = True):
         """
