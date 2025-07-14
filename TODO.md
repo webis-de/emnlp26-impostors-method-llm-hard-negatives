@@ -116,15 +116,15 @@
   - [ ] Problems:
     - LHF ????
     - Prompt unknown
-    - [x] if perplexity is the best metric, can our attribution be even better? Our AA models variability of author LLM -> **Perplexity is not feasible: Requires access to LLMs + costly**
+    - [x] if perplexity is the best metric, can our attribution be even better? Our AA models variability of author LLM → **Perplexity is not feasible: Requires access to LLMs + costly**
   - Perplexity is a measure of how well a probability distribution predicts a sample
 - [ ] look at min text length text (i.e. 500 words)
 - [ ] look at max text length text 
 - [ ] strip layout information texts in **detectors** using preprocess method 
-- [ ] PAN20 Webis arrow dataset: Finer pair selection not only pre-existing pairs (compare to PAN approaches possible?)
+- [?] PAN20 Webis arrow dataset: Finer pair selection not only pre-existing pairs (compare to PAN approaches possible?)
 - [ ] Paraphrase metrics: compare metric with human evaluation (correlation): Draw 300 paraphrases stratified by their $\Delta_{sem,syn}=Avg(Semantic Sim)-Avg(Syntactic Sim)$ similarity distribution, rate on a 5-point Likert scale
   - [Marcel's paper](https://downloads.webis.de/publications/papers/gohsen_2023b.pdf)
-- [ ] Paraphrase metrics: compare best to worst paraphrases
+- [o] Paraphrase metrics: compare best to worst paraphrases
   - is worst paraphrase already good enough?
   - [ ] include analysis of worst paraphrases in thesis (ggf. in appendix)
 - [ ] Experiment: Paraphrase (1) paragraphs, (2) chunks

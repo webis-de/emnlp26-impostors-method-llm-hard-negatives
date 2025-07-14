@@ -1246,10 +1246,13 @@ class ParaphrasingEvaluator:
         df_results.to_csv(save_path)
         logger.info(f"Results saved to {save_path}")
 
-    def evaluate(self, save_to_disk: bool = True):
+    def evaluate(
+        self, save_to_disk: bool = True, save_extremest_paraphr_per_score: bool = False
+    ):
         """
         Evaluate the paraphrasers using BERTScore, BLEU and ROUGE metrics.
         :param save_to_disk: If True, saves the results to a CSV file.
+        :param save_extremest_paraphr_per_score: If True, saves the worst and best paraphrase per score to a separate CSV file.
         :return: A pandas DataFrame containing the evaluation results.
         """
         results = []
@@ -1346,7 +1349,36 @@ class ParaphrasingEvaluator:
             df.to_csv(save_path, index=False, float_format="%.4f")
             print(f"Results saved to {save_path}")
 
-        return df
+        # Save the worst and best paraphrase per score
+        extremest_paraphrases = pd.DataFrame()
+        for metric in self.get_metric_names():
+            min_row = df.loc[df[metric].idxmin()].copy()
+            max_row = df.loc[df[metric].idxmax()].copy()
+
+            # Add extra info
+            min_row["metric"] = metric
+            min_row["extreme"] = "min"
+
+            max_row["metric"] = metric
+            max_row["extreme"] = "max"
+
+            # Convert to DataFrames and concat
+            extremest_paraphrases = pd.concat(
+                [
+                    extremest_paraphrases,
+                    pd.DataFrame([min_row]),
+                    pd.DataFrame([max_row]),
+                ],
+                ignore_index=True,
+            )
+        if save_extremest_paraphr_per_score:
+            worst_save_path = (
+                save_base_path
+                / f"extremest_paraphrases_per_metric_temp{self.temperature}_maxLength{self.max_length}.csv"
+            )
+            extremest_paraphrases.to_csv(worst_save_path, index=False)
+
+        return df, extremest_paraphrases
 
     def _build_result_row(
         self,
