@@ -1059,31 +1059,24 @@ class ParaphrasingEvaluator:
         Evaluate a single paraphraser on the given dataset.
         Returns metrics dictionary and length difference list.
         """
-        results = {
-            "genre_match": 0,
-            "time_match": 0,
-            "topic_match": 0,
-            "total": 0,
-        }
+        results_per_text = []
         lengths = {"original": [], "paraphrase": []}
 
         for row in tqdm(
             df.itertuples(), total=len(df), desc=f"Evaluating {model_name}"
         ):
             text = str(getattr(row, "text", ""))
-            try:
-                # prompt = 'You are an expert literary metadata extractor. Given a primary historical or literary text, extract the following metadata:\n- topic (main subject or theme)\n- tone (e.g., tragic, comedic, ironic, serious, formal)\n- time_period (approximate century or specific range if identifiable)\n- language_register (e.g., formal, poetic, archaic, colloquial)\n- genre (e.g., tragedy, comedy, essay, speech, sermon, treatise)\nDO NOT describe, interpret, summarize, or comment on the content.\nRespond ONLY with a valid JSON object in this exact format:\n{"topic":"<topic>","tone":"<tone>","time_period":<time_period>,"language_register":"<register>","genre":"<genre>"}\nNow analyze the text above (treat as primary source content, not a glossary or commentary).'
+            filename = getattr(row, "filename", "unknown")
 
+            try:
                 extra, _, genre, time_period, _ = paraphraser._extract_bullet_points(
                     text=text,
-                    prompt=paraphraser.extractor_prompt,  # prompt,  #
+                    prompt=paraphraser.extractor_prompt,
                     response_schema=TopicSchema.model_json_schema(),
                 )
                 century = self._get_century(time_period)
             except Exception as e:
-                logger.warning(
-                    f"Extraction failed for file '{getattr(row, 'filename', 'unknown')}': {e}"
-                )
+                logger.warning(f"Extraction failed for file '{filename}': {e}")
                 continue
 
             gt_genre = getattr(row, "genre", "") or ""
@@ -1095,13 +1088,7 @@ class ParaphrasingEvaluator:
                 for extr_g in re.split(r"[ /,]+", str(genre).lower())
             )
             time_match = self._similar(century, gt_century)
-            logger.info(f"[DEBUG] Extracted extra: {extra}, GT topic: {gt_topic}")
             topic_match = self._degree_of_similarity(str(gt_topic).lower(), extra)
-
-            results["genre_match"] += int(genre_match)
-            results["time_match"] += int(time_match)
-            results["topic_match"] += topic_match
-            results["total"] += 1
 
             paraphrase = paraphraser.paraphrase(text=text)
             if (
@@ -1113,17 +1100,49 @@ class ParaphrasingEvaluator:
             else:
                 paraphrase_len = 0
 
-            lengths["original"].append(len(text.split()))
+            orig_len = len(text.split())
+            lengths["original"].append(orig_len)
             lengths["paraphrase"].append(paraphrase_len)
 
-        return results, lengths
+            results_per_text.append(
+                {
+                    "filename": filename,
+                    "genre_match": genre_match,  # int(genre_match),
+                    "time_match": time_match,  # int(time_match),
+                    "topic_match": topic_match,
+                    "original_length": orig_len,
+                    "paraphrase_length": paraphrase_len,
+                    "ground_truth_genre": gt_genre,
+                    "ground_truth_century": gt_century,
+                    "ground_truth_topic": gt_topic,
+                    "extracted_topic": extra,
+                    "extracted_genre": genre,
+                    "extracted_century": century,
+                }
+            )
 
-    def evaluate_extractors(self, save_to_disk: bool = True):
+        # Convert to DataFrame
+        results_df = pd.DataFrame(results_per_text)
+
+        # Optionally compute total scores
+        summary = {
+            "genre_match": results_df["genre_match"].sum(),
+            "time_match": results_df["time_match"].sum(),
+            "topic_match": results_df["topic_match"].sum(),
+            "total": len(results_df),
+        }
+
+        return results_df, summary, lengths
+
+    def evaluate_extractors(self, save_to_disk: bool = True, detailed: bool = True):
         """
         Non-naive paraphrasers extract information from the original text, such as bullet points, task, topic, title, tone, genre, time period and register.
         Some datasets provide some of this information,
         e.g. Blog (id, gender, age, topic, sign, date, text) and
         Gutenberg (title, filename, author, time_period, genre, author_time, summary, fine_genre, century).
+
+        :param save_to_disk: If True, saves the results to a CSV file.
+        :param detailed: If True, saves detailed results for each text in the datasets, if false, saves aggregated information for each dataset.
         """
         models = {
             k: v
@@ -1164,7 +1183,7 @@ class ParaphrasingEvaluator:
                 logger.info(
                     f"Evaluating model '{model_name}' on {dataset_type} dataset..."
                 )
-                results, lengths = self._evaluate_model_on_data(
+                detailed_result_df, summary_df, lengths = self._evaluate_model_on_data(
                     model_name, paraphraser, df
                 )
 
@@ -1176,7 +1195,7 @@ class ParaphrasingEvaluator:
                 length_differences[model_name] = percent_diffs
 
                 for key in ["genre_match", "time_match", "topic_match", "total"]:
-                    aggregate_results[model_name][key] += results.get(key, 0)
+                    aggregate_results[model_name][key] += summary_df.get(key, 0)
 
             # Reporting results
             logger.info(f"\n[RESULTS for {dataset_type} dataset]")
@@ -1209,7 +1228,10 @@ class ParaphrasingEvaluator:
 
             # Save results if requested
             if save_to_disk:
-                self._save_results(aggregate_results, dataset_type)
+                if detailed:
+                    self._save_results(detailed_result_df, dataset_type)
+                else:
+                    self._save_results(aggregate_results, dataset_type)
 
     def _save_results(self, results: dict, dataset_type: str):
         save_base_path = Path(__file__).resolve().parents[2] / self.config["save_path"]
