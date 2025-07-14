@@ -131,7 +131,7 @@ class Paraphraser(ABC):
 
     def _post_process_llm_response(self, response: str, key: str) -> str:
         resp = unicodedata.normalize("NFKC", response)
-        print(f"\n[DEBUG] Response for {key} extraction: {resp}\n")
+        logger.info(f"\n[DEBUG] Response for {key} extraction: {resp}\n")
         match = re.search(r"\{.*?\}", resp)
         if match:
             resp = match.group(0)
@@ -566,7 +566,7 @@ class BulletPointParaphraser(Paraphraser):
         if prompt is None:
             prompt = self.extractor_prompt
 
-        print(f"\n[DEBUG] Using text extractor with prompt: {prompt}")
+        logger.info(f"\n[DEBUG] Using text extractor with prompt: {prompt}")
         res = self.text_extractor.paraphrase(
             text=text,
             prompt=prompt,
@@ -575,7 +575,7 @@ class BulletPointParaphraser(Paraphraser):
             temperature=0,  # temperature,
             response_schema=response_schema,
         )[0]
-        print(f"\n[DEBUG] Response from text extractor: {res}\n")
+        logger.info(f"\n[DEBUG] Response from text extractor: {res}\n")
 
         if isinstance(res, str):
             # res = re.sub(
@@ -621,7 +621,7 @@ class BulletPointParaphraser(Paraphraser):
             resp, dict
         ), f"Expected a Dictionary response, got {type(resp)}"
 
-        print(
+        logger.info(
             f"\n[DEBUG] Extracted {key}, tone, genre, time period, and register: {res}\n"
         )
         bullet_points, tone, genre, time_period, register = (
@@ -791,7 +791,9 @@ class TopicParaphraser(BulletPointParaphraser):
         max_length: int = MAX_LENGTH,
         temperature: float = TEMPERATURE,
     ) -> List[str]:
-        print(f"\n[DEBUG] Using TopicParaphraser with prompt: {self.extractor_prompt}")
+        logger.info(
+            f"\n[DEBUG] Using TopicParaphraser with prompt: {self.extractor_prompt}"
+        )
         topic, tone, genre, time_period, register = self._extract_bullet_points(
             text=text,
             prompt=self.extractor_prompt,
@@ -799,7 +801,9 @@ class TopicParaphraser(BulletPointParaphraser):
             key="topic",
             response_schema=TopicSchema.model_json_schema(),
         )
-        print(f"\n[DEBUG] Extracted topic, tone, genre, time period, and register:")
+        logger.info(
+            f"\n[DEBUG] Extracted topic, tone, genre, time period, and register:"
+        )
 
         generator_prompt = "Do not use asterisks. Write a text of about {l} words with a {topic} topic, {tone} tone, a {genre} genre, in the {register} register and in the {time_period} time period.".format(
             l=len(text.split()),
@@ -819,7 +823,7 @@ class TopicParaphraser(BulletPointParaphraser):
             n_responses=n_responses,
             temperature=temperature,
         )
-        print(f"\n[DEBUG] Generated paraphrased texts: {paraphrased_texts}")
+        logger.info(f"\n[DEBUG] Generated paraphrased texts: {paraphrased_texts}")
 
         return paraphrased_texts
 
@@ -1029,13 +1033,17 @@ class ParaphrasingEvaluator:
                         data.append(
                             {"author": author, "text": content, "filename": file.stem}
                         )
+                    else:
+                        logger.warning(
+                            f"Skipping file {file.name} due to insufficient length."
+                        )
 
         if metadata is not None:
             df = pd.DataFrame(data)
             df = df.join(
                 metadata.set_index("filename"),
                 on="filename",
-                how="right",
+                how="inner",
                 rsuffix="_meta",
             )
         else:
@@ -1087,7 +1095,7 @@ class ParaphrasingEvaluator:
                 for extr_g in re.split(r"[ /,]+", str(genre).lower())
             )
             time_match = self._similar(century, gt_century)
-            print(f"[DEBUG] Extracted extra: {extra}, GT topic: {gt_topic}")
+            logger.info(f"[DEBUG] Extracted extra: {extra}, GT topic: {gt_topic}")
             topic_match = self._degree_of_similarity(str(gt_topic).lower(), extra)
 
             results["genre_match"] += int(genre_match)
@@ -1123,9 +1131,9 @@ class ParaphrasingEvaluator:
             if not isinstance(v, NaiveParaphraser)
         }
         base_dirs = {
-            "blog": Path(__file__).resolve().parents[2] / "data/datasets/Blog_corpus/",
-            "gutenberg": Path(__file__).resolve().parents[2]
-            / "data/datasets/gutenberg/",
+            # "blog": Path(__file__).resolve().parents[2] / "data/datasets/Blog_corpus/",
+            # "gutenberg": Path(__file__).resolve().parents[2]
+            # / "data/datasets/gutenberg/",
             "custom": Path(__file__).resolve().parents[2]
             / "data/datasets/custom_texts/",
         }
@@ -1245,7 +1253,9 @@ class ParaphrasingEvaluator:
                 else:
                     continue
             try:
-                print(f"[DEBUG] Using paraphraser '{name}' with prompt '{prompt}'")
+                logger.info(
+                    f"[DEBUG] Using paraphraser '{name}' with prompt '{prompt}'"
+                )
                 paraphrases = [
                     _preprocess_text(p)
                     for p in paraphraser.paraphrase(
@@ -1258,7 +1268,7 @@ class ParaphrasingEvaluator:
                     raise ValueError("Empty paraphrase list.")
 
             except Exception as e:
-                print(
+                logger.error(
                     f"[ERROR] Paraphraser '{name}' with prompt '{prompt}' failed: {e}"
                 )
                 continue
