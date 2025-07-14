@@ -39,9 +39,9 @@ import dirtyjson
 import matplotlib.patches as mpatches
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARN)
 
-# cf. https://sdlaml.pages.jsc.fz-juelich.de/ai/guides/blablador_api_access/ (15.06.2025)
+# cf. https://sdlaml.pages.jsc.fz-juelich.de</ai/guides/blablador_api_access/ (15.06.2025)
 ModelName = Literal[
     "1 - Llama3 405 the best general model and big context size",
     "1 - Ministral 8b - the fast model",
@@ -380,6 +380,7 @@ class OllamaParaphraser(NaiveParaphraser):
 
         :param text: The input text to be paraphrased.
         :param prompt: The prompt to be used for paraphrasing. This model allows for JSON structured ouput, hence, specify here the prompt to be used for paraphrasing.
+        The prompt is inserted after the text to enforce its importance in the LLM's context when working on long texts.
         :param max_length: The maximum number of tokens to generate in the paraphrase.
         :param temperature: Controls the randomness of the output. Lower values make the output more deterministic
         :param n_responses: The number of paraphrases to generate.
@@ -394,7 +395,7 @@ class OllamaParaphraser(NaiveParaphraser):
         ):  # directly using parameter n does not return n responses, but only one response
             body = {
                 "model": "default:latest",
-                "messages": [{"role": "user", "content": f"{prompt.strip()} {text}"}],
+                "messages": [{"role": "user", "content": f"{text} {prompt.strip()}"}],
                 "n": 1,
                 "max_tokens": max_length,
                 "temperature": temperature,
@@ -532,7 +533,7 @@ class BulletPointParaphraser(Paraphraser):
         self.text_extractor = text_extractor
         self.text_generator = text_generator
 
-        self.extractor_prompt = 'Summarize the following text in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"bullet_points":"<list of bullet points>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"genre":"<genre>"}. Do not use direct quotes. Text to summarize:'
+        self.extractor_prompt = 'Summarize the text above in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"bullet_points":"<list of bullet points>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"genre":"<genre>"}. Do not use direct quotes.'
 
     def add_tailoring_quotes(self, value):
         value = value.strip()
@@ -727,7 +728,7 @@ class TaskParaphraser(BulletPointParaphraser):
         :param text_generator: A model or function to generate text based on the extracted task, tone and genre.
         """
         super().__init__(text_extractor=text_extractor, text_generator=text_generator)
-        self.extractor_prompt = 'Act as the author of the text. From that perspective, infer your role or identity, the topic being addressed, and the purpose or instruction behind writing the text. Combine these elements into a concise task prompt that you would give to an LLM to reproduce the text. Respond ONLY with a JSON object in the following format: {"task":"<task>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"genre":"<genre>"}. Text to extract the intended task (prompt), tone, genre, time period and register from:'
+        self.extractor_prompt = 'Act as the author of the text above. From that perspective, infer your role or identity, the topic being addressed, and the purpose or instruction behind writing the text. Combine these elements into a concise task prompt that you would give to an LLM to reproduce the text. Respond ONLY with a JSON object in the following format: {"task":"<task>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"genre":"<genre>"}.'
 
     def paraphrase(
         self,
@@ -780,7 +781,7 @@ class TopicParaphraser(BulletPointParaphraser):
         :param text_generator: A model or function to generate text based on the extracted topic, tone and genre.
         """
         super().__init__(text_extractor=text_extractor, text_generator=text_generator)
-        self.extractor_prompt = 'Extract the topic, tone, time period, register and genre from the text. Respond ONLY with a JSON object in the following format: {"topic":"<topic>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"genre":"<genre>"}. Text to extract task, tone, genre, time period and register from:'
+        self.extractor_prompt = 'Extract the topic, tone, time period, register and genre from the text above. Respond ONLY with a JSON object in the following format: {"topic":"<topic>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"genre":"<genre>"}.'
 
     def paraphrase(
         self,
@@ -835,7 +836,7 @@ class TitleParaphraser(BulletPointParaphraser):
         :param text_generator: A model or function to generate text based on the extracted title, tone and genre.
         """
         super().__init__(text_extractor=text_extractor, text_generator=text_generator)
-        self.extractor_prompt = 'Find a concise title for the text, extract the tone, time period, register and genre from the text. Respond ONLY with a JSON object in the following format: {"title":"<title>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"genre":"<genre>"}. Text to extract title, tone, genre, time period and register from:'
+        self.extractor_prompt = 'Find a concise title for the text, extract the tone, time period, register and genre from the text above. Respond ONLY with a JSON object in the following format: {"title":"<title>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"genre":"<genre>"}.'
 
     def paraphrase(
         self,
@@ -1063,9 +1064,11 @@ class ParaphrasingEvaluator:
         ):
             text = str(getattr(row, "text", ""))
             try:
+                # prompt = 'You are an expert literary metadata extractor. Given a primary historical or literary text, extract the following metadata:\n- topic (main subject or theme)\n- tone (e.g., tragic, comedic, ironic, serious, formal)\n- time_period (approximate century or specific range if identifiable)\n- language_register (e.g., formal, poetic, archaic, colloquial)\n- genre (e.g., tragedy, comedy, essay, speech, sermon, treatise)\nDO NOT describe, interpret, summarize, or comment on the content.\nRespond ONLY with a valid JSON object in this exact format:\n{"topic":"<topic>","tone":"<tone>","time_period":<time_period>,"language_register":"<register>","genre":"<genre>"}\nNow analyze the text above (treat as primary source content, not a glossary or commentary).'
+
                 extra, _, genre, time_period, _ = paraphraser._extract_bullet_points(
                     text=text,
-                    prompt=paraphraser.extractor_prompt,
+                    prompt=paraphraser.extractor_prompt,  # prompt,  #
                     response_schema=TopicSchema.model_json_schema(),
                 )
                 century = self._get_century(time_period)
@@ -1121,7 +1124,8 @@ class ParaphrasingEvaluator:
         }
         base_dirs = {
             "blog": Path(__file__).resolve().parents[2] / "data/datasets/Blog_corpus/",
-            # "gutenberg": Path(__file__).resolve().parents[2] / "data/datasets/gutenberg/",
+            "gutenberg": Path(__file__).resolve().parents[2]
+            / "data/datasets/gutenberg/",
             "custom": Path(__file__).resolve().parents[2]
             / "data/datasets/custom_texts/",
         }
@@ -1135,7 +1139,7 @@ class ParaphrasingEvaluator:
                 continue
 
             # TODO: Use only first two rows for debugging (remove in production)
-            df = df.head(2)
+            df = df.head(min(2, len(df)))  # For debugging, remove in production
             logger.info(f"Dataset snapshot:\n{df.head()}")
 
             aggregate_results = defaultdict(
