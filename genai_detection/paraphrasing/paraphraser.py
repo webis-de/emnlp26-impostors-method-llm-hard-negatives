@@ -394,7 +394,7 @@ class OllamaParaphraser(NaiveParaphraser):
             n_responses
         ):  # directly using parameter n does not return n responses, but only one response
             body = {
-                "model": "default:latest",
+                "model": self.model_id,
                 "messages": [{"role": "user", "content": f"{text} {prompt.strip()}"}],
                 "n": 1,
                 "max_tokens": max_length,
@@ -1150,9 +1150,9 @@ class ParaphrasingEvaluator:
             if not isinstance(v, NaiveParaphraser)
         }
         base_dirs = {
-            # "blog": Path(__file__).resolve().parents[2] / "data/datasets/Blog_corpus/",
-            # "gutenberg": Path(__file__).resolve().parents[2]
-            # / "data/datasets/gutenberg/",
+            "blog": Path(__file__).resolve().parents[2] / "data/datasets/Blog_corpus/",
+            "gutenberg": Path(__file__).resolve().parents[2]
+            / "data/datasets/gutenberg/",
             "custom": Path(__file__).resolve().parents[2]
             / "data/datasets/custom_texts/",
         }
@@ -1166,7 +1166,7 @@ class ParaphrasingEvaluator:
                 continue
 
             # TODO: Use only first two rows for debugging (remove in production)
-            df = df.head(min(2, len(df)))  # For debugging, remove in production
+            df = df.head(min(10, len(df)))  # For debugging, remove in production
             logger.info(f"Dataset snapshot:\n{df.head()}")
 
             aggregate_results = defaultdict(
@@ -1229,6 +1229,7 @@ class ParaphrasingEvaluator:
             # Save results if requested
             if save_to_disk:
                 if detailed:
+                    print("Saving detailed results...", type(detailed_result_df))
                     self._save_results(detailed_result_df, dataset_type)
                 else:
                     self._save_results(aggregate_results, dataset_type)
@@ -1814,26 +1815,27 @@ class ParaphrasingEvaluator:
 
 if __name__ == "__main__":
     # models
+    ollama_model_id = "mistral:7b"  # "default:latest"
     paraphrasers = {
         # 'T5_ChatGPT': T5ChatGPTParaphraser(),
         # 'T5_Google_PAWS': T5GooglePAWSParaphraser(),
         # 'Blablador': BlabladorParaphraser(model_id="1 - Llama3 405 the best general model and big context size"),
-        "Ollama": OllamaParaphraser(model_id="default:latest"),
+        "Ollama": OllamaParaphraser(model_id=ollama_model_id),
         "TopicParaphraser": TopicParaphraser(
-            text_extractor=OllamaParaphraser(model_id="default:latest"),
-            text_generator=OllamaParaphraser(model_id="default:latest"),
+            text_extractor=OllamaParaphraser(model_id=ollama_model_id),
+            text_generator=OllamaParaphraser(model_id=ollama_model_id),
         ),
         # "TaskParaphraser": TaskParaphraser(
-        #     text_extractor=OllamaParaphraser(model_id="default:latest"),
-        #     text_generator=OllamaParaphraser(model_id="default:latest"),
+        #     text_extractor=OllamaParaphraser(model_id=ollama_model_id),
+        #     text_generator=OllamaParaphraser(model_id=ollama_model_id),
         # ),
         # "TitleParaphraser": TitleParaphraser(
-        #     text_extractor=OllamaParaphraser(model_id="default:latest"),
-        #     text_generator=OllamaParaphraser(model_id="default:latest"),
+        #     text_extractor=OllamaParaphraser(model_id=ollama_model_id),
+        #     text_generator=OllamaParaphraser(model_id=ollama_model_id),
         # ),
         # "BulletPointParaphraser": BulletPointParaphraser(
-        #     text_extractor=OllamaParaphraser(model_id="default:latest"),
-        #     text_generator=OllamaParaphraser(model_id="default:latest"),
+        #     text_extractor=OllamaParaphraser(model_id=ollama_model_id),
+        #     text_generator=OllamaParaphraser(model_id=ollama_model_id),
         # ),
     }
     # paraphrasers.update({f'Blablador_{name}': BlabladorParaphraser(model_id=name) for name in list(get_args(ModelName))})
