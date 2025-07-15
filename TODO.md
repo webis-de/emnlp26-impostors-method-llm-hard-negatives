@@ -127,10 +127,17 @@
 - [o] Paraphrase metrics: compare best to worst paraphrases
   - is worst paraphrase already good enough?
   - [ ] include analysis of worst paraphrases in thesis (ggf. in appendix)
-- [ ] Experiment: Paraphrase (1) paragraphs, (2) chunks
-  - (1) Paragraphs is not ideal, because I omitted all layout information, i.e. no paragraphs → save two versions of the dataset, one with paragraphs as newlines and one without any paragraphs
+- [x] Experiment (cf. `experiment_paraphrasing.ipynb`): Paraphrase (1) paragraphs, (2) chunks
+  - ~~(1) Paragraphs is not ideal, because I omitted all layout information, i.e. no paragraphs → save two versions of the dataset, one with paragraphs as newlines and one without any paragraphs~~
   - (2) Chunks: Split text into chunks of X words, paraphrase
-  - Hypothesis: chunk-to-chunk paraphrasing has better control compared to text-to-text paraphrasing
+    - Chunks: Tried to preserve sentences (via nltk's sent_tokenize), similar number of words per chunk
+    - Tested 1 to 5 chunks per text across all models, prompts and one custom text example
+    - Findings: 
+      - Non-naive paraphrasers have steady scores across all chunk numbers, i.e. no influence of chunk number on scores
+      - Naive paraphrasers have low *syntactic* scores for 1 chunk, but higher scores for larger chunk numbers, i.e. 2-5 chunks
+      - Naive paraphrasers have steady and high *semantic* scores across all chunk numbers, i.e. 1-5 chunks (no influence of chunk number on scores)
+      - Naive paraphrasers' Gohsen delta lower for more chunks, i.e. many chunks is not ideal for paraphrasing because of high syntactic similarity for similar semantic similarity
+  - Hypothesis: chunk-to-chunk paraphrasing has better control compared to text-to-text paraphrasing: Wrong, only higher syntactic scores, but not really semantic scores → not ideal for paraphrasing
 - [ ] Experiment: 
   - (1) chunks from text of unknown authorship
   - (2) classify chunks to most similar LLM (if any)
