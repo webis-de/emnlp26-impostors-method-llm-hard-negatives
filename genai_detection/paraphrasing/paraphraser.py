@@ -1243,8 +1243,9 @@ class ParaphrasingEvaluator:
         save_dir.mkdir(parents=True, exist_ok=True)
 
         save_path = save_dir / f"extractor_eval_results_{dataset_type}.csv"
-        df_results = pd.DataFrame.from_dict(results, orient="index")
-        df_results.to_csv(save_path)
+        if not isinstance(results, pd.DataFrame):
+            results = pd.DataFrame.from_dict(results, orient="index")
+        results.to_csv(save_path)
         logger.info(f"Results saved to {save_path}")
 
     def evaluate(
