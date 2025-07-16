@@ -99,17 +99,20 @@
     - However, `load_dataset` does not work with local arrow files, i.e. I need to upload the dataset to Huggingface first OR
     - `load_dataset` works with [local CSV files](https://huggingface.co/docs/datasets/v1.11.0/loading_datasets.html): `dataset = load_dataset('csv', data_files=['my_file_1.csv', 'my_file_2.csv', 'my_file_3.csv'])`
   - **Does not work without using CLI, making it incompatible with our repo**: Created [issue](https://github.com/eric-mitchell/detect-gpt/issues/20): Only runnable via CLI
+  - [Forked repository](https://github.com/eric-mitchell/detect-gpt), but problems with dataset xsum; decision not to spend more time on this
 - [ ] new baseline for imposter approach (AV) / LLM AA: [Perplexity](https://huggingface.co/docs/transformers/perplexity)
 - [x] [MirrorMinds-LLMDetector](https://github.com/shubhamgpt007/MirrorMinds-LLMDetector) Baseline
   - similar to our approach
   - steps: extract query from text, generate 2 paraphrases using 2 LLMs, compute (BLEU, METEOR) similarity between query and paraphrase, use max similarity as score pair, threshold for classification
   - Created [issue](https://github.com/shubhamgpt007/MirrorMinds-LLMDetector/issues/1): Scripts → not importable + paths to LLMs hardcoded
+  - [Forked repository](https://github.com/KlaraGtknst/MirrorMinds-LLMDetector/tree/refactor/modul) and fixed scripts to be importable
 - [x] [Perplexity](https://huggingface.co/docs/transformers/perplexity) as baseline for imposter approach (approx PPL)  
   - [x] [LLMDet:](https://github.com/TrustedLLM/LLMDet) Existing proxy to Perplexity
     - LLMDet is a proxy for perplexity, uses probability of next token based on previous n-grams rather than tokens 
     - probability is precomputed in dictionary for k most frequent n-grams in texts of LLMs
     - require access to LLM parameters to build a dictionary of perplexity scores for each n-gram
     - [ ] Wait until [`__init__` issue](https://github.com/TrustedLLM/LLMDet/issues/14) is resolved
+    - Forking does not make sense, because I do not know what to add in missing `extender` class
   - [x] research meaning/definition of perplexity
   - [x] implement perplexity as baseline for imposter approach (approx PPL)
     - using [Huggingface Perplexity](https://huggingface.co/spaces/evaluate-metric/perplexity) metric
