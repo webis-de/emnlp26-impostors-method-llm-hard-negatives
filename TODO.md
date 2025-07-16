@@ -99,7 +99,7 @@
     - However, `load_dataset` does not work with local arrow files, i.e. I need to upload the dataset to Huggingface first OR
     - `load_dataset` works with [local CSV files](https://huggingface.co/docs/datasets/v1.11.0/loading_datasets.html): `dataset = load_dataset('csv', data_files=['my_file_1.csv', 'my_file_2.csv', 'my_file_3.csv'])`
   - **Does not work without using CLI, making it incompatible with our repo**: Created [issue](https://github.com/eric-mitchell/detect-gpt/issues/20): Only runnable via CLI
-  - [Forked repository](https://github.com/eric-mitchell/detect-gpt), but problems with dataset xsum; decision not to spend more time on this
+  - [Forked repository](https://github.com/KlaraGtknst/detect-gpt), but problems with dataset xsum; decision not to spend more time on this
 - [ ] new baseline for imposter approach (AV) / LLM AA: [Perplexity](https://huggingface.co/docs/transformers/perplexity)
 - [x] [MirrorMinds-LLMDetector](https://github.com/shubhamgpt007/MirrorMinds-LLMDetector) Baseline
   - similar to our approach
