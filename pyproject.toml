@@ -46,6 +46,8 @@ sentence-transformers = "^5.0.0"
 openpyxl = "^3.1.5"
 unilm = {git = "https://github.com/Liadrinz/transformers-unilm.git"}
 llmdet = {git = "https://github.com/TrustedLLM/LLMDet.git"}
+llm-question-generator = {git = "https://github.com/KlaraGtknst/MirrorMinds-LLMDetector.git", rev = "refactor/modul"}
+llm-detector = {git = "https://github.com/KlaraGtknst/MirrorMinds-LLMDetector.git", rev = "refactor/modul"}
 
 [build-system]
 requires = ["poetry-core"]
