@@ -22,7 +22,7 @@ class BaseConfig:
     PATH2GUTENBERG = f"{DATA_BASE_PATH}/gutenberg/gutenberg-dataset-converted"
     PATH2BLOG = f"{DATA_BASE_PATH}/Blog_corpus/blog-dataset-converted"
     PATH2STUDENT_ESSAYS = (
-        f"{DATA_BASE_PATH}/student_essays/student-essays-dataset-converted"
+        f"{DATA_BASE_PATH}/student_essays/Intro2006/student-essays-dataset-converted"
     )
     PATH2GENERIC_ON_FLY_IMP = f"{DATA_BASE_PATH}/google-on-the-fly-imposters"
     SAVE_PATH = "results/"

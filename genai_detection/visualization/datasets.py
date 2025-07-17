@@ -50,6 +50,7 @@ class BaseDatasetVisualization(ABC):
             CONFIG.GUTENBERG: CONFIG.PATH2GUTENBERG,
             CONFIG.PAN25: CONFIG.PATH2PAN25,
             CONFIG.KOPPEL: CONFIG.PATH2KOPPEL_WEBIS,
+            CONFIG.STUDENT_ESSAYS: CONFIG.PATH2STUDENT_ESSAYS,
         }
         assert self.name in list(
             name2path.keys()
@@ -315,4 +316,9 @@ class Pan25Visualization(BaseDatasetVisualization):
 
 class KoppelWebisVisualization(BaseDatasetVisualization):
     def __init__(self, name: str = CONFIG.KOPPEL):
+        super().__init__(name=name)
+
+
+class StudentEssaysVisualization(BaseDatasetVisualization):
+    def __init__(self, name: str = CONFIG.STUDENT_ESSAYS):
         super().__init__(name=name)

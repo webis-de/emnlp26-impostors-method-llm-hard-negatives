@@ -928,7 +928,7 @@ def run_student_essay():
     assert (
         base_dir.exists()
     ), f"Path {base_dir} to student essays dataset does not exist."
-    output_dir = os.path.join(base_dir, "student-essay-dataset-converted")
+    output_dir = os.path.join(base_dir, "student-essays-dataset-converted")
 
     loader = StudentEssayDatasetLoader(path=base_dir)
     dataset = loader.load()
