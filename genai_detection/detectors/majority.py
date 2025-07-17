@@ -6,6 +6,7 @@ import nltk
 import numpy as np
 import torch
 import typing as t
+import numpy.typing as npt
 
 from genai_detection.detectors.detector_base import DetectorBase
 from genai_detection.detectors.impostor import ImpostorDetector
@@ -103,7 +104,7 @@ class MajorityDetector(DetectorBase):
 
     def get_score(
         self, text: t.Union[str, t.Iterable[str]], normalize: bool = False
-    ) -> t.Union[np.float32, np.ndarray, np.nan]:
+    ) -> t.Union[np.float32, np.ndarray, npt.NDArray[np.float32]]:
         """
         Return scores indicating the probability of the input text(s) being machine-generated.
 
