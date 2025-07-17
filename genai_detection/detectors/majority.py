@@ -28,6 +28,14 @@ class MajorityDetector(DetectorBase):
         self.paraphraser = T5ChatGPTParaphraser()
 
     def _split_text_into_chunks(self, text: str, n: int = 4) -> List[str]:
+        """
+        Split text into <=n chunks, each containing approximately the same number of words.
+        The text is first tokenized into sentences, then grouped into chunks until the total word count
+        is approximately even across the n parts.
+        :param text: Input text to be split into chunks.
+        :param n: Number of chunks to split the text into. If n is greater than the number of sentences, each sentence will be a chunk.
+        :return: List of text chunks.
+        """
         # Step 1: Tokenize into sentences
         sentences = sent_tokenize(text)
 
@@ -59,23 +67,19 @@ class MajorityDetector(DetectorBase):
         self, text: Iterable[str]
     ) -> t.Union[torch.Tensor, np.ndarray, t.Iterable[float]]:
         """
-        Calculate the majority score for the given text.
-        The score is simply 1.0 for all inputs, indicating that the majority class is assumed to be machine-generated.
+        Calculate the majority score for the given text(s).
+        The score per text is the average of the scores from the detector for each chunk of text.
 
-        :param text: input text to score (no batch!), if list we assume it is tokenized.
-        :return: Majority score for the input text.
+        :param text: input text(s) to score, if list we batch of texts.
+        :return: Majority score for the input text(s).
         """
         if isinstance(text, str):
             text = [text]
         chunks = [self._split_text_into_chunks(t) for t in text]
-        # omit empty chunks
-        # chunks = [[c for c in chunk if (len(c) > 0)] for chunk in chunks]
-        # use decision of the detector on each chunk, use majority vote
         score_per_text = []
         for text_chunks in chunks:
             if isinstance(self.detector, ImpostorDetector):
                 # generate artificial paraphrase candidates
-
                 prompt = (
                     "Paraphrase the text above and output only the paraphrased version."
                 )
@@ -92,7 +96,6 @@ class MajorityDetector(DetectorBase):
             else:
                 inputs = text_chunks
 
-            # print("Inputs for detector:", inputs)
             scores = [self.detector.get_score(c, normalize=False) for c in inputs]
             score_per_text.append(np.mean(scores) if scores else 0.0)
 
