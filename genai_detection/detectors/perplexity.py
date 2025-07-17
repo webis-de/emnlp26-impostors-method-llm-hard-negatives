@@ -8,6 +8,7 @@ from genai_detection.detectors.detector_base import DetectorBase
 from evaluate import load
 
 # import llmdet.detector as llmdet  # FIXME: Wait until https://github.com/TrustedLLM/LLMDet/issues/14 is resolved
+__all__ = ["PerplexityDetector"]
 
 
 class PerplexityDetector(DetectorBase):
