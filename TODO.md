@@ -117,7 +117,7 @@
     - LLMDet is a proxy for perplexity, uses probability of next token based on previous n-grams rather than tokens 
     - probability is precomputed in dictionary for k most frequent n-grams in texts of LLMs
     - require access to LLM parameters to build a dictionary of perplexity scores for each n-gram
-    - [ ] Wait until [`__init__` issue](https://github.com/TrustedLLM/LLMDet/issues/14) is resolved
+    - [-] Wait until [`__init__` issue](https://github.com/TrustedLLM/LLMDet/issues/14) is resolved: _unlikely to be fixed in near future_
     - Forking does **not** make sense, because I do not know what to add in missing `extender` class
   - [x] research meaning/definition of perplexity
   - [x] implement perplexity as baseline for imposter approach (approx PPL)
@@ -129,7 +129,8 @@
   - Perplexity is a measure of how well a probability distribution predicts a sample
 - [ ] look at min text length text (i.e. 500 words)
 - [ ] look at max text length text 
-- [ ] strip layout information texts in **detectors** using preprocess method 
+- [x] strip layout information texts in **detectors** using preprocess method 
+    - Added preprocessing at methods (predicting, scoring and both) of base detector class, i.e. all detectors inherit from this class
 - [?] PAN20 Webis arrow dataset: Finer pair selection not only pre-existing pairs (compare to PAN approaches possible?)
 - [ ] Paraphrase metrics: compare metric with human evaluation (correlation): Draw 300 paraphrases stratified by their $\Delta_{sem,syn}=Avg(Semantic Sim)-Avg(Syntactic Sim)$ similarity distribution, rate on a 5-point Likert scale
   - [Marcel's paper](https://downloads.webis.de/publications/papers/gohsen_2023b.pdf)
