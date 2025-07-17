@@ -22,6 +22,7 @@ import torch
 import numpy as np
 import sys
 import os
+import numpy.typing as npt
 
 sys.path.append(os.path.abspath(".."))
 from genai_detection.util import preprocess_text as _preprocess_text
@@ -59,7 +60,7 @@ class DetectorBase:
 
     def get_score(
         self, text: t.Union[str, t.Iterable[str]], normalize: bool = False
-    ) -> t.Union[np.float32, np.ndarray, np.nan]:
+    ) -> t.Union[np.float32, np.ndarray, npt.NDArray[np.float32]]:
         """
         Return scores indicating the probability of the input text(s) being machine-generated.
 
@@ -73,6 +74,7 @@ class DetectorBase:
         :return: score indicating whether the input text being machine-generated
         """
         return_single = isinstance(text, str)
+        text = self.preprocess_text(text)
         text = [text] if return_single else text
         scores = self._get_score_impl(text)
         if normalize and scores is not NotImplemented:
@@ -95,7 +97,7 @@ class DetectorBase:
 
     def predict(
         self, text: t.Union[str, t.Iterable[str]]
-    ) -> t.Union[np.int32, np.ndarray, np.nan]:
+    ) -> t.Union[np.int32, np.ndarray, npt.NDArray[np.int32]]:
         """
         Make a prediction whether the input text(s) were written by a machine.
 
@@ -103,6 +105,7 @@ class DetectorBase:
         :return: boolean classifications of whether inputs are likely machine-generated
         """
         return_single = isinstance(text, str)
+        text = self.preprocess_text(text)
         text = [text] if return_single else text
         preds = self._predict_impl(text)
         preds = (
@@ -126,7 +129,8 @@ class DetectorBase:
     def predict_with_score(
         self, text: t.Union[str, t.Iterable[str]], normalize: bool = False
     ) -> t.Tuple[
-        t.Union[np.int32, np.ndarray, np.nan], t.Union[np.float32, np.ndarray, np.nan]
+        t.Union[np.int32, np.ndarray, npt.NDArray[np.int32]],
+        t.Union[np.float32, np.ndarray, npt.NDArray[np.float32]],
     ]:
         """
         Make a prediction whether the input text(s) were written by a machine and return the
@@ -140,6 +144,7 @@ class DetectorBase:
         :return: tuple of (predicted class, score)
         """
         return_single = isinstance(text, str)
+        text = self.preprocess_text(text)
         text = [text] if return_single else text
         preds, scores = self._predict_with_score_impl(text)
 
