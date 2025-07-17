@@ -21,6 +21,9 @@ class BaseConfig:
     PATH2KOPPEL_WEBIS = f"{DATA_BASE_PATH}/corpus-webis-authorship/koppel/koppel-webis-dataset-converted"
     PATH2GUTENBERG = f"{DATA_BASE_PATH}/gutenberg/gutenberg-dataset-converted"
     PATH2BLOG = f"{DATA_BASE_PATH}/Blog_corpus/blog-dataset-converted"
+    PATH2STUDENT_ESSAYS = (
+        f"{DATA_BASE_PATH}/student_essays/student-essays-dataset-converted"
+    )
     PATH2GENERIC_ON_FLY_IMP = f"{DATA_BASE_PATH}/google-on-the-fly-imposters"
     SAVE_PATH = "results/"
     PAN23 = "pan23"
@@ -29,6 +32,7 @@ class BaseConfig:
     KOPPEL = "koppel"
     BLOG = "blog"
     GUTENBERG = "gutenberg"
+    STUDENT_ESSAYS = "student_essays"
     IMPOSTER = "imposter"
     UNMASKING = "unmasking"
 
