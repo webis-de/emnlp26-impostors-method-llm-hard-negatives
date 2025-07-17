@@ -257,7 +257,7 @@ class T5ChatGPTParaphraser(NaiveParaphraser):
         response_schema: Optional[dict[str, Any]] = None,
     ) -> List[str]:
         input_ids = self.tokenizer(
-            f"{prompt.strip()} {text}",
+            f"{text}\n{prompt.strip()}",
             return_tensors="pt",
             padding="longest",
             max_length=max_length,
@@ -318,7 +318,7 @@ class T5GooglePAWSParaphraser(NaiveParaphraser):
         # TODO: no duplication penalty, and thus, there are duplicates in the output
         # print(f"[DEBUG] Using T5GooglePAWSParaphraser with prompt: {prompt}")
         encoding = self.tokenizer.encode_plus(
-            f"{prompt.strip()} {text} </s>", padding="max_length", return_tensors="pt"
+            f"{text}\n{prompt.strip()}</s>", padding="max_length", return_tensors="pt"
         )
 
         input_ids, attention_masks = encoding["input_ids"].to(self.device), encoding[
@@ -395,7 +395,7 @@ class OllamaParaphraser(NaiveParaphraser):
         ):  # directly using parameter n does not return n responses, but only one response
             body = {
                 "model": self.model_id,
-                "messages": [{"role": "user", "content": f"{text} {prompt.strip()}"}],
+                "messages": [{"role": "user", "content": f"{text}\n{prompt.strip()}"}],
                 "n": 1,
                 "max_tokens": max_length,
                 "temperature": temperature,
