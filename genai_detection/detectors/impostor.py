@@ -60,8 +60,8 @@ class ImpostorDetector(DetectorBase):
         threshold=0.1,
         imposter_technique: Literal[
             "llm", "text_len", "n_docs", "on-the-fly", "blogs", "fixed", "content"
-        ] = "text_len",
-        path2imp: str = CONFIG.PATH2GENERIC_ON_FLY_IMP,  # path to impostor file, where fixed impostors are saved or where to save generated impostors
+        ] = "fixed",
+        path2imp: str = CONFIG.PATH2BLOG,  # PATH2GENERIC_ON_FLY_IMP,  # path to impostor file, where fixed impostors are saved or where to save generated impostors
         real_time_generation: bool = False,  # whether to generate impostors in real-time or use pre-generated ones
         min_n_tokens: int = 500,  # minimum number of tokens to consider input sequence valid, defaults to 500
         upsample: bool = True,  # whether to upsample short texts (default: True, i.e. upsample) or skip them
@@ -214,6 +214,8 @@ class ImpostorDetector(DetectorBase):
                 len_ws_token_left + len_ws_token_right < 2 * self.min_n_tokens
             ) and not self.upsample:  # skip
                 continue
+            if len_ws_token_left == 0 or len_ws_token_right == 0:
+                continue  # skip empty texts
 
             # upsample short texts to the minimum number of tokens
             if len_ws_token_left < self.min_n_tokens:
