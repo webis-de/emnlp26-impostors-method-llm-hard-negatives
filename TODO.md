@@ -20,17 +20,17 @@
     - produce scenarios where we can control all variables (train new model for each dataset)
     - generalization impossible
 - [ ] related work on LLM AA (ad hoc generation of imposter texts/ candidates for AA)
-  - [Janek Bevendorff's paper](https://downloads.webis.de/publications/papers/bevendorff_2025a.pdf) 
-  - ceph
+  - [x] [Janek Bevendorff's paper](https://downloads.webis.de/publications/papers/bevendorff_2025a.pdf) 
+  - [ ] ceph
 - [ ] related work: Model variability of author LLMs
 - [ ] Does AA/ AV profit from LLM generations?
-  - we can ask an LLM generate as many (imposter) texts as we want (i.e. seed and temperature)
+  - We can ask an LLM generate as many (imposter) texts as we want (i.e. seed and temperature)
 - we have two tasks:
   - [ ] Klassisches AV: generative approaches (i.e. our imposter) vs. normal approaches (i.e. Koppel et al. 2014's imposter)
   - [ ] LLM detection: 
     - (1) LLM detection as open set AA problem
     - (2) model AA as multiple AV problems 
-    - (3) one solutiion for AV is imposter approach
+    - (3) one solution for AV is imposter approach
     - (4) we generalize imposter approach by LLM generation
     - (5) generative imposter approach gives evidence for generation by machine
     - is generative Imposter approach only LLM attribution, i.e. AA? risk: Other must've already used LLM to generate text for AA
@@ -70,11 +70,11 @@
   - [ ] visual similar to this: https://downloads.webis.de/talks/hagen_2021.pdf
   - [ ] textual description of problem: Do not use pseudocode, but natural language description (short, but whole sentence, with all input (conditions) and output variables/ classification) and specfific to situation
 - [ ] What do we want from a good solution? Make **criteria catalogue explicit**
-  - Hallucinations are okay, bc we view the paraphrases defintion relaxed
+  - Hallucinations are okay, bc we view the paraphrases definition relaxed
   - same topic!
-  - different statements are okay
+  - Different statements are okay
   - control all non-style variables (register, target audience, topic, etc.)
-- [ ] qualitative evaluation of paraphrases based on **criteria catalogue**
+- [ ] Qualitative evaluation of paraphrases based on **criteria catalogue**
   - segment based
 - [ ] quantitative evaluation of paraphrases 
   - misleading: We do not know if they measure exactly what we think
@@ -136,7 +136,7 @@
   - [Marcel's paper](https://downloads.webis.de/publications/papers/gohsen_2023b.pdf)
 - [o] Paraphrase metrics: compare best to worst paraphrases
   - is worst paraphrase already good enough?
-  - [ ] include analysis of worst paraphrases in thesis (ggf. in appendix)
+  - [ ] Include analysis of worst paraphrases in thesis (ggf. in appendix)
 - [x] Experiment (cf. `experiment_paraphrasing.ipynb`): Paraphrase (1) paragraphs, (2) chunks
   - ~~(1) Paragraphs is not ideal, because I omitted all layout information, i.e. no paragraphs → save two versions of the dataset, one with paragraphs as newlines and one without any paragraphs~~
   - (2) Chunks: Split text into chunks of X words, paraphrase
