@@ -10,9 +10,11 @@ import re
 import sys
 import unicodedata
 import typing as t
+import chardet
 
 from datasets import Dataset, DatasetDict, ClassLabel, Features, Value
 import pandas as pd
+import pyreadstat
 from tqdm import tqdm
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -630,7 +632,309 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
         )
 
 
+# === Gutenberg LOADER ===
+
+
+class StudentEssayDatasetLoader(BaseDatasetLoader):
+    def __init__(self, path: str, name: str = CONFIG.STUDENT_ESSAYS):
+        super().__init__(name=name)
+        self.path = Path(path)
+        assert (
+            self.path.exists()
+        ), f"Path {self.path} does not exist. Current path: {os.getcwd()}"
+
+    def load(self, train_split_portion: float = 0.7) -> DatasetDict:
+        """
+        Loader for the Student Essay dataset.
+        The dataset can be obtained from James W. Pennebaker.
+        """
+        # build student essays dataset
+        df = self._load_student_essays()
+        print("obtained student essays dataset with", len(df), "entries.")
+
+        # metadata dataframe
+        author_metadata = self._load_student_metadata()
+        # keep NaNs, no answer is also an answer group
+        print("obtained author metadata with", len(author_metadata), "entries.")
+
+        df = df.join(
+            author_metadata.set_index("author_id"),
+            on="author_id",
+            how="left",
+            rsuffix="_meta",
+        )
+        print("joined student essays with metadata.")
+
+        # construct pairs
+        groupby_cols = [
+            "task",
+            "sex",
+            "ethnicity",
+            "political_orientation",
+            # "teacher",
+            # "year",
+        ]
+        assert all(
+            col in df.columns for col in groupby_cols
+        ), "Missing required metadata columns."
+
+        # shuffle and split groups such that tasks are not overlapping between train and test sets
+        all_tasks = df["task"].unique().tolist()
+        random.seed(42)
+        random.shuffle(all_tasks)
+
+        task_limit = max(
+            int(train_split_portion * len(all_tasks)), 2
+        )  # at least 2 to ensure same-author pairs (bc each author appears <=1 time per task)
+        train_tasks = set(all_tasks[:task_limit])
+        test_tasks = set(all_tasks[task_limit:])
+
+        # Final sanity check
+        assert train_tasks.isdisjoint(
+            test_tasks
+        ), "Task overlap between train and test."
+        train_df = (
+            df[df["task"].isin(train_tasks)]
+            .sample(frac=1, random_state=42)
+            .reset_index(drop=True)
+        )
+        test_df = (
+            df[df["task"].isin(test_tasks)]
+            .sample(frac=1, random_state=42)
+            .reset_index(drop=True)
+        )
+        print(f"Train tasks: {train_tasks}, Test tasks: {test_tasks}\n\n")
+
+        train_pairs = self.generate_pairs(df=train_df, groupby_cols=groupby_cols)
+        test_pairs = self.generate_pairs(df=test_df, groupby_cols=groupby_cols)
+        print(
+            f"Generated {len(train_pairs)} training pairs and {len(test_pairs)} test pairs."
+        )
+
+        features = Features(
+            {
+                "pair": [Value("string")],
+                "authors": [Value("string")],
+                "same": Value("bool"),
+            }
+        )
+
+        return DatasetDict(
+            {
+                "train": Dataset.from_list(train_pairs, features=features),
+                "test": Dataset.from_list(test_pairs, features=features),
+            }
+        )
+
+    def _load_student_essays(self):
+        student_essays_df = pd.DataFrame(
+            columns=["author_id", "text", "task", "task_description"]
+        )
+        task_description = {
+            "Ass1": "Stream of consciousness",
+            "Ass2": "Talk about your childhood",
+            "Ass3": "Describe your personality",
+            "Ass4": "Thematic Apperception Test",
+            "Ass5": "Give four examples of four different theories",
+        }
+        # iterate over all TXT files in assignment directories and extract the essays
+        for dir in [f"Ass{i}" for i in range(1, 6)]:
+            path2ass_dir = self.path / dir
+            assert (
+                path2ass_dir.exists()
+            ), f'Path {path2ass_dir} to Assignment "{task_description[dir]}" of student essays dataset does not exist.'
+
+            if dir == "Ass5":  # has subtasks (directories)
+                text_files = []
+                for subtask in path2ass_dir.iterdir():
+                    text_files.extend(subtask.glob("*.txt"))
+            else:
+                text_files = path2ass_dir.glob("*.txt")
+
+            for txt_file in text_files:
+                with open(txt_file, "rb") as f:
+                    raw_data = f.read()
+                    detected = chardet.detect(raw_data)
+                    encoding = detected["encoding"]
+
+                essay_text = self.preprocess(raw_data.decode(encoding))
+                if len(essay_text.split()) < 500:
+                    continue
+                student_essays_df = pd.concat(
+                    [
+                        student_essays_df,
+                        pd.DataFrame(
+                            [
+                                {
+                                    "author_id": txt_file.stem,
+                                    "text": essay_text,
+                                    "task": txt_file.parent.name,
+                                    "task_description": task_description[dir],
+                                }
+                            ]
+                        ),
+                    ]
+                )
+        return student_essays_df
+
+    def generate_pairs(
+        self, df, n_pairs=2, groupby_cols: list = ["task", "sex", "ethnicity"]
+    ):
+        """
+        Generate pairs of texts from the dataset based on the specified groupby columns.
+        :param df: DataFrame containing the dataset with at least 'text' and 'author' columns.
+        :param n_pairs: Number of pairs to generate per group.
+        :param groupby_cols: Columns to group by, should include 'genre'.
+        :return: List of pairs with their authors and a boolean indicating if they are from the
+        same author.
+        """
+        for col in groupby_cols:
+            assert col in df.columns, f"Column '{col}' not found in DataFrame."
+
+        for col in groupby_cols:
+            num_nans = df[col].isna().sum()
+            if num_nans > 0:
+                print(f"Column '{col}' has {num_nans} NaN values.")
+                # print(f"Rows with NaN in '{col}':\n{df[df[col].isna()]}\n")
+
+        grouped = df.groupby(
+            groupby_cols, dropna=False, observed=True
+        )  # keep NaNs, no answer is also an answer group
+        # print(f"\nTotal groups: {len(grouped)}")
+        # print(f"Groups: {list(grouped.groups.keys())}\n\n")
+        pairs = []
+
+        # each author appears <=1 time per task: same-author pairs have to be generated across tasks
+        # Same-author pairs
+        same_author_pairs = []
+        # group texts by author disregarding the task
+        author_groups = {}
+        records = df.to_dict(orient="records")
+        for item in records:
+            author_groups.setdefault(item["author_id"], []).append(item)
+        for author, texts in author_groups.items():
+            if len(texts) < 2:
+                # print(f"Skipping author {author} with only {len(texts)} text(s).")
+                continue
+
+            selected = random.sample(texts, min(n_pairs * 2, len(texts)))
+            random.shuffle(selected)
+            for i in range(0, len(selected) - 1, 2):
+                a, b = selected[i], selected[i + 1]
+                same_author_pairs.append(
+                    {
+                        "pair": [a["text"], b["text"]],
+                        "authors": [author, author],
+                        "same": True,
+                    }
+                )
+        pairs.extend(same_author_pairs)
+        print(f"Generated {len(same_author_pairs)} same-author pairs.")
+
+        for group_values, group in grouped:
+            # print(f"Processing group: {group_values}, size: {len(group)}")
+            data = group.to_dict(orient="records")
+
+            # Group texts by author WITHIN the group (i.e. same task)
+            author_groups = {}
+            for item in data:
+                author_groups.setdefault(item["author_id"], []).append(item)
+
+            # Different-author pairs, balanced to same author pairs count
+            authors = list(author_groups.keys())
+            if len(authors) > 1 and same_author_pairs:
+                n_diff_pairs_target = len(
+                    same_author_pairs
+                )  # goal: match number of different-author pairs to same-author pairs
+                author_pairs = []
+                for i in range(len(authors)):
+                    for j in range(i + 1, len(authors)):
+                        author_pairs.append((authors[i], authors[j]))
+                random.shuffle(author_pairs)
+
+                count = 0
+                # Calculate max number of pairs to sample per author pair (reduce class (i.e. different-author) imbalance introdoced prior when only one pair per author pair was sampled)
+                max_pairs_per_pair = max(n_diff_pairs_target // len(author_pairs), 1)
+                for a1, a2 in author_pairs:
+                    texts_a1 = author_groups[a1]
+                    texts_a2 = author_groups[a2]
+
+                    if not texts_a1 or not texts_a2:
+                        continue
+
+                    # All possible combinations between texts from different authors
+                    all_combinations = list(product(texts_a1, texts_a2))
+                    random.shuffle(all_combinations)  # Shuffle to introduce randomness
+
+                    num_to_sample = min(len(all_combinations), max_pairs_per_pair)
+                    for t1, t2 in all_combinations[:num_to_sample]:
+                        pairs.append(
+                            {
+                                "pair": [t1["text"], t2["text"]],
+                                "authors": [a1, a2],
+                                "same": False,
+                            }
+                        )
+                        count += 1
+
+                    if count >= n_diff_pairs_target:
+                        break
+
+        print(
+            f"Generated {len(pairs) - len(same_author_pairs)} different-author pairs.\n"
+        )
+        return pairs
+
+    def _load_student_metadata(self):
+        author_metadata_columns = [
+            "ID",
+            "TEACHER",
+            "BIRTHORD",
+            "SEX",
+            "ETHNIC",
+            "POLITOR",
+            "YEAR",
+        ]
+        rename_map = {
+            "ID": "author_id",
+            "TEACHER": "teacher",
+            "BIRTHORD": "birthorder",
+            "SEX": "sex",
+            "ETHNIC": "ethnicity",
+            "POLITOR": "political_orientation",
+            "YEAR": "year",
+        }
+        raw_metadata, _ = pyreadstat.read_sav(
+            self.path / "2006Big5xxx.sav",
+            apply_value_formats=True,
+            metadataonly=False,
+        )
+        available_columns = [
+            col for col in raw_metadata.columns if col in author_metadata_columns
+        ]
+        author_metadata = raw_metadata[available_columns].copy()
+        author_metadata.rename(columns=rename_map, inplace=True)
+
+        return author_metadata
+
+
 # === SYSTEM SPECIFIC USAGE ===
+def run_student_essay():
+    base_dir = (
+        Path(__file__).resolve().parent.parent
+        / CONFIG.DATA_BASE_PATH
+        / "student_essays/Intro2006"
+    )
+    assert (
+        base_dir.exists()
+    ), f"Path {base_dir} to student essays dataset does not exist."
+    output_dir = os.path.join(base_dir, "student-essay-dataset-converted")
+
+    loader = StudentEssayDatasetLoader(path=base_dir)
+    dataset = loader.load()
+    dataset.save_to_disk(output_dir)
+
+
 def run_pan23(base_dir: str, save_path: str):
     base_dir = Path(__file__).resolve().parent / base_dir
     train_dir = os.path.join(base_dir, "pan23-authorship-verification-training-dataset")
@@ -734,5 +1038,6 @@ if __name__ == "__main__":
     # # run_pan25()
     # run_pan20()
     # run_koppel_webis()
-    run_blog_corpus()
+    # run_blog_corpus()
     # run_gutenberg_corpus()
+    run_student_essay()

@@ -91,6 +91,12 @@
 
 ### 🛠️ Implementation
 - Look at actual [Gohsen paraphrasing code](https://github.com/webis-de/coling24-task-oriented-paraphrase-analytics)
+- [x] Create Student Essay Dataset
+  - No tasks/ assignment overlap between train and test sets
+  - Same pairs: Same author across different tasks in split, bc each author <=1 essay per task
+  - Different pairs: Author pairs are in same group of task, sex, ethnicity and political orientation
+  - when filtering for texts >= 500 word (what we currently do), we loose most of the essays but keep around 219 same/ 3656 different (train) and 2 same/ 75 different (test) pairs
+    - before, w/o filtering: 1748 same/ 60832 different (train) and 818 same/ 18295 different (test) pairs
 - [x] [DetectGPT Baseline](https://github.com/eric-mitchell/detect-gpt): Use T5 to generate pertubations, score them using LLM, threshold 0.1 for classification
   - both imposter and DetectGPT approaches sample from "source" distribution, i.e. LLMs
   - different similarity measures
