@@ -108,6 +108,7 @@ class BaseDatasetVisualization(ABC):
         bins=10,
         preprocess_fn: Optional[Callable[[str], str]] = None,
         verbose: bool = False,
+        unit: str = None,
     ):
         """
         Plots a histogram of text lengths (in characters) for a list of strings.
@@ -124,11 +125,12 @@ class BaseDatasetVisualization(ABC):
         if preprocess_fn:
             text_list = [preprocess_fn(text) for text in text_list]
         lengths = [len(text) for text in text_list]
-        unit = "characters" if type(lengths[0]) is str else "ngrams"
+        if not unit:
+            unit = "characters" if type(lengths[0]) is str else "ngrams"
 
         plt.figure(figsize=(10, 6))
         plt.hist(lengths, bins=bins, color="skyblue", edgecolor="black")
-        title = f"Histogram of Text Lengths (preproc={preprocess_fn != None})\nDataset: {self.name}"
+        title = f"Histogram of Text Lengths\nDataset: {self.name}"
         plt.title(title)
         plt.xlabel(f"Text Length ({unit})")
         plt.ylabel("Frequency")
