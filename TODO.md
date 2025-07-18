@@ -127,8 +127,16 @@
     - Prompt unknown
     - [x] if perplexity is the best metric, can our attribution be even better? Our AA models variability of author LLM → **Perplexity is not feasible: Requires access to LLMs + costly**
   - Perplexity is a measure of how well a probability distribution predicts a sample
-- [ ] look at min text length text (i.e. 500 words)
-- [ ] look at max text length text 
+- [x] look at min text length text (i.e. 500 words) (cf. `explore_data.ipynb`)
+  - Blog: Concert experience report
+  - Gutenberg: Story
+  - PAN20: Nonsense text, only names
+  - Student Essays: (Fictional) story about theft of experiment results with a happy ending
+- [x] look at max text length text (cf. `explore_data.ipynb`)
+  - Blog: Fictional story/ book
+  - Gutenberg: Story
+  - PAN20: Book with multiple chapters
+  - Student Essays: Text about the inner thoughts of a person who seems to think he is manipulative.
 - [x] strip layout information texts in **detectors** using preprocess method 
     - Added preprocessing at methods (predicting, scoring and both) of base detector class, i.e. all detectors inherit from this class
 - [?] PAN20 Webis arrow dataset: Finer pair selection not only pre-existing pairs (compare to PAN approaches possible?)
