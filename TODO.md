@@ -145,6 +145,10 @@
 - [o] Paraphrase metrics: compare best to worst paraphrases
   - is worst paraphrase already good enough?
   - [ ] Include analysis of worst paraphrases in thesis (ggf. in appendix)
+  - worst paraphrases in terms of syntactic metrics are generally produced by T5 (ChatGPT) and are really short (which makes sense due to computation if metric via ngram overlap)
+  - Semantic metrics prefer Naive Ollama, one time even worst for TitleParaphraser
+  - Shorter paraphrases also capture meaning (qualitative evaluation), EXCEPT min t5 (ChatGPT) paraphrase which loses central conflict of original text
+  - suggests that T5 (ChatGPT) is not ideal for paraphrasing, i.e. it does not produce good paraphrases in terms of keeping meaning and content of original text
 - [x] Experiment (cf. `experiment_paraphrasing.ipynb`): Paraphrase (1) paragraphs, (2) chunks
   - ~~(1) Paragraphs is not ideal, because I omitted all layout information, i.e. no paragraphs → save two versions of the dataset, one with paragraphs as newlines and one without any paragraphs~~
   - (2) Chunks: Split text into chunks of X words, paraphrase
