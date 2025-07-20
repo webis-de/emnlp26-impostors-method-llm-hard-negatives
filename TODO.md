@@ -6,13 +6,13 @@
 
 ### ✍️ Written Work
 - [x] Use [Webis Thesis Template](https://git.webis.de/code-generic/code-webis-thesis/)
-- [ ] hypothesis: Text_extractor information will produce similar text to original text even though information is wrong because extractor/ generator LLM think alike
-  - [ ] experiment to test this hypothesis
-- [ ] Why we opted to not use perplexity
+- [x] hypothesis: Text_extractor information will produce similar text to original text even though information is wrong because extractor/ generator LLM think alike
+  - [ ] experiment to test this hypothesis (maybe generate "bad extractions via LLLM prompt" and compare to original text (human evaluation))
+- [x] Why we opted to not use perplexity
 - [ ] control dataset in terms of topic, genre, register
 - [ ] Difference register and tone (find literature of categories, cf. ceph)
-- [ ] imposter: random projection (i.e. random set of features set to zero is a projection to lower dimensional space)
-- [ ] our method:
+- [x] imposter: random projection (i.e. random set of features set to zero is a projection to lower dimensional space)
+- [x] our method:
   - we can (1) generate texts, as many as we want, i.e. change seed and temperature
   - (2) we work on **single case solutions** (i.e. trained on each dataset individually), no generalized solution (i.e. trained once on dataset and then used for all texts)
     - specificity (!) rather than generality
