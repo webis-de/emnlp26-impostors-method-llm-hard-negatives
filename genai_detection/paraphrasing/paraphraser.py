@@ -27,6 +27,8 @@ from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import nltk
 from openai import OpenAI
+import matplotlib.patches as mpatches
+import matplotlib.lines as mlines
 
 nltk.download("wordnet")  # necessary for METEOR score
 from nltk.translate import bleu_score, meteor_score
@@ -949,6 +951,16 @@ class ParaphrasingEvaluator:
         )
         self.wmd_model = model.WordEmbedding(model=self.pretr_word_model)
         self.config = config
+        self.base_dirs = {
+            "blog": Path(__file__).resolve().parents[2] / "data/datasets/Blog_corpus/",
+            "gutenberg": Path(__file__).resolve().parents[2]
+            / "data/datasets/gutenberg/",
+            "custom": Path(__file__).resolve().parents[2]
+            / "data/datasets/custom_texts/",
+            # TODO: Add student essays dataset
+            # "student_essays": Path(__file__).resolve().parents[2]
+            # / "data/datasets/student_essays/",
+        }
 
     @staticmethod
     def _degree_of_similarity(a: str, b: str) -> float:
@@ -1134,7 +1146,94 @@ class ParaphrasingEvaluator:
 
         return results_df, summary, lengths
 
-    def evaluate_extractors(self, save_to_disk: bool = True, detailed: bool = True):
+    def plot_metric_kdes_per_dataset(
+        self,
+        df_all: pd.DataFrame,
+        metrics: list[str],
+        save_path: Path | None = None,
+        dataset_col: str = "dataset",
+    ):
+        # Filter valid metrics
+        metrics = [
+            m
+            for m in metrics
+            if m in df_all.columns and pd.api.types.is_numeric_dtype(df_all[m])
+        ]
+        assert metrics, "No numeric metrics found to plot."
+
+        unique_labels = pd.unique(df_all[dataset_col])
+        palette = sns.color_palette("tab10", n_colors=len(unique_labels))
+        label_to_color = {
+            lbl: palette[i % len(palette)] for i, lbl in enumerate(unique_labels)
+        }
+
+        n = len(metrics)
+        n_cols = 2
+        n_rows = int(np.ceil(n / n_cols))
+
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(6 * n_cols, 4 * n_rows))
+        axes = axes.flatten()
+
+        for i, metric in enumerate(metrics):
+            ax = axes[i]
+            sub_df = df_all[[dataset_col, metric]].dropna()
+
+            # KDE per dataset
+            sns.kdeplot(
+                data=sub_df,
+                x=metric,
+                hue=dataset_col,
+                fill=True,
+                common_norm=False,
+                alpha=0.4,
+                palette=label_to_color,
+                ax=ax,
+                legend=False,
+            )
+            legend_patches = [
+                mpatches.Patch(color=color, label=self._wrap_label(label))
+                for label, color in label_to_color.items()
+            ]
+            fig.legend(
+                handles=legend_patches,
+                loc="upper left",
+                bbox_to_anchor=(1.02, 1),  # outside the plot on right
+                title="Dataset",
+                frameon=True,
+                borderaxespad=0,
+                fontsize=10,
+                title_fontsize=12,
+            )
+
+            ax.set_title(metric)
+            ax.set_xlim(sub_df[metric].min(), sub_df[metric].max())
+            ax.set_xlabel(metric)
+            ax.set_ylabel("Density")
+
+            # Remove duplicate labels in legend
+            handles, labels = ax.get_legend_handles_labels()
+            ax.legend(handles, labels, loc="upper right", frameon=True)
+
+        for j in range(i + 1, len(axes)):
+            fig.delaxes(axes[j])
+
+        title = "KDE Metric Distributions by Dataset"
+        fig.suptitle(title, fontsize=16)
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+
+        if save_path:
+            save_path = Path(save_path)
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            save_path.mkdir(parents=True, exist_ok=True)
+            out = save_path / f"kde_metric_dists_{timestamp}.png"
+            fig.savefig(out, bbox_inches="tight")
+            print(f"Saved KDE grid to {out}")
+
+        plt.show()
+
+    def evaluate_extractors(
+        self, save_to_disk: bool = True, detailed: bool = True, plot_kdes: bool = True
+    ):
         """
         Non-naive paraphrasers extract information from the original text, such as bullet points, task, topic, title, tone, genre, time period and register.
         Some datasets provide some of this information,
@@ -1149,14 +1248,8 @@ class ParaphrasingEvaluator:
             for k, v in self.paraphrasers.items()
             if not isinstance(v, NaiveParaphraser)
         }
-        base_dirs = {
-            "blog": Path(__file__).resolve().parents[2] / "data/datasets/Blog_corpus/",
-            "gutenberg": Path(__file__).resolve().parents[2]
-            / "data/datasets/gutenberg/",
-            "custom": Path(__file__).resolve().parents[2]
-            / "data/datasets/custom_texts/",
-        }
-        for dataset_type, base_dir in base_dirs.items():
+
+        for dataset_type, base_dir in self.base_dirs.items():
             try:
                 df = self._load_dataset(base_dir, dataset_type)
             except Exception as e:
@@ -1228,14 +1321,37 @@ class ParaphrasingEvaluator:
 
             # Save results if requested
             if save_to_disk:
+                save_base_path = (
+                    Path(__file__).resolve().parents[2] / self.config["save_path"]
+                )
                 if detailed:
                     print("Saving detailed results...", type(detailed_result_df))
-                    self._save_results(detailed_result_df, dataset_type)
+                    self._save_results(detailed_result_df, dataset_type, save_base_path)
                 else:
-                    self._save_results(aggregate_results, dataset_type)
+                    self._save_results(aggregate_results, dataset_type, save_base_path)
 
-    def _save_results(self, results: dict, dataset_type: str):
-        save_base_path = Path(__file__).resolve().parents[2] / self.config["save_path"]
+            # Plot KDEs for each metric per dataset
+            if plot_kdes:
+                dfs = {}
+                for dataset in evaluator.base_dirs.keys():
+                    df = pd.read_csv(
+                        save_base_path
+                        / "paraphrasing"
+                        / f"extractor_eval_results_{dataset}.csv"
+                    )
+                    df["length_diff"] = [
+                        ((p - o) / o) if o > 0 else 0
+                        for o, p in zip(df["original_length"], df["paraphrase_length"])
+                    ]  # between 0 and 1
+
+                    df["dataset"] = dataset
+                    dfs[dataset] = df
+
+                # Long / tidy combined DataFrame
+                df_all = pd.concat(dfs.values(), ignore_index=True)
+                self.plot_metric_kdes_per_dataset(df_all=df_all)
+
+    def _save_results(self, results: dict, dataset_type: str, save_base_path: Path):
         if not save_base_path.exists():
             raise FileNotFoundError(f"Save path {save_base_path} does not exist.")
 
@@ -1524,7 +1640,7 @@ class ParaphrasingEvaluator:
         angles += angles[:1]
 
         # Start plot
-        fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+        fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
 
         for model_name in grouped_mean.index:
             mean_values = grouped_mean.loc[model_name].tolist()
@@ -1537,26 +1653,27 @@ class ParaphrasingEvaluator:
             lower = np.maximum(0, np.array(mean_values) - np.array(std_values))
             upper = np.minimum(1, np.array(mean_values) + np.array(std_values))
 
-            ax.plot(angles, mean_values, label=model_name)
+            ax.plot(angles, mean_values, label=self._wrap_label(model_name))
             ax.fill_between(
                 angles, lower, upper, color=ax.get_lines()[-1].get_color(), alpha=0.2
             )
 
         # Add labels to axes
         ax.set_xticks(angles[:-1])
-        ax.set_xticklabels(labels)
+        ax.set_xticklabels(labels, fontsize=10)
+        ax.tick_params(axis="y", labelsize=8)
 
         # Optional: Set value range
         ax.set_ylim(0, 1)
 
         # Add legend and title
-        ax.legend(loc="lower left", bbox_to_anchor=(1.1, 0.7))
+        ax.legend(loc="lower left", bbox_to_anchor=(1.1, 0.7), fontsize=9)
         title = (
             f"Radar Chart: Paraphrasing Metric\non {data_category} text, grouped by {group_by}"
             if data_category
             else f"Radar Chart: Paraphrasing Metrics\ngrouped by {group_by}"
         )
-        plt.title(title)
+        plt.title(title, fontsize=12)
         plt.tight_layout()
 
         if save_path:
@@ -1603,12 +1720,17 @@ class ParaphrasingEvaluator:
         y_lim = (max(0, y_min - y_pad), min(1, y_max + y_pad))
 
         fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
+        unique_labels = df[group_by].unique()
+        palette = sns.color_palette("tab10", n_colors=len(unique_labels))
+        label_to_color = {
+            label: palette[i % len(palette)] for i, label in enumerate(unique_labels)
+        }
         sns.scatterplot(
             data=df,
             x="sem_sim_avg",
             y="syn_sim_avg",
             hue=group_by,
-            palette="tab10",
+            palette=label_to_color,
             alpha=0.7,
             s=100,
             edgecolor="k",
@@ -1629,7 +1751,12 @@ class ParaphrasingEvaluator:
         ax.grid(True)
 
         # Place legend outside the plot on the right
+        legend_patches = [
+            mpatches.Patch(color=color, label=self._wrap_label(label=label))
+            for label, color in label_to_color.items()
+        ]
         ax.legend(
+            handles=legend_patches,
             title=group_by,
             loc="upper left",
             bbox_to_anchor=(1.03, 1),
@@ -1676,6 +1803,18 @@ class ParaphrasingEvaluator:
             print(f"Plot saved to {full_path}")
 
         plt.show()
+
+    def _wrap_label(self, label: str, words_per_line: int = 6) -> str:
+        assert (
+            isinstance(words_per_line, int) and words_per_line > 0
+        ), "words_per_line must be a positive integer."
+        words = str(label).split()
+        return "\n".join(
+            [
+                " ".join(words[i : i + words_per_line])
+                for i in range(0, len(words), words_per_line)
+            ]
+        )
 
     def plot_metric_distributions(
         self,
@@ -1740,7 +1879,7 @@ class ParaphrasingEvaluator:
                     alpha=0.4,
                     ax=ax,
                     palette=label_to_color,
-                    legend=not use_shared_legend,
+                    legend=False,
                 )
 
             # Scatter for models with a single point
@@ -1750,7 +1889,7 @@ class ParaphrasingEvaluator:
                 color = label_to_color[model]
                 ax.scatter(
                     single_val,
-                    0.1,
+                    1,
                     label=label,
                     color=color,
                     s=50,
@@ -1763,22 +1902,9 @@ class ParaphrasingEvaluator:
             ax.set_xlabel(metric)
             ax.set_ylabel("Density")
 
-        # Remove unused axes
-        for j in range(i + 1, len(axes)):
-            fig.delaxes(axes[j])
-
-        def wrap_label(label: str, words_per_line: int = 6) -> str:
-            words = str(label).split()
-            return "\n".join(
-                [
-                    " ".join(words[i : i + words_per_line])
-                    for i in range(0, len(words), words_per_line)
-                ]
-            )
-
         if use_shared_legend:
             legend_patches = [
-                mpatches.Patch(color=color, label=wrap_label(label))
+                mpatches.Patch(color=color, label=self._wrap_label(label))
                 for label, color in label_to_color.items()
             ]
             fig.legend(
@@ -1791,11 +1917,37 @@ class ParaphrasingEvaluator:
                 fontsize=10,
                 title_fontsize=12,
             )
+        else:
+            present_models = counts[counts > 0].index  # all that appear for this metric
+            handles = []
+            labels = []
+            for model in present_models:
+                color = label_to_color[model]
+                if model in models_multi:
+                    # Proxy patch representing KDE fill
+                    h = mpatches.Patch(facecolor=color, alpha=0.4, edgecolor="none")
+                else:
+                    # Proxy marker representing singleton scatter
+                    h = mlines.Line2D(
+                        [],
+                        [],
+                        marker="o",
+                        linestyle="none",
+                        markerfacecolor=color,
+                        markeredgecolor="k",
+                        markersize=6,
+                    )
+                handles.append(h)
+                labels.append(model)
+            ax.legend(handles, labels, title=group_by.capitalize(), loc="best")
 
+        # Remove unused axes
+        for j in range(i + 1, len(axes)):
+            fig.delaxes(axes[j])
         title = (
-            f"Metric Distributions by Model\non {data_category} data, grouped by {group_by}"
+            f"Metric Distributions\non {data_category} data, grouped by {group_by}"
             if data_category
-            else f"Metric Distributions by Model\ngrouped by {group_by}"
+            else f"Metric Distributions\ngrouped by {group_by}"
         )
         fig.suptitle(title, fontsize=16)
         plt.tight_layout(rect=[0, 0, 0.85, 0.95])
