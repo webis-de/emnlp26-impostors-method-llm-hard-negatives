@@ -1,9 +1,15 @@
 # ✅ TODOs
 
-## 📅 08.07.2025- 21.07.2025
+## 📅 22.07.2025- 01.08.2025
 
 ### 📚 Dataset
-
+- [ ] original MirrorMinds-LLMDetector dataset
+- [ ] Webis has newer and better fanfiction dataset than PAN20
+- [ ] keep orginal PAN20 dataset for reproducibility and comparison purposes
+- [ ] second cleansed PAN20 dataset with only valid texts and better pair selection if possible
+- [ ] Add students essay dataset to `Ceph/corpora/authorship` (Lab intern!)
+  - zip dataset with password and store in Webis password database (Lab intern!)
+  - Add README to dataset and database password database indicating restrictions of dataset usage
 
 ### ✍️ Written Work
 - [ ] Paraphrase metrics: Syntactic (BLEU, ROUGE-1, ROUGE-L), semantic (BERTScore, cosine similarity of SBERT vectors, WMS), human evaluation (TODO)
@@ -36,8 +42,22 @@
 - [ ] slides with dataset discussion
   - controlled variables: topic, genre (e.g., play, fiction, non-fiction), register, time period denoted "Textgattungvariablen"
 - [ ] Include analysis of worst paraphrases in thesis (ggf. in appendix)
+- [ ] chunks of paraphrase experiment `experiment_paraphrasing.ipynb`:
+  - easier and harder cases of imposters (high syntactic similarity → more difficult)
+    - not better or worse, but different difficulty
+  - how different in terms of syntactic similarity has a text to be to be considered not authored by the author? Where is threshold? 
+  - Vary difficulty of imposter generation, i.e. how similar to original text is imposter text
+  - Confidence for different author is big if lower syntactic similarity
+    - we like high confidence
+  - high syntactic score for many chunks because there is little distraction from text and task (cf. bad task following for long texts of Gutenberg dataset)
+- [ ] Assumption: Text extractor and text generator are same model → same statistical bias (i.e. systematic deviation from actual distribution)
+  - [ ] speculation: We can count on this bias (not proven, but assumed)
+
 
 ### 🛠️ Implementation
+- [ ] keep only texts with >= 3000 words (maybe reference in Janek's generalized unmasking paper)
+- [x] Email authors of LLMDet regarding missing extender class (21.07.2025)
+- [x] Email corresponding author of DetectGPT regarding XSUM error (21.07.2025)
 - Look at actual [Gohsen paraphrasing code](https://github.com/webis-de/coling24-task-oriented-paraphrase-analytics)
 - [ ] Extract target audience from text
 - [ ] Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
@@ -50,8 +70,25 @@
 - [ ] do all T5 paraphrases loose central conflict of original text?
   - worst paraphrases on _News/ custom dataset_ are T5 (ChatGPT) paraphrases, which are really short and loose central conflict of original text cf. Implementation 08.07.2025- 21.07.2025
   - [ ] compare all (worst to best) T5 paraphrases to original text
-- [ ] compare best/worst paraphrase metrics per dataset (different genre)
-- [?] PAN20 Webis arrow dataset: Finer pair selection not only pre-existing pairs (compare to PAN approaches possible?)
+- [ ] compare best/worst paraphrase metrics *per dataset* (different genre)
+  - [x] News/ custom dataset
+  - [ ] Blog dataset
+  - [ ] Gutenberg dataset
+  - [ ] Student Essay dataset
+- [ ] compare quality of paraphrase experiment with chunks *per dataset* (different genre)
+  - currently only on first 10 texts of each dataset
+  - not so important task, if works similarly well on all datasets
+  - [x] News/ custom dataset
+  - [ ] Blog dataset
+  - [ ] Gutenberg dataset
+  - [ ] Student Essay dataset
+- [x] PAN20 Webis arrow dataset: Finer pair selection not only pre-existing pairs (compare to PAN approaches possible?)
+  - two versions: One for reproducibility and one with better pair selection (and one new dataset on ceph(?))
+- [ ] Ensure chunks of paraphrase experiment `experiment_paraphrasing.ipynb` have similar number of words
+- [ ] Introduce variance into non-naive paraphrasers, i.e. generate multiple paraphrases per text with varying seed and temperature
+- [ ] Try majority voting for PPMD compression algorithm
+- [ ] Use original text metadata if possible rather than LLM extracted metadata
+- 
 
 ## 📅 08.07.2025- 21.07.2025
 
