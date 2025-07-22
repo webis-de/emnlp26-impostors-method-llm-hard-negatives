@@ -10,6 +10,7 @@ import numpy.typing as npt
 
 from genai_detection.detectors.detector_base import DetectorBase
 from genai_detection.detectors.impostor import ImpostorDetector
+from genai_detection.detectors.ppmd import PPMdDetector
 from genai_detection.paraphrasing.paraphraser import T5ChatGPTParaphraser
 
 nltk.download("punkt")
@@ -19,7 +20,7 @@ from nltk.tokenize import sent_tokenize, word_tokenize
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from config import CONFIG
 
-__all__ = ["ImpostorDetector"]
+__all__ = ["ImpostorDetector", "PPMdDetector"]
 
 
 class MajorityDetector(DetectorBase):
@@ -79,7 +80,7 @@ class MajorityDetector(DetectorBase):
         chunks = [self._split_text_into_chunks(t) for t in text]
         score_per_text = []
         for text_chunks in chunks:
-            if isinstance(self.detector, ImpostorDetector):
+            if isinstance(self.detector, (ImpostorDetector, PPMdDetector)):
                 # generate artificial paraphrase candidates
                 prompt = (
                     "Paraphrase the text above and output only the paraphrased version."
@@ -130,7 +131,7 @@ class MajorityDetector(DetectorBase):
 
 if __name__ == "__main__":
     # Example usage
-    detector = MajorityDetector(Detector=ImpostorDetector)
+    detector = MajorityDetector(Detector=PPMdDetector)  # ImpostorDetector)
     path2datasets = (
         Path(__file__).resolve().parent.parent.parent
         / "data"
