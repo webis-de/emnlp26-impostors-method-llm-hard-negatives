@@ -5,9 +5,9 @@
 ### 📚 Dataset
 - [ ] original MirrorMinds-LLMDetector dataset
 - [ ] Webis has newer and better fanfiction dataset than PAN20
-- [ ] keep orginal PAN20 dataset for reproducibility and comparison purposes
+- [ ] keep original PAN20 dataset for reproducibility and comparison purposes
 - [ ] second cleansed PAN20 dataset with only valid texts and better pair selection if possible
-- [ ] Add students essay dataset to `Ceph/corpora/authorship` (Lab intern!)
+- [x] Add students essay dataset to `Ceph/corpora/authorship` (Lab intern!)
   - zip dataset with password and store in Webis password database (Lab intern!)
   - Add README to dataset and database password database indicating restrictions of dataset usage
 
@@ -59,7 +59,7 @@
 - [x] Email authors of LLMDet regarding missing extender class (21.07.2025)
 - [x] Email corresponding author of DetectGPT regarding XSUM error (21.07.2025)
 - Look at actual [Gohsen paraphrasing code](https://github.com/webis-de/coling24-task-oriented-paraphrase-analytics)
-- [ ] Extract target audience from text
+- [x] Extract target audience from text
 - [ ] Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
 - [ ] experiment/ hypothesis: Text_extractor information will produce similar text to original text even though information is wrong because extractor/ generator LLM think alike
   - [ ] maybe generate "bad extractions via LLM prompt" and compare to original text (human evaluation)
@@ -85,10 +85,11 @@
 - [x] PAN20 Webis arrow dataset: Finer pair selection not only pre-existing pairs (compare to PAN approaches possible?)
   - two versions: One for reproducibility and one with better pair selection (and one new dataset on ceph(?))
 - [ ] Ensure chunks of paraphrase experiment `experiment_paraphrasing.ipynb` have similar number of words
-- [ ] Introduce variance into non-naive paraphrasers, i.e. generate multiple paraphrases per text with varying seed and temperature
-- [ ] Try majority voting for PPMD compression algorithm
-- [ ] Use original text metadata if possible rather than LLM extracted metadata
-- 
+- [x] Introduce variance into non-naive paraphrasers, i.e. generate multiple paraphrases per text with varying ~~seed and~~ temperature
+- [x] Try majority voting for PPMD compression algorithm
+  - works better than ImposterDetector predicting correct for two custom news texts
+- [o] Use original text metadata if possible rather than LLM extracted metadata (**TODO**: wait for [OpenWebUI](https://llm.web.webis.de/) to work again)
+
 
 ## 📅 08.07.2025- 21.07.2025
 
