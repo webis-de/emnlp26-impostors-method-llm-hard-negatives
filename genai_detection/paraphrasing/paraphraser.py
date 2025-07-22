@@ -209,6 +209,36 @@ class NaiveParaphraser(Paraphraser):
     """
 
 
+class NonNaiveParaphraser(ABC):
+    """
+    Abstract base class for paraphrasing models.
+    """
+
+    def paraphrase(
+        self,
+        text: str,
+        prompt: str,
+        n_responses: int = 5,
+        max_length: int = MAX_LENGTH,
+        response_schema: Optional[dict[str, Any]] = None,
+        ground_truth: Optional[
+            dict
+        ] = None,  # if any ground truth is available, use it rather than the LLM extracted text
+    ) -> List[str]:
+        """
+        Generate a paraphrase of the input text.
+
+        :param text: The input text to be paraphrased.
+        :param prompt: The prompt to be used for paraphrasing.
+        :param n_responses: The number of paraphrases to generate.
+        :param max_length: The maximum number of tokens to generate in the paraphrase.
+        :param response_schema: Optional schema to validate the response.
+        :param ground_truth: Optional ground truth to use instead of the LLM extracted text.
+        :return: A paraphrased version of the input text.
+        """
+        raise NotImplementedError("Subclasses must implement this method.")
+
+
 class T5ChatGPTParaphraser(NaiveParaphraser):
     """
     A paraphrasing model based on the T5 architecture.
@@ -506,7 +536,7 @@ class BlabladorParaphraser(NaiveParaphraser):
             print("Error:", response.status_code, response.text)
 
 
-class BulletPointParaphraser(Paraphraser):
+class BulletPointParaphraser(NonNaiveParaphraser):
     """
     A paraphrasing model that first extracts bullet points, tone and genre from the input text using one LLM and then generates a paraphrase based on this information.
     """
@@ -677,6 +707,7 @@ class BulletPointParaphraser(Paraphraser):
         max_length: int = MAX_LENGTH,
         temperature: float = TEMPERATURE,
         response_schema: Optional[dict[str, Any]] = None,
+        ground_truth: Optional[dict] = None,
     ) -> List[str]:
         """
         Generate a paraphrase of the input text by first extracting bullet points.
@@ -685,6 +716,9 @@ class BulletPointParaphraser(Paraphraser):
         :param prompt: The prompt to be used for extracting the bulletpoints, tone, genre, time period, register (default works well).
         :param n_responses: The number of paraphrases to generate.
         :param max_length: The maximum number of tokens to generate in the paraphrase.
+        :param temperature: Controls the randomness of the output. Lower values make the output more deterministic.
+        :param response_schema: Optional schema to validate the response.
+        :param ground_truth: Optional ground truth to use instead of the LLM extracted text.
         :return: A paraphrased version of the input text.
         """
         bullet_points, tone, genre, time_period, register, target_audience = (
@@ -694,6 +728,12 @@ class BulletPointParaphraser(Paraphraser):
                 temperature=temperature,
                 response_schema=BulletSchema.model_json_schema(),
             )
+        )
+        genre = ground_truth.get("genre", genre) if ground_truth else genre
+        time_period = (
+            ground_truth.get("time_period", time_period)
+            if ground_truth
+            else time_period
         )
         generator_prompt = (
             f"Do not use asterisks. Write a text of about {len(text.split())} words with a {tone} tone, a {genre} genre, in the {register} register for the target audience of {target_audience} and in the {time_period} time period, covering the following points:\n"
@@ -731,6 +771,9 @@ class TaskParaphraser(BulletPointParaphraser):
         max_length: int = MAX_LENGTH,
         temperature: float = TEMPERATURE,
         response_schema: Optional[dict[str, Any]] = None,
+        ground_truth: Optional[
+            dict
+        ] = None,  # if any ground truth is available, use it rather than the LLM extracted text
     ) -> List[str]:
         task, tone, genre, time_period, register, target_audience = (
             self._extract_bullet_points(
@@ -740,6 +783,12 @@ class TaskParaphraser(BulletPointParaphraser):
                 key="task",
                 response_schema=TaskSchema.model_json_schema(),
             )
+        )
+        genre = ground_truth.get("genre", genre) if ground_truth else genre
+        time_period = (
+            ground_truth.get("time_period", time_period)
+            if ground_truth
+            else time_period
         )
 
         generator_prompt = "Do not use asterisks. Write a text of about {l} words with a {tone} tone, a {genre} genre, in the {register} register for the target audience of {target_audience} and in the {time_period} time period, covering the following task:\n{task}".format(
@@ -782,6 +831,9 @@ class TopicParaphraser(BulletPointParaphraser):
         n_responses: int = 5,
         max_length: int = MAX_LENGTH,
         temperature: float = TEMPERATURE,
+        ground_truth: Optional[
+            dict
+        ] = None,  # if any ground truth is available, use it rather than the LLM extracted text
     ) -> List[str]:
         logger.info(
             f"\n[DEBUG] Using TopicParaphraser with prompt: {self.extractor_prompt}"
@@ -796,8 +848,15 @@ class TopicParaphraser(BulletPointParaphraser):
             )
         )
         logger.info(
-            f"\n[DEBUG] Extracted topic, tone, genre, time period, and register:"
+            f"\n[DEBUG] Extracted topic, tone, genre, time period, and register."
         )
+        genre = ground_truth.get("genre", genre) if ground_truth else genre
+        time_period = (
+            ground_truth.get("time_period", time_period)
+            if ground_truth
+            else time_period
+        )
+        topic = ground_truth.get("topic", topic) if ground_truth else topic
 
         generator_prompt = "Do not use asterisks. Write a text of about {l} words with a {topic} topic, {tone} tone, a {genre} genre, in the {register} register for the target audience of {target_audience} and in the {time_period} time period.".format(
             l=len(text.split()),
@@ -841,6 +900,9 @@ class TitleParaphraser(BulletPointParaphraser):
         max_length: int = MAX_LENGTH,
         temperature: float = TEMPERATURE,
         response_schema: Optional[dict[str, Any]] = None,
+        ground_truth: Optional[
+            dict
+        ] = None,  # if any ground truth is available, use it rather than the LLM extracted text
     ) -> List[str]:
         title, tone, genre, time_period, register, target_audience, target_audience = (
             self._extract_bullet_points(
@@ -850,6 +912,12 @@ class TitleParaphraser(BulletPointParaphraser):
                 key="title",
                 response_schema=TitleSchema.model_json_schema(),
             )
+        )
+        genre = ground_truth.get("genre", genre) if ground_truth else genre
+        time_period = (
+            ground_truth.get("time_period", time_period)
+            if ground_truth
+            else time_period
         )
 
         generator_prompt = "Do not use asterisks. Write a text of about {l} words with a {title} title, {tone} tone, a {genre} genre, in the {register} register for the target audience of {target_audience} and in the {time_period} time period.".format(
@@ -895,6 +963,7 @@ class ParaphrasingEvaluator:
         max_length: int = MAX_LENGTH,
         temperature: float = TEMPERATURE,
         config: Optional[dict[str, Any]] = None,
+        ground_truth: Optional[dict[str, Any]] = None,
     ):
         """
         Initializes the ParaphrasingEvaluator with the given paraphrasers and prompts.
@@ -905,6 +974,7 @@ class ParaphrasingEvaluator:
         :param max_length: The maximum length of the generated paraphrase.
         :param temperature: Controls the randomness of the output. Lower values make the output more deterministic.
         :param config: configuration object or dict, expects at least save_path attribute
+        :param ground_truth: Optional ground truth data to compare against the generated paraphrases.
         """
         assert isinstance(paraphrasers, dict) and all(
             isinstance(p, Paraphraser) for p in paraphrasers.values()
@@ -949,6 +1019,7 @@ class ParaphrasingEvaluator:
             # "student_essays": Path(__file__).resolve().parents[2]
             # / "data/datasets/student_essays/",
         }
+        self.ground_truth = ground_truth or {}
 
     @staticmethod
     def _degree_of_similarity(a: str, b: str) -> float:
@@ -1178,30 +1249,29 @@ class ParaphrasingEvaluator:
                 ax=ax,
                 legend=False,
             )
-            legend_patches = [
-                mpatches.Patch(color=color, label=self._wrap_label(label))
-                for label, color in label_to_color.items()
-            ]
-            fig.legend(
-                handles=legend_patches,
-                loc="upper left",
-                bbox_to_anchor=(1.02, 1),  # outside the plot on right
-                title="Dataset",
-                frameon=True,
-                borderaxespad=0,
-                fontsize=10,
-                title_fontsize=12,
-            )
+            if metric != "length_diff":
+                ax.set_xlim(0, 1)
+            else:
+                ax.set_xlim(sub_df[metric].min(), sub_df[metric].max())
 
             ax.set_title(metric)
-            ax.set_xlim(sub_df[metric].min(), sub_df[metric].max())
             ax.set_xlabel(metric)
             ax.set_ylabel("Density")
 
-            # Remove duplicate labels in legend
-            handles, labels = ax.get_legend_handles_labels()
-            ax.legend(handles, labels, loc="upper right", frameon=True)
-
+        legend_patches = [
+            mpatches.Patch(color=color, label=self._wrap_label(label))
+            for label, color in label_to_color.items()
+        ]
+        fig.legend(
+            handles=legend_patches,
+            loc="upper left",
+            bbox_to_anchor=(1.02, 1),  # outside the plot on right
+            title="Dataset",
+            frameon=True,
+            borderaxespad=0,
+            fontsize=10,
+            title_fontsize=12,
+        )
         for j in range(i + 1, len(axes)):
             fig.delaxes(axes[j])
 
@@ -1388,25 +1458,8 @@ class ParaphrasingEvaluator:
         for (name, paraphraser), prompt, temperature in tqdm(
             test_configurations,
             desc="Evaluating Paraphrasers",
-            total=len(self.paraphrasers) * len(self.prompts),
+            total=len(test_configurations),
         ):
-            # config = {
-            #     "text": self.original_text,
-            #     "prompt": prompt,
-            #     "n_responses": self.n_responses,
-            # }
-            # if (
-            #     isinstance(paraphraser, BulletPointParaphraser)
-            #     or isinstance(paraphraser, TaskParaphraser)
-            #     or isinstance(paraphraser, TopicParaphraser)
-            #     or isinstance(paraphraser, TitleParaphraser)
-            # ):
-            #     config.update({"temperature": self.temperature})
-            #     # if bp_counts[name] == 0:
-            #     prompt = None  # paraphrasers above have specific prompt, which extracts bullet points/task/topic, tone and genre from the text
-            #     bp_counts[name] += 1
-            # else:
-            #     continue
             try:
                 logger.info(
                     f"[DEBUG] Using paraphraser '{name}' with prompt '{prompt}'"
@@ -1414,11 +1467,11 @@ class ParaphrasingEvaluator:
                 paraphrases = [
                     _preprocess_text(p)
                     for p in paraphraser.paraphrase(
-                        # **config,
                         text=self.original_text,
                         n_responses=self.n_responses,
                         prompt=prompt,
                         temperature=temperature,
+                        ground_truth=self.ground_truth,
                     )
                 ]
                 if not paraphrases:
@@ -1776,6 +1829,7 @@ class ParaphrasingEvaluator:
             bbox_to_anchor=(1.03, 1),
             borderaxespad=0.0,
             frameon=True,
+            fontsize=9,
         )
 
         # Inset with full range
@@ -1924,7 +1978,7 @@ class ParaphrasingEvaluator:
             fig.legend(
                 handles=legend_patches,
                 loc="upper left",
-                bbox_to_anchor=(1.02, 1),  # outside the plot on right
+                bbox_to_anchor=(1.01, 1),  # outside the plot on right
                 title=group_by.capitalize(),
                 frameon=True,
                 borderaxespad=0,
@@ -1953,7 +2007,8 @@ class ParaphrasingEvaluator:
                     )
                 handles.append(h)
                 labels.append(model)
-            ax.legend(handles, labels, title=group_by.capitalize(), loc="best")
+            for ax in axes:
+                ax.legend(handles, labels, title=group_by.capitalize(), loc="best")
 
         # Remove unused axes
         for j in range(i + 1, len(axes)):
