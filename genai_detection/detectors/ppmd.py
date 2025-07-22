@@ -49,6 +49,8 @@ class PPMdDetector(DetectorBase):
     def _get_score_impl(self, text: Iterable[str]) -> np.ndarray:
         scores = []
         for t in ichunked(text, 2):
+            if not isinstance(t, list):
+                t = list(t)
             if len(t) != 2:
                 if self.strict:
                     raise ValueError("Final batch is not a full pair.")
