@@ -84,7 +84,7 @@
   - [ ] Student Essay dataset
 - [x] PAN20 Webis arrow dataset: Finer pair selection not only pre-existing pairs (compare to PAN approaches possible?)
   - two versions: One for reproducibility and one with better pair selection (and one new dataset on ceph(?))
-- [ ] Ensure chunks of paraphrase experiment `experiment_paraphrasing.ipynb` have similar number of words
+- [x] Ensure chunks of paraphrase experiment `experiment_paraphrasing.ipynb` have a similar number of words
 - [x] Introduce variance into non-naive paraphrasers, i.e. generate multiple paraphrases per text with varying ~~seed and~~ temperature
 - [x] Try majority voting for PPMD compression algorithm
   - works better than ImposterDetector predicting correct for two custom news texts
