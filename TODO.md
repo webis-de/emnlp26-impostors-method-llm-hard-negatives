@@ -52,10 +52,12 @@
   - high syntactic score for many chunks because there is little distraction from text and task (cf. bad task following for long texts of Gutenberg dataset)
 - [ ] Assumption: Text extractor and text generator are same model → same statistical bias (i.e. systematic deviation from actual distribution)
   - [ ] speculation: We can count on this bias (not proven, but assumed)
+- [ ] Update dataset table with > 3000 words texts (except Student Essay dataset)
 
 
 ### 🛠️ Implementation
-- [ ] keep only texts with >= 3000 words (maybe reference in Janek's generalized unmasking paper)
+- [x] keep only texts with >= 3000 words (maybe reference in Janek's generalized unmasking paper)
+  - Student Essay dataset has no such texts, keep 500 words as minimum for this dataset (maximum has 1136 words)
 - [x] Email authors of LLMDet regarding missing extender class (21.07.2025)
 - [x] Email corresponding author of DetectGPT regarding XSUM error (21.07.2025)
 - Look at actual [Gohsen paraphrasing code](https://github.com/webis-de/coling24-task-oriented-paraphrase-analytics)
@@ -70,12 +72,12 @@
 - [ ] do all T5 paraphrases loose central conflict of original text?
   - worst paraphrases on _News/ custom dataset_ are T5 (ChatGPT) paraphrases, which are really short and loose central conflict of original text cf. Implementation 08.07.2025- 21.07.2025
   - [ ] compare all (worst to best) T5 paraphrases to original text
-- [ ] compare best/worst paraphrase metrics *per dataset* (different genre)
+- [o] compare best/worst paraphrase metrics *per dataset* (different genre)
   - [x] News/ custom dataset
   - [ ] Blog dataset
   - [ ] Gutenberg dataset
   - [ ] Student Essay dataset
-- [ ] compare quality of paraphrase experiment with chunks *per dataset* (different genre)
+- [o] compare quality of paraphrase experiment with chunks *per dataset* (different genre)
   - currently only on first 10 texts of each dataset
   - not so important task, if works similarly well on all datasets
   - [x] News/ custom dataset
@@ -88,7 +90,7 @@
 - [x] Introduce variance into non-naive paraphrasers, i.e. generate multiple paraphrases per text with varying ~~seed and~~ temperature
 - [x] Try majority voting for PPMD compression algorithm
   - works better than ImposterDetector predicting correct for two custom news texts
-- [o] Use original text metadata if possible rather than LLM extracted metadata (**TODO**: wait for [OpenWebUI](https://llm.web.webis.de/) to work again)
+- [x] Use original text metadata if possible rather than LLM extracted metadata ~~(wait for [OpenWebUI](https://llm.web.webis.de/) to work again)~~
 
 
 ## 📅 08.07.2025- 21.07.2025
