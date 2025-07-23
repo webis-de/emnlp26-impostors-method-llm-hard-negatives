@@ -582,14 +582,19 @@ class BulletPointParaphraser(NonNaiveParaphraser):
             prompt = self.extractor_prompt
 
         logger.info(f"\n[DEBUG] Using text extractor with prompt: {prompt}")
-        res = self.text_extractor.paraphrase(
-            text=text,
-            prompt=prompt,
-            n_responses=1,
-            max_length=CONFIG.MAX_LENGTH,
-            temperature=temperature,
-            response_schema=response_schema,
-        )[0]
+        try:
+            res = self.text_extractor.paraphrase(
+                text=text,
+                prompt=prompt,
+                n_responses=1,
+                max_length=CONFIG.MAX_LENGTH,
+                temperature=temperature,
+                response_schema=response_schema,
+            )[0]
+        except IndexError as e:
+            logger.error(f"Error extracting bullet points: {e}")
+            return [], "", "", "", "", ""
+
         logger.info(f"\n[DEBUG] Response from text extractor: {res}\n")
 
         if isinstance(res, str):
@@ -628,9 +633,6 @@ class BulletPointParaphraser(NonNaiveParaphraser):
                     temperature=temperature,
                     key=key,
                     response_schema=response_schema,
-                )
-                print(
-                    f"[ERROR] [{key}] Failed to parse text extractor response with ast.literal_eval or dirtyjson as JSON: {res}/{type(res)}\nWith error: {e}\nFor prompt: {prompt}"
                 )
         assert isinstance(
             resp, dict
@@ -915,6 +917,63 @@ class TitleParaphraser(BulletPointParaphraser):
         paraphrased_texts = self._generate_paraphrase_from_bullet_points(
             bullet_points=title,
             prompt=generator_prompt,
+            n_responses=n_responses,
+            temperature=temperature,
+        )
+
+        return paraphrased_texts
+
+
+class TranslationParaphraser(NonNaiveParaphraser):
+    """
+    A paraphrasing model that first extracts the title of the text, tone and genre from the input text using one LLM and then generates a paraphrase based on this information.
+
+    Inspired by the work of:
+    C. Zhou, C. Qiu, L. Liang and D. E. Acuna, "Paraphrase Identification With Deep Learning: A Review of Datasets and Methods," in IEEE Access, vol. 13, pp. 65797-65822, 2025, doi: 10.1109/ACCESS.2025.3556899. keywords: {Semantics;Training;Natural language processing;Deep learning;Sports;Reviews;Plagiarism;Electronic mail;Syntactics;Switches;Paraphrase identification;deep learning;review;plagiarism;datasets},
+
+
+    """
+
+    def __init__(
+        self,
+        text_extractor: Paraphraser,
+        text_generator: Paraphraser,
+        language: str = "French",
+    ):
+        """
+        Initializes the TranslationParaphraser model.
+        :param text_extractor: A model or function to translate to foreign languages.
+        :param text_generator: A model or function to translate from foreign languages.
+        """
+        super().__init__(text_extractor=text_extractor, text_generator=text_generator)
+        self.language = language
+        self.extractor_prompt = f"Translate the text above into {self.language}."
+        self.generator_prompt = (
+            f"Translate the text above from {self.language} into English."
+        )
+
+    def paraphrase(
+        self,
+        text: str,
+        prompt: Optional[str] = None,
+        n_responses: int = 5,
+        max_length: int = CONFIG.MAX_LENGTH,
+        temperature: float = CONFIG.TEMPERATURE,
+        response_schema: Optional[dict[str, Any]] = None,
+        ground_truth: Optional[dict] = None,
+    ) -> List[str]:
+        translation = self.text_extractor.paraphrase(
+            text=text,
+            prompt=self.extractor_prompt,
+            n_responses=1,
+            max_length=max_length,
+            temperature=temperature,
+            response_schema=response_schema,
+        )[0]
+
+        paraphrased_texts = self.text_generator.paraphrase(
+            text=translation,
+            prompt=self.generator_prompt,
             n_responses=n_responses,
             temperature=temperature,
         )
