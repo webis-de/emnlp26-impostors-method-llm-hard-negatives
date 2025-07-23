@@ -35,6 +35,8 @@ class BaseConfig:
     STUDENT_ESSAYS = "student_essays"
     IMPOSTER = "imposter"
     UNMASKING = "unmasking"
+    TEMPERATURE = 0.7
+    MAX_LENGTH = 512  # Maximum length of the generated paraphrase
 
 
 class ServerConfig(BaseConfig):
