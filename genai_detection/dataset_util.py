@@ -659,6 +659,14 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
 
         # metadata dataframe
         author_metadata = self._load_student_metadata()
+        # run once to save metadata
+        # author_metadata.to_excel(
+        #     Path(__file__).resolve().parent.parent
+        #     / CONFIG.DATA_BASE_PATH
+        #     / "student_essays/Intro2006"
+        #     / "file_metadata.xlsx",
+        #     index=False,
+        # )
         # keep NaNs, no answer is also an answer group
         print("obtained author metadata with", len(author_metadata), "entries.")
 
@@ -1041,8 +1049,8 @@ if __name__ == "__main__":
 
     # run_pan23(base_dir=args.path, save_path=args.out)
     # # run_pan25()
-    run_pan20()
+    # run_pan20()
     # run_koppel_webis()
     # run_blog_corpus()
     # run_gutenberg_corpus()
-    # run_student_essay()
+    run_student_essay()
