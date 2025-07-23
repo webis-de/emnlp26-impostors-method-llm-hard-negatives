@@ -209,7 +209,7 @@ class NaiveParaphraser(Paraphraser):
     """
 
 
-class NonNaiveParaphraser(ABC):
+class NonNaiveParaphraser(Paraphraser):
     """
     Abstract base class for paraphrasing models.
     """
@@ -1464,15 +1464,17 @@ class ParaphrasingEvaluator:
                 logger.info(
                     f"[DEBUG] Using paraphraser '{name}' with prompt '{prompt}'"
                 )
+                paraphrase_config = {
+                    "text": self.original_text,
+                    "n_responses": self.n_responses,
+                    "prompt": prompt,
+                    "temperature": temperature,
+                }
+                if isinstance(paraphraser, NonNaiveParaphraser):
+                    paraphrase_config["ground_truth"] = self.ground_truth
                 paraphrases = [
                     _preprocess_text(p)
-                    for p in paraphraser.paraphrase(
-                        text=self.original_text,
-                        n_responses=self.n_responses,
-                        prompt=prompt,
-                        temperature=temperature,
-                        ground_truth=self.ground_truth,
-                    )
+                    for p in paraphraser.paraphrase(**paraphrase_config)
                 ]
                 if not paraphrases:
                     raise ValueError("Empty paraphrase list.")
