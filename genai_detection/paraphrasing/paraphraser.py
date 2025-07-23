@@ -1,9 +1,5 @@
 from abc import ABC
 import ast
-from collections import defaultdict
-import datetime
-import difflib
-from itertools import chain, product
 import json
 import logging
 import os
@@ -12,33 +8,16 @@ import re
 import sys
 from typing import Any, List, Literal, Optional, get_args
 import unicodedata
-from matplotlib import pyplot as plt
-import numpy as np
-import pandas as pd
 from pydantic import BaseModel
 import requests
-import sklearn
-from word_mover_distance import model  # https://pypi.org/project/word-mover-distance/
-from sentence_transformers import SentenceTransformer
-import gensim.downloader
-import torch
-import seaborn as sns
-from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import nltk
 from openai import OpenAI
-import matplotlib.patches as mpatches
-import matplotlib.lines as mlines
-
-nltk.download("wordnet")  # necessary for METEOR score
-from nltk.translate import bleu_score, meteor_score
-import evaluate
+import dirtyjson
+import torch
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from config import CONFIG
-from genai_detection.util import preprocess_text as _preprocess_text
-import dirtyjson
-import matplotlib.patches as mpatches
+
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.WARN)
@@ -62,9 +41,6 @@ ModelName = Literal[
     "text-davinci-003",
     "text-embedding-ada-002",
 ]
-
-TEMPERATURE = 0.7
-MAX_LENGTH = 512  # Maximum length of the generated paraphrase
 
 
 class TopicSchema(BaseModel):
@@ -107,7 +83,7 @@ class Paraphraser(ABC):
         text: str,
         prompt: str,
         n_responses: int = 5,
-        max_length: int = MAX_LENGTH,
+        max_length: int = CONFIG.MAX_LENGTH,
         response_schema: Optional[dict[str, Any]] = None,
     ) -> List[str]:
         """
@@ -219,7 +195,7 @@ class NonNaiveParaphraser(Paraphraser):
         text: str,
         prompt: str,
         n_responses: int = 5,
-        max_length: int = MAX_LENGTH,
+        max_length: int = CONFIG.MAX_LENGTH,
         response_schema: Optional[dict[str, Any]] = None,
         ground_truth: Optional[
             dict
@@ -284,8 +260,8 @@ class T5ChatGPTParaphraser(NaiveParaphraser):
         repetition_penalty=10.0,
         diversity_penalty=3.0,
         no_repeat_ngram_size=2,
-        max_length: int = MAX_LENGTH,
-        temperature: float = TEMPERATURE,
+        max_length: int = CONFIG.MAX_LENGTH,
+        temperature: float = CONFIG.TEMPERATURE,
         response_schema: Optional[dict[str, Any]] = None,
     ) -> List[str]:
         input_ids = self.tokenizer(
@@ -343,8 +319,8 @@ class T5GooglePAWSParaphraser(NaiveParaphraser):
         text: str,
         prompt: str,
         n_responses: int = 5,
-        max_length: int = MAX_LENGTH,
-        temperature: float = TEMPERATURE,
+        max_length: int = CONFIG.MAX_LENGTH,
+        temperature: float = CONFIG.TEMPERATURE,
         response_schema: Optional[dict[str, Any]] = None,
     ) -> List[str]:
         # TODO: no duplication penalty, and thus, there are duplicates in the output
@@ -400,8 +376,8 @@ class OllamaParaphraser(NaiveParaphraser):
         self,
         text: str,
         prompt: str = 'Paraphrase the following text. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","paraphrase":"<paraphrased version of the text>"}. Text to paraphrase:',
-        max_length: int = MAX_LENGTH,
-        temperature: float = TEMPERATURE,
+        max_length: int = CONFIG.MAX_LENGTH,
+        temperature: float = CONFIG.TEMPERATURE,
         n_responses: int = 1,
         response_schema: Optional[
             dict[str, Any]
@@ -492,8 +468,8 @@ class BlabladorParaphraser(NaiveParaphraser):
         text: str,
         prompt: str,
         verbose: bool = False,
-        max_length: int = MAX_LENGTH,
-        temperature: float = TEMPERATURE,
+        max_length: int = CONFIG.MAX_LENGTH,
+        temperature: float = CONFIG.TEMPERATURE,
         n_responses: int = 5,
         response_schema: Optional[dict[str, Any]] = None,
     ) -> List[str]:
@@ -578,10 +554,10 @@ class BulletPointParaphraser(NonNaiveParaphraser):
         self,
         text: str,
         prompt: Optional[str] = None,
-        temperature: float = TEMPERATURE,
+        temperature: float = CONFIG.TEMPERATURE,
         key: str = "bullet_points",
         response_schema: Optional[dict[str, Any]] = None,
-    ) -> tuple[List[str], str, str, str, str]:
+    ) -> tuple[List[str], str, str, str, str, str]:
         """
         Extract bullet points, tone, and genre from the input text.
         Currently, the text extractor is instructed to avoid direct quotes from the original text, to
@@ -603,7 +579,7 @@ class BulletPointParaphraser(NonNaiveParaphraser):
             text=text,
             prompt=prompt,
             n_responses=1,
-            max_length=MAX_LENGTH,
+            max_length=CONFIG.MAX_LENGTH,
             temperature=temperature,
             response_schema=response_schema,
         )[0]
@@ -671,7 +647,7 @@ class BulletPointParaphraser(NonNaiveParaphraser):
         bullet_points: List[str],
         prompt: Optional[str] = None,
         n_responses: int = 3,
-        temperature: float = TEMPERATURE,
+        temperature: float = CONFIG.TEMPERATURE,
     ) -> tuple[List[str], str, str]:
         """
         Generate a paraphrase using the extracted bullet points, tone, and genre.
@@ -695,7 +671,7 @@ class BulletPointParaphraser(NonNaiveParaphraser):
             text="",
             prompt=prompt,
             n_responses=n_responses,
-            max_length=MAX_LENGTH,
+            max_length=CONFIG.MAX_LENGTH,
             temperature=temperature,
         )
 
@@ -704,8 +680,8 @@ class BulletPointParaphraser(NonNaiveParaphraser):
         text: str,
         prompt: Optional[str] = None,
         n_responses: int = 5,
-        max_length: int = MAX_LENGTH,
-        temperature: float = TEMPERATURE,
+        max_length: int = CONFIG.MAX_LENGTH,
+        temperature: float = CONFIG.TEMPERATURE,
         response_schema: Optional[dict[str, Any]] = None,
         ground_truth: Optional[dict] = None,
     ) -> List[str]:
@@ -768,8 +744,8 @@ class TaskParaphraser(BulletPointParaphraser):
         text: str,
         prompt: Optional[str] = None,
         n_responses: int = 5,
-        max_length: int = MAX_LENGTH,
-        temperature: float = TEMPERATURE,
+        max_length: int = CONFIG.MAX_LENGTH,
+        temperature: float = CONFIG.TEMPERATURE,
         response_schema: Optional[dict[str, Any]] = None,
         ground_truth: Optional[
             dict
@@ -829,8 +805,8 @@ class TopicParaphraser(BulletPointParaphraser):
         text: str,
         prompt: Optional[str] = None,
         n_responses: int = 5,
-        max_length: int = MAX_LENGTH,
-        temperature: float = TEMPERATURE,
+        max_length: int = CONFIG.MAX_LENGTH,
+        temperature: float = CONFIG.TEMPERATURE,
         ground_truth: Optional[
             dict
         ] = None,  # if any ground truth is available, use it rather than the LLM extracted text
@@ -897,8 +873,8 @@ class TitleParaphraser(BulletPointParaphraser):
         text: str,
         prompt: Optional[str] = None,
         n_responses: int = 5,
-        max_length: int = MAX_LENGTH,
-        temperature: float = TEMPERATURE,
+        max_length: int = CONFIG.MAX_LENGTH,
+        temperature: float = CONFIG.TEMPERATURE,
         response_schema: Optional[dict[str, Any]] = None,
         ground_truth: Optional[
             dict
@@ -937,1104 +913,6 @@ class TitleParaphraser(BulletPointParaphraser):
         )
 
         return paraphrased_texts
-
-
-class WMDReadyKeyedVectors:
-    def __init__(self, keyed_vectors):
-        self.model = keyed_vectors
-
-    def __getitem__(self, key):
-        return self.model[key]
-
-    def __contains__(self, key):
-        return key in self.model
-
-    def keys(self):
-        return self.model.key_to_index.keys()
-
-
-class ParaphrasingEvaluator:
-    def __init__(
-        self,
-        paraphrasers: dict,
-        prompts: List[str],
-        original_text: str,
-        n_responses: int = 3,
-        max_length: int = MAX_LENGTH,
-        temperature: float = TEMPERATURE,
-        config: Optional[dict[str, Any]] = None,
-        ground_truth: Optional[dict[str, Any]] = None,
-    ):
-        """
-        Initializes the ParaphrasingEvaluator with the given paraphrasers and prompts.
-        :param paraphrasers: A dictionary of paraphraser instances with their names as keys.
-        :param prompts: A list of prompts to be used for paraphrasing.
-        :param original_text: The original text to be paraphrased.
-        :param n_responses: The number of paraphrases to generate for each paraphraser.
-        :param max_length: The maximum length of the generated paraphrase.
-        :param temperature: Controls the randomness of the output. Lower values make the output more deterministic.
-        :param config: configuration object or dict, expects at least save_path attribute
-        :param ground_truth: Optional ground truth data to compare against the generated paraphrases.
-        """
-        assert isinstance(paraphrasers, dict) and all(
-            isinstance(p, Paraphraser) for p in paraphrasers.values()
-        ), "paraphrasers must be a dictionary of Paraphraser instances."
-        self.paraphrasers = paraphrasers
-        assert isinstance(prompts, list) and all(
-            isinstance(p, str) for p in prompts
-        ), "prompts must be a list of strings."
-        self.prompts = prompts
-        assert (
-            isinstance(original_text, str) and original_text.strip()
-        ), "original_text must be a non-empty string."
-        self.original_text = _preprocess_text(original_text)
-        assert (
-            isinstance(n_responses, int) and n_responses > 0
-        ), "n_responses must be a positive integer."
-        self.n_responses = n_responses
-        assert (
-            isinstance(max_length, int) and max_length > 0
-        ), "max_length must be a positive integer."
-        self.max_length = max_length
-        self.temperature = temperature
-
-        self.rouge_score = evaluate.load("rouge")
-        self.bertscore = evaluate.load("bertscore")
-        self.sbert_model = SentenceTransformer(
-            "all-MiniLM-L6-v2"
-        )  # for cosine similarity
-        # https://pypi.org/project/word-mover-distance/ Word Mover's Distance (WMD)
-        self.pretr_word_model = WMDReadyKeyedVectors(
-            gensim.downloader.load("glove-twitter-25")
-        )
-        self.wmd_model = model.WordEmbedding(model=self.pretr_word_model)
-        self.config = config
-        self.base_dirs = {
-            "blog": Path(__file__).resolve().parents[2] / "data/datasets/Blog_corpus/",
-            "gutenberg": Path(__file__).resolve().parents[2]
-            / "data/datasets/gutenberg/",
-            "custom": Path(__file__).resolve().parents[2]
-            / "data/datasets/custom_texts/",
-            # TODO: Add student essays dataset
-            # "student_essays": Path(__file__).resolve().parents[2]
-            # / "data/datasets/student_essays/",
-        }
-        self.ground_truth = ground_truth or {}
-
-    @staticmethod
-    def _degree_of_similarity(a: str, b: str) -> float:
-        """Calculate similarity ratio between two strings (case-insensitive)."""
-        return difflib.SequenceMatcher(None, str(a).lower(), str(b).lower()).ratio()
-
-    def _similar(self, a, b, sim_thres: float = 0.7) -> bool:
-        """Check if two inputs are sufficiently similar."""
-        return self._degree_of_similarity(str(a), str(b)) > sim_thres
-
-    @staticmethod
-    def _get_century(time_period) -> int:
-        """Convert a time period or year string/int to century."""
-        if isinstance(time_period, str):
-            if "present" in time_period.lower():
-                return 21
-            # Extract digits, fallback to 0 if none found or invalid
-            try:
-                time_period = int(re.sub(r"[^\d]", "", time_period))
-            except ValueError:
-                return 0
-        if not isinstance(time_period, (int, float)) or time_period <= 0:
-            return 0
-
-        if time_period > 100:
-            century = time_period // 100
-            if time_period % 100 != 0:
-                century += 1
-            return int(century)
-        return int(time_period)
-
-    def _load_dataset(self, base_dir: Path, dataset_type: str) -> pd.DataFrame:
-        """
-        Load dataset texts and metadata (if available), preprocess and filter.
-        dataset_type: 'blog', 'gutenberg', or 'custom'
-        Returns a dataframe with all necessary columns.
-        """
-        if not base_dir.exists():
-            raise FileNotFoundError(
-                f"Base directory {base_dir} does not exist. Current path: {os.getcwd()}"
-            )
-
-        metadata = None
-        data = []
-        path2metadata = base_dir / "file_metadata.xlsx"
-        if dataset_type != "blog":
-            if not path2metadata.exists():
-                raise FileNotFoundError(
-                    f"Metadata file {path2metadata} does not exist. Current path: {os.getcwd()}"
-                )
-            metadata = pd.read_excel(path2metadata)
-
-        logger.info(f"Loading data from {base_dir.name}...")
-
-        for file in chain(base_dir.glob("*.txt"), base_dir.glob("*.csv")):
-            if (
-                dataset_type == "gutenberg"
-                and "Complete_Works_of_William_Shakespeare" in file.name
-            ):
-                # Skip oversized text
-                continue
-
-            if file.suffix == ".csv" and dataset_type == "blog":
-                df = pd.read_csv(file)
-                df["text"] = df["text"].apply(_preprocess_text)
-                df = df[df["text"].apply(lambda x: len(x.split()) >= 500)]
-
-                df["year"] = (
-                    pd.to_datetime(df["date"], errors="coerce", dayfirst=True)
-                    .dt.year.fillna(0)
-                    .astype(int)
-                )
-                df["century"] = df["year"].apply(self._get_century)
-
-                return df  # Blog dataset loaded directly as DataFrame
-
-            elif file.suffix == ".txt":
-                with open(file, "r", encoding="utf-8") as f:
-                    author = " ".join(file.stem.split("_")[-2:])
-                    content = _preprocess_text(f.read())
-                    if len(content.split()) >= 500:
-                        data.append(
-                            {"author": author, "text": content, "filename": file.stem}
-                        )
-                    else:
-                        logger.warning(
-                            f"Skipping file {file.name} due to insufficient length."
-                        )
-
-        if metadata is not None:
-            df = pd.DataFrame(data)
-            df = df.join(
-                metadata.set_index("filename"),
-                on="filename",
-                how="inner",
-                rsuffix="_meta",
-            )
-        else:
-            df = pd.DataFrame(data)
-
-        df.dropna(how="all", inplace=True)
-        logger.info(f"Loaded {len(df)} records from {base_dir.name}.")
-
-        return df
-
-    def _evaluate_model_on_data(self, model_name: str, paraphraser, df: pd.DataFrame):
-        """
-        Evaluate a single paraphraser on the given dataset.
-        Returns metrics dictionary and length difference list.
-        """
-        results_per_text = []
-        lengths = {"original": [], "paraphrase": []}
-
-        for row in tqdm(
-            df.itertuples(), total=len(df), desc=f"Evaluating {model_name}"
-        ):
-            text = str(getattr(row, "text", ""))
-            filename = getattr(row, "filename", "unknown")
-
-            try:
-                extra, _, genre, time_period, _ = paraphraser._extract_bullet_points(
-                    text=text,
-                    prompt=paraphraser.extractor_prompt,
-                    response_schema=TopicSchema.model_json_schema(),
-                )
-                century = self._get_century(time_period)
-            except Exception as e:
-                logger.warning(f"Extraction failed for file '{filename}': {e}")
-                continue
-
-            gt_genre = getattr(row, "genre", "") or ""
-            gt_century = getattr(row, "century", 0) or 0
-            gt_topic = getattr(row, "topic", "") or ""
-
-            genre_match = any(
-                self._similar(extr_g.strip().lower(), gt_genre.lower())
-                for extr_g in re.split(r"[ /,]+", str(genre).lower())
-            )
-            time_match = self._similar(century, gt_century)
-            topic_match = self._degree_of_similarity(str(gt_topic).lower(), extra)
-
-            paraphrase = paraphraser.paraphrase(text=text, temperature=self.temperature)
-            if (
-                paraphrase
-                and isinstance(paraphrase, (list, tuple))
-                and len(paraphrase) > 0
-            ):
-                paraphrase_len = len(paraphrase[0].split())
-            else:
-                paraphrase_len = 0
-
-            orig_len = len(text.split())
-            lengths["original"].append(orig_len)
-            lengths["paraphrase"].append(paraphrase_len)
-
-            results_per_text.append(
-                {
-                    "filename": filename,
-                    "genre_match": genre_match,  # int(genre_match),
-                    "time_match": time_match,  # int(time_match),
-                    "topic_match": topic_match,
-                    "original_length": orig_len,
-                    "paraphrase_length": paraphrase_len,
-                    "ground_truth_genre": gt_genre,
-                    "ground_truth_century": gt_century,
-                    "ground_truth_topic": gt_topic,
-                    "extracted_topic": extra,
-                    "extracted_genre": genre,
-                    "extracted_century": century,
-                }
-            )
-
-        # Convert to DataFrame
-        results_df = pd.DataFrame(results_per_text)
-
-        # Optionally compute total scores
-        summary = {
-            "genre_match": results_df["genre_match"].sum(),
-            "time_match": results_df["time_match"].sum(),
-            "topic_match": results_df["topic_match"].sum(),
-            "total": len(results_df),
-        }
-
-        return results_df, summary, lengths
-
-    def plot_metric_kdes_per_dataset(
-        self,
-        df_all: pd.DataFrame,
-        metrics: list[str],
-        save_path: Path | None = None,
-        dataset_col: str = "dataset",
-    ):
-        # Filter valid metrics
-        metrics = [
-            m
-            for m in metrics
-            if m in df_all.columns and pd.api.types.is_numeric_dtype(df_all[m])
-        ]
-        assert metrics, "No numeric metrics found to plot."
-
-        unique_labels = pd.unique(df_all[dataset_col])
-        palette = sns.color_palette("tab10", n_colors=len(unique_labels))
-        label_to_color = {
-            lbl: palette[i % len(palette)] for i, lbl in enumerate(unique_labels)
-        }
-
-        n = len(metrics)
-        n_cols = 2
-        n_rows = int(np.ceil(n / n_cols))
-
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=(6 * n_cols, 4 * n_rows))
-        axes = axes.flatten()
-
-        for i, metric in enumerate(metrics):
-            ax = axes[i]
-            sub_df = df_all[[dataset_col, metric]].dropna()
-
-            # KDE per dataset
-            sns.kdeplot(
-                data=sub_df,
-                x=metric,
-                hue=dataset_col,
-                fill=True,
-                common_norm=False,
-                alpha=0.4,
-                palette=label_to_color,
-                ax=ax,
-                legend=False,
-            )
-            if metric != "length_diff":
-                ax.set_xlim(0, 1)
-            else:
-                ax.set_xlim(sub_df[metric].min(), sub_df[metric].max())
-
-            ax.set_title(metric)
-            ax.set_xlabel(metric)
-            ax.set_ylabel("Density")
-
-        legend_patches = [
-            mpatches.Patch(color=color, label=self._wrap_label(label))
-            for label, color in label_to_color.items()
-        ]
-        fig.legend(
-            handles=legend_patches,
-            loc="upper left",
-            bbox_to_anchor=(1.02, 1),  # outside the plot on right
-            title="Dataset",
-            frameon=True,
-            borderaxespad=0,
-            fontsize=10,
-            title_fontsize=12,
-        )
-        for j in range(i + 1, len(axes)):
-            fig.delaxes(axes[j])
-
-        title = "KDE Metric Distributions by Dataset"
-        fig.suptitle(title, fontsize=16)
-        plt.tight_layout(rect=[0, 0, 1, 0.95])
-
-        if save_path:
-            save_path = Path(save_path)
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            save_path.mkdir(parents=True, exist_ok=True)
-            out = save_path / f"kde_metric_dists_{timestamp}.png"
-            fig.savefig(out, bbox_inches="tight")
-            print(f"Saved KDE grid to {out}")
-
-        plt.show()
-
-    def evaluate_extractors(
-        self, save_to_disk: bool = True, detailed: bool = True, plot_kdes: bool = True
-    ):
-        """
-        Non-naive paraphrasers extract information from the original text, such as bullet points, task, topic, title, tone, genre, time period and register.
-        Some datasets provide some of this information,
-        e.g. Blog (id, gender, age, topic, sign, date, text) and
-        Gutenberg (title, filename, author, time_period, genre, author_time, summary, fine_genre, century).
-
-        :param save_to_disk: If True, saves the results to a CSV file.
-        :param detailed: If True, saves detailed results for each text in the datasets, if false, saves aggregated information for each dataset.
-        """
-        models = {
-            k: v
-            for k, v in self.paraphrasers.items()
-            if not isinstance(v, NaiveParaphraser)
-        }
-
-        for dataset_type, base_dir in self.base_dirs.items():
-            try:
-                df = self._load_dataset(base_dir, dataset_type)
-            except Exception as e:
-                logger.error(
-                    f"Failed to load dataset {dataset_type} from {base_dir}: {e}"
-                )
-                continue
-
-            # TODO: Use only first two rows for debugging (remove in production)
-            df = df.head(min(10, len(df)))  # For debugging, remove in production
-            logger.info(f"Dataset snapshot:\n{df.head()}")
-
-            aggregate_results = defaultdict(
-                lambda: {
-                    "genre_match": 0,
-                    "time_match": 0,
-                    "topic_match": 0,
-                    "total": 0,
-                }
-            )
-            length_differences = {}
-
-            for model_name, paraphraser in models.items():
-                logger.info(
-                    f"Evaluating model '{model_name}' on {dataset_type} dataset..."
-                )
-                detailed_result_df, summary_df, lengths = self._evaluate_model_on_data(
-                    model_name, paraphraser, df
-                )
-
-                # Calculate length differences as percentages
-                percent_diffs = [
-                    ((p - o) / o) * 100 if o > 0 else 0
-                    for o, p in zip(lengths["original"], lengths["paraphrase"])
-                ]
-                length_differences[model_name] = percent_diffs
-
-                for key in ["genre_match", "time_match", "topic_match", "total"]:
-                    aggregate_results[model_name][key] += summary_df.get(key, 0)
-
-            # Reporting results
-            logger.info(f"\n[RESULTS for {dataset_type} dataset]")
-            for model_name, metrics in aggregate_results.items():
-                total = metrics["total"]
-                if total == 0:
-                    logger.warning(
-                        f"No evaluation data for model '{model_name}' on dataset '{dataset_type}'."
-                    )
-                    continue
-                for key in ["genre_match", "time_match", "topic_match"]:
-                    aggregate_results[model_name][key] = round(metrics[key] / total, 2)
-                aggregate_results[model_name]["length_diff"] = round(
-                    np.mean(length_differences[model_name]), 2
-                )
-
-                logger.info(f"Model: {model_name}")
-                logger.info(
-                    f"  Genre Accuracy: {aggregate_results[model_name]['genre_match']}"
-                )
-                logger.info(
-                    f"  Time Accuracy (approx): {aggregate_results[model_name]['time_match']}"
-                )
-                logger.info(
-                    f"  Topic Accuracy (approx): {aggregate_results[model_name]['topic_match']}"
-                )
-                logger.info(
-                    f"  Length Difference (mean): {aggregate_results[model_name]['length_diff']}%"
-                )
-
-            # Save results if requested
-            if save_to_disk:
-                save_base_path = (
-                    Path(__file__).resolve().parents[2] / self.config["save_path"]
-                )
-                if detailed:
-                    print("Saving detailed results...", type(detailed_result_df))
-                    self._save_results(detailed_result_df, dataset_type, save_base_path)
-                else:
-                    self._save_results(aggregate_results, dataset_type, save_base_path)
-
-            # Plot KDEs for each metric per dataset
-            if plot_kdes:
-                dfs = {}
-                for dataset in evaluator.base_dirs.keys():
-                    df = pd.read_csv(
-                        save_base_path
-                        / "paraphrasing"
-                        / f"extractor_eval_results_{dataset}.csv"
-                    )
-                    df["length_diff"] = [
-                        ((p - o) / o) if o > 0 else 0
-                        for o, p in zip(df["original_length"], df["paraphrase_length"])
-                    ]  # between 0 and 1
-
-                    df["dataset"] = dataset
-                    dfs[dataset] = df
-
-                # Long / tidy combined DataFrame
-                df_all = pd.concat(dfs.values(), ignore_index=True)
-                self.plot_metric_kdes_per_dataset(df_all=df_all)
-
-    def _save_results(self, results: dict, dataset_type: str, save_base_path: Path):
-        if not save_base_path.exists():
-            raise FileNotFoundError(f"Save path {save_base_path} does not exist.")
-
-        save_dir = save_base_path / "paraphrasing"
-        save_dir.mkdir(parents=True, exist_ok=True)
-
-        save_path = save_dir / f"extractor_eval_results_{dataset_type}.csv"
-        if not isinstance(results, pd.DataFrame):
-            results = pd.DataFrame.from_dict(results, orient="index")
-        results.to_csv(save_path)
-        logger.info(f"Results saved to {save_path}")
-
-    def evaluate(
-        self, save_to_disk: bool = True, save_extremest_paraphr_per_score: bool = False
-    ):
-        """
-        Evaluate the paraphrasers using BERTScore, BLEU and ROUGE metrics.
-        :param save_to_disk: If True, saves the results to a CSV file.
-        :param save_extremest_paraphr_per_score: If True, saves the worst and best paraphrase per score to a separate CSV file.
-        :return: A pandas DataFrame containing the evaluation results.
-        """
-        results = []
-        references = [self.original_text] * self.n_responses
-        original_split = self.original_text.split()
-
-        # Naive paraphrasers take different prompts
-        test_configurations = list(product(self.paraphrasers.items(), self.prompts))
-        # Non-naive paraphrasers take the same prompt, but are called with different temperatures and seeds
-        temperatures = list(np.linspace(0, 1, max(3, len(self.prompts)), endpoint=True))
-        for i, ((name, paraphraser), prompt) in enumerate(test_configurations):
-            if not isinstance(paraphraser, NaiveParaphraser):
-                test_configurations[i] = (
-                    (name, paraphraser),
-                    None,
-                    temperatures[i % len(temperatures)],
-                )
-            else:
-                test_configurations[i] = ((name, paraphraser), prompt, self.temperature)
-
-        print(
-            f"[DEBUG] Total configurations to evaluate: {len(test_configurations)}, {test_configurations}"
-        )
-        logger.info(
-            f"[DEBUG] Total configurations to evaluate: {len(test_configurations)}, {test_configurations}"
-        )
-        for (name, paraphraser), prompt, temperature in tqdm(
-            test_configurations,
-            desc="Evaluating Paraphrasers",
-            total=len(test_configurations),
-        ):
-            try:
-                logger.info(
-                    f"[DEBUG] Using paraphraser '{name}' with prompt '{prompt}'"
-                )
-                paraphrase_config = {
-                    "text": self.original_text,
-                    "n_responses": self.n_responses,
-                    "prompt": prompt,
-                    "temperature": temperature,
-                }
-                if isinstance(paraphraser, NonNaiveParaphraser):
-                    paraphrase_config["ground_truth"] = self.ground_truth
-                paraphrases = [
-                    _preprocess_text(p)
-                    for p in paraphraser.paraphrase(**paraphrase_config)
-                ]
-                if not paraphrases:
-                    raise ValueError("Empty paraphrase list.")
-
-            except Exception as e:
-                logger.error(
-                    f"[ERROR] Paraphraser '{name}' with prompt '{prompt}' failed: {e}"
-                )
-                continue
-
-            try:
-                # input is list of strings, each string is a paraphrase/ reference
-                bert_scores = self.bertscore.compute(
-                    predictions=paraphrases,
-                    references=references,
-                    model_type="distilbert-base-uncased",
-                )
-                # rouge returns one value for all paraphrases, hence: list comprehension
-                rouge_scores = [
-                    self.rouge_score.compute(
-                        predictions=[p], references=[self.original_text]
-                    )
-                    for p in paraphrases
-                ]
-
-                for i, paraphrase in enumerate(paraphrases):
-                    results.append(
-                        self._build_result_row(
-                            name,
-                            prompt,
-                            paraphrase,
-                            original_split,
-                            bert_scores,
-                            rouge_scores[i],
-                            i,
-                        )
-                    )
-
-            except Exception as e:
-                print(
-                    f"[ERROR] Scoring failed for '{name}' with prompt '{prompt}': {e}"
-                )
-                continue
-
-        df = pd.DataFrame(results)
-        if save_to_disk:
-            save_base_path = (
-                Path(__file__).resolve().parent.parent.parent / CONFIG.SAVE_PATH
-            )
-            assert (
-                save_base_path.exists()
-            ), f"Savefig base path {save_base_path} does not exist."
-            save_base_path = save_base_path / "paraphrasing"
-            os.makedirs(save_base_path, exist_ok=True)
-            save_path = (
-                save_base_path
-                / f"paraphrasing_results_comparison_temp{self.temperature}_maxLength{self.max_length}.csv"
-            )
-            df.to_csv(save_path, index=False, float_format="%.4f")
-            print(f"Results saved to {save_path}")
-
-        # Save the worst and best paraphrase per score
-        extremest_paraphrases = pd.DataFrame()
-        for metric in self.get_metric_names():
-            min_row = df.loc[df[metric].idxmin()].copy()
-            max_row = df.loc[df[metric].idxmax()].copy()
-
-            # Add extra info
-            min_row["metric"] = metric
-            min_row["extreme"] = "min"
-
-            max_row["metric"] = metric
-            max_row["extreme"] = "max"
-
-            # Convert to DataFrames and concat
-            extremest_paraphrases = pd.concat(
-                [
-                    extremest_paraphrases,
-                    pd.DataFrame([min_row]),
-                    pd.DataFrame([max_row]),
-                ],
-                ignore_index=True,
-            )
-        if save_extremest_paraphr_per_score:
-            worst_save_path = (
-                save_base_path
-                / f"extremest_paraphrases_per_metric_temp{self.temperature}_maxLength{self.max_length}.csv"
-            )
-            extremest_paraphrases.to_csv(worst_save_path, index=False)
-
-        return df, extremest_paraphrases
-
-    def _build_result_row(
-        self,
-        name: str,
-        prompt: str,
-        paraphrase: str,
-        original_split: List[str],
-        bert_scores: dict,
-        rouge_score: dict,
-        idx: int,
-    ) -> dict:
-        """
-        Build a result row for the DataFrame.
-        :param name: Name of the paraphraser.
-        :param prompt: The prompt used for paraphrasing excluding the text to paraphrase and tailoring whitespaces, but including bulletpoints etc.
-        :param paraphrase: One of the generated paraphrase.
-        :param original_split: The original text split into tokens.
-        :param bert_scores: BERTScore results.
-        :param rouge_score: ROUGE scores for the paraphrase.
-        :param idx: Index of the paraphrase in the list of BERTScores.
-        :return: A dictionary representing the result row.
-        """
-        # in [-1, 1] range, where 1 is identical, 0 is no similarity, -1 is opposite
-        cos_sim = torch.cosine_similarity(
-            self.sbert_model.encode(self.original_text, convert_to_tensor=True),
-            self.sbert_model.encode(paraphrase, convert_to_tensor=True),
-            dim=0,
-        ).item()
-        res = {
-            "model": name,
-            "prompt": f"{prompt} <TEXT>",
-            "parameters": {
-                "n_responses": self.n_responses,
-                "max_tokens": self.max_length,
-                "temperature": self.temperature,
-            },
-            "original_text": self.original_text,
-            "paraphrased_text": paraphrase,
-            # avoid division by zero using smoothing
-            # bleu averages scores obtained from splits of paraphrase and (one of the) reference(s); here: only one reference (i.e. original text)
-            "bleu_score": bleu_score.sentence_bleu(  # in [0, 1]
-                references=[original_split],
-                hypothesis=paraphrase.split(),
-                smoothing_function=bleu_score.SmoothingFunction().method1,
-            ),  # syntactic similarity metric
-            # METEOR requires tokens as input
-            "meteor_score": meteor_score.single_meteor_score(
-                original_split, paraphrase.split()
-            ),  # in [0, 1]
-            "rouge1": rouge_score["rouge1"],  # syntactic similarity metric # in [0, 1]
-            "rouge2": rouge_score["rouge2"],  # in [0, 1]
-            "rougeL": rouge_score["rougeL"],  # syntactic similarity metric # in [0, 1]
-            "rougeLsum": rouge_score["rougeLsum"],  # in [0, 1]
-            # bertscore metrics in range [0, 1] cf. https://docs.kolena.com/metrics/bertscore/ (03.07.2025)
-            "bertscore_precision": bert_scores["precision"][
-                idx
-            ],  # semantic similarity metric
-            "bertscore_recall": bert_scores["recall"][
-                idx
-            ],  # semantic similarity metric
-            "bertscore_f1": bert_scores["f1"][idx],  # semantic similarity metric
-            # normalized (in [0, 1] by using exp) word_mover_similarity
-            "sbert_wms": np.exp(
-                -self.wmd_model.wmdistance(
-                    list(map(str.lower, original_split)), paraphrase.lower().split()
-                )
-            ),  # semantic similarity metric: exp(-distance) stable version of 1/distance
-            # normalize: (cos - (-1)) / (1 - (-1)), so that it is in [0, 1] range
-            "sbert_cos": (cos_sim + 1) / 2,  # semantic similarity metric
-            # bertscore hashcode for the paraphrase
-            "bertscore_hash": bert_scores["hashcode"],
-        }
-        semantic_sim_average = np.mean(
-            [
-                res["bertscore_precision"],
-                res["bertscore_recall"],
-                res["bertscore_f1"],
-                res["sbert_wms"],
-                res["sbert_cos"],
-            ]
-        )
-        res["sem_sim_avg"] = semantic_sim_average
-        syntactic_sim_average = np.mean(
-            [res["bleu_score"], res["rouge1"], res["rougeL"]]
-        )
-        res["syn_sim_avg"] = syntactic_sim_average
-        res["gohsen_delta"] = semantic_sim_average - syntactic_sim_average
-        return res
-
-    def get_metric_names(self) -> List[str]:
-        """
-        Get the names of the metrics used in the evaluation.
-        :return: A list of metric names.
-        """
-        return [
-            "bleu_score",
-            "meteor_score",
-            "rouge1",
-            "rouge2",
-            "rougeL",
-            "rougeLsum",
-            "bertscore_precision",
-            "bertscore_recall",
-            "bertscore_f1",
-            "sbert_wms",
-            "sbert_cos",
-            "sem_sim_avg",
-            "syn_sim_avg",
-            "gohsen_delta",
-        ]
-
-    def plot_models_metrics(
-        self,
-        df: pd.DataFrame,
-        save_path: Optional[Path] = None,
-        data_category: Optional[str] = None,
-        group_by: Optional[str] = "model",
-    ):
-        """
-        Plot the performance of models per metric.
-
-        :param df: DataFrame containing the evaluation results.
-        :param metric_name: The name of the metric to plot.
-        :param save_path: Optional path to save the plot (without filename). If None, the plot will not be saved.
-        :param data_category: Optional category of the data, used for the plot title.
-        :param group_by: The column to group the data by (default is 'model'). Alternatives could be 'prompt'.
-        :return: A list of matplotlib figures.
-        """
-        # Enforce fixed metric order
-        all_labels = self.get_metric_names()
-        labels = [metric for metric in all_labels if metric in df.columns]
-        assert (
-            group_by in df.columns
-        ), f"Group by column '{group_by}' not found in DataFrame."
-        grouped_mean = df.groupby(group_by)[labels].mean()
-        grouped_std = df.groupby(group_by)[labels].std()
-
-        # Compute angle of each axis
-        angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
-        # Complete the loop
-        angles += angles[:1]
-
-        # Start plot
-        fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
-
-        for model_name in grouped_mean.index:
-            mean_values = grouped_mean.loc[model_name].tolist()
-            std_values = grouped_std.loc[model_name].tolist()
-
-            # Close the loop
-            mean_values += mean_values[:1]
-            std_values += std_values[:1]
-
-            lower = np.maximum(0, np.array(mean_values) - np.array(std_values))
-            upper = np.minimum(1, np.array(mean_values) + np.array(std_values))
-
-            ax.plot(angles, mean_values, label=self._wrap_label(model_name))
-            ax.fill_between(
-                angles, lower, upper, color=ax.get_lines()[-1].get_color(), alpha=0.2
-            )
-
-        # Add labels to axes
-        ax.set_xticks(angles[:-1])
-        ax.set_xticklabels(labels, fontsize=10)
-        ax.tick_params(axis="y", labelsize=8)
-
-        # Optional: Set value range
-        ax.set_ylim(0, 1)
-
-        # Add legend and title
-        ax.legend(loc="lower left", bbox_to_anchor=(1.1, 0.7), fontsize=9)
-        title = (
-            f"Radar Chart: Paraphrasing Metric\non {data_category} text, grouped by {group_by}"
-            if data_category
-            else f"Radar Chart: Paraphrasing Metrics\ngrouped by {group_by}"
-        )
-        plt.title(title, fontsize=12)
-        plt.tight_layout()
-
-        if save_path:
-            save_path = Path(save_path)
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            save_path.parent.mkdir(parents=True, exist_ok=True)
-            save_path = (
-                save_path
-                / f"paraphrasing_metrics_grouped_by_{group_by}_radar_chart_{timestamp}.png"
-            )
-            plt.savefig(save_path, bbox_inches="tight")
-            print(f"Plot saved to {save_path}")
-        plt.show()
-
-    def plot_metric_scatter(
-        self,
-        df: pd.DataFrame,
-        save_path: Optional[Path] = None,
-        data_category: Optional[str] = None,
-        group_by: Optional[str] = "model",
-    ):
-        """
-        Scatter plot of semantic similarity vs syntactic similarity per model.
-
-        :param df: DataFrame with at least 'sem_sim_avg', 'syn_sim_avg', and 'model' columns.
-        :param save_path: Optional path to save the plot. If None, the plot is not saved.
-        :param data_category: Optional category of the data, used for the plot title.
-        :param group_by: The column to group the data by (default is 'model'). Alternatives could be 'prompt'.
-        :return: matplotlib Figure object.
-        """
-        required_cols = ["sem_sim_avg", "syn_sim_avg", group_by]
-        missing_cols = [col for col in required_cols if col not in df.columns]
-        if missing_cols:
-            raise ValueError(f"DataFrame is missing required columns: {missing_cols}")
-
-        # Calculate min and max with padding
-        x_min, x_max = df["sem_sim_avg"].min(), df["sem_sim_avg"].max()
-        y_min, y_max = df["syn_sim_avg"].min(), df["syn_sim_avg"].max()
-
-        x_pad = (x_max - x_min) * 0.05 if (x_max - x_min) > 0 else 0.05
-        y_pad = (y_max - y_min) * 0.05 if (y_max - y_min) > 0 else 0.05
-
-        x_lim = (max(0, x_min - x_pad), min(1, x_max + x_pad))
-        y_lim = (max(0, y_min - y_pad), min(1, y_max + y_pad))
-
-        fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
-        unique_labels = df[group_by].unique()
-        palette = sns.color_palette("tab10", n_colors=len(unique_labels))
-        label_to_color = {
-            label: palette[i % len(palette)] for i, label in enumerate(unique_labels)
-        }
-        sns.scatterplot(
-            data=df,
-            x="sem_sim_avg",
-            y="syn_sim_avg",
-            hue=group_by,
-            palette=label_to_color,
-            alpha=0.7,
-            s=100,
-            edgecolor="k",
-            ax=ax,
-        )
-
-        ax.set_xlabel("Semantic Similarity (sem_sim_avg)")
-        ax.set_ylabel("Syntactic Similarity (syn_sim_avg)")
-        title = (
-            f"Semantic vs Syntactic Similarity\non {data_category} Texts, grouped by {group_by}"
-            if data_category
-            else f"Semantic vs Syntactic Similarity\ngrouped by {group_by}"
-        )
-        ax.set_title(title)
-
-        ax.set_xlim(x_lim)
-        ax.set_ylim(y_lim)
-        ax.grid(True)
-
-        # Place legend outside the plot on the right
-        legend_patches = [
-            mpatches.Patch(color=color, label=self._wrap_label(label=label))
-            for label, color in label_to_color.items()
-        ]
-        ax.legend(
-            handles=legend_patches,
-            title=group_by,
-            loc="upper left",
-            bbox_to_anchor=(1.03, 1),
-            borderaxespad=0.0,
-            frameon=True,
-            fontsize=9,
-        )
-
-        # Inset with full range
-        inset_size = 0.25
-        inset_ax = fig.add_axes([0.9, 0.1, inset_size, inset_size])
-
-        sns.scatterplot(
-            data=df,
-            x="sem_sim_avg",
-            y="syn_sim_avg",
-            hue=group_by,
-            palette="tab10",
-            alpha=0.7,
-            s=40,
-            edgecolor="k",
-            legend=False,  # No legend on inset
-            ax=inset_ax,
-        )
-
-        inset_ax.set_xlim(0, 1)
-        inset_ax.set_ylim(0, 1)
-        inset_ax.set_title("Full range")
-        inset_ax.grid(True)
-        inset_ax.set_xticks([0, 0.5, 1])
-        inset_ax.set_yticks([0, 0.5, 1])
-        inset_ax.tick_params(axis="both", which="major", labelsize=8)
-
-        # Adjust layout to leave 25% room for legend/inset on the right
-        # plt.tight_layout(rect=[0, 0, 0.75, 1])
-
-        if save_path:
-            save_path = Path(save_path)
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            save_path.parent.mkdir(parents=True, exist_ok=True)
-            full_path = (
-                save_path / f"sem_syn_scatter_grouped_by_{group_by}_{timestamp}.png"
-            )
-            plt.savefig(full_path, bbox_inches="tight")
-            print(f"Plot saved to {full_path}")
-
-        plt.show()
-
-    def _wrap_label(self, label: str, words_per_line: int = 6) -> str:
-        assert (
-            isinstance(words_per_line, int) and words_per_line > 0
-        ), "words_per_line must be a positive integer."
-        words = str(label).split()
-        return "\n".join(
-            [
-                " ".join(words[i : i + words_per_line])
-                for i in range(0, len(words), words_per_line)
-            ]
-        )
-
-    def plot_metric_distributions(
-        self,
-        df: pd.DataFrame,
-        save_path: Optional[Path] = None,
-        data_category: Optional[str] = None,
-        group_by: Optional[str] = "model",
-    ):
-        """
-        Plot distribution of each metric per model in subplots.
-
-        :param df: DataFrame containing metric scores and a 'model' column.
-        :param save_path: Optional path to save the plot. If None, the plot is not saved.
-        :param data_category: Optional string for plot title context.
-        :param group_by: The column to group the data by (default is 'model'). Alternatives could be 'prompt'.
-        :return: None
-        """
-        metric_names = [
-            metric for metric in self.get_metric_names() if metric in df.columns
-        ]
-        assert len(metric_names) > 0, "No valid metrics found in DataFrame."
-        assert (
-            group_by in df.columns
-        ), f"Group by column '{group_by}' not found in DataFrame."
-
-        n_metrics = len(metric_names)
-        n_cols = 2
-        n_rows = (n_metrics + 1) // n_cols
-
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=(6 * n_cols, 4 * n_rows))
-        axes = axes.flatten()
-
-        unique_labels = df[group_by].unique()
-        max_words_in_label = max(len(str(label).split()) for label in unique_labels)
-        use_shared_legend = max_words_in_label > 3
-        palette = sns.color_palette("tab10", n_colors=len(unique_labels))
-        label_to_color = {
-            label: palette[i % len(palette)] for i, label in enumerate(unique_labels)
-        }
-
-        for i, metric in enumerate(metric_names):
-            ax = axes[i]
-            if metric not in df.columns:
-                continue
-
-            # Find models with only one data point for this metric
-            counts = df.groupby(group_by)[metric].count()
-
-            # Models with multiple entries (for KDE)
-            models_multi = counts[counts > 1].index
-            # Models with single entry (for scatter)
-            models_single = counts[counts == 1].index
-
-            # Plot KDE for models with multiple points
-            if len(models_multi) > 0:
-                sns.kdeplot(
-                    data=df[df[group_by].isin(models_multi)],
-                    x=metric,
-                    hue=group_by,
-                    fill=True,
-                    common_norm=False,
-                    alpha=0.4,
-                    ax=ax,
-                    palette=label_to_color,
-                    legend=False,
-                )
-
-            # Scatter for models with a single point
-            for model in models_single:
-                single_val = df[(df[group_by] == model)][metric].values[0]
-                label = model if not use_shared_legend else None
-                color = label_to_color[model]
-                ax.scatter(
-                    single_val,
-                    1,
-                    label=label,
-                    color=color,
-                    s=50,
-                    edgecolor="k",
-                    zorder=5,
-                )
-
-            ax.set_title(f"Distribution of {metric}")
-            ax.set_xlim(0, 1)  # assuming similarity metrics in [0, 1]
-            ax.set_xlabel(metric)
-            ax.set_ylabel("Density")
-
-        if use_shared_legend:
-            legend_patches = [
-                mpatches.Patch(color=color, label=self._wrap_label(label))
-                for label, color in label_to_color.items()
-            ]
-            fig.legend(
-                handles=legend_patches,
-                loc="upper left",
-                bbox_to_anchor=(1.01, 1),  # outside the plot on right
-                title=group_by.capitalize(),
-                frameon=True,
-                borderaxespad=0,
-                fontsize=10,
-                title_fontsize=12,
-            )
-        else:
-            present_models = counts[counts > 0].index  # all that appear for this metric
-            handles = []
-            labels = []
-            for model in present_models:
-                color = label_to_color[model]
-                if model in models_multi:
-                    # Proxy patch representing KDE fill
-                    h = mpatches.Patch(facecolor=color, alpha=0.4, edgecolor="none")
-                else:
-                    # Proxy marker representing singleton scatter
-                    h = mlines.Line2D(
-                        [],
-                        [],
-                        marker="o",
-                        linestyle="none",
-                        markerfacecolor=color,
-                        markeredgecolor="k",
-                        markersize=6,
-                    )
-                handles.append(h)
-                labels.append(model)
-            for ax in axes:
-                ax.legend(handles, labels, title=group_by.capitalize(), loc="best")
-
-        # Remove unused axes
-        for j in range(i + 1, len(axes)):
-            fig.delaxes(axes[j])
-        title = (
-            f"Metric Distributions\non {data_category} data, grouped by {group_by}"
-            if data_category
-            else f"Metric Distributions\ngrouped by {group_by}"
-        )
-        fig.suptitle(title, fontsize=16)
-        plt.tight_layout(rect=[0, 0, 0.85, 0.95])
-
-        if save_path:
-            save_path = Path(save_path)
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            save_path.parent.mkdir(parents=True, exist_ok=True)
-            full_path = (
-                save_path
-                / f"metric_distributions_grouped_by_{group_by}_{timestamp}.png"
-            )
-            plt.savefig(full_path, bbox_inches="tight")
-            print(f"Plot saved to {full_path}")
-
-        plt.show()
 
 
 if __name__ == "__main__":
@@ -2076,23 +954,3 @@ if __name__ == "__main__":
     # assert path2datasets.exists(), f"Path to datasets {path2datasets} does not exist."
     # file_name = "cnn_230625"
     # original_text = open(path2datasets / f"{file_name}.txt").read()
-    n_responses = 3  # number of paraphrases to generate
-    max_length = MAX_LENGTH  # Maximum length of the generated paraphrase
-    temperature = TEMPERATURE  # Controls the randomness of the output. Lower values make the output more deterministic.
-    evaluator = ParaphrasingEvaluator(
-        paraphrasers=paraphrasers,
-        prompts=[
-            "Paraphrase the following text and output only the paraphrased version:"
-        ],  # use a single prompt for simplicity
-        original_text="This is a sample text to be paraphrased.",
-        n_responses=n_responses,
-        max_length=max_length,
-        temperature=temperature,
-        config={
-            "save_path": Path(__file__).resolve().parent.parent.parent
-            / CONFIG.SAVE_PATH
-        },
-    )
-    evaluator.evaluate_extractors(save_to_disk=True)
-    # paraphrase_evaluator = ParaphrasingEvaluator(paraphrasers=paraphrasers, prompts=prompts, original_text=original_text, n_responses=n_responses, max_length=max_length, temperature=temperature)
-    # paraphrase_evaluator.evaluate()
