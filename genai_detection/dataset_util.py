@@ -22,6 +22,7 @@ from config import CONFIG
 from genai_detection.util import preprocess_text as _preprocess_text
 
 random.seed(42)
+MIN_NUM_WORDS = 3000  # minimum number of words in a text to be considered valid
 
 # === BASE CLASS ===
 
@@ -92,8 +93,8 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
         print("Initial number of entries:", len(df))
         df["text"] = df["text"].apply(lambda x: self.preprocess(x))
         df = df[
-            df["text"].apply(lambda x: len(x.split()) >= 500)
-        ]  # filter out text with less than 500 words (not characters, bc there are 501 characters one-word entries)
+            df["text"].apply(lambda x: len(x.split()) >= MIN_NUM_WORDS)
+        ]  # filter out text with less than MIN_NUM_WORDS words (not characters, bc there are 501 characters one-word entries)
 
         df["year"] = pd.to_datetime(
             df["date"], format="mixed", dayfirst=True, errors="coerce"
@@ -225,6 +226,8 @@ class KoppelWebisDatasetLoader(BaseDatasetLoader):
                     if file.is_file() and file.suffix == ".txt":
                         with open(file, "r", encoding="utf-8", errors="replace") as f:
                             content = f.read()
+                            if len(content.split()) < MIN_NUM_WORDS:
+                                continue
                             content = self.preprocess(content)
                             data.append({"author": author.name, "text": content})
         pairs = self._generate_pairs(data)
@@ -303,10 +306,10 @@ class Pan20DatasetLoader(Pan23DatasetLoader):
         merged_data["pair"] = merged_data["pair"].apply(
             lambda pair: [self.preprocess(text) for text in pair]
         )
-        # Keep only pairs with at least 500 words in each text, bc there are one-word entries
+        # Keep only pairs with at least MIN_NUM_WORDS words in each text, bc there are one-word entries
         merged_data = merged_data[
             merged_data["pair"].apply(
-                lambda pair: all(len(text.split()) >= 500 for text in pair)
+                lambda pair: all(len(text.split()) >= MIN_NUM_WORDS for text in pair)
             )
         ]
 
@@ -547,6 +550,8 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
                     file.stem.split("_")[-2:]
                 )  # filename format is "title_firstName_sirname.txt"
                 content = f.read()
+                if len(content.split()) < MIN_NUM_WORDS:
+                    continue
                 content = self.preprocess(content)
                 data.append({"author": author, "text": content, "filename": file.stem})
 
@@ -758,7 +763,9 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
                     encoding = detected["encoding"]
 
                 essay_text = self.preprocess(raw_data.decode(encoding))
-                if len(essay_text.split()) < 500:
+                if len(essay_text.split()) < min(
+                    500, MIN_NUM_WORDS
+                ):  # texts are < 2000 words
                     continue
                 student_essays_df = pd.concat(
                     [
@@ -800,8 +807,6 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         grouped = df.groupby(
             groupby_cols, dropna=False, observed=True
         )  # keep NaNs, no answer is also an answer group
-        # print(f"\nTotal groups: {len(grouped)}")
-        # print(f"Groups: {list(grouped.groups.keys())}\n\n")
         pairs = []
 
         # each author appears <=1 time per task: same-author pairs have to be generated across tasks
@@ -1036,8 +1041,8 @@ if __name__ == "__main__":
 
     # run_pan23(base_dir=args.path, save_path=args.out)
     # # run_pan25()
-    # run_pan20()
+    run_pan20()
     # run_koppel_webis()
     # run_blog_corpus()
     # run_gutenberg_corpus()
-    run_student_essay()
+    # run_student_essay()
