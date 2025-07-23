@@ -8,6 +8,7 @@ import re
 import sys
 from typing import Any, List, Literal, Optional, get_args
 import unicodedata
+import openai
 from pydantic import BaseModel
 import requests
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -411,7 +412,13 @@ class OllamaParaphraser(NaiveParaphraser):
             # if response_schema:
             #      # text={"format": {"type": "json_object"}},  # FIXME: keyword unknwon even though: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#json-mode
             #     body['response_format'] = {"type": "json_schema", "json_schema": response_schema}  # use pydantic schema to validate the response, https://ollama.com/blog/structured-outputs
-            response = self.client.chat.completions.create(**body)
+            try:
+                response = self.client.chat.completions.create(**body)
+            except openai.InternalServerError as e:
+                print(
+                    f"[ERROR] Failed to generate paraphrase with Ollama: {e}. Skipping..."
+                )
+                continue
             # print(f"[DEBUG] Response from Ollama paraphraser: {response.choices[0].message.content}")
             # print(f"[DEBUG] Response format: {format.model_json_schema()}/{type(format)}")
             resp = response.choices[0].message.content
@@ -880,7 +887,7 @@ class TitleParaphraser(BulletPointParaphraser):
             dict
         ] = None,  # if any ground truth is available, use it rather than the LLM extracted text
     ) -> List[str]:
-        title, tone, genre, time_period, register, target_audience, target_audience = (
+        title, tone, genre, time_period, register, target_audience = (
             self._extract_bullet_points(
                 text=text,
                 prompt=self.extractor_prompt,
