@@ -191,6 +191,30 @@ class NonNaiveParaphraser(Paraphraser):
     Abstract base class for paraphrasing models.
     """
 
+    def __init__(self, text_extractor=None, text_generator=None):
+        """
+        Initializes the BulletPointParaphraser model.
+        This model is a placeholder and does not implement actual paraphrasing logic.
+
+        :param text_extractor: A model or function to extract bullet points, tone and genre from the input text.
+        :param text_generator: A model or function to generate text based on the extracted bullet points, tone and genre.
+        """
+        assert isinstance(
+            text_extractor, Paraphraser
+        ), f"{text_extractor.__name__} must inherit from Paraphraser"
+        assert isinstance(
+            text_generator, Paraphraser
+        ), f"{text_generator.__name__} must inherit from Paraphraser"
+        assert hasattr(
+            text_extractor, "paraphrase"
+        ), "text_extractor must implement a 'paraphrase' method"
+        assert hasattr(
+            text_generator, "paraphrase"
+        ), "text_generator must implement a 'paraphrase' method"
+
+        self.text_extractor = text_extractor
+        self.text_generator = text_generator
+
     def paraphrase(
         self,
         text: str,
@@ -532,22 +556,7 @@ class BulletPointParaphraser(NonNaiveParaphraser):
         :param text_extractor: A model or function to extract bullet points, tone and genre from the input text.
         :param text_generator: A model or function to generate text based on the extracted bullet points, tone and genre.
         """
-        assert isinstance(
-            text_extractor, Paraphraser
-        ), f"{text_extractor.__name__} must inherit from Paraphraser"
-        assert isinstance(
-            text_generator, Paraphraser
-        ), f"{text_generator.__name__} must inherit from Paraphraser"
-        assert hasattr(
-            text_extractor, "paraphrase"
-        ), "text_extractor must implement a 'paraphrase' method"
-        assert hasattr(
-            text_generator, "paraphrase"
-        ), "text_generator must implement a 'paraphrase' method"
-
-        self.text_extractor = text_extractor
-        self.text_generator = text_generator
-
+        super().__init__(text_extractor=text_extractor, text_generator=text_generator)
         self.extractor_prompt = 'Summarize the text above in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"bullet_points":"<list of bullet points>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"target_audience":"<target_audience>","genre":"<genre>"}. Do not use direct quotes.'
 
     def add_tailoring_quotes(self, value):
