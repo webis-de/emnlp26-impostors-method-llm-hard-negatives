@@ -76,6 +76,10 @@ Note that you have to comment dataset methods you do not need at the bottom of t
 - **Gutenberg**: [Gutenberg dataset](https://www.gutenberg.org/)
   - Contains texts from the Gutenberg project with authorship information.
   - The dataset is in TXT format.
+- **Student Essay**: 
+  - Contains student essays from 2006 across 6 tasks.
+  - The dataset is a selection of TXT, SAV and DAT files.
+  - Contact James W. Pennebaker for access to the dataset.
 
 ## 📁 Add a new dataset
 To add a new dataset, create new directories in the `data/datasets/<your-dataset-name>` directory with the following structure:
