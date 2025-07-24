@@ -56,6 +56,11 @@
 
 
 ### 🛠️ Implementation
+- [ ] run evaluation of cluster 
+  - [o] script with parallel code
+  - [x] sbatch script
+  - [x] Docker container to run evaluation
+- [o] Backtranslation (2-step) paraphrasing (multi language model required: Ollama's zephyr: 7B works)
 - [x] keep only texts with >= 3000 words (maybe reference in Janek's generalized unmasking paper)
   - Student Essay dataset has no such texts, keep 500 words as minimum for this dataset (maximum has 1136 words)
 - [x] Email authors of LLMDet regarding missing extender class (21.07.2025)
@@ -80,8 +85,8 @@
 - [o] compare quality of paraphrase experiment with chunks *per dataset* (different genre)
   - currently only on first 10 texts of each dataset
   - not so important task, if works similarly well on all datasets
-  - [x] News/ custom dataset
-  - [ ] Blog dataset
+  - [x] News/ custom dataset (23.07.2025)
+  - [o] Blog dataset (24.07.2025)
   - [ ] Gutenberg dataset
   - [ ] Student Essay dataset
 - [x] PAN20 Webis arrow dataset: Finer pair selection not only pre-existing pairs (compare to PAN approaches possible?)
