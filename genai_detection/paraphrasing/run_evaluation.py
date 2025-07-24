@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Add the root of the project to Python path
 # sys.path.append(os.path.abspath(".."))
+print("Current working directory:", os.getcwd())
 from config import CONFIG
 from genai_detection.paraphrasing.paraphraser import (
     T5ChatGPTParaphraser,
