@@ -213,8 +213,14 @@ class ImpostorDetector(DetectorBase):
             if (
                 len_ws_token_left + len_ws_token_right < 2 * self.min_n_tokens
             ) and not self.upsample:  # skip
+                print(
+                    f"Skipping text pair: Left: {text_left}, Right: {text_right} (too short, {len_ws_token_left + len_ws_token_right} tokens < {2 * self.min_n_tokens})"
+                )
                 continue
             if len_ws_token_left == 0 or len_ws_token_right == 0:
+                print(
+                    f"Skipping empty text pair: Left: {text_left}, Right: {text_right}"
+                )
                 continue  # skip empty texts
 
             # upsample short texts to the minimum number of tokens
