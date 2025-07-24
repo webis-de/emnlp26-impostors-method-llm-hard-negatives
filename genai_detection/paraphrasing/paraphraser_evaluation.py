@@ -241,6 +241,15 @@ class ParaphrasingEvaluator:
         """
         results_per_text = []
         lengths = {"original": [], "paraphrase": []}
+        if "century" not in df.columns and "date" in df.columns:
+            # Blog dataset has 'date' column (eg. 12,May,2004), convert to 'century'
+            df["century"] = df["date"].apply(
+                lambda x: (
+                    self._get_century(int(x.split(",")[2]))
+                    if len(x.split(",")) > 2
+                    else 0
+                )
+            )
 
         for row in tqdm(
             df.itertuples(), total=len(df), desc=f"Evaluating {model_name}"
@@ -249,13 +258,16 @@ class ParaphrasingEvaluator:
             filename = getattr(row, "filename", "unknown")
 
             try:
-                extra, _, genre, time_period, _, _ = paraphraser._extract_bullet_points(
+                extra, _, genre, century, _, _ = paraphraser._extract_bullet_points(
                     text=text,
                     prompt=paraphraser.extractor_prompt,
                     response_schema=TopicSchema.model_json_schema(),
                 )
-                century = self._get_century(time_period)
+                # century = self._get_century(time_period)
             except Exception as e:
+                # Hopefully fixed:
+                # FIXME: Extraction failed for file '3581210': list index out of range
+                # FIXME: Extraction failed for file 'Pride_and_Prejudice_Jane_Austen': list index out of range
                 logger.warning(f"Extraction failed for file '{filename}': {e}")
                 continue
 
@@ -323,6 +335,7 @@ class ParaphrasingEvaluator:
         metrics: list[str],
         save_path: Path | None = None,
         dataset_col: str = "dataset",
+        display_plot: bool = True,
     ):
         # Filter valid metrics
         metrics = [
@@ -399,10 +412,15 @@ class ParaphrasingEvaluator:
             fig.savefig(out, bbox_inches="tight")
             print(f"Saved KDE grid to {out}")
 
-        plt.show()
+        if display_plot:
+            plt.show()
 
     def evaluate_extractors(
-        self, save_to_disk: bool = True, detailed: bool = True, plot_kdes: bool = True
+        self,
+        save_to_disk: bool = True,
+        detailed: bool = True,
+        plot_kdes: bool = True,
+        display_plot: bool = True,
     ):
         """
         Non-naive paraphrasers extract information from the original text, such as bullet points, task, topic, title, tone, genre, time period and register.
@@ -430,6 +448,8 @@ class ParaphrasingEvaluator:
 
             # TODO: Use only first two rows for debugging (remove in production)
             df = df.head(min(10, len(df)))  # For debugging, remove in production
+            if "id" in df.columns:
+                df.rename(columns={"id": "filename"}, inplace=True)
             logger.info(f"Dataset snapshot:\n{df.head()}")
             print(f"Dataset snapshot:\n{df.head()}")
 
@@ -507,7 +527,7 @@ class ParaphrasingEvaluator:
             # Plot KDEs for each metric per dataset
             if plot_kdes:
                 dfs = {}
-                for dataset in evaluator.base_dirs.keys():
+                for dataset in self.base_dirs.keys():
                     df = pd.read_csv(
                         save_base_path
                         / "paraphrasing"
@@ -523,13 +543,19 @@ class ParaphrasingEvaluator:
 
                 # Long / tidy combined DataFrame
                 df_all = pd.concat(dfs.values(), ignore_index=True)
-                self.plot_metric_kdes_per_dataset(df_all=df_all)
+                self.plot_metric_kdes_per_dataset(
+                    df_all=df_all,
+                    metrics=["genre_match", "time_match", "topic_match", "length_diff"],
+                    display_plot=display_plot,
+                )
 
     def _save_results(self, results: dict, dataset_type: str, save_base_path: Path):
         if not save_base_path.exists():
             raise FileNotFoundError(f"Save path {save_base_path} does not exist.")
-
-        save_dir = save_base_path / "paraphrasing"
+        if not "paraphrasing" in str(save_base_path):
+            save_dir = save_base_path / "paraphrasing"
+        else:
+            save_dir = save_base_path
         save_dir.mkdir(parents=True, exist_ok=True)
 
         save_path = save_dir / f"extractor_eval_results_{dataset_type}.csv"
@@ -576,6 +602,7 @@ class ParaphrasingEvaluator:
             desc="Evaluating Paraphrasers",
             total=len(test_configurations),
         ):
+            # FIXME: experiment notebook: predictions format bad (list of words), refernce format ok
             try:
                 logger.info(
                     f"[DEBUG] Using paraphraser '{name}' with prompt '{prompt}'"
@@ -599,7 +626,9 @@ class ParaphrasingEvaluator:
                 logger.error(
                     f"[ERROR] Paraphraser '{name}' with prompt '{prompt}' failed: {e}"
                 )
-                continue
+                paraphrases = [
+                    "" for _ in range(self.n_responses)
+                ]  # Fallback to empty strings
 
             try:
                 # input is list of strings, each string is a paraphrase/ reference
@@ -799,6 +828,7 @@ class ParaphrasingEvaluator:
         save_path: Optional[Path] = None,
         data_category: Optional[str] = None,
         group_by: Optional[str] = "model",
+        display_plot: bool = True,
     ):
         """
         Plot the performance of models per metric.
@@ -808,6 +838,7 @@ class ParaphrasingEvaluator:
         :param save_path: Optional path to save the plot (without filename). If None, the plot will not be saved.
         :param data_category: Optional category of the data, used for the plot title.
         :param group_by: The column to group the data by (default is 'model'). Alternatives could be 'prompt'.
+        :param display_plot: Whether to display the plot (default is True).
         :return: A list of matplotlib figures.
         """
         # Enforce fixed metric order
@@ -871,7 +902,8 @@ class ParaphrasingEvaluator:
             )
             plt.savefig(save_path, bbox_inches="tight")
             print(f"Plot saved to {save_path}")
-        plt.show()
+        if display_plot:
+            plt.show()
 
     def plot_metric_scatter(
         self,
@@ -879,6 +911,7 @@ class ParaphrasingEvaluator:
         save_path: Optional[Path] = None,
         data_category: Optional[str] = None,
         group_by: Optional[str] = "model",
+        display_plot: bool = True,
     ):
         """
         Scatter plot of semantic similarity vs syntactic similarity per model.
@@ -887,6 +920,7 @@ class ParaphrasingEvaluator:
         :param save_path: Optional path to save the plot. If None, the plot is not saved.
         :param data_category: Optional category of the data, used for the plot title.
         :param group_by: The column to group the data by (default is 'model'). Alternatives could be 'prompt'.
+        :param display_plot: Whether to display the plot (default is True).
         :return: matplotlib Figure object.
         """
         required_cols = ["sem_sim_avg", "syn_sim_avg", group_by]
@@ -988,7 +1022,8 @@ class ParaphrasingEvaluator:
             plt.savefig(full_path, bbox_inches="tight")
             print(f"Plot saved to {full_path}")
 
-        plt.show()
+        if display_plot:
+            plt.show()
 
     def _wrap_label(self, label: str, words_per_line: int = 6) -> str:
         assert (
@@ -1008,6 +1043,7 @@ class ParaphrasingEvaluator:
         save_path: Optional[Path] = None,
         data_category: Optional[str] = None,
         group_by: Optional[str] = "model",
+        display_plot: bool = True,
     ):
         """
         Plot distribution of each metric per model in subplots.
@@ -1016,6 +1052,7 @@ class ParaphrasingEvaluator:
         :param save_path: Optional path to save the plot. If None, the plot is not saved.
         :param data_category: Optional string for plot title context.
         :param group_by: The column to group the data by (default is 'model'). Alternatives could be 'prompt'.
+        :param display_plot: Whether to display the plot (default is True).
         :return: None
         """
         metric_names = [
@@ -1150,7 +1187,8 @@ class ParaphrasingEvaluator:
             plt.savefig(full_path, bbox_inches="tight")
             print(f"Plot saved to {full_path}")
 
-        plt.show()
+        if display_plot:
+            plt.show()
 
 
 if __name__ == "__main__":
