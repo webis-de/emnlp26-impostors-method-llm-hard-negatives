@@ -3,4 +3,6 @@ services:
     image: registry.webis.de/code-teaching/theses/artificial-authorship-verification
     platform: linux/amd64
     build: .
+    volumes:
+      - ./:/src/
 
