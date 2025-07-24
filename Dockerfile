@@ -1,4 +1,4 @@
-# docker build -t registry.webis.de/code-research/theses/artificial-authorship-verification .
+# docker build -t registry.webis.de/code-teaching/theses/artificial-authorship-verification .
 FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
 
 # Copy only dependency-related files
