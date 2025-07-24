@@ -6,4 +6,4 @@
 #SBATCH --output=logs/log-paraphrase-eval-%j.log
 #SBATCH --container-image=registry.webis.de/code-teaching/theses/artificial-authorship-verification:latest
 #SBATCH --container-mounts=/mnt/ceph/storage/data-tmp/current/kgutekunst/dev/artificial-authorship-verification/:/src
-python3 run_evaluation.py
+python3 genai_detection/paraphrasing/run_evaluation.py
