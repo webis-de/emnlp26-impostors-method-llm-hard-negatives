@@ -16,9 +16,8 @@ from openai import OpenAI
 import dirtyjson
 import torch
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
-from config import CONFIG
-
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+from genai_detection.config import CONFIG
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.WARN)

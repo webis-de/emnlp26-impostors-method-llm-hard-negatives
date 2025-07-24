@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # Add the root of the project to Python path
 # sys.path.append(os.path.abspath(".."))
 print("Current working directory:", os.getcwd())
-from config import CONFIG
+from genai_detection.config import CONFIG
 from genai_detection.paraphrasing.paraphraser import (
     T5ChatGPTParaphraser,
     T5GooglePAWSParaphraser,
@@ -49,9 +49,8 @@ CATEGORY2DIRECTORY = {
 
 
 def get_base_paths():
-    base_path = Path(__file__).resolve().parent.parent.parent
-    data_root = Path(os.getcwd()).resolve().parent / "data" / "datasets"
-    save_path = base_path / CONFIG.SAVE_PATH / "paraphrasing"
+    data_root = Path(os.getcwd()).resolve() / "data" / "datasets"
+    save_path = Path(os.getcwd()).resolve() / CONFIG.SAVE_PATH / "paraphrasing"
     save_path.mkdir(parents=True, exist_ok=True)
     assert data_root.exists(), f"Data root path {data_root} does not exist."
     return data_root, save_path

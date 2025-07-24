@@ -10,7 +10,7 @@ import pandas as pd
 from datasets import load_from_disk, concatenate_datasets
 
 sys.path.append(os.path.abspath(".."))
-from config import CONFIG
+from genai_detection.config import CONFIG
 from genai_detection.detectors.impostor import ImpostorDetector
 
 from datasets import Dataset, DatasetDict, ClassLabel, Features, Value

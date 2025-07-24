@@ -25,7 +25,7 @@ from genai_detection.detectors.detector_base import DetectorBase
 from genai_detection.imposter_generators import ImposterGenerator
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
-from config import CONFIG
+from genai_detection.config import CONFIG
 
 __all__ = ["ImpostorDetector"]
 

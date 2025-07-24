@@ -20,7 +20,7 @@ from concurrent.futures import ProcessPoolExecutor
 import seaborn as sns
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from config import CONFIG
+from genai_detection.config import CONFIG
 from detectors.impostor import ImpostorDetector
 from detectors.unmasking import UnmaskingDetector
 

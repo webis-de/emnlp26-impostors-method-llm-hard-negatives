@@ -18,7 +18,7 @@ from nltk.tokenize import sent_tokenize, word_tokenize
 
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
-from config import CONFIG
+from genai_detection.config import CONFIG
 
 __all__ = ["ImpostorDetector", "PPMdDetector"]
 

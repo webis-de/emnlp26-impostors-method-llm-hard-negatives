@@ -17,8 +17,8 @@ import pandas as pd
 import pyreadstat
 from tqdm import tqdm
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from config import CONFIG
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from genai_detection.config import CONFIG
 from genai_detection.util import preprocess_text as _preprocess_text
 
 random.seed(42)

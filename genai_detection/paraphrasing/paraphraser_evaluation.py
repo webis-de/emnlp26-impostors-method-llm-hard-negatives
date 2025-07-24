@@ -40,7 +40,7 @@ from genai_detection.paraphrasing.paraphraser import (
 )
 
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
-from config import CONFIG
+from genai_detection.config import CONFIG
 from genai_detection.util import preprocess_text as _preprocess_text
 
 nltk.download("wordnet")  # necessary for METEOR score

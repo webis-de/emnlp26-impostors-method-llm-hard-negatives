@@ -10,7 +10,7 @@ import torch
 import time
 from huggingface_hub import snapshot_download
 from genai_detection.imposter_generators.ImposterGenerator import BaseImposterGenerator
-from config import CONFIG
+from genai_detection.config import CONFIG
 
 
 class MirrorMindsGenerator(BaseImposterGenerator):
