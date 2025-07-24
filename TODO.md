@@ -60,7 +60,7 @@
   - [o] script with parallel code
   - [x] sbatch script
   - [x] Docker container to run evaluation
-- [o] Backtranslation (2-step) paraphrasing (multi language model required: Ollama's zephyr: 7B works)
+- [x] Backtranslation (2-step) paraphrasing (multi language model required: Ollama's zephyr: 7B works)
 - [x] keep only texts with >= 3000 words (maybe reference in Janek's generalized unmasking paper)
   - Student Essay dataset has no such texts, keep 500 words as minimum for this dataset (maximum has 1136 words)
 - [x] Email authors of LLMDet regarding missing extender class (21.07.2025)
