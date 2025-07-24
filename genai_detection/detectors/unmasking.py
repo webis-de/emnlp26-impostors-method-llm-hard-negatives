@@ -104,7 +104,12 @@ class UnmaskingDetector(DetectorBase):
         :return: list of curve points (half the size of the input)
         """
         curves = []
-        for t in ichunked(text, 2, strict=self.strict):
+        for t in ichunked(text, 2):
+            t = list(t)  # cache generator object
+            if len(t) != 2 and self.strict:
+                raise ValueError(
+                    "Input text must be a list of pairs, i.e. have even length."
+                )
             tokens_left = self.tokenizer(self.preprocess_text(t[0]))
             tokens_right = self.tokenizer(self.preprocess_text(t[1]))
             if len(tokens_left) == 0 or len(tokens_right) == 0:
@@ -136,21 +141,23 @@ class UnmaskingDetector(DetectorBase):
             x_right = self.chunks_to_matrix(chunks_right, top_tokens)
 
             curves.append(
-                self.deconstruct(
-                    x_left,
-                    x_right,
-                    self.rounds,
-                    self.n_delete,
-                    self.cv_folds,
-                    self.smoothing_kernel_size,
-                )
+                list(
+                    self.deconstruct(
+                        x_left,
+                        x_right,
+                        self.rounds,
+                        self.n_delete,
+                        self.cv_folds,
+                        self.smoothing_kernel_size,
+                    )
+                )  # cache generator object
             )
         return curves
 
     def _get_score_impl(self, text: Iterable[str]) -> List[float]:
         scores = []
         for degen_acc in self.get_curves(text):
-            score = 2 * np.sum(degen_acc - 0.75) / len(degen_acc)
+            score = 2 * np.sum(np.array(degen_acc) - 0.75) / len(degen_acc)
             scores.append(1.0 / (1.0 + np.exp(score)))
         return scores
 
@@ -315,7 +322,7 @@ class UnmaskingDetector(DetectorBase):
             argsort = np.argsort(coefs)
             coefs_sorted = coefs[argsort]
             # most discriminating negative and positive features
-            top_arg = np.concat(
+            top_arg = np.concatenate(
                 [
                     argsort[coefs_sorted > 0][-n_delete:],
                     argsort[coefs_sorted < 0][:n_delete],
