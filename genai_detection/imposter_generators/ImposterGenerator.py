@@ -548,7 +548,9 @@ class LLMImposterGenerator(BaseImposterGenerator):
                         continue
             else:  # Non-naive paraphrasers
                 try:
-                    imposter_text = paraphraser.paraphrase(text, prompt=self.prompts[i])
+                    imposter_text = paraphraser.paraphrase(
+                        text, prompt=self.prompts[i], n_responses=1
+                    )[0]
                     paraphrases.append(imposter_text)
                 except Exception as e:
                     print(f"Error generating imposter with {paraphraser}: {e}")
