@@ -30,6 +30,7 @@ from genai_detection.paraphrasing.paraphraser import (
     TaskParaphraser,
     TitleParaphraser,
     BulletPointParaphraser,
+    TranslationParaphraser,
     Paraphraser,
     NonNaiveParaphraser,
     NaiveParaphraser,
@@ -516,13 +517,16 @@ class ParaphrasingEvaluator:
             # Save results if requested
             if save_to_disk:
                 save_base_path = (
-                    Path(__file__).resolve().parents[2] / self.config["save_path"]
+                    Path(__file__).resolve().parents[1]
+                    / self.config["save_path"]  # eventually 2 instead of 1
                 )
+                if not "paraphrasing" in str(save_base_path):
+                    save_base_path = save_base_path / "paraphrasing"
                 if detailed:
-                    print("Saving detailed results...", type(detailed_result_df))
                     self._save_results(detailed_result_df, dataset_type, save_base_path)
                 else:
                     self._save_results(aggregate_results, dataset_type, save_base_path)
+                print("Saved results to ", save_base_path)
 
             # Plot KDEs for each metric per dataset
             if plot_kdes:
@@ -552,13 +556,9 @@ class ParaphrasingEvaluator:
     def _save_results(self, results: dict, dataset_type: str, save_base_path: Path):
         if not save_base_path.exists():
             raise FileNotFoundError(f"Save path {save_base_path} does not exist.")
-        if not "paraphrasing" in str(save_base_path):
-            save_dir = save_base_path / "paraphrasing"
-        else:
-            save_dir = save_base_path
-        save_dir.mkdir(parents=True, exist_ok=True)
+        save_base_path.mkdir(parents=True, exist_ok=True)
 
-        save_path = save_dir / f"extractor_eval_results_{dataset_type}.csv"
+        save_path = save_base_path / f"extractor_eval_results_{dataset_type}.csv"
         if not isinstance(results, pd.DataFrame):
             results = pd.DataFrame.from_dict(results, orient="index")
         results.to_csv(save_path)
@@ -1212,6 +1212,10 @@ if __name__ == "__main__":
         #     text_generator=OllamaParaphraser(model_id=ollama_model_id),
         # ),
         # "BulletPointParaphraser": BulletPointParaphraser(
+        #     text_extractor=OllamaParaphraser(model_id=ollama_model_id),
+        #     text_generator=OllamaParaphraser(model_id=ollama_model_id),
+        # ),
+        # "TranslationParaphraser": TranslationParaphraser(
         #     text_extractor=OllamaParaphraser(model_id=ollama_model_id),
         #     text_generator=OllamaParaphraser(model_id=ollama_model_id),
         # ),
