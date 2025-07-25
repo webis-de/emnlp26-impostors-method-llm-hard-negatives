@@ -10,6 +10,7 @@ class BaseConfig:
     SERPAPI_KEY = os.getenv("SERPAPI_KEY")
     BLABLADOR_KEY = os.getenv("BLABLADOR_KEY")
     OPENAI_KEY = os.getenv("OPENAI_KEY")
+    DEEPL_API_KEY = os.getenv("DEEPL_KEY")
     DATA_BASE_PATH = "data/datasets"
     PATH2PAN25 = f"{DATA_BASE_PATH}/pan25-genai-identification/pan25-dataset-converted"
     PATH2PAN23 = (

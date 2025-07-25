@@ -15,6 +15,7 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from openai import OpenAI
 import dirtyjson
 import torch
+import deepl
 
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from genai_detection.config import CONFIG
@@ -941,7 +942,8 @@ class TranslationParaphraser(NonNaiveParaphraser):
     Inspired by the work of:
     C. Zhou, C. Qiu, L. Liang and D. E. Acuna, "Paraphrase Identification With Deep Learning: A Review of Datasets and Methods," in IEEE Access, vol. 13, pp. 65797-65822, 2025, doi: 10.1109/ACCESS.2025.3556899. keywords: {Semantics;Training;Natural language processing;Deep learning;Sports;Reviews;Plagiarism;Electronic mail;Syntactics;Switches;Paraphrase identification;deep learning;review;plagiarism;datasets},
 
-
+    For implementation details, see:
+    https://github.com/deeplcom/deepl-python (accessed 25.07.2025)
     """
 
     def __init__(
@@ -957,10 +959,9 @@ class TranslationParaphraser(NonNaiveParaphraser):
         """
         super().__init__(text_extractor=text_extractor, text_generator=text_generator)
         self.language = language
-        self.extractor_prompt = f"Translate the text above into {self.language}."
-        self.generator_prompt = (
-            f"Translate the text above from {self.language} into English."
-        )
+        self.extractor_prompt = f"Translate the text above into {self.language}. Do not use direct quotes or newlines. Output only the translated text, without any additional explanations or formatting."
+        self.generator_prompt = f"Translate the text above from {self.language} into English. Do not use direct quotes or newlines. Output only the translated text, without any additional explanations or formatting."
+        self.deepl_client = deepl.DeepLClient(CONFIG.DEEPL_API_KEY)
 
     def paraphrase(
         self,
@@ -972,18 +973,31 @@ class TranslationParaphraser(NonNaiveParaphraser):
         response_schema: Optional[dict[str, Any]] = None,
         ground_truth: Optional[dict] = None,
     ) -> List[str]:
-        translation = self.text_extractor.paraphrase(
-            text=text,
-            prompt=self.extractor_prompt,
-            n_responses=1,
-            max_length=max_length,
-            temperature=temperature,
-            response_schema=response_schema,
+        print(
+            f"[DEBUG] Using TranslationParaphraser with prompt: {self.extractor_prompt}"
         )
-        while not translation:
-            print(
-                f"[WARNING] No translation returned. Retrying with the same text and prompt: {self.extractor_prompt}"
-            )
+        paraphrased_texts = []
+        try:
+            # TODO: uncomment
+            # translation = self.deepl_client.translate_text(text, target_lang="FR")
+            # if translation.detected_source_lang == "EN":  # deprecated
+            #     language = "EN-US"
+            # res = self.deepl_client.translate_text(
+            #     translation.text, target_lang=language
+            # )
+            # paraphrased_texts.append(res.text)
+            # TODO: comment
+            paraphrased_texts.append("")
+        except Exception as e:
+            print(f"[ERROR] Failed to translate text using DeepL: {e}")
+
+        if (
+            paraphrased_texts
+        ):  # only 500,000 characters per month for free: only one high-quality translation
+            n_responses -= 1
+
+        if n_responses >= 1:
+            print(f"[DEBUG] Generating more paraphrases")
             translation = self.text_extractor.paraphrase(
                 text=text,
                 prompt=self.extractor_prompt,
@@ -992,29 +1006,44 @@ class TranslationParaphraser(NonNaiveParaphraser):
                 temperature=temperature,
                 response_schema=response_schema,
             )
+            while not translation:
+                print(
+                    f"[WARNING] No translation returned. Retrying with the same text and prompt: {self.extractor_prompt}"
+                )
+                translation = self.text_extractor.paraphrase(
+                    text=text,
+                    prompt=self.extractor_prompt,
+                    n_responses=1,
+                    max_length=max_length,
+                    temperature=temperature,
+                    response_schema=response_schema,
+                )
 
-        paraphrased_texts = self.text_generator.paraphrase(
-            text=translation,
-            prompt=self.generator_prompt,
-            n_responses=n_responses,
-            temperature=temperature,
-        )
+            print(f"[DEBUG] Translation: {translation}")
+            paraphrased_texts.extend(
+                self.text_generator.paraphrase(
+                    text=translation,
+                    prompt=self.generator_prompt,
+                    n_responses=n_responses,
+                    temperature=temperature,
+                )
+            )
 
         return paraphrased_texts
 
 
 if __name__ == "__main__":
     # models
-    ollama_model_id = "mistral:7b"  # "default:latest"
+    ollama_model_id = "default:latest"  # "mistral:7b"  #
     paraphrasers = {
         # 'T5_ChatGPT': T5ChatGPTParaphraser(),
         # 'T5_Google_PAWS': T5GooglePAWSParaphraser(),
         # 'Blablador': BlabladorParaphraser(model_id="1 - Llama3 405 the best general model and big context size"),
         "Ollama": OllamaParaphraser(model_id=ollama_model_id),
-        "TopicParaphraser": TopicParaphraser(
-            text_extractor=OllamaParaphraser(model_id=ollama_model_id),
-            text_generator=OllamaParaphraser(model_id=ollama_model_id),
-        ),
+        # "TopicParaphraser": TopicParaphraser(
+        #     text_extractor=OllamaParaphraser(model_id=ollama_model_id),
+        #     text_generator=OllamaParaphraser(model_id=ollama_model_id),
+        # ),
         # "TaskParaphraser": TaskParaphraser(
         #     text_extractor=OllamaParaphraser(model_id=ollama_model_id),
         #     text_generator=OllamaParaphraser(model_id=ollama_model_id),
@@ -1027,6 +1056,11 @@ if __name__ == "__main__":
         #     text_extractor=OllamaParaphraser(model_id=ollama_model_id),
         #     text_generator=OllamaParaphraser(model_id=ollama_model_id),
         # ),
+        "TranslationParaphraser": TranslationParaphraser(
+            text_extractor=OllamaParaphraser(model_id=ollama_model_id),
+            text_generator=OllamaParaphraser(model_id=ollama_model_id),
+            language="French",
+        ),
     }
     # paraphrasers.update({f'Blablador_{name}': BlabladorParaphraser(model_id=name) for name in list(get_args(ModelName))})
 
@@ -1042,3 +1076,8 @@ if __name__ == "__main__":
     # assert path2datasets.exists(), f"Path to datasets {path2datasets} does not exist."
     # file_name = "cnn_230625"
     # original_text = open(path2datasets / f"{file_name}.txt").read()
+    text = "Dear Santa, I wish for a big red nosed reindeer that can fly and a sleigh full of toys for all the children in the world. I promise to be good and help others. Love, Timmy."
+    p = paraphrasers["TranslationParaphraser"]
+    print(f"[DEBUG] Paraphrasing text with {p.__class__.__name__}")
+    paraphrased_texts = p.paraphrase(text=text, n_responses=2)
+    print(f"[DEBUG] Paraphrased texts: {paraphrased_texts}")
