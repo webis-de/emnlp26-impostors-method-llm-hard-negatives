@@ -63,15 +63,20 @@
   - Choose hyperparameters
   - compare different paradigmen of paraphrasing and compare 1-2 implementations per paradigm
   - 1 x graph/ slide with steps, concrete task per step and approach per step
+- [ ] why not using DeepL for rephrasing? [Need to specify tone in API](https://github.com/deeplcom/deepl-python), hence defeats the purpose of capturing the LLM's style
 
 ### 🛠️ Implementation
 - [ ] OpenAI
-- [ ] try pushing 20GB Docker container to webis registry
+- [x] try pushing 20GB Docker container to webis registry from university network
+  - does not work, broken pipe
 - [ ] Find number of words sufficient for LLM Detection from Janek's paper
 - [ ] Backtranslation (2-step) paraphrasing: How good is LLM (Ollama?)
   - use only western languages, because LLMs are maybe better with them
-- [ ] Backtranslation (2-step) paraphrasing: Free DeepL API
-- [ ] What are Imposter paper (Koppel et Al 2014) baselines: Implement them
+- [x] Backtranslation (2-step) paraphrasing: [Free DeepL API](https://www.deepl.com/en/your-account/keys)
+  - 500,000 max characters per month
+  - currently commented out in `paraphraser.py`
+  - when commented in, used only for first paraphrase, to save API calls/ characters
+- [ ] What are Imposter paper (Koppel et Al. 2014) baselines: Implement them
 - [ ] scatter semantic/ syntactic scores
   - [ ] change "model" to "Paraphraser" in plot legend
   - [ ] artificial bins of similarity
