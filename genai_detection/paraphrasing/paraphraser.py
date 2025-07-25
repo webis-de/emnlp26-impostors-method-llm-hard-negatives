@@ -979,7 +979,19 @@ class TranslationParaphraser(NonNaiveParaphraser):
             max_length=max_length,
             temperature=temperature,
             response_schema=response_schema,
-        )[0]
+        )
+        while not translation:
+            print(
+                f"[WARNING] No translation returned. Retrying with the same text and prompt: {self.extractor_prompt}"
+            )
+            translation = self.text_extractor.paraphrase(
+                text=text,
+                prompt=self.extractor_prompt,
+                n_responses=1,
+                max_length=max_length,
+                temperature=temperature,
+                response_schema=response_schema,
+            )
 
         paraphrased_texts = self.text_generator.paraphrase(
             text=translation,
