@@ -107,7 +107,7 @@ class ContentImposterGenerator(BaseImposterGenerator):
 
     def generate_imposters(
         self, text: str, path2imp: str = None, real_time_generation: bool = False
-    ) -> List[str]:
+    ) -> Dict[str]:
         """
         Generates imposters from a pre-defined dataset.
         :param text: input text to generate imposters for (not used in this implementation)
@@ -436,7 +436,7 @@ class TextLenImposterGenerator(BaseImposterGenerator):
         path2imp: str = None,
         real_time_generation: bool = False,
         valid_relative_text_len_dif: float = 0.3,
-    ) -> List[str]:
+    ) -> Dict[str]:
         ds = self._get_dataset_split_from_path(path2imp)
         max_subset_size = min(
             self.n_impostors, len(ds)
@@ -484,7 +484,7 @@ class NDocsImposterGenerator(BaseImposterGenerator):
 
     def generate_imposters(
         self, text: str, path2imp: str = None, real_time_generation: bool = False
-    ) -> List[str]:
+    ) -> Dict[str]:
         pass
 
 
@@ -534,24 +534,24 @@ class LLMImposterGenerator(BaseImposterGenerator):
 
     def generate_imposters(
         self, text: str, path2imp: str = None, real_time_generation: bool = False
-    ) -> List[str]:
+    ) -> Dict[str]:
         imposters = {}
         paraphrases = []
         for i, paraphraser in enumerate(self.paraphrasers):
             if isinstance(paraphraser, NaiveParaphraser):
                 for prompt in self.prompts:
                     try:
-                        imposter_text = paraphraser.paraphrase(text, prompt=prompt)
-                        paraphrases.append(imposter_text)
+                        imposter_texts = paraphraser.paraphrase(text, prompt=prompt)
+                        paraphrases.extend(imposter_texts)
                     except Exception as e:
                         print(f"Error generating imposter with {paraphraser}: {e}")
                         continue
             else:  # Non-naive paraphrasers
                 try:
-                    imposter_text = paraphraser.paraphrase(
+                    imposter_texts = paraphraser.paraphrase(
                         text, prompt=self.prompts[i], n_responses=1
                     )[0]
-                    paraphrases.append(imposter_text)
+                    paraphrases.extend(imposter_texts)
                 except Exception as e:
                     print(f"Error generating imposter with {paraphraser}: {e}")
                     continue
@@ -576,7 +576,7 @@ class FixedImposterGenerator(BaseImposterGenerator):
 
     def generate_imposters(
         self, text: str, path2imp: Path = None, real_time_generation: bool = False
-    ) -> List[str]:
+    ) -> Dict[str]:
         """
         Generates imposters from a pre-defined dataset.
         :param text: input text to generate imposters for (not used in this implementation)
@@ -585,9 +585,14 @@ class FixedImposterGenerator(BaseImposterGenerator):
         :return: dictionary of imposters with keys as ids and values as texts
         """
         ds = self._get_dataset_split_from_path(path2imp)
-        sampled = ds.shuffle().select(range(min(len(ds), self.n_impostors // 2)))
+
+        sampled = ds.shuffle().select(
+            range(max(1, min(len(ds), self.n_impostors // 2)))
+        )
         imposters = {}
+        print(sampled, type(sampled))
         for i, entry in enumerate(sampled):
+            print(entry)
             if "pair" not in entry:
                 continue
             key = entry.get("id", f"imposter_{i}")
