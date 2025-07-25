@@ -531,11 +531,10 @@ class ParaphrasingEvaluator:
             # Plot KDEs for each metric per dataset
             if plot_kdes:
                 dfs = {}
+                print("Read results from disk for plotting from ", save_base_path)
                 for dataset in self.base_dirs.keys():
                     df = pd.read_csv(
-                        save_base_path
-                        / "paraphrasing"
-                        / f"extractor_eval_results_{dataset}.csv"
+                        save_base_path / f"extractor_eval_results_{dataset}.csv"
                     )
                     df["length_diff"] = [
                         ((p - o) / o) if o > 0 else 0
