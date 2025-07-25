@@ -37,6 +37,7 @@ class BaseConfig:
     UNMASKING = "unmasking"
     TEMPERATURE = 0.7
     MAX_LENGTH = 512  # Maximum length of the generated paraphrase
+    OLLAMA_VERSION = "zephyr:7b"  # "mistral:7b"  # "default:latest"
 
 
 class ServerConfig(BaseConfig):
