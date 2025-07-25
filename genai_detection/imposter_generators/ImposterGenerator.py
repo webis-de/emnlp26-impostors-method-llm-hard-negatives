@@ -107,7 +107,7 @@ class ContentImposterGenerator(BaseImposterGenerator):
 
     def generate_imposters(
         self, text: str, path2imp: str = None, real_time_generation: bool = False
-    ) -> Dict[str]:
+    ) -> Dict[str, str]:
         """
         Generates imposters from a pre-defined dataset.
         :param text: input text to generate imposters for (not used in this implementation)
@@ -436,7 +436,7 @@ class TextLenImposterGenerator(BaseImposterGenerator):
         path2imp: str = None,
         real_time_generation: bool = False,
         valid_relative_text_len_dif: float = 0.3,
-    ) -> Dict[str]:
+    ) -> Dict[str, str]:
         ds = self._get_dataset_split_from_path(path2imp)
         max_subset_size = min(
             self.n_impostors, len(ds)
@@ -484,7 +484,7 @@ class NDocsImposterGenerator(BaseImposterGenerator):
 
     def generate_imposters(
         self, text: str, path2imp: str = None, real_time_generation: bool = False
-    ) -> Dict[str]:
+    ) -> Dict[str, str]:
         pass
 
 
@@ -534,7 +534,7 @@ class LLMImposterGenerator(BaseImposterGenerator):
 
     def generate_imposters(
         self, text: str, path2imp: str = None, real_time_generation: bool = False
-    ) -> Dict[str]:
+    ) -> Dict[str, str]:
         imposters = {}
         paraphrases = []
         for i, paraphraser in enumerate(self.paraphrasers):
@@ -576,7 +576,7 @@ class FixedImposterGenerator(BaseImposterGenerator):
 
     def generate_imposters(
         self, text: str, path2imp: Path = None, real_time_generation: bool = False
-    ) -> Dict[str]:
+    ) -> Dict[str, str]:
         """
         Generates imposters from a pre-defined dataset.
         :param text: input text to generate imposters for (not used in this implementation)
@@ -590,9 +590,7 @@ class FixedImposterGenerator(BaseImposterGenerator):
             range(max(1, min(len(ds), self.n_impostors // 2)))
         )
         imposters = {}
-        print(sampled, type(sampled))
         for i, entry in enumerate(sampled):
-            print(entry)
             if "pair" not in entry:
                 continue
             key = entry.get("id", f"imposter_{i}")
