@@ -60,7 +60,7 @@ class ImpostorDetector(DetectorBase):
         threshold=0.1,
         imposter_technique: Literal[
             "llm", "text_len", "n_docs", "on-the-fly", "blogs", "fixed", "content"
-        ] = "fixed",
+        ] = "llm",
         path2imp: str = CONFIG.PATH2BLOG,  # PATH2GENERIC_ON_FLY_IMP,  # path to impostor file, where fixed impostors are saved or where to save generated impostors
         real_time_generation: bool = False,  # whether to generate impostors in real-time or use pre-generated ones
         min_n_tokens: int = 500,  # minimum number of tokens to consider input sequence valid, defaults to 500
