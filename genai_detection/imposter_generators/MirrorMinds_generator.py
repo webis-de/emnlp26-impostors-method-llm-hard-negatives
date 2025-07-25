@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import List
 from llm_question_generator.question_generator import QuestionGenerator
 from llm_question_generator.parser import apply_extraction
 from llm_question_generator.question_config import QuestionGeneratorConfig
@@ -24,7 +25,7 @@ class MirrorMindsGenerator(BaseImposterGenerator):
         torch.cuda.empty_cache()
         self.model_path = snapshot_download(repo_id="google/flan-t5-small")
 
-    def generate_imposters(self, text: str) -> str:
+    def generate_imposters(self, text: str) -> List[str]:
         """
         Generate an imposter text by mirroring the structure of the input text.
 
@@ -34,18 +35,21 @@ class MirrorMindsGenerator(BaseImposterGenerator):
         start_time = time.time()
 
         text_df = pd.DataFrame({"Essay": [text]})
-        text_df.to_pickle(CONFIG.DATA_BASE_PATH + "/sample_essays.pkl")
+        # make tmp directory if it does not exist
+        tmp_path = Path(os.getcwd()) / "tmp-MirrorMinds"
+        os.makedirs(tmp_path, exist_ok=True)
+        text_df.to_pickle(tmp_path / "sample_essays.pkl")
         imposter_texts = []
         for i in range(self.n_impostors):
             question_config = QuestionGeneratorConfig(
                 model_path=self.model_path,
-                input_path=CONFIG.DATA_BASE_PATH + "/sample_essays.pkl",
-                output_path=CONFIG.DATA_BASE_PATH + "/generated_questions.pkl",
+                input_path=tmp_path / "sample_essays.pkl",
+                output_path=tmp_path / "generated_questions.pkl",
             )
             response_config = ResponseGeneratorConfig(
                 model_path=self.model_path,
                 input_path=question_config.output_path,
-                output_path=CONFIG.DATA_BASE_PATH + "/generated_responses.pkl",
+                output_path=tmp_path / "generated_responses.pkl",
             )
 
             df = pd.read_pickle(question_config.input_path)
@@ -68,9 +72,13 @@ class MirrorMindsGenerator(BaseImposterGenerator):
             if not df.empty:
                 imposter_texts.append(df["generated_text"].iloc[0])
 
-        print(f"Total script runtime: {time.time() - start_time:.2f} seconds")
-        print("Generated questions and responses saved successfully.")
-        print(df)
+        # print(f"Total script runtime: {time.time() - start_time:.2f} seconds")
+        # print("Generated questions and responses saved successfully.")
+        # print(df)
+        os.remove(tmp_path / "sample_essays.pkl")
+        os.remove(tmp_path / "generated_questions.pkl")
+        os.remove(tmp_path / "generated_responses.pkl")
+        os.rmdir(tmp_path)
         return imposter_texts
 
 
