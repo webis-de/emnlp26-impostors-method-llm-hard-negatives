@@ -18,6 +18,23 @@ from bs4 import BeautifulSoup
 from datasets import load_from_disk
 import serpapi
 from dotenv import load_dotenv
+from genai_detection.paraphrasing.paraphraser import (
+    T5ChatGPTParaphraser,
+    T5GooglePAWSParaphraser,
+    OllamaParaphraser,
+    TopicParaphraser,
+    TaskParaphraser,
+    TitleParaphraser,
+    BulletPointParaphraser,
+    TranslationParaphraser,
+    Paraphraser,
+    NonNaiveParaphraser,
+    NaiveParaphraser,
+    TopicSchema,
+    BulletSchema,
+    TaskSchema,
+    TitleSchema,
+)
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from genai_detection.config import CONFIG
@@ -474,11 +491,73 @@ class NDocsImposterGenerator(BaseImposterGenerator):
 class LLMImposterGenerator(BaseImposterGenerator):
     def __init__(self, n_impostors: int):
         self.n_impostors = n_impostors
+        self.t5_chatgpt_paraphraser = T5ChatGPTParaphraser()
+        self.t5_google_paws_paraphraser = T5GooglePAWSParaphraser()
+        self.ollama_paraphraser = OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION)
+        self.topic_paraphraser = TopicParaphraser(
+            text_extractor=self.ollama_paraphraser,
+            text_generator=self.ollama_paraphraser,
+        )
+        self.task_paraphraser = TaskParaphraser(
+            text_extractor=self.ollama_paraphraser,
+            text_generator=self.ollama_paraphraser,
+        )
+        self.title_paraphraser = TitleParaphraser(
+            text_extractor=self.ollama_paraphraser,
+            text_generator=self.ollama_paraphraser,
+        )
+        self.bullet_point_paraphraser = BulletPointParaphraser(
+            text_extractor=self.ollama_paraphraser,
+            text_generator=self.ollama_paraphraser,
+        )
+        self.translation_paraphraser = TranslationParaphraser(
+            text_extractor=self.ollama_paraphraser,
+            text_generator=self.ollama_paraphraser,
+        )
+        self.paraphrasers = [
+            self.t5_chatgpt_paraphraser,
+            self.t5_google_paws_paraphraser,
+            # self.ollama_paraphraser,
+            # self.topic_paraphraser,
+            # self.task_paraphraser,
+            # self.title_paraphraser,
+            # self.bullet_point_paraphraser,
+            # self.translation_paraphraser,
+        ]
+        self.prompts = [
+            "Paraphrase the text above and output only the paraphrased version.",
+            "For the text above: First, extract bullet points capturing the main ideas, then create a text based on these bullet points. Only output the final text (i.e. do not output the bullet points or any additional chain of thoughts).",
+            "For the text above: Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
+            "For the text above: Paraphrase the sentence using the same tone as the original with approximately the same number of words.",
+            "For the text above: Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence.",
+        ]
 
     def generate_imposters(
         self, text: str, path2imp: str = None, real_time_generation: bool = False
     ) -> List[str]:
-        pass
+        imposters = {}
+        paraphrases = []
+        for i, paraphraser in enumerate(self.paraphrasers):
+            if isinstance(paraphraser, NaiveParaphraser):
+                for prompt in self.prompts:
+                    try:
+                        imposter_text = paraphraser.paraphrase(text, prompt=prompt)
+                        paraphrases.append(imposter_text)
+                    except Exception as e:
+                        print(f"Error generating imposter with {paraphraser}: {e}")
+                        continue
+            else:  # Non-naive paraphrasers
+                try:
+                    imposter_text = paraphraser.paraphrase(text, prompt=self.prompts[i])
+                    paraphrases.append(imposter_text)
+                except Exception as e:
+                    print(f"Error generating imposter with {paraphraser}: {e}")
+                    continue
+
+        imposters = {
+            f"imposter_{i}": imp for i, imp in enumerate(paraphrases) if len(imp) > 0
+        }
+        return imposters
 
 
 class FixedImposterGenerator(BaseImposterGenerator):
