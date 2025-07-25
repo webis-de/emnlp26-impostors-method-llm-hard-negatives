@@ -634,7 +634,7 @@ class BulletPointParaphraser(NonNaiveParaphraser):
             except Exception as e:
                 # resp = {key: [res]}
                 # TODO: try again, until valid JSON is returned
-                print("Again")
+                print("Again, result: ", res)
                 return self._extract_bullet_points(
                     text=text,
                     prompt=prompt,
@@ -714,6 +714,8 @@ class BulletPointParaphraser(NonNaiveParaphraser):
         :param ground_truth: Optional ground truth to use instead of the LLM extracted text.
         :return: A paraphrased version of the input text.
         """
+        if prompt == "":
+            prompt = None
         bullet_points, tone, genre, time_period, register, target_audience = (
             self._extract_bullet_points(
                 text=text,
