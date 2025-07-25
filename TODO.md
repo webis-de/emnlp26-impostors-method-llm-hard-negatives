@@ -1,15 +1,11 @@
 # ✅ TODOs
 
-## 📅 22.07.2025- 01.08.2025
-
+## 📅 25.07.2025- 01.08.2025
 ### 📚 Dataset
 - [ ] original MirrorMinds-LLMDetector dataset
 - [ ] Webis has newer and better fanfiction dataset than PAN20
 - [ ] keep original PAN20 dataset for reproducibility and comparison purposes
 - [ ] second cleansed PAN20 dataset with only valid texts and better pair selection if possible
-- [x] Add students essay dataset to `Ceph/corpora/authorship` (Lab intern!)
-  - zip dataset with password and store in Webis password database (Lab intern!)
-  - Add README to dataset and database password database indicating restrictions of dataset usage
 
 ### ✍️ Written Work
 - [ ] Paraphrase metrics: Syntactic (BLEU, ROUGE-1, ROUGE-L), semantic (BERTScore, cosine similarity of SBERT vectors, WMS), human evaluation (TODO)
@@ -53,21 +49,52 @@
 - [ ] Assumption: Text extractor and text generator are same model → same statistical bias (i.e. systematic deviation from actual distribution)
   - [ ] speculation: We can count on this bias (not proven, but assumed)
 - [ ] Update dataset table with > 3000 words texts (except Student Essay dataset)
-
+- [ ] scatter semantic/ syntactic scores: 
+  - [ ] Linear relationship
+  - [ ] where is threshold for imposters being too difficult or still authored by author? Human should evaluate
+    - Hard negative border
+    - Topic and content is similar, but different origin
+- [ ] Today: Instruction LLMs for Paraphrasing rather than T5
+- [ ] slide:
+  - Steps of approach
+  - Problems solved by approach
+  - How many configs currently possible (Dataset, AV Classification, Paraphrasing): list them all (drop irrelevant ones later)
+  - What is missing?
+  - Choose hyperparameters
+  - compare different paradigmen of paraphrasing and compare 1-2 implementations per paradigm
+  - 1 x graph/ slide with steps, concrete task per step and approach per step
 
 ### 🛠️ Implementation
+- [ ] OpenAI
+- [ ] try pushing 20GB Docker container to webis registry
+- [ ] Find number of words sufficient for LLM Detection from Janek's paper
+- [ ] Backtranslation (2-step) paraphrasing: How good is LLM (Ollama?)
+  - use only western languages, because LLMs are maybe better with them
+- [ ] Backtranslation (2-step) paraphrasing: Free DeepL API
+- [ ] What are Imposter paper (Koppel et Al 2014) baselines: Implement them
+- [ ] scatter semantic/ syntactic scores
+  - [ ] change "model" to "Paraphraser" in plot legend
+  - [ ] artificial bins of similarity
+    - quality of prediction per bin
+- [ ] classifier for LLM detection/ AV 
+  - [ ] train simple classifier on semantic and syntactic similarity scores (based on their 2D distribution)
+  - problems: Generate labelled instances
+- [ ] plot error rate (y-axis) vs. (syntactic) similarity (x-axis) between generated imposters and original text (potential subtract similarity of original text to candidate text)
+  - How difficult is prediction for AV approach given certain imposter generation strategy?
+  - [ ] error rate: Number of false positives + false negatives / total number of texts
+  - [ ] x-axis: Syntactic similarity
+  - [ ] y-axis: Error rate
+- [ ] vertical prototyp rather than horizontal prototyp (get existing modules working rather than generating new modules)
+- [ ] Grid search for hyperparameters 
+  - [ ] smart choice of hyperparameters, ggf. do not use all hyperparameters
+- [o] LLM generated imposters
 - [ ] run evaluation of cluster 
-  - [o] script with parallel code
+  - [ ] make Docker container to smaller
+  - [x] script with parallel code
   - [x] sbatch script
   - [x] Docker container to run evaluation
-- [x] Backtranslation (2-step) paraphrasing (multi language model required: Ollama's zephyr: 7B works)
-- [x] keep only texts with >= 3000 words (maybe reference in Janek's generalized unmasking paper)
-  - Student Essay dataset has no such texts, keep 500 words as minimum for this dataset (maximum has 1136 words)
-- [x] Email authors of LLMDet regarding missing extender class (21.07.2025)
-- [x] Email corresponding author of DetectGPT regarding XSUM error (21.07.2025)
-- Look at actual [Gohsen paraphrasing code](https://github.com/webis-de/coling24-task-oriented-paraphrase-analytics)
-- [x] Extract target audience from text
-- [ ] Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
+- [ ] [Answer by LLMDet collaborator](https://github.com/TrustedLLM/LLMDet/issues/14#issuecomment-3111760619)
+- [o] Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
 - [ ] experiment/ hypothesis: Text_extractor information will produce similar text to original text even though information is wrong because extractor/ generator LLM think alike
   - [ ] maybe generate "bad extractions via LLM prompt" and compare to original text (human evaluation)
 - [ ] compare MirrorMinds-LLMDetector paraphrases and our imposter generators
@@ -78,8 +105,8 @@
   - worst paraphrases on _News/ custom dataset_ are T5 (ChatGPT) paraphrases, which are really short and loose central conflict of original text cf. Implementation 08.07.2025- 21.07.2025
   - [ ] compare all (worst to best) T5 paraphrases to original text
 - [o] compare best/worst paraphrase metrics *per dataset* (different genre)
-  - [x] News/ custom dataset
-  - [ ] Blog dataset
+  - [x] News/ custom dataset (without temperature variation)
+  - [x] Blog dataset
   - [ ] Gutenberg dataset
   - [ ] Student Essay dataset
 - [o] compare quality of paraphrase experiment with chunks *per dataset* (different genre)
@@ -89,7 +116,28 @@
   - [o] Blog dataset (24.07.2025)
   - [ ] Gutenberg dataset
   - [ ] Student Essay dataset
+
+
+## 📅 22.07.2025- 01.08.2025
+
+### 📚 Dataset
+- [x] Add students essay dataset to `Ceph/corpora/authorship` (Lab intern!)
+  - zip dataset with password and store in Webis password database (Lab intern!)
+  - Add README to dataset and database password database indicating restrictions of dataset usage
+
+### ✍️ Written Work
+-
+
+### 🛠️ Implementation
+- [x] Backtranslation (2-step) paraphrasing (multi language model required: Ollama's zephyr: 7B works)
+- [x] keep only texts with >= 3000 words (maybe reference in Janek's generalized unmasking paper)
+  - Student Essay dataset has no such texts, keep 500 words as minimum for this dataset (maximum has 1136 words)
+- [x] Email authors of LLMDet regarding missing extender class (21.07.2025)
+- [x] Email corresponding author of DetectGPT regarding XSUM error (21.07.2025)
+- Look at actual [Gohsen paraphrasing code](https://github.com/webis-de/coling24-task-oriented-paraphrase-analytics)
+- [x] Extract target audience from text
 - [x] PAN20 Webis arrow dataset: Finer pair selection not only pre-existing pairs (compare to PAN approaches possible?)
+  - preprocessed and only above MIN_WORDS texts
   - two versions: One for reproducibility and one with better pair selection (and one new dataset on ceph(?))
 - [x] Ensure chunks of paraphrase experiment `experiment_paraphrasing.ipynb` have a similar number of words
 - [x] Introduce variance into non-naive paraphrasers, i.e. generate multiple paraphrases per text with varying ~~seed and~~ temperature
