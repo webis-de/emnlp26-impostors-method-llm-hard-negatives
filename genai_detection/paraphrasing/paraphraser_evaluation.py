@@ -528,29 +528,29 @@ class ParaphrasingEvaluator:
                     self._save_results(aggregate_results, dataset_type, save_base_path)
                 print("Saved results to ", save_base_path)
 
-            # Plot KDEs for each metric per dataset
-            if plot_kdes:
-                dfs = {}
-                print("Read results from disk for plotting from ", save_base_path)
-                for dataset in self.base_dirs.keys():
-                    df = pd.read_csv(
-                        save_base_path / f"extractor_eval_results_{dataset}.csv"
-                    )
-                    df["length_diff"] = [
-                        ((p - o) / o) if o > 0 else 0
-                        for o, p in zip(df["original_length"], df["paraphrase_length"])
-                    ]  # between 0 and 1
-
-                    df["dataset"] = dataset
-                    dfs[dataset] = df
-
-                # Long / tidy combined DataFrame
-                df_all = pd.concat(dfs.values(), ignore_index=True)
-                self.plot_metric_kdes_per_dataset(
-                    df_all=df_all,
-                    metrics=["genre_match", "time_match", "topic_match", "length_diff"],
-                    display_plot=display_plot,
+        # Plot KDEs for each metric per dataset
+        if plot_kdes:
+            dfs = {}
+            print("Read results from disk for plotting from ", save_base_path)
+            for dataset in self.base_dirs.keys():
+                df = pd.read_csv(
+                    save_base_path / f"extractor_eval_results_{dataset}.csv"
                 )
+                df["length_diff"] = [
+                    ((p - o) / o) if o > 0 else 0
+                    for o, p in zip(df["original_length"], df["paraphrase_length"])
+                ]  # between 0 and 1
+
+                df["dataset"] = dataset
+                dfs[dataset] = df
+
+            # Long / tidy combined DataFrame
+            df_all = pd.concat(dfs.values(), ignore_index=True)
+            self.plot_metric_kdes_per_dataset(
+                df_all=df_all,
+                metrics=["genre_match", "time_match", "topic_match", "length_diff"],
+                display_plot=display_plot,
+            )
 
     def _save_results(self, results: dict, dataset_type: str, save_base_path: Path):
         if not save_base_path.exists():
