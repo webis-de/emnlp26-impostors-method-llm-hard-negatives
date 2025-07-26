@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import re
 import sys
-from typing import List, Dict
+from typing import List, Dict, Optional
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from sentence_transformers import SentenceTransformer, util
@@ -489,41 +489,50 @@ class NDocsImposterGenerator(BaseImposterGenerator):
 
 
 class LLMImposterGenerator(BaseImposterGenerator):
-    def __init__(self, n_impostors: int):
+    def __init__(
+        self, n_impostors: int, paraphrasers: Optional[List[Paraphraser]] = None
+    ):
         self.n_impostors = n_impostors
-        self.t5_chatgpt_paraphraser = T5ChatGPTParaphraser()
-        self.t5_google_paws_paraphraser = T5GooglePAWSParaphraser()
-        self.ollama_paraphraser = OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION)
-        self.topic_paraphraser = TopicParaphraser(
-            text_extractor=self.ollama_paraphraser,
-            text_generator=self.ollama_paraphraser,
-        )
-        self.task_paraphraser = TaskParaphraser(
-            text_extractor=self.ollama_paraphraser,
-            text_generator=self.ollama_paraphraser,
-        )
-        self.title_paraphraser = TitleParaphraser(
-            text_extractor=self.ollama_paraphraser,
-            text_generator=self.ollama_paraphraser,
-        )
-        self.bullet_point_paraphraser = BulletPointParaphraser(
-            text_extractor=self.ollama_paraphraser,
-            text_generator=self.ollama_paraphraser,
-        )
-        self.translation_paraphraser = TranslationParaphraser(
-            text_extractor=self.ollama_paraphraser,
-            text_generator=self.ollama_paraphraser,
-        )
-        self.paraphrasers = [
-            self.t5_chatgpt_paraphraser,
-            self.t5_google_paws_paraphraser,
-            # self.ollama_paraphraser,
-            # self.topic_paraphraser,
-            # self.task_paraphraser,
-            # self.title_paraphraser,
-            # self.bullet_point_paraphraser,
-            # self.translation_paraphraser,
-        ]
+        if paraphrasers is None:
+            self.t5_chatgpt_paraphraser = T5ChatGPTParaphraser()
+            self.t5_google_paws_paraphraser = T5GooglePAWSParaphraser()
+            self.ollama_paraphraser = OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION)
+            self.topic_paraphraser = TopicParaphraser(
+                text_extractor=self.ollama_paraphraser,
+                text_generator=self.ollama_paraphraser,
+            )
+            self.task_paraphraser = TaskParaphraser(
+                text_extractor=self.ollama_paraphraser,
+                text_generator=self.ollama_paraphraser,
+            )
+            self.title_paraphraser = TitleParaphraser(
+                text_extractor=self.ollama_paraphraser,
+                text_generator=self.ollama_paraphraser,
+            )
+            self.bullet_point_paraphraser = BulletPointParaphraser(
+                text_extractor=self.ollama_paraphraser,
+                text_generator=self.ollama_paraphraser,
+            )
+            self.translation_paraphraser = TranslationParaphraser(
+                text_extractor=self.ollama_paraphraser,
+                text_generator=self.ollama_paraphraser,
+            )
+            self.paraphrasers = [
+                self.t5_chatgpt_paraphraser,
+                self.t5_google_paws_paraphraser,
+                self.ollama_paraphraser,
+                self.topic_paraphraser,
+                self.task_paraphraser,
+                self.title_paraphraser,
+                self.bullet_point_paraphraser,
+                self.translation_paraphraser,
+            ]
+        else:
+            assert all(
+                isinstance(p, Paraphraser) for p in paraphrasers
+            ), "All paraphrasers must be instances of Paraphraser or its subclasses."
+            assert len(paraphrasers) > 0, "At least one paraphraser must be provided."
+            self.paraphrasers = paraphrasers
         self.prompts = [
             "Paraphrase the text above and output only the paraphrased version.",
             "For the text above: First, extract bullet points capturing the main ideas, then create a text based on these bullet points. Only output the final text (i.e. do not output the bullet points or any additional chain of thoughts).",
@@ -560,6 +569,66 @@ class LLMImposterGenerator(BaseImposterGenerator):
             f"imposter_{i}": imp for i, imp in enumerate(paraphrases) if len(imp) > 0
         }
         return imposters
+
+
+class NaiveLLMImposterGenerator(LLMImposterGenerator):
+    def __init__(self, n_impostors: int):
+        """
+        Naive LLM-based imposter generator that uses only naive paraphraser.
+        :param n_impostors: number of impostors to generate
+        """
+        ollama_paraphraser = OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION)
+        topic_paraphraser = TopicParaphraser(
+            text_extractor=ollama_paraphraser,
+            text_generator=ollama_paraphraser,
+        )
+        task_paraphraser = TaskParaphraser(
+            text_extractor=ollama_paraphraser,
+            text_generator=ollama_paraphraser,
+        )
+        title_paraphraser = TitleParaphraser(
+            text_extractor=ollama_paraphraser,
+            text_generator=ollama_paraphraser,
+        )
+        bullet_point_paraphraser = BulletPointParaphraser(
+            text_extractor=ollama_paraphraser,
+            text_generator=ollama_paraphraser,
+        )
+        translation_paraphraser = TranslationParaphraser(
+            text_extractor=ollama_paraphraser,
+            text_generator=ollama_paraphraser,
+        )
+
+        super().__init__(
+            n_impostors=n_impostors,
+            paraphrasers=[
+                topic_paraphraser,
+                task_paraphraser,
+                title_paraphraser,
+                bullet_point_paraphraser,
+                translation_paraphraser,
+            ],
+        )
+
+
+class NonNaiveLLMImposterGenerator(LLMImposterGenerator):
+    def __init__(self, n_impostors: int):
+        """
+        Naive LLM-based imposter generator that uses no naive paraphraser (i.e. only two-step paraphrasers).
+        :param n_impostors: number of impostors to generate
+        """
+        t5_chatgpt_paraphraser = T5ChatGPTParaphraser()
+        t5_google_paws_paraphraser = T5GooglePAWSParaphraser()
+        ollama_paraphraser = OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION)
+
+        super().__init__(
+            n_impostors=n_impostors,
+            paraphrasers=[
+                t5_chatgpt_paraphraser,
+                t5_google_paws_paraphraser,
+                ollama_paraphraser,
+            ],
+        )
 
 
 class FixedImposterGenerator(BaseImposterGenerator):

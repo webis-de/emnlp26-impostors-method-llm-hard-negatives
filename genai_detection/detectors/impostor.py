@@ -59,7 +59,15 @@ class ImpostorDetector(DetectorBase):
         n_impostors=25,
         threshold=0.1,
         imposter_technique: Literal[
-            "llm", "text_len", "n_docs", "on-the-fly", "blogs", "fixed", "content"
+            "llm",
+            "text_len",
+            "n_docs",
+            "on-the-fly",
+            "blogs",
+            "fixed",
+            "content",
+            "naive_llm",
+            "non_naive_llm",
         ] = "llm",
         path2imp: str = CONFIG.PATH2BLOG,  # PATH2GENERIC_ON_FLY_IMP,  # path to impostor file, where fixed impostors are saved or where to save generated impostors
         real_time_generation: bool = False,  # whether to generate impostors in real-time or use pre-generated ones
@@ -76,7 +84,8 @@ class ImpostorDetector(DetectorBase):
         :param n_impostors: number of impostors to use for each candidate TODO: allow specification type of LLM impostors; Koppel et Al. (2014) use 25 impostors
         :param threshold: threshold for the minimum similarity score to consider two texts same-author, TODO: not used yet, Koppel et Al. (2014) use 0.1
         :param imposter_technique: which technique to use to generate impostors. Options are:
-            - "llm": use LLMs to generate impostors to control both topic and genre (our contribution, not implemented yet)
+            - "llm": use LLMs to generate impostors to control both topic and genre
+            - "naive_llm": use a naive LLM approach to generate impostors
             - "text_len": generate impostors of similar length from a predefined dataset (our baseline w/o reference, default)
             - "n_docs": generate impostors based on the number of documents written by the author (Kocher et Al. (2015), not implemented yet)
             - "fixed": use a fixed set of impostors (Koppel et. A. (2014), not implemented yet), imposters are not related to the input text
@@ -103,6 +112,14 @@ class ImpostorDetector(DetectorBase):
 
         if imposter_technique == "llm":
             self.imposter_generator = ImposterGenerator.LLMImposterGenerator(
+                n_impostors=self.n_impostors
+            )
+        elif imposter_technique == "naive_llm":
+            self.imposter_generator = ImposterGenerator.NaiveLLMImposterGenerator(
+                n_impostors=self.n_impostors
+            )
+        elif imposter_technique == "non_naive_llm":
+            self.imposter_generator = ImposterGenerator.NonNaiveLLMImposterGenerator(
                 n_impostors=self.n_impostors
             )
         elif imposter_technique == "n_docs":
