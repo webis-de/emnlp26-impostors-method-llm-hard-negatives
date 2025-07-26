@@ -1,4 +1,5 @@
 import argparse
+import gc
 from itertools import combinations, product
 import os
 import json
@@ -12,13 +13,24 @@ import unicodedata
 import typing as t
 import chardet
 
-from datasets import Dataset, DatasetDict, ClassLabel, Features, Value
+from datasets import Dataset, DatasetDict, ClassLabel, Features, Value, load_from_disk
+import numpy as np
 import pandas as pd
 import pyreadstat
 from tqdm import tqdm
 
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from genai_detection.config import CONFIG
+from genai_detection.paraphrasing.paraphraser import (
+    BulletPointParaphraser,
+    OllamaParaphraser,
+    T5ChatGPTParaphraser,
+    T5GooglePAWSParaphraser,
+    TaskParaphraser,
+    TitleParaphraser,
+    TopicParaphraser,
+    TranslationParaphraser,
+)
 from genai_detection.util import preprocess_text as _preprocess_text
 
 random.seed(42)
@@ -931,6 +943,166 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         return author_metadata
 
 
+# === Cross-genre Dataset Loader ===
+class CrossGenreDatasetLoader(BaseDatasetLoader):
+    def __init__(self, path: str = "", name: str = CONFIG.CROSS_GENRE):
+        """
+        Loader for the Cross-genre dataset, i.e. from Blog, Gutenberg, and Student Essays.
+        """
+        super().__init__(name=name)
+
+    def load(self, n_samples: int = 1) -> DatasetDict:
+        """
+        Loader for the Cross-genre dataset.
+        The dataset is expected to be a directory with text files, where each file is named in the format "author_genre.txt".
+        Each file contains the text of a book, and the author and genre are derived from the filename.
+        """
+        # not-artifical generated pairs
+        seed = 42
+        np.random.seed(seed)
+
+        category2directory = {
+            "Blog": CONFIG.PATH2BLOG,
+            "Gutenberg": CONFIG.PATH2GUTENBERG,
+            "Student Essays": CONFIG.PATH2STUDENT_ESSAYS,
+            "Pan 20": CONFIG.PATH2PAN20,
+        }
+
+        dataset = pd.DataFrame(
+            columns=[
+                "category",
+                "disputed_text",
+                "candidate_text",
+                "same",
+                "pair",
+                "artificial_generation",
+            ]
+        )
+
+        def load_dataset(path: Path) -> pd.DataFrame:
+            return load_from_disk(path)["train"].to_pandas()
+
+        for data_category in category2directory.keys():
+            path2datasets = (
+                Path(os.getcwd()).resolve() / category2directory[data_category]
+            )
+            complete_df = load_dataset(path2datasets)
+            positive_sample = complete_df[complete_df["same"]].sample(
+                n=n_samples, random_state=seed
+            )
+            negative_sample = complete_df[~complete_df["same"]].sample(
+                n=n_samples, random_state=seed
+            )
+            # Delete to save memory
+            del complete_df
+            gc.collect()
+
+            for df in [positive_sample, negative_sample]:
+                pair = df["pair"].values[0]
+                authors = df["authors"].values[0]
+                dataset = pd.concat(
+                    [
+                        dataset,
+                        pd.DataFrame(
+                            [
+                                {
+                                    "category": data_category,
+                                    "disputed_text": pair[0],
+                                    "authors": authors,
+                                    "candidate_text": pair[1],
+                                    "same": df["same"].values[0],
+                                    "pair": df["pair"].values[0],
+                                    "artificial_generation": False,
+                                }
+                            ]
+                        ),
+                    ]
+                )
+        dataset.reset_index(drop=True, inplace=True)
+
+        # artificial generation
+        def create_paraphrasers(model):
+            return {
+                "T5_ChatGPT": T5ChatGPTParaphraser(),
+                "T5_Google_PAWS": T5GooglePAWSParaphraser(),
+                "Ollama": model,
+                "BulletPoint": BulletPointParaphraser(model, model),
+                # "Task": TaskParaphraser(model, model),
+                # "Topic": TopicParaphraser(model, model),
+                # "Title": TitleParaphraser(model, model),
+                "Translation": TranslationParaphraser(model, model),
+            }
+
+        model = OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION)
+        paraphrasers = create_paraphrasers(model)
+        unique_rows = dataset.drop_duplicates(subset=["disputed_text"])
+        for i in tqdm(
+            unique_rows.index, desc="Processing unique disputed texts for paraphrasing"
+        ):
+            text = unique_rows.loc[i, "disputed_text"]
+            author = unique_rows.loc[i, "authors"][0]
+            paraphrase_config = {
+                "text": text,
+                "n_responses": 1,
+                "prompt": "",
+                "temperature": CONFIG.TEMPERATURE,
+            }
+            for paraphraser_name, paraphraser in paraphrasers.items():
+                try:
+                    paraphrase = _preprocess_text(
+                        paraphraser.paraphrase(**paraphrase_config)[0]
+                    )
+                    if not paraphrase:
+                        continue
+                except Exception as e:
+                    print(f"[ERROR] Failed to paraphrase with {paraphraser_name}: {e}")
+                    continue
+                dataset = pd.concat(
+                    [
+                        dataset,
+                        pd.DataFrame(
+                            [
+                                {
+                                    "category": unique_rows.loc[i, "category"],
+                                    "disputed_text": text,
+                                    "candidate_text": paraphrase,
+                                    "same": False,
+                                    "pair": [text, paraphrase],
+                                    "artificial_generation": True,
+                                    "authors": [author, paraphraser_name],
+                                }
+                            ]
+                        ),
+                    ]
+                )
+
+        dataset.reset_index(drop=True, inplace=True)
+        features = Features(
+            {
+                "pair": [Value("string")],
+                "authors": [Value("string")],
+                "same": Value("bool"),
+                "category": Value("string"),
+                "disputed_text": Value("string"),
+                "candidate_text": Value("string"),
+                "artificial_generation": Value("bool"),
+            }
+        )
+
+        # Convert DataFrames to list of dictionaries
+        train_data = dataset.to_dict(orient="records")
+        print(f"Total dataset size: {len(train_data)} records.")
+        # test_data = test_df.to_dict(orient="records")
+
+        # Create DatasetDict
+        return DatasetDict(
+            {
+                "train": Dataset.from_list(train_data, features=features),
+                # "test": Dataset.from_list(test_data, features=features),
+            }
+        )
+
+
 # === SYSTEM SPECIFIC USAGE ===
 def run_student_essay():
     base_dir = (
@@ -1030,6 +1202,12 @@ def run_gutenberg_corpus():
     dataset.save_to_disk(output_dir)
 
 
+def run_cross_genre():
+    loader = CrossGenreDatasetLoader()
+    dataset = loader.load()
+    dataset.save_to_disk(Path(__file__).resolve().parent.parent / CONFIG.CROSS_GENRE)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Dataset creation.")
     parser.add_argument(
@@ -1053,4 +1231,5 @@ if __name__ == "__main__":
     # run_koppel_webis()
     # run_blog_corpus()
     # run_gutenberg_corpus()
-    run_student_essay()
+    # run_student_essay()
+    run_cross_genre()
