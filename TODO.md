@@ -78,7 +78,7 @@
   - when commented in, used only for first paraphrase, to save API calls/ characters
 - [ ] What are Imposter paper (Koppel et Al. 2014) baselines: Implement them
 - [ ] scatter semantic/ syntactic scores
-  - [ ] change "model" to "Paraphraser" in plot legend
+  - [x] change "model" to "Paraphraser" in plot legend
   - [ ] artificial bins of similarity
     - quality of prediction per bin
 - [ ] classifier for LLM detection/ AV 
@@ -118,9 +118,9 @@
   - currently only on first 10 texts of each dataset
   - not so important task, if works similarly well on all datasets
   - [x] News/ custom dataset (23.07.2025)
-  - [o] Blog dataset (24.07.2025)
-  - [ ] Gutenberg dataset
-  - [ ] Student Essay dataset
+  - [x] Blog dataset (24.07.2025)
+  - [ ] Gutenberg dataset **TODO: not enough memory on Macbook, run on cluster**
+  - [ ] Student Essay dataset **TODO: crushes Macbook when running locally**
 
 
 ## 📅 22.07.2025- 01.08.2025
