@@ -308,8 +308,8 @@ def preprocess_text(text: t.Union[str, t.Iterable[str]]) -> t.Union[str, t.List[
         - trailing numbers as line numbers
     - remove newlines
     - utf-8 to ascii conversion, i.e. omit special characters
-    - lowercase everything
     - strip leading and trailing whitespace
+    We do not lowercase the text to preserve authorial style such as capitalization or all caps.
 
     :param text: input text or batch of input texts
     :return: preprocessed text or batch of preprocessed texts
@@ -363,10 +363,7 @@ def preprocess_text(text: t.Union[str, t.Iterable[str]]) -> t.Union[str, t.List[
             .decode("ascii")
         )
 
-        # convert everything to lowercase for uniformity
-        single_text = single_text.lower().strip()
-
-        return single_text
+        return single_text.strip()
 
     if isinstance(text, str):
         return clean(text)

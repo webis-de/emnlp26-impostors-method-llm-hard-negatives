@@ -67,6 +67,7 @@
 
 ### 🛠️ Implementation
 - [ ] OpenAI
+- [x] Do not lowercase the text to preserve authorial style such as capitalization or all caps `util.py`: `preprocess_text` function
 - [x] try pushing 20GB Docker container to webis registry from university network
   - does not work, broken pipe
 - [ ] Find number of words sufficient for LLM Detection from Janek's paper
@@ -89,10 +90,10 @@
   - [ ] error rate: Number of false positives + false negatives / total number of texts
   - [ ] x-axis: Syntactic similarity
   - [ ] y-axis: Error rate
-- [ ] vertical prototyp rather than horizontal prototyp (get existing modules working rather than generating new modules)
+- [ ] vertical prototype rather than horizontal prototype (get existing modules working rather than generating new modules)
 - [ ] Grid search for hyperparameters 
   - [ ] smart choice of hyperparameters, ggf. do not use all hyperparameters
-- [o] LLM generated imposters
+- [x] LLM generated imposters
 - [ ] run evaluation of cluster 
   - [ ] make Docker container to smaller
   - [x] script with parallel code
@@ -100,6 +101,7 @@
   - [x] Docker container to run evaluation
 - [ ] [Answer by LLMDet collaborator](https://github.com/TrustedLLM/LLMDet/issues/14#issuecomment-3111760619)
 - [o] Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
+  - estimated 36h of runtime
 - [ ] experiment/ hypothesis: Text_extractor information will produce similar text to original text even though information is wrong because extractor/ generator LLM think alike
   - [ ] maybe generate "bad extractions via LLM prompt" and compare to original text (human evaluation)
 - [ ] compare MirrorMinds-LLMDetector paraphrases and our imposter generators
