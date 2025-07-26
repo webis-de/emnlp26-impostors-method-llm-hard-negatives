@@ -923,6 +923,9 @@ class ParaphrasingEvaluator:
         :return: matplotlib Figure object.
         """
         required_cols = ["sem_sim_avg", "syn_sim_avg", group_by]
+        if group_by == "model" and "Paraphraser" not in df.columns:
+            df.rename(columns={group_by: "Paraphraser"}, inplace=True)
+            group_by = "Paraphraser"
         missing_cols = [col for col in required_cols if col not in df.columns]
         if missing_cols:
             raise ValueError(f"DataFrame is missing required columns: {missing_cols}")
