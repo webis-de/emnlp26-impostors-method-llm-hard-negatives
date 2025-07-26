@@ -705,7 +705,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
 
         # shuffle and split groups such that tasks are not overlapping between train and test sets
         all_tasks = df["task"].unique().tolist()
-        random.seed(42)
+        random.seed(352)
         random.shuffle(all_tasks)
 
         task_limit = max(
@@ -752,6 +752,10 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         )
 
     def _load_student_essays(self):
+        """
+        Load student essays.
+        Koppel et al. (2014) use only the first 4 assignments.
+        """
         student_essays_df = pd.DataFrame(
             columns=["author_id", "text", "task", "task_description"]
         )
@@ -760,21 +764,21 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             "Ass2": "Talk about your childhood",
             "Ass3": "Describe your personality",
             "Ass4": "Thematic Apperception Test",
-            "Ass5": "Give four examples of four different theories",
+            # "Ass5": "Give four examples of four different theories",  # not used in Koppel et al. (2014)
         }
         # iterate over all TXT files in assignment directories and extract the essays
-        for dir in [f"Ass{i}" for i in range(1, 6)]:
+        for dir in [f"Ass{i}" for i in range(1, len(task_description) + 1)]:
             path2ass_dir = self.path / dir
             assert (
                 path2ass_dir.exists()
             ), f'Path {path2ass_dir} to Assignment "{task_description[dir]}" of student essays dataset does not exist.'
 
-            if dir == "Ass5":  # has subtasks (directories)
-                text_files = []
-                for subtask in path2ass_dir.iterdir():
-                    text_files.extend(subtask.glob("*.txt"))
-            else:
-                text_files = path2ass_dir.glob("*.txt")
+            # if dir == "Ass5":  # has subtasks (directories)
+            #     text_files = []
+            #     for subtask in path2ass_dir.iterdir():
+            #         text_files.extend(subtask.glob("*.txt"))
+            # else:
+            text_files = path2ass_dir.glob("*.txt")
 
             for txt_file in text_files:
                 with open(txt_file, "rb") as f:
@@ -787,15 +791,21 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
                     500, MIN_NUM_WORDS
                 ):  # texts are < 2000 words
                     continue
+                task = txt_file.parent.name
+                if task == "Ass1" and "2006_" in txt_file.stem:
+                    # files are named "2006_author_id.txt": Hence crop the year
+                    author_id = txt_file.stem.split("_", 1)[1]  # remove "2006_"
+                else:
+                    author_id = txt_file.stem
                 student_essays_df = pd.concat(
                     [
                         student_essays_df,
                         pd.DataFrame(
                             [
                                 {
-                                    "author_id": txt_file.stem,
+                                    "author_id": author_id,
                                     "text": essay_text,
-                                    "task": txt_file.parent.name,
+                                    "task": task,
                                     "task_description": task_description[dir],
                                 }
                             ]
@@ -809,6 +819,8 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
     ):
         """
         Generate pairs of texts from the dataset based on the specified groupby columns.
+        Koppel et al. (2014) select pairs of texts from the different tasks, regardless of same or different author label.
+
         :param df: DataFrame containing the dataset with at least 'text' and 'author' columns.
         :param n_pairs: Number of pairs to generate per group.
         :param groupby_cols: Columns to group by, should include 'genre'.
@@ -856,54 +868,63 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         pairs.extend(same_author_pairs)
         print(f"Generated {len(same_author_pairs)} same-author pairs.")
 
+        # Store author_id -> list of texts across all groups
+        global_author_texts = defaultdict(list)
+
+        # Mapping author_id to group_id to ensure authors come from different tasks
+        author_group_map = {}
+
+        # First loop: collect data across groups
         for group_values, group in grouped:
-            # print(f"Processing group: {group_values}, size: {len(group)}")
+            group_id = str(group_values)  # could be a tuple or single value
             data = group.to_dict(orient="records")
 
-            # Group texts by author WITHIN the group (i.e. same task)
-            author_groups = {}
             for item in data:
-                author_groups.setdefault(item["author_id"], []).append(item)
+                author_id = item["author_id"]
+                global_author_texts[author_id].append(item)
+                author_group_map[author_id] = group_id
 
-            # Different-author pairs, balanced to same author pairs count
-            authors = list(author_groups.keys())
-            if len(authors) > 1 and same_author_pairs:
-                n_diff_pairs_target = len(
-                    same_author_pairs
-                )  # goal: match number of different-author pairs to same-author pairs
-                author_pairs = []
-                for i in range(len(authors)):
-                    for j in range(i + 1, len(authors)):
-                        author_pairs.append((authors[i], authors[j]))
-                random.shuffle(author_pairs)
+        # Prepare cross-task different-author pairs
+        authors = list(global_author_texts.keys())
+        author_pairs = []
+        for i in range(len(authors)):
+            for j in range(i + 1, len(authors)):
+                a1, a2 = authors[i], authors[j]
+                if (
+                    author_group_map[a1] != author_group_map[a2]
+                ):  # ensure from different tasks
+                    author_pairs.append((a1, a2))
 
-                count = 0
-                # Calculate max number of pairs to sample per author pair (reduce class (i.e. different-author) imbalance introdoced prior when only one pair per author pair was sampled)
-                max_pairs_per_pair = max(n_diff_pairs_target // len(author_pairs), 1)
-                for a1, a2 in author_pairs:
-                    texts_a1 = author_groups[a1]
-                    texts_a2 = author_groups[a2]
+        random.shuffle(author_pairs)
 
-                    if not texts_a1 or not texts_a2:
-                        continue
+        # Determine how many different-author pairs to generate
+        n_diff_pairs_target = len(same_author_pairs)
+        max_pairs_per_pair = max(n_diff_pairs_target // len(author_pairs), 1)
 
-                    # All possible combinations between texts from different authors
-                    all_combinations = list(product(texts_a1, texts_a2))
-                    random.shuffle(all_combinations)  # Shuffle to introduce randomness
+        count = 0
+        for a1, a2 in author_pairs:
+            texts_a1 = global_author_texts[a1]
+            texts_a2 = global_author_texts[a2]
 
-                    num_to_sample = min(len(all_combinations), max_pairs_per_pair)
-                    for t1, t2 in all_combinations[:num_to_sample]:
-                        pairs.append(
-                            {
-                                "pair": [t1["text"], t2["text"]],
-                                "authors": [a1, a2],
-                                "same": False,
-                            }
-                        )
-                        count += 1
+            if not texts_a1 or not texts_a2:
+                continue
 
-                    if count >= n_diff_pairs_target:
-                        break
+            all_combinations = list(product(texts_a1, texts_a2))
+            random.shuffle(all_combinations)
+
+            num_to_sample = min(len(all_combinations), max_pairs_per_pair)
+            for t1, t2 in all_combinations[:num_to_sample]:
+                pairs.append(
+                    {
+                        "pair": [t1["text"], t2["text"]],
+                        "authors": [a1, a2],
+                        "same": False,
+                    }
+                )
+                count += 1
+
+            if count >= n_diff_pairs_target:
+                break
 
         print(
             f"Generated {len(pairs) - len(same_author_pairs)} different-author pairs.\n"
@@ -1231,5 +1252,5 @@ if __name__ == "__main__":
     # run_koppel_webis()
     # run_blog_corpus()
     # run_gutenberg_corpus()
-    # run_student_essay()
-    run_cross_genre()
+    run_student_essay()
+    # run_cross_genre()
