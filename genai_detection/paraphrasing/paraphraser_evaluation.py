@@ -923,16 +923,18 @@ class ParaphrasingEvaluator:
         :return: matplotlib Figure object.
         """
         if group_by == "model" and "Paraphraser" not in df.columns:
-            df.rename(columns={group_by: "Paraphraser"}, inplace=True)
+            data = df.rename(columns={group_by: "Paraphraser"}, inplace=False)
             group_by = "Paraphraser"
+        else:
+            data = df.copy()
         required_cols = ["sem_sim_avg", "syn_sim_avg", group_by]
-        missing_cols = [col for col in required_cols if col not in df.columns]
+        missing_cols = [col for col in required_cols if col not in data.columns]
         if missing_cols:
             raise ValueError(f"DataFrame is missing required columns: {missing_cols}")
 
         # Calculate min and max with padding
-        x_min, x_max = df["sem_sim_avg"].min(), df["sem_sim_avg"].max()
-        y_min, y_max = df["syn_sim_avg"].min(), df["syn_sim_avg"].max()
+        x_min, x_max = data["sem_sim_avg"].min(), data["sem_sim_avg"].max()
+        y_min, y_max = data["syn_sim_avg"].min(), data["syn_sim_avg"].max()
 
         x_pad = (x_max - x_min) * 0.05 if (x_max - x_min) > 0 else 0.05
         y_pad = (y_max - y_min) * 0.05 if (y_max - y_min) > 0 else 0.05
@@ -941,13 +943,13 @@ class ParaphrasingEvaluator:
         y_lim = (max(0, y_min - y_pad), min(1, y_max + y_pad))
 
         fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
-        unique_labels = df[group_by].unique()
+        unique_labels = data[group_by].unique()
         palette = sns.color_palette("tab10", n_colors=len(unique_labels))
         label_to_color = {
             label: palette[i % len(palette)] for i, label in enumerate(unique_labels)
         }
         sns.scatterplot(
-            data=df,
+            data=data,
             x="sem_sim_avg",
             y="syn_sim_avg",
             hue=group_by,
@@ -991,7 +993,7 @@ class ParaphrasingEvaluator:
         inset_ax = fig.add_axes([0.9, 0.1, inset_size, inset_size])
 
         sns.scatterplot(
-            data=df,
+            data=data,
             x="sem_sim_avg",
             y="syn_sim_avg",
             hue=group_by,
@@ -1060,9 +1062,14 @@ class ParaphrasingEvaluator:
         metric_names = [
             metric for metric in self.get_metric_names() if metric in df.columns
         ]
+        if group_by == "model" and "Paraphraser" not in df.columns:
+            data = df.rename(columns={group_by: "Paraphraser"}, inplace=False)
+            group_by = "Paraphraser"
+        else:
+            data = df.copy()
         assert len(metric_names) > 0, "No valid metrics found in DataFrame."
         assert (
-            group_by in df.columns
+            group_by in data.columns
         ), f"Group by column '{group_by}' not found in DataFrame."
 
         n_metrics = len(metric_names)
@@ -1072,7 +1079,7 @@ class ParaphrasingEvaluator:
         fig, axes = plt.subplots(n_rows, n_cols, figsize=(6 * n_cols, 4 * n_rows))
         axes = axes.flatten()
 
-        unique_labels = df[group_by].unique()
+        unique_labels = data[group_by].unique()
         max_words_in_label = max(len(str(label).split()) for label in unique_labels)
         use_shared_legend = max_words_in_label > 3
         palette = sns.color_palette("tab10", n_colors=len(unique_labels))
@@ -1082,11 +1089,11 @@ class ParaphrasingEvaluator:
 
         for i, metric in enumerate(metric_names):
             ax = axes[i]
-            if metric not in df.columns:
+            if metric not in data.columns:
                 continue
 
             # Find models with only one data point for this metric
-            counts = df.groupby(group_by)[metric].count()
+            counts = data.groupby(group_by)[metric].count()
 
             # Models with multiple entries (for KDE)
             models_multi = counts[counts > 1].index
@@ -1096,7 +1103,7 @@ class ParaphrasingEvaluator:
             # Plot KDE for models with multiple points
             if len(models_multi) > 0:
                 sns.kdeplot(
-                    data=df[df[group_by].isin(models_multi)],
+                    data=data[data[group_by].isin(models_multi)],
                     x=metric,
                     hue=group_by,
                     fill=True,
@@ -1109,7 +1116,7 @@ class ParaphrasingEvaluator:
 
             # Scatter for models with a single point
             for model in models_single:
-                single_val = df[(df[group_by] == model)][metric].values[0]
+                single_val = data[(data[group_by] == model)][metric].values[0]
                 label = model if not use_shared_legend else None
                 color = label_to_color[model]
                 ax.scatter(
