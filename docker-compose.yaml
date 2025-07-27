@@ -1,6 +1,7 @@
 services:
-  args-acquisition:
-    image: registry.webis.de/code-teaching/theses/artificial-authorship-verification
+  artificial-authorship-verification:
+    image: registry.webis.de/code-teaching/theses/artificial-authorship-verification 
+      # registry.uni-kassel.dev/kgutekunst/artificial-authorship-verification
     platform: linux/amd64
     build: .
     volumes:

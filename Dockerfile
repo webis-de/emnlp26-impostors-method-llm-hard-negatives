@@ -11,6 +11,7 @@ RUN --mount=type=cache,target=/root/.cache set -x \
 
 COPY pyproject.toml poetry.lock README.md ./
 COPY genai_detection/__init__.py ./genai_detection/
-RUN poetry install
+RUN --mount=type=cache,target=/root/.cache set -x \
+    poetry lock && poetry install
 
 COPY . .
