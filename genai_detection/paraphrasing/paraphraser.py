@@ -16,6 +16,7 @@ from openai import OpenAI
 import dirtyjson
 import torch
 import deepl
+from nltk.tokenize import sent_tokenize
 
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from genai_detection.config import CONFIG
@@ -185,6 +186,34 @@ class NaiveParaphraser(Paraphraser):
     This class is a placeholder and does not implement actual paraphrasing logic.
     """
 
+    def _sentence_tokenized_chunks(
+        self, input_text: str, max_tokens: int = CONFIG.MAX_LENGTH
+    ) -> List[str]:
+        sentences = sent_tokenize(input_text)
+        chunks = []
+        current_chunk = ""
+        current_len = 0
+
+        for sentence in sentences:
+            tokenized = self.tokenizer.encode(sentence, add_special_tokens=False)
+            token_len = len(tokenized)
+
+            # If adding this sentence would exceed limit, start a new chunk
+            if current_len + token_len > max_tokens:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                current_chunk = sentence
+                current_len = token_len
+            else:
+                current_chunk += " " + sentence
+                current_len += token_len
+
+        # Append final chunk
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+
+        return chunks
+
 
 class NonNaiveParaphraser(Paraphraser):
     """
@@ -289,27 +318,35 @@ class T5ChatGPTParaphraser(NaiveParaphraser):
         temperature: float = CONFIG.TEMPERATURE,
         response_schema: Optional[dict[str, Any]] = None,
     ) -> List[str]:
-        input_ids = self.tokenizer(
-            f"{text}\n{prompt.strip()}",
-            return_tensors="pt",
-            padding="longest",
-            max_length=max_length,
-            truncation=True,
-        ).input_ids.to(self.device)
+        chunks = self._sentence_tokenized_chunks(input_text=text, max_tokens=max_length)
+        results = []
 
-        outputs = self.model.generate(
-            input_ids,
-            repetition_penalty=repetition_penalty,
-            num_return_sequences=n_responses,
-            no_repeat_ngram_size=no_repeat_ngram_size,
-            num_beams=num_beams,
-            num_beam_groups=num_beam_groups,
-            max_length=max_length,
-            diversity_penalty=diversity_penalty,
-        )
+        for i, chunk in enumerate(chunks):
+            input_ids = self.tokenizer(
+                f"{chunk}\n{prompt.strip()}",
+                return_tensors="pt",
+                padding="longest",
+                max_length=max_length,
+                truncation=True,
+            ).input_ids.to(self.device)
 
-        res = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
+            outputs = self.model.generate(
+                input_ids,
+                repetition_penalty=repetition_penalty,
+                num_return_sequences=n_responses,
+                no_repeat_ngram_size=no_repeat_ngram_size,
+                num_beams=num_beams,
+                num_beam_groups=num_beam_groups,
+                max_length=max_length,
+                diversity_penalty=diversity_penalty,
+                trust_remote_code=True,
+            )
+            if len(results) > 0:
+                results = torch.cat([results, outputs], dim=1)
+            else:
+                results = outputs
 
+        res = self.tokenizer.batch_decode(results, skip_special_tokens=True)
         return res
 
 
@@ -348,25 +385,62 @@ class T5GooglePAWSParaphraser(NaiveParaphraser):
         temperature: float = CONFIG.TEMPERATURE,
         response_schema: Optional[dict[str, Any]] = None,
     ) -> List[str]:
+        chunks = self._sentence_tokenized_chunks(input_text=text, max_tokens=max_length)
+        results = []
+
+        for i, chunk in enumerate(chunks):
+            encoding = self.tokenizer.encode_plus(
+                f"{chunk}\n{prompt.strip()}</s>",
+                padding="max_length",
+                return_tensors="pt",
+            )
+
+            input_ids, attention_masks = encoding["input_ids"].to(
+                self.device
+            ), encoding["attention_mask"].to(self.device)
+
+            outputs = self.model.generate(
+                input_ids=input_ids,
+                attention_mask=attention_masks,
+                max_length=max_length,
+                do_sample=True,
+                top_k=120,
+                top_p=0.95,
+                num_return_sequences=n_responses,
+                trust_remote_code=True,
+            )
+            if len(results) > 0:
+                try:
+                    results = torch.cat([results, outputs], dim=1)
+
+                except Exception as e:
+                    print(e)
+                    print("failed text chunk:", results, outputs)
+            else:
+                results = outputs
+
+        outputs = results
+
         # TODO: no duplication penalty, and thus, there are duplicates in the output
         # print(f"[DEBUG] Using T5GooglePAWSParaphraser with prompt: {prompt}")
-        encoding = self.tokenizer.encode_plus(
-            f"{text}\n{prompt.strip()}</s>", padding="max_length", return_tensors="pt"
-        )
+        # encoding = self.tokenizer.encode_plus(
+        #     f"{text}\n{prompt.strip()}</s>", padding="max_length", return_tensors="pt"
+        # )
 
-        input_ids, attention_masks = encoding["input_ids"].to(self.device), encoding[
-            "attention_mask"
-        ].to(self.device)
+        # input_ids, attention_masks = encoding["input_ids"].to(self.device), encoding[
+        #     "attention_mask"
+        # ].to(self.device)
 
-        outputs = self.model.generate(
-            input_ids=input_ids,
-            attention_mask=attention_masks,
-            max_length=max_length,
-            do_sample=True,
-            top_k=120,
-            top_p=0.95,
-            num_return_sequences=n_responses,
-        )
+        # outputs = self.model.generate(
+        #     input_ids=input_ids,
+        #     attention_mask=attention_masks,
+        #     max_length=max_length,
+        #     do_sample=True,
+        #     top_k=120,
+        #     top_p=0.95,
+        #     num_return_sequences=n_responses,
+        #     trust_remote_code=True,
+        # )
 
         res = []
         for output in outputs:
@@ -374,7 +448,6 @@ class T5GooglePAWSParaphraser(NaiveParaphraser):
                 output, skip_special_tokens=True, clean_up_tokenization_spaces=True
             )
             res.append(line)
-
         return res
 
 
