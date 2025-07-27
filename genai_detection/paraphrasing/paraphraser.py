@@ -958,6 +958,9 @@ class TranslationParaphraser(NonNaiveParaphraser):
         :param text_extractor: A model or function to translate to foreign languages.
         :param text_generator: A model or function to translate from foreign languages.
         """
+        assert isinstance(text_extractor, NaiveParaphraser) and isinstance(
+            text_generator, NaiveParaphraser
+        ), "Both text_extractor and text_generator must be instances of NaiveParaphraser or its subclasses."
         super().__init__(text_extractor=text_extractor, text_generator=text_generator)
         self.language = language
         self.extractor_prompt = f"Translate the text above into {self.language}. Do not use direct quotes or newlines. Output only the translated text, without any additional commentary or formatting."
