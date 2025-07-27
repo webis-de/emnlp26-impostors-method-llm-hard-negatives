@@ -732,8 +732,9 @@ class BulletPointParaphraser(NonNaiveParaphraser):
             else time_period
         )
         generator_prompt = (
-            f"Do not use asterisks. Write a text of about {len(text.split())} words with a {tone} tone, a {genre} genre, in the {register} register for the target audience of {target_audience} and in the {time_period} time period, covering the following points:\n"
+            f"Write a text of about {len(text.split())} words with a {tone} tone, a {genre} genre, in the {register} register for the target audience of {target_audience} and in the {time_period} time period, covering the following points:\n"
             + "\n".join(f"- {bp}" for bp in bullet_points)
+            + "\nDo not use asterisks. Only output the text without any additional commentary."
         )
         paraphrased_texts = self._generate_paraphrase_from_bullet_points(
             bullet_points=bullet_points,
@@ -787,7 +788,7 @@ class TaskParaphraser(BulletPointParaphraser):
             else time_period
         )
 
-        generator_prompt = "Do not use asterisks. Write a text of about {l} words with a {tone} tone, a {genre} genre, in the {register} register for the target audience of {target_audience} and in the {time_period} time period, covering the following task:\n{task}".format(
+        generator_prompt = "Write a text of about {l} words with a {tone} tone, a {genre} genre, in the {register} register for the target audience of {target_audience} and in the {time_period} time period, covering the following task:\n{task}. Do not use asterisks. Only output the text without any additional commentary.".format(
             l=len(text.split()),
             tone=tone,
             genre=genre,
@@ -854,7 +855,7 @@ class TopicParaphraser(BulletPointParaphraser):
         )
         topic = ground_truth.get("topic", topic) if ground_truth else topic
 
-        generator_prompt = "Do not use asterisks. Write a text of about {l} words with a {topic} topic, {tone} tone, a {genre} genre, in the {register} register for the target audience of {target_audience} and in the {time_period} time period.".format(
+        generator_prompt = "Write a text of about {l} words with a {topic} topic, {tone} tone, a {genre} genre, in the {register} register for the target audience of {target_audience} and in the {time_period} time period. Do not use asterisks. Only output the text without any additional commentary.".format(
             l=len(text.split()),
             tone=tone,
             genre=genre,
@@ -916,7 +917,7 @@ class TitleParaphraser(BulletPointParaphraser):
             else time_period
         )
 
-        generator_prompt = "Do not use asterisks. Write a text of about {l} words with a {title} title, {tone} tone, a {genre} genre, in the {register} register for the target audience of {target_audience} and in the {time_period} time period.".format(
+        generator_prompt = "Write a text of about {l} words with a {title} title, {tone} tone, a {genre} genre, in the {register} register for the target audience of {target_audience} and in the {time_period} time period. Do not use asterisks. Only output the text without any additional commentary.".format(
             l=len(text.split()),
             tone=tone,
             genre=genre,
@@ -959,8 +960,8 @@ class TranslationParaphraser(NonNaiveParaphraser):
         """
         super().__init__(text_extractor=text_extractor, text_generator=text_generator)
         self.language = language
-        self.extractor_prompt = f"Translate the text above into {self.language}. Do not use direct quotes or newlines. Output only the translated text, without any additional explanations or formatting."
-        self.generator_prompt = f"Translate the text above from {self.language} into English. Do not use direct quotes or newlines. Output only the translated text, without any additional explanations or formatting."
+        self.extractor_prompt = f"Translate the text above into {self.language}. Do not use direct quotes or newlines. Output only the translated text, without any additional commentary or formatting."
+        self.generator_prompt = f"Translate the text above from {self.language} into English. Do not use direct quotes or newlines. Output only the translated text, without any additional commentary or formatting."
         self.deepl_client = deepl.DeepLClient(CONFIG.DEEPL_API_KEY)
 
     def paraphrase(
