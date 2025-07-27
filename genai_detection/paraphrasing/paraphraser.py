@@ -318,6 +318,7 @@ class T5ChatGPTParaphraser(NaiveParaphraser):
         temperature: float = CONFIG.TEMPERATURE,
         response_schema: Optional[dict[str, Any]] = None,
     ) -> List[str]:
+        print("T5 model")
         chunks = self._sentence_tokenized_chunks(input_text=text, max_tokens=max_length)
         results = []
 
@@ -385,6 +386,7 @@ class T5GooglePAWSParaphraser(NaiveParaphraser):
         temperature: float = CONFIG.TEMPERATURE,
         response_schema: Optional[dict[str, Any]] = None,
     ) -> List[str]:
+        print("T5 model")
         chunks = self._sentence_tokenized_chunks(input_text=text, max_tokens=max_length)
         results = []
 
@@ -492,9 +494,7 @@ class OllamaParaphraser(NaiveParaphraser):
         :param n_responses: The number of paraphrases to generate.
         :return: A list of paraphrased versions of the input text.
         """
-        # if response_schema is None:
-        #     print("[WARNING] No response format specified. Using default JSON object format.")
-        # print(f"[DEBUG] paraphrase of Ollama: Response format: {format.model_json_schema()}/{type(format)}")
+        print("Ollama model")
         responses = []
         for i in range(
             n_responses
@@ -586,6 +586,7 @@ class BlabladorParaphraser(NaiveParaphraser):
         :param temperature: Controls the randomness of the output. Lower values make the output more deterministic.
         :return: A paraphrased version of the input text.
         """
+        print("Blablador model")
         payload = {
             "model": self.model_id,  # model ID
             "prompt": f"{prompt.strip()} {text}",
@@ -788,6 +789,7 @@ class BulletPointParaphraser(NonNaiveParaphraser):
         :param ground_truth: Optional ground truth to use instead of the LLM extracted text.
         :return: A paraphrased version of the input text.
         """
+        print("BulletPoint model")
         if prompt == "":
             prompt = None
         bullet_points, tone, genre, time_period, register, target_audience = (
@@ -845,6 +847,7 @@ class TaskParaphraser(BulletPointParaphraser):
             dict
         ] = None,  # if any ground truth is available, use it rather than the LLM extracted text
     ) -> List[str]:
+        print("Task model")
         task, tone, genre, time_period, register, target_audience = (
             self._extract_bullet_points(
                 text=text,
@@ -905,6 +908,7 @@ class TopicParaphraser(BulletPointParaphraser):
             dict
         ] = None,  # if any ground truth is available, use it rather than the LLM extracted text
     ) -> List[str]:
+        print("Topic model")
         logger.info(
             f"\n[DEBUG] Using TopicParaphraser with prompt: {self.extractor_prompt}"
         )
@@ -974,6 +978,7 @@ class TitleParaphraser(BulletPointParaphraser):
             dict
         ] = None,  # if any ground truth is available, use it rather than the LLM extracted text
     ) -> List[str]:
+        print("Title model")
         title, tone, genre, time_period, register, target_audience = (
             self._extract_bullet_points(
                 text=text,
