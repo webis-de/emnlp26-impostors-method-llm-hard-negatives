@@ -571,10 +571,10 @@ class LLMImposterGenerator(BaseImposterGenerator):
         return imposters
 
 
-class NaiveLLMImposterGenerator(LLMImposterGenerator):
+class NonNaiveLLMImposterGenerator(LLMImposterGenerator):
     def __init__(self, n_impostors: int):
         """
-        Naive LLM-based imposter generator that uses only naive paraphraser.
+        Naive LLM-based imposter generator that uses no naive paraphrasers (i.e. only two-step paraphrasers).
         :param n_impostors: number of impostors to generate
         """
         ollama_paraphraser = OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION)
@@ -611,10 +611,10 @@ class NaiveLLMImposterGenerator(LLMImposterGenerator):
         )
 
 
-class NonNaiveLLMImposterGenerator(LLMImposterGenerator):
+class NaiveLLMImposterGenerator(LLMImposterGenerator):
     def __init__(self, n_impostors: int):
         """
-        Naive LLM-based imposter generator that uses no naive paraphraser (i.e. only two-step paraphrasers).
+        Naive LLM-based imposter generator that uses only naive paraphrasers.
         :param n_impostors: number of impostors to generate
         """
         t5_chatgpt_paraphraser = T5ChatGPTParaphraser()
