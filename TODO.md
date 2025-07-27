@@ -64,13 +64,26 @@
   - compare different paradigmen of paraphrasing and compare 1-2 implementations per paradigm
   - 1 x graph/ slide with steps, concrete task per step and approach per step
 - [ ] why not using DeepL for rephrasing? [Need to specify tone in API](https://github.com/deeplcom/deepl-python), hence defeats the purpose of capturing the LLM's style
+- [ ] How PAN20 dataset was created? cf. [Bevendorff et. Al. 2020 (Chap. 2)](https://downloads.webis.de/publications/papers/bevendorff_2020d.pdf) 
+- [ ] lowercasing texts for unmasking or other AV/AA: [Janek's Two Paradigm of LLM Detection: AA vs. AV pg. 3768 left 1st paragraph](https://aclanthology.org/2025.findings-acl.194.pdf), [Janek's BA pg. 11](https://downloads.webis.de/theses/papers/bevendorff_2016.pdf)
 
 ### 🛠️ Implementation
 - [ ] OpenAI
+- [ ] lowercasing texts for unmasking or other AV/AA: 
+    - Yes: [Janek's Two Paradigms of LLM Detection: AA vs. AV pg. 3768 left 1st paragraph](https://aclanthology.org/2025.findings-acl.194.pdf), [Janek's BA pg. 11](https://downloads.webis.de/theses/papers/bevendorff_2016.pdf)
+    - Currently no, bc loosing information, i.e. capitalization, all caps, etc.
 - [x] Do not lowercase the text to preserve authorial style such as capitalization or all caps `util.py`: `preprocess_text` function
 - [x] try pushing 20GB Docker container to webis registry from university network
   - does not work, broken pipe
 - [ ] Find number of words sufficient for LLM Detection from Janek's paper
+  - [Generalized Unmasking](https://aclanthology.org/N19-1068/) uses chunks between 300 and 1,000 words (**500-700 words** best without adding too much computational overhead)
+  - [Generalized Unmasking](https://www.degruyterbrill.com/document/doi/10.1515/itit-2019-0046/html?casa_token=pbCaF7FgUXoAAAAA:8Vw71FUWE5spAbSsEuGGTdIjjm_o1_eb_inHwU3BR6eSrdVMOYy3--iqvDJwCV7EQ1HWtQBh610) uses chunks of **700 words**
+  - [AV PAN 2023 Overview Paper (chap.2)](https://ceur-ws.org/Vol-3497/paper-199.pdf) emails of at least **2000 characters**
+  - [Janek's Two Paradigmen of LLM Detection: AA vs. AV](https://aclanthology.org/2025.findings-acl.194.pdf) 
+    - p. 2767, left second last paragraph + Fig. 1,2: **2000-5000 characters** for separation of LLM entropies
+    - (Fig. 3: Unmasking on 250-500 most frequent character 3-grams)
+    - texts with >= **3000 characters** 
+    - texts: **lowercased** and stemmed
 - [ ] Backtranslation (2-step) paraphrasing: How good is LLM (Ollama?)
   - use only western languages, because LLMs are maybe better with them
 - [x] Backtranslation (2-step) paraphrasing: [Free DeepL API](https://www.deepl.com/en/your-account/keys)
@@ -78,6 +91,12 @@
   - currently commented out in `paraphraser.py`
   - when commented in, used only for first paraphrase, to save API calls/ characters
 - [ ] What are Imposter paper (Koppel et Al. 2014) baselines: Implement them
+  - 1. Similarity-Based Baseline: Measure the similarity (1a cosine ca. 71% acc, 1b min-max ca. 74% acc) between the candidate text and the original text (space-free 4-gram tfidf of top 100,000 n-grams across corpus) and assign same-author label if similarity is above a certain threshold.
+  - 2. Supervised Baseline: Train a supervised classifier (linear SVM) on 1,000 labeled sample pairs to distinguish between same-author and different-author pairs based on absolute element-wise differences in their top 100,000 tfidf embedding: 79.8% accuracy
+- Koppel et. Al. Studnt Essay dataset: 
+  - [ ] Use only first 500 words of each text
+  - [ ] corpus of 2000 pairs
+  - [ ] X,Y pairs: never from same task, regardless of same or different author
 - [ ] scatter semantic/ syntactic scores
   - [x] change "model" to "Paraphraser" in plot legend
   - [ ] artificial bins of similarity
@@ -137,7 +156,7 @@
 
 ### 🛠️ Implementation
 - [x] Backtranslation (2-step) paraphrasing (multi language model required: Ollama's zephyr: 7B works)
-- [x] keep only texts with >= 3000 words (maybe reference in Janek's generalized unmasking paper)
+- [x] keep only texts with >= 3000 words (maybe reference in [Janek's generalized unmasking paper](https://aclanthology.org/N19-1068/))
   - Student Essay dataset has no such texts, keep 500 words as minimum for this dataset (maximum has 1136 words)
 - [x] Email authors of LLMDet regarding missing extender class (21.07.2025)
 - [x] Email corresponding author of DetectGPT regarding XSUM error (21.07.2025)
@@ -342,7 +361,7 @@
 - [x] TitleBasedParaphraser
   - first LLM: (Select/Extract) Title → second LLM: generate text
 - [x] radar plot: 
-  - [x] mean is line and standard deviation should be shaded area around the line (cf. Jannek's papers)
+  - [x] mean is line and standard deviation should be shaded area around the line (cf. Janek's papers)
   - [x] scores must always be at same position
 - [x] Paraphrase scores, cf. [Marcel's paper](https://downloads.webis.de/publications/papers/gohsen_2023b.pdf), [Marcel's second paper](https://downloads.webis.de/publications/papers/gohsen_2024b.pdf)
   - [Marcel's paper](https://downloads.webis.de/publications/papers/gohsen_2023b.pdf)
