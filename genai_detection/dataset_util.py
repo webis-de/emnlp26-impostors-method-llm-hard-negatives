@@ -34,7 +34,10 @@ from genai_detection.paraphrasing.paraphraser import (
 from genai_detection.util import preprocess_text as _preprocess_text
 
 random.seed(42)
-MIN_NUM_WORDS = 3000  # minimum number of words in a text to be considered valid
+# Koppel et. Al. (2004): 500 words
+# Bevendorff et. Al. (2019): 700 words (https://www.degruyterbrill.com/document/doi/10.1515/itit-2019-0046/html?casa_token=pbCaF7FgUXoAAAAA:8Vw71FUWE5spAbSsEuGGTdIjjm_o1_eb_inHwU3BR6eSrdVMOYy3--iqvDJwCV7EQ1HWtQBh610)
+# Bevendorff et. Al. (2025): 3000 characters (https://aclanthology.org/2025.findings-acl.194.pdf)
+MIN_NUM_WORDS = 700  # minimum number of words in a text to be considered valid
 
 # === BASE CLASS ===
 

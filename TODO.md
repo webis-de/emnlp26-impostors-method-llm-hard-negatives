@@ -66,6 +66,13 @@
 - [ ] why not using DeepL for rephrasing? [Need to specify tone in API](https://github.com/deeplcom/deepl-python), hence defeats the purpose of capturing the LLM's style
 - [ ] How PAN20 dataset was created? cf. [Bevendorff et. Al. 2020 (Chap. 2)](https://downloads.webis.de/publications/papers/bevendorff_2020d.pdf) 
 - [ ] lowercasing texts for unmasking or other AV/AA: [Janek's Two Paradigm of LLM Detection: AA vs. AV pg. 3768 left 1st paragraph](https://aclanthology.org/2025.findings-acl.194.pdf), [Janek's BA pg. 11](https://downloads.webis.de/theses/papers/bevendorff_2016.pdf)
+- [x] Minimum number of characters/ words for a text to qualify
+  -[Generalized Unmasking](https://aclanthology.org/N19-1068/) uses chunks between 300 and 1,000 words (**500-700 words** best without adding too much computational overhead)
+  - [Generalized Unmasking](https://www.degruyterbrill.com/document/doi/10.1515/itit-2019-0046/html?casa_token=pbCaF7FgUXoAAAAA:8Vw71FUWE5spAbSsEuGGTdIjjm_o1_eb_inHwU3BR6eSrdVMOYy3--iqvDJwCV7EQ1HWtQBh610) uses chunks of **700 words**
+  - [AV PAN 2023 Overview Paper (chap.2)](https://ceur-ws.org/Vol-3497/paper-199.pdf) emails of at least **2000 characters**
+  - [Janek's Two Paradigms of LLM Detection: AA vs. AV](https://aclanthology.org/2025.findings-acl.194.pdf) 
+    - p. 2767, left second last paragraph + Fig. 1,2: **2000-5000 characters** for separation of LLM entropies
+    - pg. 3768: texts with >= **3000 characters** 
 
 ### 🛠️ Implementation
 - [ ] OpenAI
@@ -79,11 +86,11 @@
   - [Generalized Unmasking](https://aclanthology.org/N19-1068/) uses chunks between 300 and 1,000 words (**500-700 words** best without adding too much computational overhead)
   - [Generalized Unmasking](https://www.degruyterbrill.com/document/doi/10.1515/itit-2019-0046/html?casa_token=pbCaF7FgUXoAAAAA:8Vw71FUWE5spAbSsEuGGTdIjjm_o1_eb_inHwU3BR6eSrdVMOYy3--iqvDJwCV7EQ1HWtQBh610) uses chunks of **700 words**
   - [AV PAN 2023 Overview Paper (chap.2)](https://ceur-ws.org/Vol-3497/paper-199.pdf) emails of at least **2000 characters**
-  - [Janek's Two Paradigmen of LLM Detection: AA vs. AV](https://aclanthology.org/2025.findings-acl.194.pdf) 
+  - [Janek's Two Paradigms of LLM Detection: AA vs. AV](https://aclanthology.org/2025.findings-acl.194.pdf) 
     - p. 2767, left second last paragraph + Fig. 1,2: **2000-5000 characters** for separation of LLM entropies
     - (Fig. 3: Unmasking on 250-500 most frequent character 3-grams)
-    - texts with >= **3000 characters** 
-    - texts: **lowercased** and stemmed
+    - pg. 3768: texts with >= **3000 characters** 
+    - pg. 3768: texts: **lowercased** and stemmed
 - [ ] Backtranslation (2-step) paraphrasing: How good is LLM (Ollama?)
   - use only western languages, because LLMs are maybe better with them
 - [x] Backtranslation (2-step) paraphrasing: [Free DeepL API](https://www.deepl.com/en/your-account/keys)
