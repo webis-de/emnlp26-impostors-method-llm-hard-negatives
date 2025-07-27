@@ -790,9 +790,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
                     encoding = detected["encoding"]
 
                 essay_text = self.preprocess(raw_data.decode(encoding))
-                if len(essay_text.split()) < min(
-                    500, MIN_NUM_WORDS
-                ):  # texts are < 2000 words
+                if len(essay_text.split()) < MIN_NUM_WORDS:  # texts are < 1500 words
                     continue
                 task = txt_file.parent.name
                 if task == "Ass1" and "2006_" in txt_file.stem:
