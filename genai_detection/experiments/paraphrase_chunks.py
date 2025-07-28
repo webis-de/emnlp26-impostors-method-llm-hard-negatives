@@ -281,7 +281,7 @@ def save_textwise_chunk_scores(scores_per_text: dict, output_dir: str | Path):
         )
 
 
-def get_slim_dfs_for_one_text(n_paragraphs_df: list) -> list(pd.DataFrame):
+def get_slim_dfs_for_one_text(n_paragraphs_df: list) -> list:  # of dataframes
     slim_n_paragraphs_dfs = []
     for i in range(len(n_paragraphs_df)):
         # each row is average score over scores of all chunks
