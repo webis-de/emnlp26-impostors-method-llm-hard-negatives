@@ -229,9 +229,9 @@ class KoppelWebisDatasetLoader(BaseDatasetLoader):
     def __init__(self, path: str, name: str = CONFIG.KOPPEL):
         super().__init__(name=name)
         self.path = Path(path)
-        assert (
-            self.path.exists()
-        ), f"Path {self.path} does not exist. Current path: {os.getcwd()}"
+        # assert (
+        #     self.path.exists()
+        # ), f"Path {self.path} does not exist. Current path: {os.getcwd()}"
 
     def load(self) -> DatasetDict:
         data = []
@@ -310,9 +310,7 @@ class Pan20DatasetLoader(Pan23DatasetLoader):
             pair_name = "pan20-authorship-verification-training-small.jsonl"
             truth_name = "pan20-authorship-verification-training-small-truth.jsonl"
         pairs = self._load_jsonl(os.path.join(directory_path, pair_name))
-        print("finished loading pairs from", pair_name)
         truth = self._load_jsonl(os.path.join(directory_path, truth_name))
-        print("finished loading truth from", truth_name)
         truth_map = {item["id"]: item for item in truth}
 
         merged_data = []
@@ -1251,7 +1249,7 @@ if __name__ == "__main__":
 
     # run_pan23(base_dir=args.path, save_path=args.out)
     # # run_pan25()
-    run_pan20()
+    # run_pan20()
     run_koppel_webis()
     run_blog_corpus()
     run_gutenberg_corpus()
