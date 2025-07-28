@@ -75,6 +75,9 @@
     - pg. 3768: texts with >= **3000 characters** 
 
 ### 🛠️ Implementation
+- [o] run `experiments/naive_paraphrasers_FPs.py` on cluster via `scripts/exp_naive_paraphrasers_FPs.sh`
+- [o] run `dataset_util.py` on cluster via `scripts/run_dataset_creation.sh`
+- [o] run `experiments/run_evaluation.py`via `scripts/evaluate_paraphrasers.sh`
 - [ ] OpenAI
 - [ ] lowercasing texts for unmasking or other AV/AA: 
     - Yes: [Janek's Two Paradigms of LLM Detection: AA vs. AV pg. 3768 left 1st paragraph](https://aclanthology.org/2025.findings-acl.194.pdf), [Janek's BA pg. 11](https://downloads.webis.de/theses/papers/bevendorff_2016.pdf)
