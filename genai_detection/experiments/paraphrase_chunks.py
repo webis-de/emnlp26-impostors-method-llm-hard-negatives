@@ -185,7 +185,7 @@ def run_experiment(path2dataset: str) -> pd.DataFrame:
     """
     assert os.path.exists(path2dataset), f"Dataset path {path2dataset} does not exist."
     dataset = get_dataset(path2dataset)
-    dataset = dataset.head(2)
+    dataset = dataset.head(1)
     n_responses = 1
 
     # Initialize paraphrasers and prompts
@@ -270,7 +270,7 @@ def save_textwise_chunk_scores(scores_per_text: dict, output_dir: str | Path):
     assert output_dir.exists(), f"Output directory {output_dir} does not exist."
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    for i, k, v in enumerate(scores_per_text.items()):
+    for i, (k, v) in enumerate(scores_per_text.items()):
         n_paragraphs_df, data_category = v
         path2results = output_dir / f"text_{i}"
         os.makedirs(path2results, exist_ok=True)
