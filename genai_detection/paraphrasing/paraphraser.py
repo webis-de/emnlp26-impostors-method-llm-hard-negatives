@@ -19,7 +19,6 @@ import deepl
 import nltk
 from nltk.tokenize import sent_tokenize
 
-# nltk.download("punkt")  # Ensure NLTK punkt tokenizer is downloaded
 nltk.download("punkt_tab")
 
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
