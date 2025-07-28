@@ -127,7 +127,7 @@ class ParaphrasingEvaluator:
             / "data/datasets/custom_texts/",
             # TODO: Add student essays dataset
             # "student_essays": Path(__file__).resolve().parents[2]
-            # / "data/datasets/student_essays/",
+            # / "data/datasets/student_essays/Intro2006/",
         }
         self.ground_truth = ground_truth or {}
 
