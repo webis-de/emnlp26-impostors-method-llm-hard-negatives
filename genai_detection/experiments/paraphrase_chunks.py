@@ -281,7 +281,7 @@ def save_textwise_chunk_scores(scores_per_text: dict, output_dir: str | Path):
         )
 
 
-def get_slim_dfs_for_one_text(n_paragraphs_df: list) -> pd.DataFrame:
+def get_slim_dfs_for_one_text(n_paragraphs_df: list) -> list(pd.DataFrame):
     slim_n_paragraphs_dfs = []
     for i in range(len(n_paragraphs_df)):
         # each row is average score over scores of all chunks
@@ -300,16 +300,16 @@ def get_slim_dfs_for_one_text(n_paragraphs_df: list) -> pd.DataFrame:
         )
         # slim_n_paragraphs_df["n_chunks"] = i + 1  # index + 1 = number of chunks
         slim_n_paragraphs_dfs.append(slim_n_paragraphs_df)
-        return slim_n_paragraphs_df
+    return slim_n_paragraphs_df
 
 
 def plot_model_metrics(
-    n_paragraphs_df,
-    save_dir="model_plots",
-    show=True,
-    save=True,
+    n_paragraphs_df: pd.DataFrame,
+    save_dir: str = "model_plots",
+    show: bool = True,
+    save: bool = True,
     figsize=(10, 6),
-    data_category="News",
+    data_category: str = "News",
 ):
     """
     Create and save line plots of metric scores per model over n_chunks.
