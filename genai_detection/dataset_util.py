@@ -310,7 +310,9 @@ class Pan20DatasetLoader(Pan23DatasetLoader):
             pair_name = "pan20-authorship-verification-training-small.jsonl"
             truth_name = "pan20-authorship-verification-training-small-truth.jsonl"
         pairs = self._load_jsonl(os.path.join(directory_path, pair_name))
+        print("finished loading pairs from", pair_name)
         truth = self._load_jsonl(os.path.join(directory_path, truth_name))
+        print("finished loading truth from", truth_name)
         truth_map = {item["id"]: item for item in truth}
 
         merged_data = []
