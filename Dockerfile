@@ -14,7 +14,7 @@ COPY genai_detection/__init__.py ./genai_detection/
 
 RUN sed -i.bak 's/+cpu", source = "torch-cpu"/+cu128", source = "torch-cu128"/g' pyproject.toml
 RUN poetry lock
-RUN --mount=type=cache,target=/root/.cache set -x \
+RUN --mount=type=cache,target=/root/.cache \
     poetry install
 
 COPY . .
