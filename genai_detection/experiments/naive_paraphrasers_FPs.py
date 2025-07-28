@@ -5,6 +5,7 @@ Hence, we hypothesize if the imposter model uses only Naive Paraphrasers (i.e. T
 We therefore created (Non-)Naive LLM-based imposter generators in the `LLMImposterGenerator` class and use only the (Non-)Naive Paraphrasers.
 """
 
+import argparse
 import os
 from pathlib import Path
 from typing import DefaultDict
@@ -42,16 +43,15 @@ SAVE_PATH = (
 TIMESTAMP = pd.Timestamp.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 
-def get_dataset() -> pd.DataFrame:
+def get_dataset(path2dataset: str) -> pd.DataFrame:
     """
     Load the cross-genre dataset from the specified path.
     The dataset is expected to be in a format compatible with the `load_from_disk` function.
 
     The construction of this cross-genre dataset is in file `genai_detection/dataset_util.py`.
     """
-    dataset = load_from_disk(Path(__file__).resolve().parents[2] / CONFIG.CROSS_GENRE)[
-        "train"
-    ].to_pandas()
+    assert os.path.exists(path2dataset), f"Dataset path {path2dataset} does not exist."
+    dataset = load_from_disk(path2dataset)["train"].to_pandas()
     print(f"Loaded Cross-genre dataset with {len(dataset)} examples.")
     dataset["paraphraser"] = dataset["authors"].apply(lambda x: x[1])
     return dataset
@@ -213,10 +213,21 @@ def run_FNs_experiment(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Assess effect of (Non-) Naive imposter generation."
+    )
+    parser.add_argument(
+        "--path2dataset",
+        type=str,
+        default=Path(__file__).resolve().parents[2] / CONFIG.CROSS_GENRE,
+        help="Path to cross-genre dataset (default: %(default)s).",
+    )
+    args = parser.parse_args()
+
     # Run the experiment
     if not SAVE_PATH.exists():
         SAVE_PATH.mkdir(parents=True, exist_ok=True)
-    get_dataset()
+    get_dataset(path2dataset=args.path2dataset)
     dataset_dict = split_dataset_by_paraphraser_naivety(get_dataset())
     print("Dataset acquistion completed successfully.")
 
