@@ -227,8 +227,8 @@ if __name__ == "__main__":
     # Run the experiment
     if not SAVE_PATH.exists():
         SAVE_PATH.mkdir(parents=True, exist_ok=True)
-    get_dataset(path2dataset=args.path2dataset)
-    dataset_dict = split_dataset_by_paraphraser_naivety(get_dataset())
+    dataset = get_dataset(path2dataset=args.path2dataset)
+    dataset_dict = split_dataset_by_paraphraser_naivety(dataset=dataset)
     print("Dataset acquistion completed successfully.")
 
     detector_dict = load_detectors()
