@@ -459,22 +459,18 @@ class OllamaParaphraser(NaiveParaphraser):
     """
 
     def __init__(self, model_id: str = "default:latest"):
-        print("Ollama model")
         self.client = OpenAI(
             base_url="https://llm.web.webis.de/api",
             api_key=CONFIG.OPENAI_KEY,
         )
-        print(f"[DEBUG] Using Ollama model: {model_id}")
         # custom (non-OpenAI) endpoint: Use requests library
         response = requests.get(
             "https://llm.web.webis.de/ollama/api/tags",
             headers={"Authorization": f"Bearer {CONFIG.OPENAI_KEY}"},
         )
-        print("DEBUG] Response from Ollama API:", response.status_code, response.text)
         models = response.json()["models"]
         assert model_id in [model["name"] for model in models]
         self.model_id = model_id
-        print(f"[DEBUG] Initialized Ollama model.")
 
     def paraphrase(
         self,
