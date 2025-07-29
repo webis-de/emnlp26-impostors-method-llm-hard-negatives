@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=imposter_dataset_creation
+#SBATCH --job-name=dataset_creation
 #SBATCH --mem=128g
 #SBATCH --cpus-per-task=4
 #SBATCH --output=logs/log-dataset-creation-%j.log
