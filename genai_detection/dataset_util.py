@@ -663,13 +663,15 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             self.path.exists()
         ), f"Path {self.path} does not exist. Current path: {os.getcwd()}"
 
-    def load(self, train_split_portion: float = 0.7) -> DatasetDict:
+    def load(
+        self, train_split_portion: float = 0.7, min_num_words: int = MIN_NUM_WORDS
+    ) -> DatasetDict:
         """
         Loader for the Student Essay dataset.
         The dataset can be obtained from James W. Pennebaker.
         """
         # build student essays dataset
-        df = self._load_student_essays()
+        df = self._load_student_essays(min_num_words=min_num_words)
         print("obtained student essays dataset with", len(df), "entries.")
 
         # metadata dataframe
@@ -754,7 +756,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             }
         )
 
-    def _load_student_essays(self):
+    def _load_student_essays(self, min_num_words: int = MIN_NUM_WORDS) -> pd.DataFrame:
         """
         Load student essays.
         Koppel et al. (2014) use only the first 4 assignments.
@@ -790,7 +792,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
                     encoding = detected["encoding"]
 
                 essay_text = self.preprocess(raw_data.decode(encoding))
-                if len(essay_text.split()) < MIN_NUM_WORDS:  # texts are < 1500 words
+                if len(essay_text.split()) < min_num_words:  # texts are < 1500 words
                     continue
                 task = txt_file.parent.name
                 if task == "Ass1" and "2006_" in txt_file.stem:
