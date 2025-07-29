@@ -1,0 +1,74 @@
+from more_itertools import ichunked
+import numpy as np
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+import torch
+from genai_detection.config import CONFIG
+from genai_detection.detectors.imposter_base import ImposterBaselineBase
+import typing as t
+
+
+class UnSupervisedImposterBaseline(ImposterBaselineBase):
+    """
+    Unsupervised Imposter Baseline detector class.
+
+    This class extends the DetectorBase and implements an unsupervised baseline for the Imposter method by Koopel et. Al. (2014).
+    A document pair (i.e. disputed document and candidate author document) is represented as a vector of TF-IDF features.
+    The frequenies are calculated based on the 100,000 most frequent space-free character 4-grams in the corpus.
+    Similarities are than calculated using cosine similarity or min-max similarity.
+    Classification is carried out using a threshold on the similarity score.
+    Koppel et Al. (2014) have achieved (with the best threshold) a maximum of an accuracy of 70.6% using cosine similarity
+    and a maximum an accuracy of 74.2% using min-max simialrity on a deployment set.
+
+    References:
+    ===========
+    Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’.
+    Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
+    """
+
+    def __init__(self):
+        """
+        Initialize the Unsupervised Imposter Baseline detector.
+        """
+        super().__init__()
+        self._vectorizer = TfidfVectorizer(
+            vocabulary=self.get_top_tokens(), input="content", dtype=np.float32
+        )
+        self.threshold = (
+            0.5  # Default threshold, can be adjusted based on validation set
+        )
+
+    def _get_score_impl(
+        self, text: t.Iterable[str]
+    ) -> t.Union[torch.Tensor, np.ndarray, t.Iterable[float]]:
+        """
+        Scoring implementation for the Supervised Imposter Baseline detector.
+
+        :param text: An iterable of strings (texts) to score.
+        :return: A list of scores for each text.
+        """
+        if isinstance(text, str):
+            text = [text]
+
+        vectors = [self.get_tfidf_vector_for_text(t) for t in text]
+        scores_per_pair = (
+            []
+        )  # id is index of pair (i.e, length is half of the input text list)
+        for i, vecs in enumerate(ichunked(vectors, 2)):
+            vecs = list(
+                vecs
+            )  # generator object is not subscriptable, so convert to list
+            assert len(vecs) == 2, "Input text must be a list of pairs of texts."
+            scores_per_pair.append(self.cosine_similarity(vecs[0], vecs[1]))
+
+        return np.array(scores_per_pair)
+
+    def get_prediction(self, text: t.Iterable[str]) -> t.List[bool]:
+        """
+        Predict if the input text(s) were written by a the same author TODO: machine.
+
+        :param text: input text or batch of input texts
+        :return: boolean classifications of whether inputs are likely same author TODO: machine-generated
+        """
+        scores = self.get_score(text)
+        return [score > self.threshold for score in scores]
