@@ -47,9 +47,9 @@ CATEGORIES = [
 PROMPTS = [
     "Paraphrase the following text and output only the paraphrased version:",
     "First, extract bullet points capturing the main ideas, then create a text based on these bullet points. Only output the final text (i.e. do not output the bullet points or any additional chain of thoughts):",
-    # "Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
-    # "Paraphrase the sentence using the same tone as the original with approximately the same number of words:",
-    # "Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence:",
+    "Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
+    "Paraphrase the sentence using the same tone as the original with approximately the same number of words:",
+    "Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence:",
 ]
 SAVE_PATH = (
     Path(__file__).resolve().parents[2]
@@ -83,38 +83,38 @@ def get_paraphraser_dict() -> Dict[str, Paraphraser]:
     """
     paraphrasers = {
         "T5_ChatGPT": T5ChatGPTParaphraser(),
-        # "T5_Google_PAWS": T5GooglePAWSParaphraser(),
-        # "Ollama": OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
+        "T5_Google_PAWS": T5GooglePAWSParaphraser(),
+        "Ollama": OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
     }
-    # bullet_point_paraphraser = BulletPointParaphraser(
-    #     text_extractor=paraphrasers["Ollama"],
-    #     text_generator=paraphrasers["Ollama"],
-    # )
-    # task_paraphraser = TaskParaphraser(
-    #     text_extractor=paraphrasers["Ollama"],
-    #     text_generator=paraphrasers["Ollama"],
-    # )
-    # topic_paraphraser = TopicParaphraser(
-    #     text_extractor=paraphrasers["Ollama"],
-    #     text_generator=paraphrasers["Ollama"],
-    # )
-    # title_paraphraser = TitleParaphraser(
-    #     text_extractor=paraphrasers["Ollama"],
-    #     text_generator=paraphrasers["Ollama"],
-    # )
-    # translation_paraphraser = TranslationParaphraser(
-    #     text_extractor=paraphrasers["Ollama"],
-    #     text_generator=paraphrasers["Ollama"],
-    # )
-    # paraphrasers.update(
-    #     {
-    #         "BulletPoint": bullet_point_paraphraser,
-    #         "Task": task_paraphraser,
-    #         "Topic": topic_paraphraser,
-    #         "Title": title_paraphraser,
-    #         "Translation": translation_paraphraser,
-    #     }
-    # )
+    bullet_point_paraphraser = BulletPointParaphraser(
+        text_extractor=paraphrasers["Ollama"],
+        text_generator=paraphrasers["Ollama"],
+    )
+    task_paraphraser = TaskParaphraser(
+        text_extractor=paraphrasers["Ollama"],
+        text_generator=paraphrasers["Ollama"],
+    )
+    topic_paraphraser = TopicParaphraser(
+        text_extractor=paraphrasers["Ollama"],
+        text_generator=paraphrasers["Ollama"],
+    )
+    title_paraphraser = TitleParaphraser(
+        text_extractor=paraphrasers["Ollama"],
+        text_generator=paraphrasers["Ollama"],
+    )
+    translation_paraphraser = TranslationParaphraser(
+        text_extractor=paraphrasers["Ollama"],
+        text_generator=paraphrasers["Ollama"],
+    )
+    paraphrasers.update(
+        {
+            "BulletPoint": bullet_point_paraphraser,
+            "Task": task_paraphraser,
+            "Topic": topic_paraphraser,
+            "Title": title_paraphraser,
+            "Translation": translation_paraphraser,
+        }
+    )
     return paraphrasers
 
 
@@ -185,7 +185,6 @@ def run_experiment(path2dataset: str) -> pd.DataFrame:
     """
     assert os.path.exists(path2dataset), f"Dataset path {path2dataset} does not exist."
     dataset = get_dataset(path2dataset)
-    dataset = dataset.head(1)
     n_responses = 1
 
     # Initialize paraphrasers and prompts
@@ -237,8 +236,6 @@ def run_experiment(path2dataset: str) -> pd.DataFrame:
             # Add to results list
             n_paragraphs_df.append(averaged_df)
         scores_per_text[original_text] = [n_paragraphs_df, category]
-        print(f"Number of chunks tested: {len(n_paragraphs_df)}")
-    print(f"Total number of texts processed: {len(scores_per_text)}")
     return scores_per_text
 
 
@@ -283,11 +280,8 @@ def save_textwise_chunk_scores(scores_per_text: dict, output_dir: str | Path):
 
 def get_slim_dfs_for_one_text(n_paragraphs_df: list) -> list:  # of dataframes
     slim_n_paragraphs_dfs = []
-    print("nmber of chunks tested:", len(n_paragraphs_df))
     for i in range(len(n_paragraphs_df)):
         # each row is average score over scores of all chunks
-        print(f"Chunk size: {i}, number of score entries: {len(n_paragraphs_df[i])}")
-
         slim_n_paragraphs_df = n_paragraphs_df[i].drop(
             columns=[
                 # "prompt",
@@ -297,12 +291,7 @@ def get_slim_dfs_for_one_text(n_paragraphs_df: list) -> list:  # of dataframes
                 "bertscore_hash",
             ]
         )
-        print(type(slim_n_paragraphs_df))
-        # slim_n_paragraphs_df["n_chunks"] = i + 1  # index + 1 = number of chunks
         slim_n_paragraphs_dfs.append(slim_n_paragraphs_df)
-    print("type of slimmed DataFrames:", type(slim_n_paragraphs_dfs))
-    print(f"Number of slim DataFrames: {len(slim_n_paragraphs_dfs)}")
-    # FIXME: Should return list of dataframes but return single dataframe
     return slim_n_paragraphs_dfs
 
 
