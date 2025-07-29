@@ -39,7 +39,7 @@ CATEGORY2DIRECTORY = {
         "custom_texts",
         "cnn_040725",
     ],  # Dalai Lama; "cnn_230625"    # USA attacks Iran
-    "Blog": ["blog_corpus", 27],
+    "Blog": ["Blog_corpus", 27],
     "Gutenberg": ["gutenberg", "Othello_the_Moor_of_Venice_William_Shakespeare"],
     "Student Essay": [
         "student_essays/Intro2006",
