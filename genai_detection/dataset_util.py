@@ -975,7 +975,7 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
         """
         super().__init__(name=name)
 
-    def load(self, n_samples: int = 1) -> DatasetDict:
+    def load(self, n_samples: int = 1, train_split_portion: float = 0.7) -> DatasetDict:
         """
         Loader for the Cross-genre dataset.
         The dataset is expected to be a directory with text files, where each file is named in the format "author_genre.txt".
@@ -1114,15 +1114,18 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
         )
 
         # Convert DataFrames to list of dictionaries
-        train_data = dataset.to_dict(orient="records")
+        dataset = dataset.to_dict(orient="records")
+        random.seed(seed)
+        random.shuffle(dataset)
+        train_data = dataset[: int(len(dataset) * train_split_portion)]
+        test_data = dataset[int(len(dataset) * train_split_portion) :]
         print(f"Total dataset size: {len(train_data)} records.")
-        # test_data = test_df.to_dict(orient="records")
 
         # Create DatasetDict
         return DatasetDict(
             {
                 "train": Dataset.from_list(train_data, features=features),
-                # "test": Dataset.from_list(test_data, features=features),
+                "test": Dataset.from_list(test_data, features=features),
             }
         )
 
@@ -1228,7 +1231,7 @@ def run_gutenberg_corpus():
 
 def run_cross_genre():
     loader = CrossGenreDatasetLoader()
-    dataset = loader.load()
+    dataset = loader.load(n_samples=2)
     dataset.save_to_disk(Path(__file__).resolve().parent.parent / CONFIG.CROSS_GENRE)
 
 
