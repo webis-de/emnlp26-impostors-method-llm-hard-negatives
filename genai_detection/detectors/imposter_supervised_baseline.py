@@ -50,7 +50,6 @@ class SupervisedImposterBaseline(ImposterBaselineBase):
             text = [text]
 
         vectors = [self.get_tfidf_vector_for_text(t) for t in text]
-        print(f"Obtained {len(vectors)} TFIDF vectors for {len(text)} texts.")
         scores_per_pair = (
             []
         )  # id is index of pair (i.e, length is half of the input text list)
@@ -60,10 +59,6 @@ class SupervisedImposterBaseline(ImposterBaselineBase):
             )  # generator object is not subscriptable, so convert to list
             assert len(vecs) == 2, "Input text must be a list of pairs of texts."
             scores_per_pair.append(self.model.predict(abs(vecs[0] - vecs[1])))
-
-        print(
-            f"Obtained {len(scores_per_pair)} supervised Linear SVC scores for {len(text)} texts."
-        )
         return np.array(scores_per_pair)
 
     def get_prediction(self, text: t.Iterable[str]) -> t.List[bool]:
@@ -85,14 +80,11 @@ class SupervisedImposterBaseline(ImposterBaselineBase):
             Path(__file__).resolve().parents[2] / "models" / "imposter_svc_model.pkl"
         )
         if path2model.exists():
-            print(f"Loading pre-trained model from {path2model}.")
             return pickle.load(path2model)
         else:
-            print(f"Pre-trained model not found at {path2model}, training a new one.")
             path2model.parent.mkdir(parents=True, exist_ok=True)
             model = LinearSVC()
             # Load training data
-            print("Loading training data...", self.dataset.columns)
             disputed_texts = self.dataset[["disputed_text", "candidate_text", "same"]]
             # sample texts
             frac = 0.6
