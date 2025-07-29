@@ -31,9 +31,6 @@ class UnSupervisedImposterBaseline(ImposterBaselineBase):
         Initialize the Unsupervised Imposter Baseline detector.
         """
         super().__init__()
-        self._vectorizer = TfidfVectorizer(
-            vocabulary=self.get_top_tokens(), input="content", dtype=np.float32
-        )
         self.threshold = (
             0.5  # Default threshold, can be adjusted based on validation set
         )
@@ -72,3 +69,18 @@ class UnSupervisedImposterBaseline(ImposterBaselineBase):
         """
         scores = self.get_score(text)
         return [score > self.threshold for score in scores]
+
+
+if __name__ == "__main__":
+    # Example usage
+    detector = UnSupervisedImposterBaseline()
+    sample_texts = [
+        "This is a sample text for testing.",
+        "This is another sample text for testing.",
+        "This text is different from the others.",
+        "Yet another text to test the detector.",
+    ]
+    scores = detector.get_score(sample_texts)
+    predictions = detector.get_prediction(sample_texts)
+    print("Scores:", scores)
+    print("Predictions:", predictions)

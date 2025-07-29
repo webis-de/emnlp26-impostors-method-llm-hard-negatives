@@ -1,3 +1,4 @@
+from operator import itemgetter
 import re
 from more_itertools import ichunked
 import numpy as np
@@ -104,6 +105,7 @@ class ImposterBaselineBase(ImposterBase):
         self.dataset = load_from_disk(
             Path(__file__).resolve().parents[2] / CONFIG.CROSS_GENRE
         )["train"].to_pandas()
+        print("Obtained dataset.")
         self._vectorizer = TfidfVectorizer(
             vocabulary=self.get_top_tokens(), input="content", dtype=np.float32
         ).fit(
@@ -112,6 +114,7 @@ class ImposterBaselineBase(ImposterBase):
                 for t in self.dataset["disputed_text"].tolist()
             ]
         )
+        print("Fitted vectorizer.")
 
     def get_top_tokens(self, max_tokens: int = 100000):
         """
@@ -125,6 +128,7 @@ class ImposterBaselineBase(ImposterBase):
         flat_list = [item for sublist in tokens for item in sublist]
         freqs = Counter(flat_list)
         freqs = Counter({k: v for k, v in freqs.items() if v > 1})
+        return list(map(itemgetter(0), freqs.most_common(max_tokens)))
         return heapq.nlargest(max_tokens, tokens, key=lambda x: freqs[x])
 
     def get_tfidf_vector_for_text(self, text: str):
