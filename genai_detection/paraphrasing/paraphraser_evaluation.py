@@ -409,9 +409,10 @@ class ParaphrasingEvaluator:
             save_path = Path(save_path)
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path.mkdir(parents=True, exist_ok=True)
-            out = save_path / f"kde_metric_dists_{timestamp}.png"
-            fig.savefig(out, bbox_inches="tight")
-            print(f"Saved KDE grid to {out}")
+            for format in ["png", "svg"]:
+                out = save_path / f"kde_metric_dists_{timestamp}.{format}"
+                fig.savefig(out, bbox_inches="tight", transparent=True, format=format)
+                print(f"Saved KDE grid to {out}")
 
         if display_plot:
             plt.show()
@@ -636,6 +637,15 @@ class ParaphrasingEvaluator:
                     references=references,
                     model_type="distilbert-base-uncased",
                 )
+            except Exception as e:
+                print("[ERROR] BERTScore computation failed:", e)
+                bert_scores = {
+                    "precision": [0.0] * self.n_responses,
+                    "recall": [0.0] * self.n_responses,
+                    "f1": [0.0] * self.n_responses,
+                    "hashcode": "",
+                }
+            try:
                 # rouge returns one value for all paraphrases, hence: list comprehension
                 rouge_scores = [
                     self.rouge_score.compute(
@@ -643,7 +653,18 @@ class ParaphrasingEvaluator:
                     )
                     for p in paraphrases
                 ]
-
+            except Exception as e:
+                print("[ERROR] ROUGE computation failed:", e)
+                rouge_scores = [
+                    {
+                        "rouge1": 0.0,
+                        "rouge2": 0.0,
+                        "rougeL": 0.0,
+                        "rougeLsum": 0.0,
+                    }
+                    for _ in paraphrases
+                ]
+            try:
                 for i, paraphrase in enumerate(paraphrases):
                     results.append(
                         self._build_result_row(
@@ -659,7 +680,7 @@ class ParaphrasingEvaluator:
 
             except Exception as e:
                 print(
-                    f"[ERROR] Scoring failed for '{name}' with prompt '{prompt}': {e}"
+                    f"[ERROR] Scoring failed for '{name}' with prompt '{prompt}' and paraphrases '{paraphrases}': {e}"
                 )
                 continue
 
@@ -895,12 +916,15 @@ class ParaphrasingEvaluator:
             save_path = Path(save_path)
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            save_path = (
-                save_path
-                / f"paraphrasing_metrics_grouped_by_{group_by}_radar_chart_{timestamp}.png"
-            )
-            plt.savefig(save_path, bbox_inches="tight")
-            print(f"Plot saved to {save_path}")
+            for format in ["png", "svg"]:
+                save_path = (
+                    save_path
+                    / f"paraphrasing_metrics_grouped_by_{group_by}_radar_chart_{timestamp}.{format}"
+                )
+                plt.savefig(
+                    save_path, bbox_inches="tight", transparent=True, format=format
+                )
+                print(f"Plot saved to {save_path}")
         if display_plot:
             plt.show()
 
@@ -1020,11 +1044,15 @@ class ParaphrasingEvaluator:
             save_path = Path(save_path)
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            full_path = (
-                save_path / f"sem_syn_scatter_grouped_by_{group_by}_{timestamp}.png"
-            )
-            plt.savefig(full_path, bbox_inches="tight")
-            print(f"Plot saved to {full_path}")
+            for format in ["png", "svg"]:
+                full_path = (
+                    save_path
+                    / f"sem_syn_scatter_grouped_by_{group_by}_{timestamp}.{format}"
+                )
+                plt.savefig(
+                    full_path, bbox_inches="tight", transparent=True, format=format
+                )
+                print(f"Plot saved to {full_path}")
 
         if display_plot:
             plt.show()
@@ -1189,12 +1217,15 @@ class ParaphrasingEvaluator:
             save_path = Path(save_path)
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            full_path = (
-                save_path
-                / f"metric_distributions_grouped_by_{group_by}_{timestamp}.png"
-            )
-            plt.savefig(full_path, bbox_inches="tight")
-            print(f"Plot saved to {full_path}")
+            for format in ["png", "svg"]:
+                full_path = (
+                    save_path
+                    / f"metric_distributions_grouped_by_{group_by}_{timestamp}.{format}"
+                )
+                plt.savefig(
+                    full_path, bbox_inches="tight", transparent=True, format=format
+                )
+                print(f"Plot saved to {full_path}")
 
         if display_plot:
             plt.show()
