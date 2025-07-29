@@ -110,8 +110,13 @@ class ParaphrasingEvaluator:
 
         self.rouge_score = evaluate.load("rouge")
         self.bertscore = evaluate.load("bertscore")
+        device = (
+            "cuda"
+            if torch.cuda.is_available()
+            else ("mps" if torch.backends.mps.is_available() else "cpu")
+        )
         self.sbert_model = SentenceTransformer(
-            "all-MiniLM-L6-v2"
+            "all-MiniLM-L6-v2", device=device
         )  # for cosine similarity
         # https://pypi.org/project/word-mover-distance/ Word Mover's Distance (WMD)
         self.pretr_word_model = WMDReadyKeyedVectors(
