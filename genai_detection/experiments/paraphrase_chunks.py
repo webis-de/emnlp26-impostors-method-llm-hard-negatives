@@ -283,11 +283,10 @@ def save_textwise_chunk_scores(scores_per_text: dict, output_dir: str | Path):
 
 def get_slim_dfs_for_one_text(n_paragraphs_df: list) -> list:  # of dataframes
     slim_n_paragraphs_dfs = []
+    print("nmber of chunks tested:", len(n_paragraphs_df))
     for i in range(len(n_paragraphs_df)):
         # each row is average score over scores of all chunks
-        print(
-            f"Chunk size: {i + 1}, number of score entries: {len(n_paragraphs_df[i])}"
-        )
+        print(f"Chunk size: {i}, number of score entries: {len(n_paragraphs_df[i])}")
 
         slim_n_paragraphs_df = n_paragraphs_df[i].drop(
             columns=[
@@ -298,9 +297,13 @@ def get_slim_dfs_for_one_text(n_paragraphs_df: list) -> list:  # of dataframes
                 "bertscore_hash",
             ]
         )
+        print(type(slim_n_paragraphs_df))
         # slim_n_paragraphs_df["n_chunks"] = i + 1  # index + 1 = number of chunks
         slim_n_paragraphs_dfs.append(slim_n_paragraphs_df)
-    return slim_n_paragraphs_df
+    print("type of slimmed DataFrames:", type(slim_n_paragraphs_dfs))
+    print(f"Number of slim DataFrames: {len(slim_n_paragraphs_dfs)}")
+    # FIXME: Should return list of dataframes but return single dataframe
+    return slim_n_paragraphs_dfs
 
 
 def plot_model_metrics(
