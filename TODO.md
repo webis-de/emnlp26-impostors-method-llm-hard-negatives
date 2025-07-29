@@ -76,7 +76,7 @@
 
 ### 🛠️ Implementation
 - [o] run `experiments/naive_paraphrasers_FPs.py` on cluster via `scripts/exp_naive_paraphrasers_FPs.sh`
-- [o] run `dataset_util.py` on cluster via `scripts/run_dataset_creation.sh`
+- [x] run `dataset_util.py` on cluster via `scripts/run_dataset_creation.sh`
 - [o] run `experiments/run_evaluation.py`via `scripts/evaluate_paraphrasers.sh`
 - [ ] OpenAI
 - [ ] lowercasing texts for unmasking or other AV/AA: 
@@ -85,7 +85,7 @@
 - [x] Do not lowercase the text to preserve authorial style such as capitalization or all caps `util.py`: `preprocess_text` function
 - [x] try pushing 20GB Docker container to webis registry from university network
   - does not work, broken pipe
-- [ ] Find number of words sufficient for LLM Detection from Janek's paper
+- [x] Find number of words sufficient for LLM Detection from Janek's paper
   - [Generalized Unmasking](https://aclanthology.org/N19-1068/) uses chunks between 300 and 1,000 words (**500-700 words** best without adding too much computational overhead)
   - [Generalized Unmasking](https://www.degruyterbrill.com/document/doi/10.1515/itit-2019-0046/html?casa_token=pbCaF7FgUXoAAAAA:8Vw71FUWE5spAbSsEuGGTdIjjm_o1_eb_inHwU3BR6eSrdVMOYy3--iqvDJwCV7EQ1HWtQBh610) uses chunks of **700 words**
   - [AV PAN 2023 Overview Paper (chap.2)](https://ceur-ws.org/Vol-3497/paper-199.pdf) emails of at least **2000 characters**
@@ -100,7 +100,7 @@
   - 500,000 max characters per month
   - currently commented out in `paraphraser.py`
   - when commented in, used only for first paraphrase, to save API calls/ characters
-- [ ] What are Imposter paper (Koppel et Al. 2014) baselines: Implement them
+- [o] What are Imposter paper (Koppel et Al. 2014) baselines: Implement them
   - 1. Similarity-Based Baseline: Measure the similarity (1a cosine ca. 71% acc, 1b min-max ca. 74% acc) between the candidate text and the original text (space-free 4-gram tfidf of top 100,000 n-grams across corpus) and assign same-author label if similarity is above a certain threshold.
   - 2. Supervised Baseline: Train a supervised classifier (linear SVM) on 1,000 labeled sample pairs to distinguish between same-author and different-author pairs based on absolute element-wise differences in their top 100,000 tfidf embedding: 79.8% accuracy
 - Koppel et. Al. Studnt Essay dataset: 
