@@ -69,7 +69,7 @@ class SupervisedImposterBaseline(ImposterBaselineBase):
         :return: boolean classifications of whether inputs are likely same author TODO: machine-generated
         """
         scores = self.get_score(text)
-        return scores
+        return [bool(item) for sublist in scores for item in sublist]
 
     def get_trained_linear_svc(self):
         """
@@ -113,21 +113,32 @@ class SupervisedImposterBaseline(ImposterBaselineBase):
             y = training_data["same"].astype(int).values
             # Train model
             model.fit(X, y)
-            # Save model
-            pickle.dump(model, open(path2model, "wb"))
+            # TODO: Save model
+            # pickle.dump(model, open(path2model, "wb"))
             return model
 
 
 if __name__ == "__main__":
     # Example usage
     detector = SupervisedImposterBaseline()
+    dataset = load_from_disk(Path(__file__).resolve().parents[2] / CONFIG.CROSS_GENRE)[
+        "test"
+    ].to_pandas()[["disputed_text", "candidate_text", "same"]]
+    print("TWCHCVH", dataset.iloc[0])
     sample_texts = [
-        "This is a sample disputed text.",
-        "This is a sample candidate text.",
-        "Another disputed text for testing.",
-        "Another candidate text for testing.",
+        [dataset.iloc[i]["disputed_text"], dataset.iloc[i]["candidate_text"]]
+        for i in range(len(dataset))
     ]
+    print("Number of texts: ", len(sample_texts))
+    sample_texts = [item for sublist in sample_texts for item in sublist]
     scores = detector.get_score(sample_texts)
     predictions = detector.get_prediction(sample_texts)
     print("Scores:", scores)
     print("Predictions:", predictions)
+    print("Ground Truth: ", dataset["same"])
+
+    # debug
+    dataset = load_from_disk(Path(__file__).resolve().parents[2] / CONFIG.CROSS_GENRE)[
+        "train"
+    ].to_pandas()[["disputed_text", "candidate_text", "same"]]
+    print(dataset["same"].value_counts())
