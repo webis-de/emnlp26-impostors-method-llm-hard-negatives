@@ -72,7 +72,7 @@ class BaseImposterGenerator(ABC):
     def _get_dataset_split_from_path(self, path2imp: str):
         path2imp = Path(path2imp)
         if not path2imp.exists():
-            raise FileNotFoundError(f"Training data not found at {path2imp}")
+            raise FileNotFoundError(f"Data not found at {path2imp}")
         dataset = load_from_disk(
             os.path.join(
                 os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")),
