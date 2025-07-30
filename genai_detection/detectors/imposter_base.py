@@ -10,6 +10,7 @@ from datasets import load_from_disk
 import heapq
 from pathlib import Path
 import re
+import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 
@@ -58,10 +59,11 @@ class ImposterBase(DetectorBase):
                 if (len(token) < n) and ((n - 2) <= len(token)):
                     # add all n-grams options with spaces
                     # TODO: results in most common ngrams ('the ', 22), (' the', 22), 'to  ': 10, ' to ': 10, '  to': 10,
-                    n_grams.extend(
-                        " " * i + token + " " * (n - len(token) - i)
-                        for i in range(n - len(token) + 1)
-                    )
+                    # n_grams.extend(
+                    #     " " * i + token + " " * (n - len(token) - i)
+                    #     for i in range(n - len(token) + 1)
+                    # )
+                    n_grams.append(token + " " * (n - len(token)))
             return n_grams
 
         else:
@@ -103,8 +105,11 @@ class ImposterBaselineBase(ImposterBase):
     def __init__(self):
         super().__init__()
         self.dataset = load_from_disk(
-            Path(__file__).resolve().parents[2] / CONFIG.CROSS_GENRE
+            Path(__file__).resolve().parents[2] / CONFIG.PATH2STUDENT_ESSAYS
         )["train"].to_pandas()
+        self.dataset[["disputed_text", "candidate_text"]] = pd.DataFrame(
+            self.dataset["pair"].tolist(), index=self.dataset.index
+        )
         print("Obtained dataset.")
         self._vectorizer = TfidfVectorizer(
             vocabulary=self.get_top_tokens(), input="content", dtype=np.float32
@@ -123,6 +128,7 @@ class ImposterBaselineBase(ImposterBase):
         :param max_tokens: The maximum number of tokens to return.
         :return: A list of the top tokens.
         """
+        print(self.dataset.columns)
         all_texts = self.dataset["disputed_text"].tolist()
         tokens = [self.tokenize_char_ngrams(text, 4) for text in all_texts]
         flat_list = [item for sublist in tokens for item in sublist]
