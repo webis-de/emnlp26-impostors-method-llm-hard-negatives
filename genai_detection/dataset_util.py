@@ -1011,11 +1011,13 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
                 Path(os.getcwd()).resolve() / category2directory[data_category]
             )
             complete_df = load_dataset(path2datasets)
-            positive_sample = complete_df[complete_df["same"]].sample(
-                n=n_samples, random_state=seed
+            all_positive_samples = complete_df[complete_df["same"]]
+            positive_sample = all_positive_samples.sample(
+                n=min(n_samples, len(all_positive_samples)), random_state=seed
             )
-            negative_sample = complete_df[~complete_df["same"]].sample(
-                n=n_samples, random_state=seed
+            all_negative_samples = complete_df[~complete_df["same"]]
+            negative_sample = all_negative_samples.sample(
+                n=min(n_samples, len(all_negative_samples)), random_state=seed
             )
             # Delete to save memory
             del complete_df
@@ -1059,7 +1061,11 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
 
         model = OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION)
         paraphrasers = create_paraphrasers(model)
+        # only as many artificial samples as normal ones (multiplied by number of paraphrasers)
         unique_rows = dataset.drop_duplicates(subset=["disputed_text"])
+        unique_rows = unique_rows.sample(
+            n=min(len(unique_rows), n_samples), random_state=seed
+        )
         for i in tqdm(
             unique_rows.index, desc="Processing unique disputed texts for paraphrasing"
         ):
@@ -1231,7 +1237,7 @@ def run_gutenberg_corpus():
 
 def run_cross_genre():
     loader = CrossGenreDatasetLoader()
-    dataset = loader.load(n_samples=2)
+    dataset = loader.load(n_samples=10)
     dataset.save_to_disk(Path(__file__).resolve().parent.parent / CONFIG.CROSS_GENRE)
 
 
@@ -1249,7 +1255,7 @@ if __name__ == "__main__":
         default="data/datasets/pan23-authorship-verification/",
         help="Path where Huggingface dataset should be saved (default: %(default)s)",
     )
-
+    print("jksfkj %(parser)s")
     args = parser.parse_args()
 
     # run_pan23(base_dir=args.path, save_path=args.out)
