@@ -108,6 +108,8 @@ class ImpostorDetector(ImposterBase):
         self.real_time_generation = real_time_generation
         self.min_n_tokens = min_n_tokens
         self.upsample = upsample
+        self.imposter_technique = imposter_technique
+        self._training_mode = True  # set to True if you are in training mode, False for validation of model
 
         if imposter_technique == "llm":
             self.imposter_generator = ImposterGenerator.LLMImposterGenerator(
@@ -128,7 +130,8 @@ class ImpostorDetector(ImposterBase):
             )
         elif imposter_technique == "fixed":
             self.imposter_generator = ImposterGenerator.FixedImposterGenerator(
-                n_impostors=self.n_impostors
+                n_impostors=self.n_impostors,
+                split="test" if self._training_mode else "train",
             )
         elif imposter_technique == "on-the-fly":
             self.imposter_generator = ImposterGenerator.GoogleSearchImposterGenerator(
@@ -136,7 +139,8 @@ class ImpostorDetector(ImposterBase):
             )
         elif imposter_technique == "blogs":
             self.imposter_generator = ImposterGenerator.BlogImposterGenerator(
-                n_impostors=self.n_impostors
+                n_impostors=self.n_impostors,
+                split="test" if self._training_mode else "train",
             )
         elif imposter_technique == "content":
             self.imposter_generator = ImposterGenerator.ContentImposterGenerator(
@@ -145,6 +149,26 @@ class ImpostorDetector(ImposterBase):
         else:
             self.imposter_generator = ImposterGenerator.TextLenImposterGenerator(
                 n_impostors=self.n_impostors
+            )
+
+    def set_training_mode(self, training_mode: bool):
+        """
+        Set the training mode for the detector.
+        If training_mode is True, the detector will use the test split of the impostor generator.
+        If training_mode is False, the detector will use the train split of the impostor generator.
+        This will reduce the risk of texts from the actual author among the impostors (i.e. actual positives among the hard negatives).
+        :param training_mode: True if in training mode, False otherwise.
+        """
+        self._training_mode = training_mode
+        if self.imposter_technique == "fixed":
+            self.imposter_generator = ImposterGenerator.FixedImposterGenerator(
+                n_impostors=self.n_impostors,
+                split="test" if self._training_mode else "train",
+            )
+        elif imposter_technique == "blogs":
+            self.imposter_generator = ImposterGenerator.BlogImposterGenerator(
+                n_impostors=self.n_impostors,
+                split="test" if self._training_mode else "train",
             )
 
     @staticmethod
@@ -261,9 +285,7 @@ class ImpostorDetector(ImposterBase):
             # Koppel et Al. (2014) use documents of length 500 words exactly -> we DON'T crop at min_n_tokens to keep more information
             # preprocess_text omits all layour/ structural information to keep only style
             tokens_left = self.tokenizer(self.preprocess_text(text_left))
-            tokens_right = self.tokenizer(
-                self.preprocess_text(text_right)
-            )  # [:self.min_n_tokens]
+            tokens_right = self.tokenizer(self.preprocess_text(text_right))
 
             # ensure both texts have same length (control confounder text length): min length of both
             max_len_allowed = min(len(tokens_left), len(tokens_right))
@@ -294,6 +316,7 @@ class ImpostorDetector(ImposterBase):
             else:
                 shared_tokens = freqs_left.keys() | freqs_right.keys()
 
+            # TODO: Use complete corpus for Student Essays
             top_tokens = heapq.nlargest(
                 self.top_n, shared_tokens, key=lambda x: freqs_left[x] + freqs_right[x]
             )
@@ -319,7 +342,7 @@ class ImpostorDetector(ImposterBase):
             }
 
             # two iterations, generating imposters for each candidate once
-            for j, (unknown, candidate) in enumerate(
+            for j, (disputed, candidate) in enumerate(
                 itertools.permutations(list(store.keys()), 2)
             ):
                 scores_over_different_rounds = 0
@@ -351,7 +374,7 @@ class ImpostorDetector(ImposterBase):
                     )
                     scores = {
                         c: self.minmax_similarity(
-                            store[unknown]["tfidf"][
+                            store[disputed]["tfidf"][
                                 :, rand_feat_to_keep_ids
                             ],  # disputed text
                             tmp_store[c]["tfidf"][:, rand_feat_to_keep_ids],
@@ -367,8 +390,8 @@ class ImpostorDetector(ImposterBase):
 
         # one elmenent = averaged score of X,Y and Y,X pair (score=number of rounds where the candidate was the most similar)
         # TODO: threshold is in [0,1], maybe normalize by rounds?
-        return list(scores_per_pair.values())
-        # return [v / self.rounds for v in scores_per_pair.values()]
+        # return list(scores_per_pair.values())
+        return [v / self.rounds for v in scores_per_pair.values()]
 
     def normalize_text(self, text):
         """
@@ -410,7 +433,10 @@ class ImpostorDetector(ImposterBase):
         # avoid fitting a new vectorizer every time (costly)
         if not hasattr(self, "_vectorizer") or self._vectorizer_vocab != top_token_list:
             self._vectorizer = TfidfVectorizer(
-                vocabulary=top_token_list, input="content", dtype=np.float32
+                vocabulary=top_token_list,
+                input="content",
+                dtype=np.float32,
+                lowercase=False,
             )
             self._vectorizer_vocab = top_token_list
 
