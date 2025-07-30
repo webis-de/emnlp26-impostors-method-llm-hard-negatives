@@ -18,32 +18,38 @@ from sklearn.metrics import (
 )
 from concurrent.futures import ProcessPoolExecutor
 import seaborn as sns
+from genai_detection.detectors.detector_base import DetectorBase
+from genai_detection.detectors.impostor import ImpostorDetector
+from genai_detection.detectors.unmasking import UnmaskingDetector
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from genai_detection.config import CONFIG
-from detectors.impostor import ImpostorDetector
-from detectors.unmasking import UnmaskingDetector
 
 
 class VisDetectors:
     """
     A class to compare detectors on the same dataset.
     It visualizes the detection results using ROC and Precision-Recall curves, confusion matrices, and decision thresholds.
+    Some visualization approaches are inspired by Koppel et al. (2014) paper.
+
+    References:
+    ===========
+    Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’.
+    Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
     """
 
-    def __init__(self, dataset, imposter_args=None, detectors: list = None) -> None:
+    def __init__(self, dataset_name: str, detectors: list = None) -> None:
         """
         Initializes the VisDetectors class.
-        :param dataset: The name of the dataset to use for visualization.
-        :param imposter_args: Arguments for the ImpostorDetector.
-        :param detectors: List of detectors to visualize. Currenrly implemented: Unmasking and Imposter methods.
+        :param dataset_name: The name of the dataset to use for visualization.
+        :param detectors: List of detectors objects to visualize. Currently supported: Unmasking and Imposter methods.
         """
-        self.dataset = dataset
-        self.imposter_args = imposter_args
+        self.dataset_name = dataset_name
+        assert all(
+            isinstance(detector, DetectorBase) for detector in detectors
+        ), "All detectors must inheret from DetectorBase."
         self.detectors = detectors if detectors is not None else []
-        self.savefig_base = (
-            Path.cwd() / CONFIG.SAVE_PATH
-        )  # save path relative to the current working directory
+        self.savefig_base = Path(__file__).resolve().parent.parent / CONFIG.SAVE_PATH
 
     def _format_title(self, base, kwargs):
         """
@@ -52,12 +58,38 @@ class VisDetectors:
         :param kwargs: Additional keyword arguments to include in the title. Structured as a dictionary.
         :return: A formatted title string excluding path2imp, because paths are too long.
         """
-        items = [f"{k}={v}" for k, v in kwargs.items() if k != "path2imp"]
+        items = [
+            f"{k}={v:.2f}" if isinstance(v, float) else f"{k}={v}"
+            for k, v in kwargs.items()
+            if k != "path2imp"
+        ]
         # newline after every 2 items, for better readability
         lines = []
         for i in range(0, len(items), 2):
             lines.append(", ".join(items[i : i + 2]))
         return base + "\n" + "\n".join(lines)
+
+    def _load_datasets(self, balanced: bool = False):
+        train_dataset = self.load_data(split="train")
+        test_dataset = self.load_data(split="test")  # scores obtained on test data
+        if balanced:
+            for split, df in datasets.items():
+                size_smaller_class = df["same"].value_counts().min()
+                # ensure target class 'same' is present after being used for grouping
+                datasets[split] = (
+                    df.groupby("same", group_keys=False)
+                    .apply(
+                        lambda x: x.sample(size_smaller_class, random_state=42).assign(
+                            same=x["same"].iloc[0]
+                        )
+                    )
+                    .reset_index(drop=True)
+                )
+        if train_dataset.empty or test_dataset.empty:
+            raise ValueError(
+                "Train or test dataset is empty. Cannot visualize imposters."
+            )
+        return train_dataset, test_dataset
 
     def visualize(self, balanced: bool = False) -> None:
         """
@@ -65,48 +97,26 @@ class VisDetectors:
 
         :param balanced: Whether the number of same and different author pairs from dataset should be balanced (i.e. sampling strategy).
         """
-        datasets = {}
+        print(f"Visualizing detectors on dataset: {self.dataset_name}")
+        train_dataset, test_dataset = self._load_datasets(balanced=balanced)
         for detector in self.detectors:
-            if detector == CONFIG.IMPOSTER:  # imposter finds threshold on training data
-                datasets["train"] = self.load_data(split="train")
-            datasets["test"] = self.load_data(
-                split="test"
-            )  # scores obtained on test data
-            if balanced:
-                for split, df in datasets.items():
-                    size_smaller_class = df["same"].value_counts().min()
-                    # ensure target class 'same' is present after being used for grouping
-                    datasets[split] = (
-                        df.groupby("same", group_keys=False)
-                        .apply(
-                            lambda x: x.sample(
-                                size_smaller_class, random_state=42
-                            ).assign(same=x["same"].iloc[0])
-                        )
-                        .reset_index(drop=True)
-                    )
-
-                if detector == CONFIG.IMPOSTER:
-                    train_dataset = datasets["train"]
-                    test_dataset = datasets["test"]
-                    if train_dataset.empty or test_dataset.empty:
-                        raise ValueError(
-                            "Train or test dataset is empty. Cannot visualize imposters."
-                        )
-                    self.visualize_imposters(
-                        train_dataset, test_dataset, dataset_name=self.dataset
-                    )
-                elif detector == CONFIG.UNMASKING:
-                    assert not datasets[
-                        "test"
-                    ].empty, "Test dataset is empty. Cannot visualize unmasking curves."
-                    self.plot_unmasking_curves(
-                        dataset=datasets["test"], dataset_name=self.dataset
-                    )
-                else:
-                    raise ValueError(
-                        f"Detector {detector} is not supported for visualization."
-                    )
+            if isinstance(detector, ImpostorDetector):
+                self.visualize_imposters(
+                    impostor_detector=detector,
+                    train_dataset=train_dataset,
+                    test_dataset=test_dataset,
+                    dataset_name=self.dataset_name,
+                )
+            elif isinstance(detector, UnmaskingDetector):
+                self.plot_unmasking_curves(
+                    unmasking_detector=detector,
+                    dataset=test_dataset,
+                    dataset_name=self.dataset_name,
+                )
+            else:
+                raise ValueError(
+                    f"Detector {detector} is not supported for visualization."
+                )
 
     def _get_opt_imp_threshold(self, fpr, tpr, thresholds):
         """
@@ -129,15 +139,15 @@ class VisDetectors:
         tpr = np.asarray(tpr)
         thresholds = np.asarray(thresholds)
 
-        # validity mask: finite and within [0, 1]
+        # validity mask: finite and within (0, 1)
         valid_mask = (
             np.isfinite(fpr)
             & np.isfinite(tpr)
             & np.isfinite(thresholds)
-            & (fpr >= 0)
-            & (fpr <= 1)
-            & (tpr >= 0)
-            & (tpr <= 1)
+            & (fpr > 0)  # do not include 0 and 1 to avoid best threshold being 0 or 1
+            & (fpr < 1)
+            & (tpr > 0)
+            & (tpr < 1)
         )
 
         # check if there are any valid values
@@ -158,7 +168,11 @@ class VisDetectors:
             return 0.5  # or np.nan, depending on your use case
 
     def visualize_imposters(
-        self, train_dataset, test_dataset, dataset_name: str
+        self,
+        impostor_detector,
+        train_dataset: pd.DataFrame,
+        test_dataset: pd.DataFrame,
+        dataset_name: str,
     ) -> None:
         """
         Visualizes the imposter detection results.
@@ -167,64 +181,92 @@ class VisDetectors:
         Parameters:
             train_dataset (pd.DataFrame): The training dataset.
             test_dataset (pd.DataFrame): The test dataset.
+            impostor_detector (ImpostorDetector): The imposter detector to use.
+            dataset_name (str): The name of the dataset for visualization.
         """
-        impostor_det = ImpostorDetector(**self.imposter_args)
         with ProcessPoolExecutor() as executor:
             train_dataset["imposter_score"] = list(
-                executor.map(impostor_det.get_score, train_dataset["pair"])
+                executor.map(impostor_detector.get_score, train_dataset["pair"])
             )
+        print("Calculated imposter scores on training data.")
 
         # find threshold that best separates imposters from non-imposters in the training set (targets are in the 'same' column)
-        args = self.imposter_args.copy()
+        args = {
+            "rounds": impostor_detector.rounds,
+            "top_n": impostor_detector.top_n,
+            "imposter_technique": impostor_detector.imposter_technique,
+            "upsample": impostor_detector.upsample,
+        }
         args["dataset"] = dataset_name
-        fpr, tpr, thresholds = self.plot_decision_threshold_imposter(
+        fpr, tpr, thresholds, best_f1_thres = self.plot_decision_threshold_imposter(
             scores=train_dataset["imposter_score"],
             labels=train_dataset["same"],
             title_kwargs=args,
         )
 
-        self.imposter_args["threshold"] = self._get_opt_imp_threshold(
-            fpr, tpr, thresholds
+        best_f1_thres = np.round(best_f1_thres, 2)
+        youdens_j_thres = np.round(self._get_opt_imp_threshold(fpr, tpr, thresholds), 2)
+        print(
+            f"Optimal threshold for imposter detection via Youden's J function: {youdens_j_thres:.2f}/ via best F1: {best_f1_thres:.2f}"
         )
 
         # work with test dataset
+        impostor_detector.set_training_mode(
+            False
+        )  # set to False for validation: Use training set for imposter generation for fixed imposter technique‚
         with ProcessPoolExecutor() as executor:
             test_dataset["imposter_score"] = list(
-                executor.map(impostor_det.get_score, test_dataset["pair"])
+                executor.map(impostor_detector.get_score, test_dataset["pair"])
             )
-        test_dataset["pred_same"] = (
-            test_dataset["imposter_score"] >= self.imposter_args["threshold"]
-        )
 
-        # 'same' is ground truth, 'pred_same' is prediction
-        y_true = test_dataset["same"]
-        y_pred = test_dataset["pred_same"]
+        for thres_name, thres in zip(
+            ["Youden's J", "best F1"], [youdens_j_thres, best_f1_thres]
+        ):
+            args["threshold"] = thres
+            print(f"Visualizing imposter scores with threshold: {thres_name} = {thres}")
 
-        cm = confusion_matrix(y_true, y_pred)
-        disp = ConfusionMatrixDisplay(
-            confusion_matrix=cm, display_labels=["Different authors", "Same author"]
-        )
+            test_dataset["pred_same"] = test_dataset["imposter_score"] >= thres
 
-        disp.plot(cmap=plt.cm.Blues)
-        title = self._format_title(
-            base="Confusion Matrix on Test Data", kwargs=self.imposter_args
-        )
-        plt.title(title)
-        plt.tight_layout()
-        save_path = self.savefig_base / "impostor_scores" / self.dataset
-        filename = title.replace(",", "").replace("\n", "_").replace(" ", "_")
-        plt.savefig((save_path / filename).with_suffix(".png"))
-        plt.close()
+            # 'same' is ground truth, 'pred_same' is prediction
+            y_true = test_dataset["same"]
+            y_pred = test_dataset["pred_same"]
 
-    def plot_unmasking_curves(self, dataset, dataset_name: str = None):
+            cm = confusion_matrix(y_true, y_pred)
+            disp = ConfusionMatrixDisplay(
+                confusion_matrix=cm, display_labels=["Different authors", "Same author"]
+            )
+
+            disp.plot(cmap=plt.cm.Blues)
+            title = self._format_title(
+                base=f"Confusion Matrix on Test Data with threshold {thres_name}",
+                kwargs=args,
+            )
+            plt.title(title)
+            plt.tight_layout()
+            save_path = self.savefig_base / "impostor_scores" / self.dataset_name
+            filename = (
+                title.replace(",", "")
+                .replace("\n", "_")
+                .replace(" ", "_")
+                .replace("'", "")
+            )
+            save_path.mkdir(parents=True, exist_ok=True)
+            for format in ["svg"]:  # "png",
+                print(f"Saving confusion matrix to {save_path / filename}.{format}")
+                plt.savefig((save_path / filename).with_suffix(f".{format}"))
+            plt.close()
+
+    def plot_unmasking_curves(
+        self, unmasking_detector: UnmaskingDetector, dataset, dataset_name: str = None
+    ):
         """
         Plots unmasking curves for the given dataset.
+        :param unmasking_detector: The UnmaskingDetector instance to use for plotting.
         :param dataset: The dataset containing pairs of texts and their labels.
         :param dataset_name: The name of the dataset for the plot title and save path.
         """
-        unmask_det = UnmaskingDetector()
         with ProcessPoolExecutor() as executor:
-            curves = list(executor.map(unmask_det.get_curves, dataset["pair"]))
+            curves = list(executor.map(unmasking_detector.get_curves, dataset["pair"]))
 
         targets = dataset["same"].tolist()
         pal = sns.color_palette("husl", 2)
@@ -232,10 +274,11 @@ class VisDetectors:
         for c, l in zip(curves, targets):
             if len(c) == 0:
                 continue
-            c = c[0].tolist()
+            if type(c[0]) is not list:
+                c = c[0].tolist()
             label = None
             if l not in seen_labels:
-                label = f"Same Author: {l}"
+                label = f"Same Author"  #: {l}"
                 seen_labels.add(l)
             plt.plot(c, color=pal[l], label=label, alpha=0.1, linewidth=1)
 
@@ -252,7 +295,7 @@ class VisDetectors:
         save_path = self.savefig_base / "unmasking_curves" / dataset_name
         save_path.mkdir(parents=True, exist_ok=True)
         filename = title.replace("\n", "_").replace(" ", "_")
-        plt.savefig((save_path / filename).with_suffix(".png"))
+        plt.savefig((save_path / filename).with_suffix(".svg"))
         plt.close()
 
     def load_data(self, split: Literal["train", "test", "val"]):
@@ -264,33 +307,37 @@ class VisDetectors:
             dataset: The loaded dataset.
         """
         try:
-            if self.dataset == CONFIG.PAN25:
+            if self.dataset_name == CONFIG.PAN25:
                 return load_from_disk(
                     os.path.join(os.path.abspath("."), CONFIG.PATH2PAN25)
                 )[split].to_pandas()
-            elif self.dataset == CONFIG.PAN23:
+            elif self.dataset_name == CONFIG.PAN23:
                 return load_from_disk(
                     os.path.join(os.path.abspath("."), CONFIG.PATH2PAN23)
                 )[split].to_pandas()
-            elif self.dataset == CONFIG.PAN20:
+            elif self.dataset_name == CONFIG.PAN20:
                 return load_from_disk(
                     os.path.join(os.path.abspath("."), CONFIG.PATH2PAN20)
                 )[split].to_pandas()
-            elif self.dataset == CONFIG.KOPPEL:
+            elif self.dataset_name == CONFIG.KOPPEL:
                 return load_from_disk(
                     os.path.join(os.path.abspath("."), CONFIG.PATH2KOPPEL_WEBIS)
                 )[split].to_pandas()
-            elif self.dataset == CONFIG.BLOG:
+            elif self.dataset_name == CONFIG.BLOG:
                 return load_from_disk(
                     os.path.join(os.path.abspath("."), CONFIG.PATH2BLOG)
                 )[split].to_pandas()
+            elif self.dataset_name == CONFIG.STUDENT_ESSAYS:
+                return load_from_disk(
+                    Path(__file__).resolve().parent.parent / CONFIG.PATH2STUDENT_ESSAYS
+                )[split].to_pandas()
             else:
                 raise ValueError(
-                    f"Dataset {self.dataset} is not supported for visualization."
+                    f"Dataset {self.dataset_name} is not supported for visualization."
                 )
         except Exception as e:
             raise RuntimeError(
-                f"Failed to load dataset {self.dataset} for split {split}: {e}"
+                f"Failed to load dataset {self.dataset_name} for split {split}: {e}"
             ) from e
 
     # ProcessPoolExecutor does not support self, so we need to use a static method
@@ -315,7 +362,7 @@ class VisDetectors:
         :param scores: The imposter scores.
         :param labels: The true labels (same or different authors).
         :param title_kwargs: Additional keyword arguments for the plot title.
-        :return: fpr, tpr, roc_thresholds
+        :return: fpr, tpr, roc_thresholds, best threshold for F1 score.
         """
         sys.path.append(os.path.abspath(".."))
         save_path = (
@@ -356,40 +403,49 @@ class VisDetectors:
         precision, recall, pr_thresholds = precision_recall_curve(labels, scores)
         plt.subplot(1, 2, 2)
         plt.plot(recall, precision, label="PR Curve", color="orange")
+        plt.ylim(0, 1)
         plt.scatter(
             0.34,
             0.95,
             marker="o",
             color="red",
-            label=r"Koppel et. Al. (2014) for $\sigma*=unknown$, $50$ authors",
+            label=r"$\sigma*=unknown$, $50$ authors$^1$",
         )
         plt.scatter(
             0.222,
             0.902,
             marker="x",
             color="red",
-            label=r"Koppel et. Al. (2014) for $\sigma*=0.8$, $500$ authors",
+            label=r"$\sigma^*=0.8$, $500$ authors$^1$",
         )
+        plt.annotate(
+            "1: Koppel et. Al. (2014)",
+            xy=(1.0, -0.2),
+            xycoords="axes fraction",
+            ha="right",
+            va="center",
+            fontsize=10,
+        )
+
         plt.xlabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
         plt.ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
         title = self._format_title(base="Precision-Recall Curve", kwargs=title_kwargs)
         plt.title(title)
         plt.legend()
         plt.tight_layout()
-        figure_name = (
-            "roc_prec_recall_curve.png"
-            if not title_kwargs
-            else f"roc_prec_recall_curve_r{title_kwargs['rounds']}_top{title_kwargs['top_n']}.png"
-        )
-        savefig = os.path.join(save_path, figure_name)
-        plt.savefig(savefig)
+        for format in ["svg"]:  # "png",
+            figure_name = (
+                f"roc_prec_recall_curve.{format}"
+                if not title_kwargs
+                else f"roc_prec_recall_curve_r{title_kwargs['rounds']}_top{title_kwargs['top_n']}.{format}"
+            )
+            savefig = os.path.join(save_path, figure_name)
+            plt.savefig(savefig)
         plt.close(fig)
 
         # Threshold vs (1) F1 score, (2) Accuracy, (3) Precision, (4) Recall
         fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-        fig.subplots_adjust(
-            hspace=0.25, wspace=0.25
-        )  # hspace controls vertical spacing
+        fig.subplots_adjust(hspace=0.5, wspace=0.25)  # hspace controls vertical spacing
         thresholds = np.linspace(min(scores), max(scores), 100)
 
         thresholds = np.linspace(min(scores), max(scores), 100)
@@ -413,48 +469,53 @@ class VisDetectors:
         axes[0, 0].set_ylabel(
             "F1 Score $\\frac{{2 \\cdot P \\cdot R}}{{P + R}}$", fontsize=14
         )
+        axes[0, 0].set_ylim(0, 1)
         title = self._format_title(base="Threshold vs F1 Score", kwargs=title_kwargs)
-        axes[0, 0].set_title(title)
+        axes[0, 0].set_title(title, fontsize=10)
         axes[0, 0].grid(True)
 
         # Plot 2: Accuracy vs Threshold
         axes[0, 1].plot(thresholds, accs)
         axes[0, 1].set_xlabel("Threshold")
         axes[0, 1].set_ylabel("Accuracy Score $\\frac{{TP + TN}}{{N}}$", fontsize=14)
+        axes[0, 1].set_ylim(0, 1)
         title = self._format_title(
             base="Threshold vs Accuracy Score", kwargs=title_kwargs
         )
-        axes[0, 1].set_title(title)
+        axes[0, 1].set_title(title, fontsize=10)
         axes[0, 1].grid(True)
 
         # Plot 3: Precision vs Threshold
         axes[1, 0].plot(pr_thresholds, precision[:-1])
         axes[1, 0].set_xlabel("Threshold")
         axes[1, 0].set_ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
+        axes[1, 0].set_ylim(0, 1)
         title = self._format_title(
             base="Threshold vs Precision Score", kwargs=title_kwargs
         )
-        axes[1, 0].set_title(title)
+        axes[1, 0].set_title(title, fontsize=10)
         axes[1, 0].grid(True)
 
         # Plot 4: Recall vs Threshold
         axes[1, 1].plot(pr_thresholds, recall[:-1])
         axes[1, 1].set_xlabel("Threshold")
         axes[1, 1].set_ylabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
+        axes[1, 1].set_ylim(0, 1)
         title = self._format_title(
             base="Threshold vs Recall Score", kwargs=title_kwargs
         )
-        axes[1, 1].set_title(title)
+        axes[1, 1].set_title(title, fontsize=10)
         axes[1, 1].grid(True)
 
-        filename = "thres_vs_f1_acc_prec_recall.png"
-        if title_kwargs:
-            filename = f"thres_vs_f1_acc_prec_recall_r{title_kwargs['rounds']}_top{title_kwargs['top_n']}.png"
-        savefig = os.path.join(save_path, filename)
-        plt.savefig(savefig)
+        for format in ["svg"]:  # "png",
+            filename = f"thres_vs_f1_acc_prec_recall.{format}"
+            if title_kwargs:
+                filename = f"thres_vs_f1_acc_prec_recall_r{title_kwargs['rounds']}_top{title_kwargs['top_n']}.{format}"
+            savefig = os.path.join(save_path, filename)
+            plt.savefig(savefig)
 
         plt.close(fig)
-        return fpr, tpr, roc_thresholds
+        return fpr, tpr, roc_thresholds, thresholds[1:-1][np.argmax(f1s[1:-1])]
 
 
 if __name__ == "__main__":
