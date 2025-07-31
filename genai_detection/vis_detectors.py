@@ -838,8 +838,20 @@ class VisDetectors:
             for future in as_completed(futures):
                 result = future.result()
                 if result:
-                    precisions[result["imp_gen"]] = result["precision"]
-                    recalls[result["imp_gen"]] = result["recall"]
+                    total_precisions[result["imp_gen"]] = result["total_precisions"]
+                    total_recalls[result["imp_gen"]] = result["total_recalls"]
+                    same_author_precisions[result["imp_gen"]] = result[
+                        "same_author_precisions"
+                    ]
+                    same_author_recalls[result["imp_gen"]] = result[
+                        "same_author_recalls"
+                    ]
+                    different_author_precisions[result["imp_gen"]] = result[
+                        "different_author_precisions"
+                    ]
+                    different_author_recalls[result["imp_gen"]] = result[
+                        "different_author_recalls"
+                    ]
 
         for baseline_name, baseline in zip(
             baselines,
@@ -1024,8 +1036,8 @@ if __name__ == "__main__":
         detectors=[impostor],
     )
     print("impostor Detector initialized.")
-    vis_det.reproduce_fig2_prec_recall_dif_n_imp()
-    # vis_det.reproduce_fig4_prec_recall_dif_imp_appr()
+    # vis_det.reproduce_fig2_prec_recall_dif_n_imp()
+    vis_det.reproduce_fig4_prec_recall_dif_imp_appr()
     print("Finished reproducing Figure 2 from Koppel et al. (2014) on BLOG data.")
 
     vis_det = VisDetectors(
@@ -1033,6 +1045,6 @@ if __name__ == "__main__":
         detectors=[impostor],
     )
     print("impostor Detector initialized.")
-    vis_det.reproduce_fig2_prec_recall_dif_n_imp()
-    # vis_det.reproduce_fig4_prec_recall_dif_imp_appr()
+    # vis_det.reproduce_fig2_prec_recall_dif_n_imp()
+    vis_det.reproduce_fig4_prec_recall_dif_imp_appr()
     print("Finished reproducing Figure 2 from Koppel et al. (2014) on STUDENT data.")
