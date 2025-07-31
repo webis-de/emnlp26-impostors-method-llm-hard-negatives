@@ -73,10 +73,10 @@ class VisDetectors:
         train_dataset = self.load_data(split="train")
         test_dataset = self.load_data(split="test")  # scores obtained on test data
         if balanced:
-            for split, df in datasets.items():
+            for df in [train_dataset, test_dataset]:
                 size_smaller_class = df["same"].value_counts().min()
                 # ensure target class 'same' is present after being used for grouping
-                datasets[split] = (
+                df = (
                     df.groupby("same", group_keys=False)
                     .apply(
                         lambda x: x.sample(size_smaller_class, random_state=42).assign(
@@ -309,23 +309,23 @@ class VisDetectors:
         try:
             if self.dataset_name == CONFIG.PAN25:
                 return load_from_disk(
-                    os.path.join(os.path.abspath("."), CONFIG.PATH2PAN25)
+                    Path(__file__).resolve().parent.parent / CONFIG.PATH2PAN25
                 )[split].to_pandas()
             elif self.dataset_name == CONFIG.PAN23:
                 return load_from_disk(
-                    os.path.join(os.path.abspath("."), CONFIG.PATH2PAN23)
+                    Path(__file__).resolve().parent.parent / CONFIG.PATH2PAN23
                 )[split].to_pandas()
             elif self.dataset_name == CONFIG.PAN20:
                 return load_from_disk(
-                    os.path.join(os.path.abspath("."), CONFIG.PATH2PAN20)
+                    Path(__file__).resolve().parent.parent / CONFIG.PATH2PAN20
                 )[split].to_pandas()
             elif self.dataset_name == CONFIG.KOPPEL:
                 return load_from_disk(
-                    os.path.join(os.path.abspath("."), CONFIG.PATH2KOPPEL_WEBIS)
+                    Path(__file__).resolve().parent.parent / CONFIG.PATH2KOPPEL_WEBIS
                 )[split].to_pandas()
             elif self.dataset_name == CONFIG.BLOG:
                 return load_from_disk(
-                    os.path.join(os.path.abspath("."), CONFIG.PATH2BLOG)
+                    Path(__file__).resolve().parent.parent / CONFIG.PATH2BLOG
                 )[split].to_pandas()
             elif self.dataset_name == CONFIG.STUDENT_ESSAYS:
                 return load_from_disk(
