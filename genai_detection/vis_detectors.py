@@ -196,6 +196,7 @@ class VisDetectors:
             "top_n": impostor_detector.top_n,
             "imposter_technique": impostor_detector.imposter_technique,
             "upsample": impostor_detector.upsample,
+            "n_impostors": impostor_detector.n_impostors,
         }
         args["dataset"] = dataset_name
         fpr, tpr, thresholds, best_f1_thres = self.plot_decision_threshold_imposter(
@@ -437,7 +438,7 @@ class VisDetectors:
             figure_name = (
                 f"roc_prec_recall_curve.{format}"
                 if not title_kwargs
-                else f"roc_prec_recall_curve_r{title_kwargs['rounds']}_top{title_kwargs['top_n']}.{format}"
+                else f"roc_prec_recall_curve_r{title_kwargs['rounds']}_top{title_kwargs['top_n']}_n_imp{title_kwargs['n_impostors']}.{format}"
             )
             savefig = os.path.join(save_path, figure_name)
             plt.savefig(savefig)
@@ -510,12 +511,160 @@ class VisDetectors:
         for format in ["svg"]:  # "png",
             filename = f"thres_vs_f1_acc_prec_recall.{format}"
             if title_kwargs:
-                filename = f"thres_vs_f1_acc_prec_recall_r{title_kwargs['rounds']}_top{title_kwargs['top_n']}.{format}"
+                filename = f"thres_vs_f1_acc_prec_recall_r{title_kwargs['rounds']}_top{title_kwargs['top_n']}_n_imp{title_kwargs['n_impostors']}.{format}"
             savefig = os.path.join(save_path, filename)
             plt.savefig(savefig)
 
         plt.close(fig)
         return fpr, tpr, roc_thresholds, thresholds[1:-1][np.argmax(f1s[1:-1])]
+
+    # ugly, but only for reproduction of Figure 2 from Koppel et al. (2014)
+    def reproduce_fig2_prec_recall_dif_n_imp(self) -> None:
+        """
+        Visualizes the imposter detection results via Precision-Recall curves for different numbers of imposters (cf. Figure 2 from Koppel et al. (2014)).
+        """
+        train_dataset, test_dataset = self._load_datasets(balanced=True)
+        dataset_name = self.dataset_name
+        n_imp_options = [50, 500, 5000]
+        precisions, recalls = [], []
+        for n_imp in n_imp_options:
+            impostor_detector = ImpostorDetector(
+                imposter_technique="fixed",
+                n_impostors=n_imp,
+                rounds=100,  # cf. pg. 181, Koppel et al. (2014)
+                top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
+                path2imp=Path(os.getcwd()).resolve().parent
+                / CONFIG.PATH2STUDENT_ESSAYS,
+                upsample=False,
+            )
+            with ProcessPoolExecutor() as executor:
+                train_dataset["imposter_score"] = list(
+                    executor.map(impostor_detector.get_score, train_dataset["pair"])
+                )
+            print("Calculated imposter scores on training data.")
+
+            # find threshold that best separates imposters from non-imposters in the training set (targets are in the 'same' column)
+            args = {
+                "rounds": impostor_detector.rounds,
+                "top_n": impostor_detector.top_n,
+                "imposter_technique": impostor_detector.imposter_technique,
+                "upsample": impostor_detector.upsample,
+                "n_impostors": impostor_detector.n_impostors,
+            }
+            args["dataset"] = dataset_name
+            fpr, tpr, thresholds, best_f1_thres = self.plot_decision_threshold_imposter(
+                scores=train_dataset["imposter_score"],
+                labels=train_dataset["same"],
+                title_kwargs=args,
+            )
+            precision, recall, pr_thresholds = precision_recall_curve(
+                train_dataset["same"], train_dataset["imposter_score"]
+            )
+            precisions.append(precision)
+            recalls.append(recall)
+
+            best_f1_thres = np.round(best_f1_thres, 2)
+            youdens_j_thres = np.round(
+                self._get_opt_imp_threshold(fpr, tpr, thresholds), 2
+            )
+            print(
+                f"Optimal threshold for imposter detection via Youden's J function: {youdens_j_thres:.2f}/ via best F1: {best_f1_thres:.2f}"
+            )
+
+            # work with test dataset
+            impostor_detector.set_training_mode(
+                False
+            )  # set to False for validation: Use training set for imposter generation for fixed imposter technique‚
+            with ProcessPoolExecutor() as executor:
+                test_dataset["imposter_score"] = list(
+                    executor.map(impostor_detector.get_score, test_dataset["pair"])
+                )
+
+            for thres_name, thres in zip(
+                ["Youden's J", "best F1"], [youdens_j_thres, best_f1_thres]
+            ):
+                args["threshold"] = thres
+                print(
+                    f"Visualizing imposter scores with threshold: {thres_name} = {thres}"
+                )
+
+                test_dataset["pred_same"] = test_dataset["imposter_score"] >= thres
+
+                # 'same' is ground truth, 'pred_same' is prediction
+                y_true = test_dataset["same"]
+                y_pred = test_dataset["pred_same"]
+
+                cm = confusion_matrix(y_true, y_pred)
+                disp = ConfusionMatrixDisplay(
+                    confusion_matrix=cm,
+                    display_labels=["Different authors", "Same author"],
+                )
+
+                disp.plot(cmap=plt.cm.Blues)
+                title = self._format_title(
+                    base=f"Confusion Matrix on Test Data with threshold {thres_name}",
+                    kwargs=args,
+                )
+                plt.title(title)
+                plt.tight_layout()
+                save_path = self.savefig_base / "impostor_scores" / self.dataset_name
+                filename = (
+                    title.replace(",", "")
+                    .replace("\n", "_")
+                    .replace(" ", "_")
+                    .replace("'", "")
+                )
+                save_path.mkdir(parents=True, exist_ok=True)
+                for format in ["svg"]:  # "png",
+                    print(f"Saving confusion matrix to {save_path / filename}.{format}")
+                    plt.savefig((save_path / filename).with_suffix(f".{format}"))
+                plt.close()
+        # Precision-Recall Curve: 	Imbalanced
+        # scores: non-thresholded measure of decisions, relative ranking of predictions
+        # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.precision_recall_curve.html (05.06.2025)
+
+        fig = plt.figure(figsize=(10, 5))
+        for n_imp, precision, recall in zip(n_imp_options, precisions, recalls):
+            plt.plot(recall, precision, label="# Imposters = " + str(n_imp))
+        plt.ylim(0, 1)
+        plt.scatter(
+            0.34,
+            0.95,
+            marker="o",
+            color="red",
+            label=r"$\sigma*=unknown$, $50$ authors$^1$",
+        )
+        plt.scatter(
+            0.222,
+            0.902,
+            marker="x",
+            color="red",
+            label=r"$\sigma^*=0.8$, $500$ authors$^1$",
+        )
+        plt.annotate(
+            "1: Koppel et. Al. (2014)",
+            xy=(1.0, -0.2),
+            xycoords="axes fraction",
+            ha="right",
+            va="center",
+            fontsize=10,
+        )
+
+        plt.xlabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
+        plt.ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
+        title = self._format_title(base="Precision-Recall Curve", kwargs=title_kwargs)
+        plt.title(title)
+        plt.legend()
+        plt.tight_layout()
+        for format in ["svg"]:  # "png",
+            figure_name = (
+                f"roc_prec_recall_curve_dif_n_imp.{format}"
+                if not args
+                else f"roc_prec_recall_curve_r{args['rounds']}_top{args['top_n']}_dif_n_imp.{format}"
+            )
+            savefig = os.path.join(save_path, figure_name)
+            plt.savefig(savefig)
+        plt.close(fig)
 
 
 if __name__ == "__main__":
@@ -591,4 +740,29 @@ if __name__ == "__main__":
         },
         detectors=[CONFIG.IMPOSTER, CONFIG.UNMASKING],
     )
-    vis_det.visualize(balanced=args.balanced)
+    # vis_det.visualize(balanced=args.balanced)
+
+    # ugly, but only for reproduction of Figure 2 from Koppel et al. (2014)
+    imposter = ImpostorDetector(
+        imposter_technique="fixed",
+        n_impostors=50,
+        rounds=20,
+        top_n=100000,
+        path2imp=Path(os.getcwd()).resolve().parent / CONFIG.PATH2STUDENT_ESSAYS,
+        upsample=False,
+    )
+    print("Imposter Detector initialized.")
+
+    vis_det = VisDetectors(
+        dataset_name=CONFIG.BLOG,
+        detectors=[imposter],
+    )
+    vis_det.reproduce_fig2_prec_recall_dif_n_imp()
+    print("Finished reproducing Figure 2 from Koppel et al. (2014) on BLOG data.")
+
+    vis_det = VisDetectors(
+        dataset_name=CONFIG.STUDENT_ESSAYS,
+        detectors=[imposter],
+    )
+    vis_det.reproduce_fig2_prec_recall_dif_n_imp()
+    print("Finished reproducing Figure 2 from Koppel et al. (2014) on STUDENT data.")
