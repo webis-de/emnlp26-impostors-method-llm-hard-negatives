@@ -96,6 +96,7 @@ def evaluate_category(data_category, data_root, save_path):
         metadata = load_metadata(path2datasets, file_name) if use_ground_truth else {}
         text = load_text(data_category, path2datasets, file_name)
         model = OllamaParaphraser(model_id=OLLAMA_VERSION)
+        print(f"Loaded ollama model: {model}")
         paraphrasers = create_paraphrasers(model)
         print(f"Loaded paraphrasers for {data_category}")
 
