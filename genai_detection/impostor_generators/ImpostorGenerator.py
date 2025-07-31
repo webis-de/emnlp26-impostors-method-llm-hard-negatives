@@ -16,6 +16,7 @@ import spacy
 import requests
 from bs4 import BeautifulSoup
 from datasets import load_from_disk
+from spacy.cli import download
 import serpapi
 from dotenv import load_dotenv
 from genai_detection.paraphrasing.paraphraser import (
@@ -180,7 +181,14 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
         assert (
             self.n_min_words < self.n_max_words
         ), "n_min_words must be less than n_max_words"
-        self.nlp = spacy.load("en_core_web_sm")
+        try:
+            self.nlp = spacy.load("en_core_web_sm")
+        except OSError:
+            print(
+                "Spacy model 'en_core_web_sm' not found. Downloading it now. This may take a while."
+            )
+            download("en_core_web_sm")
+            self.nlp = spacy.load("en_core_web_sm")
 
     def get_medium_frequency_words(
         self, text: str, lower_pct: int = 30, upper_pct: int = 70
