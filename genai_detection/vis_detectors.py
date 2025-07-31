@@ -865,9 +865,15 @@ class VisDetectors:
                 SupervisedImpostorBaseline(dataset_name=self.dataset_name),
             ],
         ):
-            test_dataset[f"{baseline_name.replace(' ','_')}_score"] = (
-                baseline.get_prediction(test_dataset["pair"])
-            )
+            try:
+                preds = baseline.get_prediction(test_dataset["pair"])
+            except Exception as e:
+                print(
+                    f"[ERROR] Failed for baseline {baseline_name}:\n{e}\n{traceback.format_exc()}\nReloading datasets..."
+                )
+                train_dataset, test_dataset = self._load_datasets(balanced=True)
+                preds = baseline.get_prediction(test_dataset["pair"])
+            test_dataset[f"{baseline_name.replace(' ','_')}_score"] = preds
 
             # both same and different author pairs
             precision, recall, pr_thresholds = precision_recall_curve(
@@ -1036,8 +1042,8 @@ if __name__ == "__main__":
         detectors=[impostor],
     )
     print("impostor Detector initialized.")
-    vis_det.reproduce_fig2_prec_recall_dif_n_imp()
-    # vis_det.reproduce_fig4_prec_recall_dif_imp_appr()
+    # vis_det.reproduce_fig2_prec_recall_dif_n_imp()
+    vis_det.reproduce_fig4_prec_recall_dif_imp_appr()
     print("Finished reproducing Figure 2 from Koppel et al. (2014) on BLOG data.")
 
     vis_det = VisDetectors(
@@ -1045,6 +1051,6 @@ if __name__ == "__main__":
         detectors=[impostor],
     )
     print("impostor Detector initialized.")
-    vis_det.reproduce_fig2_prec_recall_dif_n_imp()
-    # vis_det.reproduce_fig4_prec_recall_dif_imp_appr()
+    # vis_det.reproduce_fig2_prec_recall_dif_n_imp()
+    vis_det.reproduce_fig4_prec_recall_dif_imp_appr()
     print("Finished reproducing Figure 2 from Koppel et al. (2014) on STUDENT data.")
