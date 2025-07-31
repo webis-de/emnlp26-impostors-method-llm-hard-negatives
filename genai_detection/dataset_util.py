@@ -879,7 +879,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
 
         # First loop: collect data across groups
         for group_values, group in grouped:
-            group_id = str(group_values)  # could be a tuple or single value
+            group_id = str(group_values)
             data = group.to_dict(orient="records")
 
             for item in data:
@@ -887,7 +887,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
                 global_author_texts[author_id].append(item)
                 author_group_map[author_id] = group_id
 
-        # Prepare cross-task different-author pairs
+        # Prepare cross-task (cf. Koppel et Al. (2014)) different-author pairs
         authors = list(global_author_texts.keys())
         author_pairs = []
         for i in range(len(authors)):
