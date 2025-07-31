@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import re
 import sys
+import traceback
 from typing import Literal
 from datasets import load_from_disk
 from matplotlib import pyplot as plt
@@ -16,10 +17,16 @@ from sklearn.metrics import (
     roc_curve,
     accuracy_score,
 )
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import seaborn as sns
 from genai_detection.detectors.detector_base import DetectorBase
 from genai_detection.detectors.impostor import ImpostorDetector
+from genai_detection.detectors.impostor_supervised_baseline import (
+    SupervisedImpostorBaseline,
+)
+from genai_detection.detectors.impostor_unsupervised_baseline import (
+    UnSupervisedImpostorBaseline,
+)
 from genai_detection.detectors.unmasking import UnmaskingDetector
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -59,7 +66,7 @@ class VisDetectors:
         :return: A formatted title string excluding path2imp, because paths are too long.
         """
         items = [
-            f"{k}={v:.2f}" if isinstance(v, float) else f"{k}={v}"
+            f"{k}={v:.2f}" if (isinstance(v, float) or k == "threshold") else f"{k}={v}"
             for k, v in kwargs.items()
             if k != "path2imp"
         ]
@@ -197,8 +204,8 @@ class VisDetectors:
             "impostor_technique": impostor_detector.impostor_technique,
             "upsample": impostor_detector.upsample,
             "n_impostors": impostor_detector.n_impostors,
+            "dataset": dataset_name,
         }
-        args["dataset"] = dataset_name
         fpr, tpr, thresholds, best_f1_thres = self.plot_decision_threshold_impostor(
             scores=train_dataset["impostor_score"],
             labels=train_dataset["same"],
@@ -247,6 +254,7 @@ class VisDetectors:
             save_path = self.savefig_base / "impostor_scores" / self.dataset_name
             filename = (
                 title.replace(",", "")
+                .replace(".", "_")
                 .replace("\n", "_")
                 .replace(" ", "_")
                 .replace("'", "")
@@ -386,6 +394,7 @@ class VisDetectors:
         fpr, tpr, roc_thresholds = roc_curve(labels, scores)
         fig = plt.figure(figsize=(10, 5))
         plt.subplot(1, 2, 1)
+        plt.gca().set_aspect("equal")
         plt.plot(fpr, tpr, label="ROC Curve")
         plt.plot([0, 1], [0, 1], linestyle="--", color="gray")
         plt.xlabel(
@@ -403,6 +412,7 @@ class VisDetectors:
         # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.precision_recall_curve.html (05.06.2025)
         precision, recall, pr_thresholds = precision_recall_curve(labels, scores)
         plt.subplot(1, 2, 2)
+        plt.gca().set_aspect("equal")
         plt.plot(recall, precision, label="PR Curve", color="orange")
         plt.ylim(0, 1)
         plt.scatter(
@@ -466,6 +476,7 @@ class VisDetectors:
 
         # Plot 1: F1 vs Threshold
         axes[0, 0].plot(thresholds, f1s)
+        axes[0, 0].set_aspect("equal", "box")
         axes[0, 0].set_xlabel("Threshold")
         axes[0, 0].set_ylabel(
             "F1 Score $\\frac{{2 \\cdot P \\cdot R}}{{P + R}}$", fontsize=14
@@ -477,6 +488,7 @@ class VisDetectors:
 
         # Plot 2: Accuracy vs Threshold
         axes[0, 1].plot(thresholds, accs)
+        axes[0, 1].set_aspect("equal", "box")
         axes[0, 1].set_xlabel("Threshold")
         axes[0, 1].set_ylabel("Accuracy Score $\\frac{{TP + TN}}{{N}}$", fontsize=14)
         axes[0, 1].set_ylim(0, 1)
@@ -488,6 +500,7 @@ class VisDetectors:
 
         # Plot 3: Precision vs Threshold
         axes[1, 0].plot(pr_thresholds, precision[:-1])
+        axes[1, 0].set_aspect("equal", "box")
         axes[1, 0].set_xlabel("Threshold")
         axes[1, 0].set_ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
         axes[1, 0].set_ylim(0, 1)
@@ -499,6 +512,7 @@ class VisDetectors:
 
         # Plot 4: Recall vs Threshold
         axes[1, 1].plot(pr_thresholds, recall[:-1])
+        axes[1, 1].set_aspect("equal", "box")
         axes[1, 1].set_xlabel("Threshold")
         axes[1, 1].set_ylabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
         axes[1, 1].set_ylim(0, 1)
@@ -518,6 +532,24 @@ class VisDetectors:
         plt.close(fig)
         return fpr, tpr, roc_thresholds, thresholds[1:-1][np.argmax(f1s[1:-1])]
 
+    #####################################################################################################################
+    def _run_fig_2_worker(
+        self, n_imp, train_dataset, test_dataset, dataset_name, path2imp
+    ):
+        try:
+            print(f"Using {n_imp} impostors from {path2imp}")
+            precs, recs = self._fig_2_for_fixed_n_imposters(
+                train_dataset,
+                test_dataset,
+                dataset_name,
+                path2imp,
+                n_imp,
+            )
+            return {"n_imp": n_imp, "precision": precs, "recall": recs}
+        except Exception as e:
+            print(f"[ERROR] Failed for n_imp = {n_imp}:\n{traceback.format_exc()}")
+            return None
+
     # ugly, but only for reproduction of Figure 2 from Koppel et al. (2014)
     def reproduce_fig2_prec_recall_dif_n_imp(self) -> None:
         """
@@ -526,108 +558,43 @@ class VisDetectors:
         train_dataset, test_dataset = self._load_datasets(balanced=True)
         dataset_name = self.dataset_name
         n_imp_options = [50, 500, 5000]
-        precisions, recalls = [], []
+        precisions, recalls = {}, {}
         path2imp = (
             Path(os.getcwd()).resolve() / CONFIG.PATH2BLOG
             if self.dataset_name == CONFIG.BLOG
             else Path(os.getcwd()).resolve() / CONFIG.PATH2STUDENT_ESSAYS
         )
-        for n_imp in n_imp_options:
-            print(f"Using {n_imp} impostors from {path2imp}")
-            # initialize impostor detector
-            impostor_detector = ImpostorDetector(
-                impostor_technique="fixed",
-                n_impostors=n_imp,
-                rounds=100,  # cf. pg. 181, Koppel et al. (2014)
-                top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
-                path2imp=path2imp,
-                upsample=False,
-            )
-            with ProcessPoolExecutor() as executor:
-                train_dataset["impostor_score"] = list(
-                    executor.map(impostor_detector.get_score, train_dataset["pair"])
-                )
-            print("Calculated impostor scores on training data.")
 
-            # find threshold that best separates impostors from non-impostors in the training set (targets are in the 'same' column)
-            args = {
-                "rounds": impostor_detector.rounds,
-                "top_n": impostor_detector.top_n,
-                "impostor_technique": impostor_detector.impostor_technique,
-                "upsample": impostor_detector.upsample,
-                "n_impostors": impostor_detector.n_impostors,
+        with ProcessPoolExecutor() as executor:
+            futures = {
+                executor.submit(
+                    self._run_fig_2_worker,
+                    n_imp,
+                    train_dataset,
+                    test_dataset,
+                    dataset_name,
+                    path2imp,
+                ): n_imp
+                for n_imp in n_imp_options
             }
-            args["dataset"] = dataset_name
-            fpr, tpr, thresholds, best_f1_thres = self.plot_decision_threshold_impostor(
-                scores=train_dataset["impostor_score"],
-                labels=train_dataset["same"],
-                title_kwargs=args,
-            )
-            precision, recall, pr_thresholds = precision_recall_curve(
-                train_dataset["same"], train_dataset["impostor_score"]
-            )
-            precisions.append(precision)
-            recalls.append(recall)
 
-            best_f1_thres = np.round(best_f1_thres, 2)
-            youdens_j_thres = np.round(
-                self._get_opt_imp_threshold(fpr, tpr, thresholds), 2
-            )
-            print(
-                f"Optimal threshold for impostor detection via Youden's J function: {youdens_j_thres:.2f}/ via best F1: {best_f1_thres:.2f}"
-            )
-
-            # work with test dataset
-            impostor_detector.set_training_mode(
-                False
-            )  # set to False for validation: Use training set for impostor generation for fixed impostor technique‚
-            with ProcessPoolExecutor() as executor:
-                test_dataset["impostor_score"] = list(
-                    executor.map(impostor_detector.get_score, test_dataset["pair"])
-                )
-
-            for thres_name, thres in zip(
-                ["Youden's J", "best F1"], [youdens_j_thres, best_f1_thres]
-            ):
-                args["threshold"] = thres
-                print(
-                    f"Visualizing impostor scores with threshold: {thres_name} = {thres}"
-                )
-
-                test_dataset["pred_same"] = test_dataset["impostor_score"] >= thres
-
-                # 'same' is ground truth, 'pred_same' is prediction
-                y_true = test_dataset["same"]
-                y_pred = test_dataset["pred_same"]
-
-                cm = confusion_matrix(y_true, y_pred)
-                disp = ConfusionMatrixDisplay(
-                    confusion_matrix=cm,
-                    display_labels=["Different authors", "Same author"],
-                )
-
-                disp.plot(cmap=plt.cm.Blues)
-                title = self._format_title(
-                    base=f"Confusion Matrix on Test Data with threshold {thres_name}",
-                    kwargs=args,
-                )
-                plt.title(title)
-                plt.tight_layout()
-                save_path = self.savefig_base / "impostor_scores" / self.dataset_name
-                filename = (
-                    title.replace(",", "")
-                    .replace("\n", "_")
-                    .replace(" ", "_")
-                    .replace("'", "")
-                )
-                save_path.mkdir(parents=True, exist_ok=True)
-                for format in ["svg"]:  # "png",
-                    print(f"Saving confusion matrix to {save_path / filename}.{format}")
-                    plt.savefig((save_path / filename).with_suffix(f".{format}"))
-                plt.close()
-        # Precision-Recall Curve: 	Imbalanced
-        # scores: non-thresholded measure of decisions, relative ranking of predictions
-        # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.precision_recall_curve.html (05.06.2025)
+            for future in as_completed(futures):
+                result = future.result()
+                if result:
+                    precisions[result["n_imp"]] = result["precision"]
+                    recalls[result["n_imp"]] = result["recall"]
+        # for n_imp in n_imp_options:
+        #     print(f"Using {n_imp} impostors from {path2imp}")
+        #     # initialize impostor detector
+        #     precs, recs = self._fig_2_for_fixed_n_imposters(
+        #         train_dataset,
+        #         test_dataset,
+        #         dataset_name,
+        #         path2imp,
+        #         n_imp,
+        #     )
+        #     precisions.append(precs)
+        #     recalls.append(recs)
 
         fig = plt.figure(figsize=(10, 5))
         for n_imp, precision, recall in zip(n_imp_options, precisions, recalls):
@@ -658,7 +625,7 @@ class VisDetectors:
 
         plt.xlabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
         plt.ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
-        title = self._format_title(base="Precision-Recall Curve", kwargs=title_kwargs)
+        title = self._format_title(base="Precision-Recall Curve", kwargs=args)
         plt.title(title)
         plt.legend()
         plt.tight_layout()
@@ -668,9 +635,282 @@ class VisDetectors:
                 if not args
                 else f"roc_prec_recall_curve_r{args['rounds']}_top{args['top_n']}_dif_n_imp.{format}"
             )
-            savefig = os.path.join(save_path, figure_name)
+            savefig = os.path.join(
+                self.savefig_base / "impostor_scores" / self.dataset_name, figure_name
+            )
             plt.savefig(savefig)
         plt.close(fig)
+
+    def _fig_2_for_fixed_n_imposters(
+        self, train_dataset, test_dataset, dataset_name, path2imp, n_imp
+    ):
+        impostor_detector = ImpostorDetector(
+            impostor_technique="fixed",
+            n_impostors=n_imp,
+            rounds=100,  # cf. pg. 181, Koppel et al. (2014)
+            top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
+            path2imp=path2imp,
+            upsample=False,
+        )
+        with ProcessPoolExecutor() as executor:
+            train_dataset["impostor_score"] = list(
+                executor.map(impostor_detector.get_score, train_dataset["pair"])
+            )
+        print("Calculated impostor scores on training data.")
+
+        fpr, tpr, thresholds, best_f1_thres = self.plot_decision_threshold_impostor(
+            scores=train_dataset["impostor_score"],
+            labels=train_dataset["same"],
+            title_kwargs=args,
+        )
+
+        best_f1_thres = np.round(best_f1_thres, 2)
+        youdens_j_thres = np.round(self._get_opt_imp_threshold(fpr, tpr, thresholds), 2)
+        print(
+            f"Optimal threshold for impostor detection via Youden's J function: {youdens_j_thres:.2f}/ via best F1: {best_f1_thres:.2f}"
+        )
+
+        # work with test dataset
+        impostor_detector.set_training_mode(
+            False
+        )  # set to False for validation: Use training set for impostor generation for fixed impostor technique‚
+        with ProcessPoolExecutor() as executor:
+            test_dataset["impostor_score"] = list(
+                executor.map(impostor_detector.get_score, test_dataset["pair"])
+            )
+
+        precision, recall, pr_thresholds = precision_recall_curve(
+            test_dataset["same"], test_dataset["impostor_score"]
+        )
+
+        for thres_name, thres in zip(
+            ["Youden's J", "best F1"], [youdens_j_thres, best_f1_thres]
+        ):
+            args["threshold"] = thres
+            print(f"Visualizing impostor scores with threshold: {thres_name} = {thres}")
+
+            test_dataset["pred_same"] = test_dataset["impostor_score"] >= thres
+
+            # 'same' is ground truth, 'pred_same' is prediction
+            y_true = test_dataset["same"]
+            y_pred = test_dataset["pred_same"]
+
+            cm = confusion_matrix(y_true, y_pred)
+            disp = ConfusionMatrixDisplay(
+                confusion_matrix=cm,
+                display_labels=["Different authors", "Same author"],
+            )
+
+            disp.plot(cmap=plt.cm.Blues)
+            title = self._format_title(
+                base=f"Confusion Matrix on Test Data with threshold {thres_name}",
+                kwargs=args,
+            )
+            plt.title(title)
+            plt.tight_layout()
+            save_path = self.savefig_base / "impostor_scores" / self.dataset_name
+            filename = (
+                title.replace(",", "")
+                .replace("\n", "_")
+                .replace(" ", "_")
+                .replace("'", "")
+            )
+            save_path.mkdir(parents=True, exist_ok=True)
+            for format in ["svg"]:  # "png",
+                print(f"Saving confusion matrix to {save_path / filename}.{format}")
+                plt.savefig((save_path / filename).with_suffix(f".{format}"))
+            plt.close()
+        return precision, recall
+
+    # ugly, but only for reproduction of Figure 4 a, b from Koppel et al. (2014)
+    def reproduce_fig4_prec_recall_dif_imp_appr(self) -> None:
+        """
+        Visualizes the impostor detection results via Precision-Recall curves for different impostor generation techniques (cf. Figures 4 a, b from Koppel et al. (2014)).
+        """
+        train_dataset, test_dataset = self._load_datasets(balanced=True)
+        dataset_name = self.dataset_name
+        imp_gen_options = ["fixed", "on-the-fly"]
+        baselines = [
+            "unsupervised baseline min-max",
+            "unsupervised baseline cosine",
+            "supervised baseline",
+        ]
+        total_precisions, total_recalls = [], []
+        same_author_precisions, same_author_recalls = [], []
+        different_author_precisions, different_author_recalls = [], []
+        path2imp = (
+            Path(os.getcwd()).resolve() / CONFIG.PATH2BLOG
+            if self.dataset_name == CONFIG.BLOG
+            else Path(os.getcwd()).resolve() / CONFIG.PATH2STUDENT_ESSAYS
+        )
+        for imp_gen in imp_gen_options:
+            print(
+                f"Using {imp_gen} impostor generation with path to imposters: {path2imp}"
+            )
+            # initialize impostor detector
+            impostor_detector = ImpostorDetector(
+                impostor_technique=imp_gen,
+                n_impostors=50,
+                rounds=100,  # cf. pg. 181, Koppel et al. (2014)
+                top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
+                path2imp=path2imp,
+                upsample=False,
+            )
+            with ProcessPoolExecutor() as executor:
+                train_dataset["impostor_score"] = list(
+                    executor.map(impostor_detector.get_score, train_dataset["pair"])
+                )
+            print("Calculated impostor scores on training data.")
+
+            # find threshold that best separates impostors from non-impostors in the training set (targets are in the 'same' column)
+            args = {
+                "rounds": impostor_detector.rounds,
+                "top_n": impostor_detector.top_n,
+                "impostor_technique": impostor_detector.impostor_technique,
+                "upsample": impostor_detector.upsample,
+                "n_impostors": impostor_detector.n_impostors,
+            }
+            args["dataset"] = dataset_name
+            fpr, tpr, thresholds, best_f1_thres = self.plot_decision_threshold_impostor(
+                scores=train_dataset["impostor_score"],
+                labels=train_dataset["same"],
+                title_kwargs=args,
+            )
+
+            best_f1_thres = np.round(best_f1_thres, 2)
+            youdens_j_thres = np.round(
+                self._get_opt_imp_threshold(fpr, tpr, thresholds), 2
+            )
+            print(
+                f"Optimal threshold for impostor detection via Youden's J function: {youdens_j_thres:.2f}/ via best F1: {best_f1_thres:.2f}"
+            )
+
+            # work with test dataset
+            impostor_detector.set_training_mode(
+                False
+            )  # set to False for validation: Use training set for impostor generation for fixed impostor technique
+            with ProcessPoolExecutor() as executor:
+                test_dataset["impostor_score"] = list(
+                    executor.map(impostor_detector.get_score, test_dataset["pair"])
+                )
+
+            # both same and different author pairs
+            precision, recall, pr_thresholds = precision_recall_curve(
+                test_dataset["same"], test_dataset["impostor_score"]
+            )
+            total_precisions.append(precision)
+            total_recalls.append(recall)
+
+            # same author pairs
+            precision, recall, pr_thresholds = precision_recall_curve(
+                test_dataset[test_dataset["same"]]["same"],
+                test_dataset[test_dataset["same"]]["impostor_score"],
+            )
+            same_author_precisions.append(precision)
+            same_author_recalls.append(recall)
+
+            # different author pairs
+            precision, recall, pr_thresholds = precision_recall_curve(
+                test_dataset[~test_dataset["same"]]["same"],
+                test_dataset[~test_dataset["same"]]["impostor_score"],
+            )
+            different_author_precisions.append(precision)
+            different_author_recalls.append(recall)
+
+        for baseline_name, baseline in zip(
+            baselines,
+            [
+                UnSupervisedImpostorBaseline(
+                    use_cosine_simiarity=False, dataset_name=self.dataset_name
+                ),
+                UnSupervisedImpostorBaseline(
+                    use_cosine_simiarity=True, dataset_name=self.dataset_name
+                ),
+                SupervisedImpostorBaseline(dataset_name=self.dataset_name),
+            ],
+        ):
+            test_dataset[f"{baseline_name.replace(' ','_')}_score"] = (
+                baseline.get_prediction(test_dataset["pair"])
+            )
+
+            # both same and different author pairs
+            precision, recall, pr_thresholds = precision_recall_curve(
+                test_dataset["same"],
+                test_dataset[f"{baseline_name.replace(' ','_')}_score"],
+            )
+            total_precisions.append(precision)
+            total_recalls.append(recall)
+
+            # same author pairs
+            precision, recall, pr_thresholds = precision_recall_curve(
+                test_dataset[test_dataset["same"]]["same"],
+                test_dataset[test_dataset["same"]][
+                    f"{baseline_name.replace(' ','_')}_score"
+                ],
+            )
+            same_author_precisions.append(precision)
+            same_author_recalls.append(recall)
+
+            # different author pairs
+            precision, recall, pr_thresholds = precision_recall_curve(
+                test_dataset[~test_dataset["same"]]["same"],
+                test_dataset[~test_dataset["same"]][
+                    f"{baseline_name.replace(' ','_')}_score"
+                ],
+            )
+            different_author_precisions.append(precision)
+            different_author_recalls.append(recall)
+
+        # Precision-Recall Curve: 	Imbalanced
+        # scores: non-thresholded measure of decisions, relative ranking of predictions
+        # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.precision_recall_curve.html (05.06.2025)
+
+        for kind, data in zip(
+            ["Complete", "Same Author", "Different Author"],
+            [
+                (total_precisions, total_recalls),
+                (same_author_precisions, same_author_recalls),
+                (different_author_precisions, different_author_recalls),
+            ],
+        ):
+            print(f"Plotting Precision-Recall Curve for {kind} pairs")
+            precisions, recalls = data
+            fig = plt.figure(figsize=(10, 5))
+            for imp_gen, precision, recall in zip(imp_gen_options, precisions, recalls):
+                plt.plot(recall, precision, label="# impostors = " + str(imp_gen))
+
+            for baseline_name, precision, recall in zip(
+                baselines,
+                precisions[len(imp_gen_options) :],
+                recalls[len(imp_gen_options) :],
+            ):
+                plt.plot(
+                    recall,
+                    precision,
+                    label=f"{baseline_name}",
+                    linestyle="--",
+                )
+            plt.ylim(0, 1)
+            plt.xlabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
+            plt.ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
+            title = self._format_title(
+                base=f"Precision-Recall Curve for {kind} Data", kwargs=args
+            )
+            plt.title(title)
+            plt.legend()
+            plt.tight_layout()
+            for format in ["svg"]:  # "png",
+                figure_name = (
+                    f"roc_prec_recall_curve_dif_{kind.replace(' ', '_')}_imp_gen.{format}"
+                    if not args
+                    else f"roc_prec_recall_curve_r{args['rounds']}_top{args['top_n']}_{kind.replace(' ', '_')}_dif_imp_gen.{format}"
+                )
+                savefig = os.path.join(
+                    self.savefig_base / "impostor_scores" / self.dataset_name,
+                    figure_name,
+                )
+                plt.savefig(savefig)
+            plt.close(fig)
 
 
 if __name__ == "__main__":
