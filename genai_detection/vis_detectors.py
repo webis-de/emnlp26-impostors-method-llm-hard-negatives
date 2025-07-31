@@ -527,14 +527,20 @@ class VisDetectors:
         dataset_name = self.dataset_name
         n_imp_options = [50, 500, 5000]
         precisions, recalls = [], []
+        path2imp = (
+            Path(os.getcwd()).resolve() / CONFIG.PATH2BLOG
+            if self.dataset_name == CONFIG.BLOG
+            else Path(os.getcwd()).resolve() / CONFIG.PATH2STUDENT_ESSAYS
+        )
         for n_imp in n_imp_options:
+            print(f"Using {n_imp} imposters from {path2imp}")
+            # initialize imposter detector
             impostor_detector = ImpostorDetector(
                 imposter_technique="fixed",
                 n_impostors=n_imp,
                 rounds=100,  # cf. pg. 181, Koppel et al. (2014)
                 top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
-                path2imp=Path(os.getcwd()).resolve().parent
-                / CONFIG.PATH2STUDENT_ESSAYS,
+                path2imp=path2imp,
                 upsample=False,
             )
             with ProcessPoolExecutor() as executor:
