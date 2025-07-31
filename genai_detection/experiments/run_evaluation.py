@@ -100,6 +100,7 @@ def evaluate_category(data_category, data_root, save_path):
         text = load_text(data_category, path2datasets, file_name)
         print(f"Loaded text for {data_category} with length {len(text)}")
         model = OllamaParaphraser(model_id=OLLAMA_VERSION)
+        print("Loaded Ollama paraphraser")
         paraphrasers = create_paraphrasers(model)
         print(f"Loaded paraphrasers for {data_category}")
 

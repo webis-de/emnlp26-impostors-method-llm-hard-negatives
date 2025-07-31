@@ -466,13 +466,16 @@ class OllamaParaphraser(NaiveParaphraser):
             base_url="https://llm.web.webis.de/api",
             api_key=CONFIG.OPENAI_KEY,
         )
+        print(f"Using Ollama model: {model_id} with client {self.client}")
         # custom (non-OpenAI) endpoint: Use requests library
         response = requests.get(
             "https://llm.web.webis.de/ollama/api/tags",
             headers={"Authorization": f"Bearer {CONFIG.OPENAI_KEY}"},
         )
         models = response.json()["models"]
-        assert model_id in [model["name"] for model in models]
+        assert model_id in [
+            model["name"] for model in models
+        ], f"Model {model_id} is not available. Please choose from the available models: {[model['name'] for model in models]}"
         self.model_id = model_id
 
     def paraphrase(
