@@ -94,13 +94,8 @@ def evaluate_category(data_category, data_root, save_path):
 
         use_ground_truth = not (data_category in ["Blog", "Student Essay"])
         metadata = load_metadata(path2datasets, file_name) if use_ground_truth else {}
-        print(f"Obtained Metadata for {data_category}")
-
-        print("About to load text for", data_category)
         text = load_text(data_category, path2datasets, file_name)
-        print(f"Loaded text for {data_category} with length {len(text)}")
         model = OllamaParaphraser(model_id=OLLAMA_VERSION)
-        print("Loaded Ollama paraphraser")
         paraphrasers = create_paraphrasers(model)
         print(f"Loaded paraphrasers for {data_category}")
 
@@ -113,6 +108,7 @@ def evaluate_category(data_category, data_root, save_path):
             temperature=TEMPERATURE,
             ground_truth=metadata,
         )
+        print(f"Starting evaluation for {data_category}")
 
         df, extremest = evaluator.evaluate(
             save_extremest_paraphr_per_score=True, save_to_disk=True

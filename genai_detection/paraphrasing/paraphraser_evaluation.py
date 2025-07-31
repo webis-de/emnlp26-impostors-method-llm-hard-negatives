@@ -115,11 +115,13 @@ class ParaphrasingEvaluator:
             if torch.cuda.is_available()
             else ("mps" if torch.backends.mps.is_available() else "cpu")
         )
+        print(f"Using device: {device}")
         # FIXME:
         self.sbert_model = SentenceTransformer(
             "sentence-transformers/all-MiniLM-L6-v2", device=device
         )  # for cosine similarity
         # https://pypi.org/project/word-mover-distance/ Word Mover's Distance (WMD)
+        print("Loading pre-trained word vectors for WMD...")
         self.pretr_word_model = WMDReadyKeyedVectors(
             gensim.downloader.load("glove-twitter-25")
         )

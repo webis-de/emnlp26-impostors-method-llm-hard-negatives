@@ -466,7 +466,6 @@ class OllamaParaphraser(NaiveParaphraser):
             base_url="https://llm.web.webis.de/api",
             api_key=CONFIG.OPENAI_KEY,
         )
-        print(f"Using Ollama model: {model_id} with client {self.client}")
         # custom (non-OpenAI) endpoint: Use requests library
         response = requests.get(
             "https://llm.web.webis.de/ollama/api/tags",
