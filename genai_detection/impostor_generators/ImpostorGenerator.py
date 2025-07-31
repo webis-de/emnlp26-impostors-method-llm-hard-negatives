@@ -340,6 +340,8 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
         4. Save the results to a CSV file.
         5. Format results into a dictionary with keys as query and position, and values as the full text (or snippets) of the search result.
 
+        While Koppel et Al. (2014) randomly choose n imposters among the top m imposter, we use all of them.
+
         :param text (str): input text to generate impostors for
         :param path2imp (str or Path, optional): Path to save the CSV. If a directory or None, appends a timestamped filename.
         :param real_time_generation (bool): If True, generates queries and fetches results in real-time. If False, uses precomputed results from the specified path.
@@ -365,7 +367,9 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
                 return result_df
 
             if path2imp is None:
-                path2imp = Path(CONFIG.PATH2GENERIC_ON_FLY_IMP)
+                path2imp = (
+                    Path(__file__).resolve().parents[2] / CONFIG.PATH2GENERIC_ON_FLY_IMP
+                )
             else:
                 path2imp = Path(path2imp)
             if path2imp.suffix != ".csv" or path2imp.is_dir():
