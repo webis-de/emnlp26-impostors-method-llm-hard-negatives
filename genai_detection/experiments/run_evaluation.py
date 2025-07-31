@@ -85,6 +85,7 @@ def create_paraphrasers(model):
 
 
 def evaluate_category(data_category, data_root, save_path):
+    print(f"Evaluating category: {data_category}")
     try:
         dir_name, file_name = CATEGORY2DIRECTORY[data_category]
         path2datasets = data_root / dir_name
@@ -93,10 +94,14 @@ def evaluate_category(data_category, data_root, save_path):
 
         use_ground_truth = not (data_category in ["Blog", "Student Essay"])
         metadata = load_metadata(path2datasets, file_name) if use_ground_truth else {}
+        print(f"Obtained Metadata for {data_category}")
 
+        print("About to load text for", data_category)
         text = load_text(data_category, path2datasets, file_name)
+        print(f"Loaded text for {data_category} with length {len(text)}")
         model = OllamaParaphraser(model_id=OLLAMA_VERSION)
         paraphrasers = create_paraphrasers(model)
+        print(f"Loaded paraphrasers for {data_category}")
 
         evaluator = ParaphrasingEvaluator(
             paraphrasers=paraphrasers,
@@ -112,6 +117,7 @@ def evaluate_category(data_category, data_root, save_path):
             save_extremest_paraphr_per_score=True, save_to_disk=True
         )
 
+        print("Starting plotting for", data_category)
         for group in ["model", "prompt"]:
             evaluator.plot_models_metrics(
                 df, save_path, data_category, group_by=group, display_plot=False
@@ -149,12 +155,14 @@ def run_extraction_evaluation(save_path):
         temperature=TEMPERATURE,
         config={"save_path": save_path},
     )
+    print("Starting extraction evaluation")
     evaluator.evaluate_extractors(save_to_disk=True, display_plot=False)
     print("Extraction evaluation complete")
 
 
 def run_evaluation():
     data_root, save_path = get_base_paths()
+    print(f"Data root: {data_root}, Save path: {save_path}")
     results = []
 
     with ThreadPoolExecutor() as executor:
