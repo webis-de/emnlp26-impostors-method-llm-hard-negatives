@@ -583,23 +583,13 @@ class VisDetectors:
                 if result:
                     precisions[result["n_imp"]] = result["precision"]
                     recalls[result["n_imp"]] = result["recall"]
-        # for n_imp in n_imp_options:
-        #     print(f"Using {n_imp} impostors from {path2imp}")
-        #     # initialize impostor detector
-        #     precs, recs = self._fig_2_for_fixed_n_imposters(
-        #         train_dataset,
-        #         test_dataset,
-        #         dataset_name,
-        #         path2imp,
-        #         n_imp,
-        #     )
-        #     precisions.append(precs)
-        #     recalls.append(recs)
 
         fig = plt.figure(figsize=(10, 5))
-        for n_imp, precision, recall in zip(n_imp_options, precisions, recalls):
+        for n_imp, precision in precisions.items():
+            recall = recalls[n_imp]
             plt.plot(recall, precision, label="# impostors = " + str(n_imp))
         plt.ylim(0, 1)
+        plt.gca().set_aspect("equal", "box")
         plt.scatter(
             0.34,
             0.95,
@@ -722,28 +712,11 @@ class VisDetectors:
             plt.close()
         return precision, recall
 
-    # ugly, but only for reproduction of Figure 4 a, b from Koppel et al. (2014)
-    def reproduce_fig4_prec_recall_dif_imp_appr(self) -> None:
-        """
-        Visualizes the impostor detection results via Precision-Recall curves for different impostor generation techniques (cf. Figures 4 a, b from Koppel et al. (2014)).
-        """
-        train_dataset, test_dataset = self._load_datasets(balanced=True)
-        dataset_name = self.dataset_name
-        imp_gen_options = ["fixed", "on-the-fly"]
-        baselines = [
-            "unsupervised baseline min-max",
-            "unsupervised baseline cosine",
-            "supervised baseline",
-        ]
-        total_precisions, total_recalls = [], []
-        same_author_precisions, same_author_recalls = [], []
-        different_author_precisions, different_author_recalls = [], []
-        path2imp = (
-            Path(os.getcwd()).resolve() / CONFIG.PATH2BLOG
-            if self.dataset_name == CONFIG.BLOG
-            else Path(os.getcwd()).resolve() / CONFIG.PATH2STUDENT_ESSAYS
-        )
-        for imp_gen in imp_gen_options:
+    #################################################################################
+    def _run_fig_4_worker(
+        self, imp_gen, train_dataset, test_dataset, dataset_name, path2imp
+    ):
+        try:
             print(
                 f"Using {imp_gen} impostor generation with path to imposters: {path2imp}"
             )
@@ -795,27 +768,78 @@ class VisDetectors:
                 )
 
             # both same and different author pairs
-            precision, recall, pr_thresholds = precision_recall_curve(
+            total_precisions, total_recalls, pr_thresholds = precision_recall_curve(
                 test_dataset["same"], test_dataset["impostor_score"]
             )
-            total_precisions.append(precision)
-            total_recalls.append(recall)
 
             # same author pairs
-            precision, recall, pr_thresholds = precision_recall_curve(
-                test_dataset[test_dataset["same"]]["same"],
-                test_dataset[test_dataset["same"]]["impostor_score"],
+            same_author_precisions, same_author_recalls, pr_thresholds = (
+                precision_recall_curve(
+                    test_dataset[test_dataset["same"]]["same"],
+                    test_dataset[test_dataset["same"]]["impostor_score"],
+                )
             )
-            same_author_precisions.append(precision)
-            same_author_recalls.append(recall)
 
             # different author pairs
-            precision, recall, pr_thresholds = precision_recall_curve(
-                test_dataset[~test_dataset["same"]]["same"],
-                test_dataset[~test_dataset["same"]]["impostor_score"],
+            different_author_precisions, different_author_recalls, pr_thresholds = (
+                precision_recall_curve(
+                    test_dataset[~test_dataset["same"]]["same"],
+                    test_dataset[~test_dataset["same"]]["impostor_score"],
+                )
             )
-            different_author_precisions.append(precision)
-            different_author_recalls.append(recall)
+
+            return {
+                "imp_gen": imp_gen,
+                "total_precisions": total_precisions,
+                "total_recalls": total_recalls,
+                "same_author_precisions": same_author_precisions,
+                "same_author_recalls": same_author_recalls,
+                "different_author_precisions": different_author_precisions,
+                "different_author_recalls": different_author_recalls,
+            }
+        except Exception as e:
+            print(f"[ERROR] Failed for imp_gen = {imp_gen}:\n{traceback.format_exc()}")
+            return None
+
+    # ugly, but only for reproduction of Figure 4 a, b from Koppel et al. (2014)
+    def reproduce_fig4_prec_recall_dif_imp_appr(self) -> None:
+        """
+        Visualizes the impostor detection results via Precision-Recall curves for different impostor generation techniques (cf. Figures 4 a, b from Koppel et al. (2014)).
+        """
+        train_dataset, test_dataset = self._load_datasets(balanced=True)
+        dataset_name = self.dataset_name
+        imp_gen_options = ["fixed", "on-the-fly"]
+        baselines = [
+            "unsupervised baseline min-max",
+            "unsupervised baseline cosine",
+            "supervised baseline",
+        ]
+        total_precisions, total_recalls = {}, {}
+        same_author_precisions, same_author_recalls = {}, {}
+        different_author_precisions, different_author_recalls = {}, {}
+        path2imp = (
+            Path(os.getcwd()).resolve() / CONFIG.PATH2BLOG
+            if self.dataset_name == CONFIG.BLOG
+            else Path(os.getcwd()).resolve() / CONFIG.PATH2STUDENT_ESSAYS
+        )
+        with ProcessPoolExecutor() as executor:
+            futures = {
+                executor.submit(
+                    self._run_fig_4_worker,
+                    imp_gen,
+                    train_dataset,
+                    test_dataset,
+                    dataset_name,
+                    path2imp,
+                ): imp_gen
+                for imp_gen in imp_gen_options
+            }
+
+            for future in as_completed(futures):
+                result = future.result()
+                if result:
+                    precisions[result["imp_gen"]] = result["precision"]
+                    recalls[result["imp_gen"]] = result["recall"]
 
         for baseline_name, baseline in zip(
             baselines,
@@ -838,8 +862,8 @@ class VisDetectors:
                 test_dataset["same"],
                 test_dataset[f"{baseline_name.replace(' ','_')}_score"],
             )
-            total_precisions.append(precision)
-            total_recalls.append(recall)
+            total_precisions[baseline_name.replace(" ", "_")] = precision
+            total_recalls[baseline_name.replace(" ", "_")] = recall
 
             # same author pairs
             precision, recall, pr_thresholds = precision_recall_curve(
@@ -848,8 +872,8 @@ class VisDetectors:
                     f"{baseline_name.replace(' ','_')}_score"
                 ],
             )
-            same_author_precisions.append(precision)
-            same_author_recalls.append(recall)
+            same_author_precisions[baseline_name.replace(" ", "_")] = precision
+            same_author_recalls[baseline_name.replace(" ", "_")] = recall
 
             # different author pairs
             precision, recall, pr_thresholds = precision_recall_curve(
@@ -858,8 +882,8 @@ class VisDetectors:
                     f"{baseline_name.replace(' ','_')}_score"
                 ],
             )
-            different_author_precisions.append(precision)
-            different_author_recalls.append(recall)
+            different_author_precisions[baseline_name.replace(" ", "_")] = precision
+            different_author_recalls[baseline_name.replace(" ", "_")] = recall
 
         # Precision-Recall Curve: 	Imbalanced
         # scores: non-thresholded measure of decisions, relative ranking of predictions
@@ -876,21 +900,17 @@ class VisDetectors:
             print(f"Plotting Precision-Recall Curve for {kind} pairs")
             precisions, recalls = data
             fig = plt.figure(figsize=(10, 5))
-            for imp_gen, precision, recall in zip(imp_gen_options, precisions, recalls):
-                plt.plot(recall, precision, label="# impostors = " + str(imp_gen))
-
-            for baseline_name, precision, recall in zip(
-                baselines,
-                precisions[len(imp_gen_options) :],
-                recalls[len(imp_gen_options) :],
-            ):
+            for imp_gen, precision in precisions.items():
+                recall = recalls[imp_gen]
                 plt.plot(
                     recall,
                     precision,
-                    label=f"{baseline_name}",
-                    linestyle="--",
+                    label=imp_gen,
+                    linestyle="-" if imp_gen in imp_gen_options else "--",
                 )
+
             plt.ylim(0, 1)
+            plt.gca().set_aspect("equal")
             plt.xlabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
             plt.ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
             title = self._format_title(
