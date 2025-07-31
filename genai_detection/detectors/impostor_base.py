@@ -102,11 +102,16 @@ class ImpostorBaselineBase(ImpostorBase):
     This class provides the basic structure for scoring and prediction methods.
     """
 
-    def __init__(self):
+    def __init__(self, dataset_name: str = CONFIG.STUDENT_ESSAYS):
         super().__init__()
-        self.dataset = load_from_disk(
-            Path(__file__).resolve().parents[2] / CONFIG.PATH2STUDENT_ESSAYS
-        )["train"].to_pandas()
+        dataset = (
+            CONFIG.PATH2STUDENT_ESSAYS
+            if dataset_name == CONFIG.STUDENT_ESSAYS
+            else CONFIG.PATH2BLOG
+        )
+        self.dataset = load_from_disk(Path(__file__).resolve().parents[2] / dataset)[
+            "train"
+        ].to_pandas()
         self.dataset[["disputed_text", "candidate_text"]] = pd.DataFrame(
             self.dataset["pair"].tolist(), index=self.dataset.index
         )

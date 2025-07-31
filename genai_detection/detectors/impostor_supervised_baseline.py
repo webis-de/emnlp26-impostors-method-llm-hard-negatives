@@ -30,11 +30,11 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
     Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
     """
 
-    def __init__(self):
+    def __init__(self, dataset_name: str = CONFIG.STUDENT_ESSAYS):
         """
         Initialize the Supervised Impostor Baseline detector.
         """
-        super().__init__()
+        super().__init__(dataset_name=dataset_name)
         self.model = self.get_trained_linear_svc()
 
     def _get_score_impl(

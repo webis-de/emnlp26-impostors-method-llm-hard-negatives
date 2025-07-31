@@ -26,14 +26,19 @@ class UnSupervisedImpostorBaseline(ImpostorBaselineBase):
     Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        use_cosine_simiarity: bool = True,
+        dataset_name: str = CONFIG.STUDENT_ESSAYS,
+    ):
         """
         Initialize the Unsupervised Impostor Baseline detector.
         """
-        super().__init__()
+        super().__init__(dataset_name=dataset_name)
         self.threshold = (
             0.5  # Default threshold, can be adjusted based on validation set
         )
+        self.cosine = use_cosine_simiarity
 
     def _get_score_impl(
         self, text: t.Iterable[str]
@@ -56,7 +61,10 @@ class UnSupervisedImpostorBaseline(ImpostorBaselineBase):
                 vecs
             )  # generator object is not subscriptable, so convert to list
             assert len(vecs) == 2, "Input text must be a list of pairs of texts."
-            scores_per_pair.append(self.cosine_similarity(vecs[0], vecs[1]))
+            if self.cosine:
+                scores_per_pair.append(self.cosine_similarity(vecs[0], vecs[1]))
+            else:
+                scores_per_pair.append(self.minmax_similarity(vecs[0], vecs[1]))
 
         return np.array(scores_per_pair)
 
