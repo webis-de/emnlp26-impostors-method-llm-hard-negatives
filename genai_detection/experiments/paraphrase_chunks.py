@@ -6,7 +6,7 @@ The scores will be averaged to get a score for the whole text, which will be com
 """
 
 import argparse
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from functools import partial
 from pathlib import Path
 import os
@@ -233,7 +233,7 @@ def run_experiment(path2dataset: str) -> pd.DataFrame:
                 num_chunks=num_chunks,
             )
 
-            with ProcessPoolExecutor() as executor:
+            with ThreadPoolExecutor() as executor:  # not cpu bound but IO bound: Use ThreadPoolExecutor rather than ProcessPoolExecutor
                 futures = [executor.submit(evaluate_fn, chunk) for chunk in chunks]
                 for future in tqdm(
                     as_completed(futures),
