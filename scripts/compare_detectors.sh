@@ -5,4 +5,4 @@
 #SBATCH --output=logs/log-comp-detectors-%j.log
 #SBATCH --container-image=registry.webis.de/code-teaching/theses/artificial-authorship-verification:latest
 #SBATCH --container-mounts=/mnt/ceph/storage/data-tmp/current/kgutekunst/dev/artificial-authorship-verification/:/src
-python3 genai_detection/vis_detectors.py --rounds 100 --top_n 100000 --imposter_technique "fixed" 
+python3 genai_detection/vis_detectors.py --rounds 100 --top_n 100000 --impostor_technique "fixed" 
