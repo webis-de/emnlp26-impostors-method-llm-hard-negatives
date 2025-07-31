@@ -7,17 +7,17 @@ import pandas as pd
 
 import torch
 from genai_detection.config import CONFIG
-from genai_detection.detectors.imposter_base import ImposterBaselineBase
+from genai_detection.detectors.impostor_base import ImpostorBaselineBase
 import typing as t
 from sklearn.svm import LinearSVC
 import pickle
 
 
-class SupervisedImposterBaseline(ImposterBaselineBase):
+class SupervisedImpostorBaseline(ImpostorBaselineBase):
     """
-    Supervised Imposter Baseline detector class.
+    Supervised Impostor Baseline detector class.
 
-    This class extends the DetectorBase and implements a supervised baseline for the Imposter method by Koopel et. Al. (2014).
+    This class extends the DetectorBase and implements a supervised baseline for the Impostor method by Koopel et. Al. (2014).
     A document pair (i.e. disputed document and candidate author document) is represented as a vector of TF-IDF features.
     The frequenies are calculated based on the 100,000 most frequent space-free character 4-grams in the corpus.
     The representation of a text pair is the element-wise difference of the two TF-IDF vectors.
@@ -32,7 +32,7 @@ class SupervisedImposterBaseline(ImposterBaselineBase):
 
     def __init__(self):
         """
-        Initialize the Supervised Imposter Baseline detector.
+        Initialize the Supervised Impostor Baseline detector.
         """
         super().__init__()
         self.model = self.get_trained_linear_svc()
@@ -41,7 +41,7 @@ class SupervisedImposterBaseline(ImposterBaselineBase):
         self, text: t.Iterable[str]
     ) -> t.Union[torch.Tensor, np.ndarray, t.Iterable[float]]:
         """
-        Scoring implementation for the Supervised Imposter Baseline detector.
+        Scoring implementation for the Supervised Impostor Baseline detector.
 
         :param text: An iterable of strings (texts) to score.
         :return: A list of scores for each text.
@@ -73,11 +73,11 @@ class SupervisedImposterBaseline(ImposterBaselineBase):
 
     def get_trained_linear_svc(self):
         """
-        Load a pre-trained LinearSVC model for the Supervised Imposter Baseline detector.
+        Load a pre-trained LinearSVC model for the Supervised Impostor Baseline detector.
         If there is no pretrained model, train one.
         """
         path2model = (
-            Path(__file__).resolve().parents[2] / "models" / "imposter_svc_model.pkl"
+            Path(__file__).resolve().parents[2] / "models" / "impostor_svc_model.pkl"
         )
         if path2model.exists():
             return pickle.load(path2model)
@@ -120,7 +120,7 @@ class SupervisedImposterBaseline(ImposterBaselineBase):
 
 if __name__ == "__main__":
     # Example usage
-    detector = SupervisedImposterBaseline()
+    detector = SupervisedImpostorBaseline()
     dataset = load_from_disk(Path(__file__).resolve().parents[2] / CONFIG.CROSS_GENRE)[
         "test"
     ].to_pandas()[["disputed_text", "candidate_text", "same"]]

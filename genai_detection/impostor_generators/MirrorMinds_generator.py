@@ -10,13 +10,13 @@ import pandas as pd
 import torch
 import time
 from huggingface_hub import snapshot_download
-from genai_detection.imposter_generators.ImposterGenerator import BaseImposterGenerator
+from genai_detection.impostor_generators.ImpostorGenerator import BaseImpostorGenerator
 from genai_detection.config import CONFIG
 
 
-class MirrorMindsGenerator(BaseImposterGenerator):
+class MirrorMindsGenerator(BaseImpostorGenerator):
     """
-    MirrorMindsGenerator is a generator that creates imposter texts by mirroring the structure of the original text.
+    MirrorMindsGenerator is a generator that creates impostor texts by mirroring the structure of the original text.
     It uses the MirrorMinds model to generate paraphrases that maintain the original meaning while altering the wording.
     """
 
@@ -25,12 +25,12 @@ class MirrorMindsGenerator(BaseImposterGenerator):
         torch.cuda.empty_cache()
         self.model_path = snapshot_download(repo_id="google/flan-t5-small")
 
-    def generate_imposters(self, text: str) -> List[str]:
+    def generate_impostors(self, text: str) -> List[str]:
         """
-        Generate an imposter text by mirroring the structure of the input text.
+        Generate an impostor text by mirroring the structure of the input text.
 
         :param text: The original text to be mirrored.
-        :return: The generated imposter text.
+        :return: The generated impostor text.
         """
         start_time = time.time()
 
@@ -39,7 +39,7 @@ class MirrorMindsGenerator(BaseImposterGenerator):
         tmp_path = Path(os.getcwd()) / "tmp-MirrorMinds"
         os.makedirs(tmp_path, exist_ok=True)
         text_df.to_pickle(tmp_path / "sample_essays.pkl")
-        imposter_texts = []
+        impostor_texts = []
         for i in range(self.n_impostors):
             question_config = QuestionGeneratorConfig(
                 model_path=self.model_path,
@@ -70,7 +70,7 @@ class MirrorMindsGenerator(BaseImposterGenerator):
                 response_config.input_path, response_config.output_path
             )
             if not df.empty:
-                imposter_texts.append(df["generated_text"].iloc[0])
+                impostor_texts.append(df["generated_text"].iloc[0])
 
         # print(f"Total script runtime: {time.time() - start_time:.2f} seconds")
         # print("Generated questions and responses saved successfully.")
@@ -79,7 +79,7 @@ class MirrorMindsGenerator(BaseImposterGenerator):
         os.remove(tmp_path / "generated_questions.pkl")
         os.remove(tmp_path / "generated_responses.pkl")
         os.rmdir(tmp_path)
-        return imposter_texts
+        return impostor_texts
 
 
 if __name__ == "__main__":
@@ -87,5 +87,5 @@ if __name__ == "__main__":
     path2datasets = Path(os.getcwd()).resolve() / "data" / "datasets" / "custom_texts"
     file_name = "cnn_040725"  # Dalai Lama
     original_text = open(path2datasets / f"{file_name}.txt").read()
-    imposter_text = generator.generate_imposters(original_text)
-    print("Imposter Text:", imposter_text)
+    impostor_text = generator.generate_impostors(original_text)
+    print("Impostor Text:", impostor_text)

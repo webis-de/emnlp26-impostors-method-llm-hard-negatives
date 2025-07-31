@@ -42,7 +42,7 @@ class VisDetectors:
         """
         Initializes the VisDetectors class.
         :param dataset_name: The name of the dataset to use for visualization.
-        :param detectors: List of detectors objects to visualize. Currently supported: Unmasking and Imposter methods.
+        :param detectors: List of detectors objects to visualize. Currently supported: Unmasking and impostor methods.
         """
         self.dataset_name = dataset_name
         assert all(
@@ -87,7 +87,7 @@ class VisDetectors:
                 )
         if train_dataset.empty or test_dataset.empty:
             raise ValueError(
-                "Train or test dataset is empty. Cannot visualize imposters."
+                "Train or test dataset is empty. Cannot visualize impostors."
             )
         return train_dataset, test_dataset
 
@@ -101,7 +101,7 @@ class VisDetectors:
         train_dataset, test_dataset = self._load_datasets(balanced=balanced)
         for detector in self.detectors:
             if isinstance(detector, ImpostorDetector):
-                self.visualize_imposters(
+                self.visualize_impostors(
                     impostor_detector=detector,
                     train_dataset=train_dataset,
                     test_dataset=test_dataset,
@@ -167,7 +167,7 @@ class VisDetectors:
             )
             return 0.5  # or np.nan, depending on your use case
 
-    def visualize_imposters(
+    def visualize_impostors(
         self,
         impostor_detector,
         train_dataset: pd.DataFrame,
@@ -175,32 +175,32 @@ class VisDetectors:
         dataset_name: str,
     ) -> None:
         """
-        Visualizes the imposter detection results.
-        Uses training data to find a threshold for imposter detection and then visualizes the imposters in the test dataset.
+        Visualizes the impostor detection results.
+        Uses training data to find a threshold for impostor detection and then visualizes the impostors in the test dataset.
 
         Parameters:
             train_dataset (pd.DataFrame): The training dataset.
             test_dataset (pd.DataFrame): The test dataset.
-            impostor_detector (ImpostorDetector): The imposter detector to use.
+            impostor_detector (ImpostorDetector): The impostor detector to use.
             dataset_name (str): The name of the dataset for visualization.
         """
         with ProcessPoolExecutor() as executor:
-            train_dataset["imposter_score"] = list(
+            train_dataset["impostor_score"] = list(
                 executor.map(impostor_detector.get_score, train_dataset["pair"])
             )
-        print("Calculated imposter scores on training data.")
+        print("Calculated impostor scores on training data.")
 
-        # find threshold that best separates imposters from non-imposters in the training set (targets are in the 'same' column)
+        # find threshold that best separates impostors from non-impostors in the training set (targets are in the 'same' column)
         args = {
             "rounds": impostor_detector.rounds,
             "top_n": impostor_detector.top_n,
-            "imposter_technique": impostor_detector.imposter_technique,
+            "impostor_technique": impostor_detector.impostor_technique,
             "upsample": impostor_detector.upsample,
             "n_impostors": impostor_detector.n_impostors,
         }
         args["dataset"] = dataset_name
-        fpr, tpr, thresholds, best_f1_thres = self.plot_decision_threshold_imposter(
-            scores=train_dataset["imposter_score"],
+        fpr, tpr, thresholds, best_f1_thres = self.plot_decision_threshold_impostor(
+            scores=train_dataset["impostor_score"],
             labels=train_dataset["same"],
             title_kwargs=args,
         )
@@ -208,15 +208,15 @@ class VisDetectors:
         best_f1_thres = np.round(best_f1_thres, 2)
         youdens_j_thres = np.round(self._get_opt_imp_threshold(fpr, tpr, thresholds), 2)
         print(
-            f"Optimal threshold for imposter detection via Youden's J function: {youdens_j_thres:.2f}/ via best F1: {best_f1_thres:.2f}"
+            f"Optimal threshold for impostor detection via Youden's J function: {youdens_j_thres:.2f}/ via best F1: {best_f1_thres:.2f}"
         )
 
         # work with test dataset
         impostor_detector.set_training_mode(
             False
-        )  # set to False for validation: Use training set for imposter generation for fixed imposter technique‚
+        )  # set to False for validation: Use training set for impostor generation for fixed impostor technique‚
         with ProcessPoolExecutor() as executor:
-            test_dataset["imposter_score"] = list(
+            test_dataset["impostor_score"] = list(
                 executor.map(impostor_detector.get_score, test_dataset["pair"])
             )
 
@@ -224,9 +224,9 @@ class VisDetectors:
             ["Youden's J", "best F1"], [youdens_j_thres, best_f1_thres]
         ):
             args["threshold"] = thres
-            print(f"Visualizing imposter scores with threshold: {thres_name} = {thres}")
+            print(f"Visualizing impostor scores with threshold: {thres_name} = {thres}")
 
-            test_dataset["pred_same"] = test_dataset["imposter_score"] >= thres
+            test_dataset["pred_same"] = test_dataset["impostor_score"] >= thres
 
             # 'same' is ground truth, 'pred_same' is prediction
             y_true = test_dataset["same"]
@@ -355,12 +355,12 @@ class VisDetectors:
         preds = scores >= threshold
         return (f1_score(targets, preds), accuracy_score(targets, preds))
 
-    def plot_decision_threshold_imposter(
+    def plot_decision_threshold_impostor(
         self, scores: pd.Series, labels: pd.Series, title_kwargs: dict = None
     ):
         """
-        Plots the decision threshold for the imposter detector using ROC and Precision-Recall curves.
-        :param scores: The imposter scores.
+        Plots the decision threshold for the impostor detector using ROC and Precision-Recall curves.
+        :param scores: The impostor scores.
         :param labels: The true labels (same or different authors).
         :param title_kwargs: Additional keyword arguments for the plot title.
         :return: fpr, tpr, roc_thresholds, best threshold for F1 score.
@@ -521,7 +521,7 @@ class VisDetectors:
     # ugly, but only for reproduction of Figure 2 from Koppel et al. (2014)
     def reproduce_fig2_prec_recall_dif_n_imp(self) -> None:
         """
-        Visualizes the imposter detection results via Precision-Recall curves for different numbers of imposters (cf. Figure 2 from Koppel et al. (2014)).
+        Visualizes the impostor detection results via Precision-Recall curves for different numbers of impostors (cf. Figure 2 from Koppel et al. (2014)).
         """
         train_dataset, test_dataset = self._load_datasets(balanced=True)
         dataset_name = self.dataset_name
@@ -533,10 +533,10 @@ class VisDetectors:
             else Path(os.getcwd()).resolve() / CONFIG.PATH2STUDENT_ESSAYS
         )
         for n_imp in n_imp_options:
-            print(f"Using {n_imp} imposters from {path2imp}")
-            # initialize imposter detector
+            print(f"Using {n_imp} impostors from {path2imp}")
+            # initialize impostor detector
             impostor_detector = ImpostorDetector(
-                imposter_technique="fixed",
+                impostor_technique="fixed",
                 n_impostors=n_imp,
                 rounds=100,  # cf. pg. 181, Koppel et al. (2014)
                 top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
@@ -544,27 +544,27 @@ class VisDetectors:
                 upsample=False,
             )
             with ProcessPoolExecutor() as executor:
-                train_dataset["imposter_score"] = list(
+                train_dataset["impostor_score"] = list(
                     executor.map(impostor_detector.get_score, train_dataset["pair"])
                 )
-            print("Calculated imposter scores on training data.")
+            print("Calculated impostor scores on training data.")
 
-            # find threshold that best separates imposters from non-imposters in the training set (targets are in the 'same' column)
+            # find threshold that best separates impostors from non-impostors in the training set (targets are in the 'same' column)
             args = {
                 "rounds": impostor_detector.rounds,
                 "top_n": impostor_detector.top_n,
-                "imposter_technique": impostor_detector.imposter_technique,
+                "impostor_technique": impostor_detector.impostor_technique,
                 "upsample": impostor_detector.upsample,
                 "n_impostors": impostor_detector.n_impostors,
             }
             args["dataset"] = dataset_name
-            fpr, tpr, thresholds, best_f1_thres = self.plot_decision_threshold_imposter(
-                scores=train_dataset["imposter_score"],
+            fpr, tpr, thresholds, best_f1_thres = self.plot_decision_threshold_impostor(
+                scores=train_dataset["impostor_score"],
                 labels=train_dataset["same"],
                 title_kwargs=args,
             )
             precision, recall, pr_thresholds = precision_recall_curve(
-                train_dataset["same"], train_dataset["imposter_score"]
+                train_dataset["same"], train_dataset["impostor_score"]
             )
             precisions.append(precision)
             recalls.append(recall)
@@ -574,15 +574,15 @@ class VisDetectors:
                 self._get_opt_imp_threshold(fpr, tpr, thresholds), 2
             )
             print(
-                f"Optimal threshold for imposter detection via Youden's J function: {youdens_j_thres:.2f}/ via best F1: {best_f1_thres:.2f}"
+                f"Optimal threshold for impostor detection via Youden's J function: {youdens_j_thres:.2f}/ via best F1: {best_f1_thres:.2f}"
             )
 
             # work with test dataset
             impostor_detector.set_training_mode(
                 False
-            )  # set to False for validation: Use training set for imposter generation for fixed imposter technique‚
+            )  # set to False for validation: Use training set for impostor generation for fixed impostor technique‚
             with ProcessPoolExecutor() as executor:
-                test_dataset["imposter_score"] = list(
+                test_dataset["impostor_score"] = list(
                     executor.map(impostor_detector.get_score, test_dataset["pair"])
                 )
 
@@ -591,10 +591,10 @@ class VisDetectors:
             ):
                 args["threshold"] = thres
                 print(
-                    f"Visualizing imposter scores with threshold: {thres_name} = {thres}"
+                    f"Visualizing impostor scores with threshold: {thres_name} = {thres}"
                 )
 
-                test_dataset["pred_same"] = test_dataset["imposter_score"] >= thres
+                test_dataset["pred_same"] = test_dataset["impostor_score"] >= thres
 
                 # 'same' is ground truth, 'pred_same' is prediction
                 y_true = test_dataset["same"]
@@ -631,7 +631,7 @@ class VisDetectors:
 
         fig = plt.figure(figsize=(10, 5))
         for n_imp, precision, recall in zip(n_imp_options, precisions, recalls):
-            plt.plot(recall, precision, label="# Imposters = " + str(n_imp))
+            plt.plot(recall, precision, label="# impostors = " + str(n_imp))
         plt.ylim(0, 1)
         plt.scatter(
             0.34,
@@ -689,10 +689,10 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--n_imposters",
+        "--n_impostors",
         type=int,
         default=50,
-        help="Number of imposters to generate per candidate (default: %(default)s)",
+        help="Number of impostors to generate per candidate (default: %(default)s)",
     )
 
     parser.add_argument(
@@ -704,7 +704,7 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--imposter_technique",
+        "--impostor_technique",
         type=str,
         choices=[
             "llm",
@@ -716,14 +716,14 @@ if __name__ == "__main__":
             "content",
         ],
         default="fixed",
-        help="Imposter technique to use (default: %(default)s)",
+        help="impostor technique to use (default: %(default)s)",
     )
 
     parser.add_argument(
         "--path2imp",
         type=str,
         default=Path(os.getcwd()).resolve().parent / CONFIG.PATH2BLOG,
-        help="Path to the imposter dataset (default: %(default)s)",
+        help="Path to the impostor dataset (default: %(default)s)",
     )
 
     parser.add_argument(
@@ -742,9 +742,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    imposter = ImpostorDetector(
-        imposter_technique="fixed",
-        n_impostors=args.n_imposters,
+    impostor = ImpostorDetector(
+        impostor_technique="fixed",
+        n_impostors=args.n_impostors,
         rounds=args.rounds,
         top_n=args.top_n,
         path2imp=args.path2imp,
@@ -753,24 +753,24 @@ if __name__ == "__main__":
 
     # vis_det = VisDetectors(
     #     dataset_name=args.dataset_name,
-    #     detectors=[imposter],
+    #     detectors=[impostor],
     # )
-    # print("Imposter Detector initialized.")
+    # print("impostor Detector initialized.")
     # vis_det.visualize(balanced=args.balanced)
 
     # ugly, but only for reproduction of Figure 2 from Koppel et al. (2014)
     vis_det = VisDetectors(
         dataset_name=CONFIG.BLOG,
-        detectors=[imposter],
+        detectors=[impostor],
     )
-    print("Imposter Detector initialized.")
+    print("impostor Detector initialized.")
     vis_det.reproduce_fig2_prec_recall_dif_n_imp()
     print("Finished reproducing Figure 2 from Koppel et al. (2014) on BLOG data.")
 
     vis_det = VisDetectors(
         dataset_name=CONFIG.STUDENT_ESSAYS,
-        detectors=[imposter],
+        detectors=[impostor],
     )
-    print("Imposter Detector initialized.")
+    print("impostor Detector initialized.")
     vis_det.reproduce_fig2_prec_recall_dif_n_imp()
     print("Finished reproducing Figure 2 from Koppel et al. (2014) on STUDENT data.")

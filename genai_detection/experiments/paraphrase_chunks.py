@@ -392,7 +392,7 @@ def plot_model_metrics(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Assess effect of (Non-) Naive imposter generation."
+        description="Assess effect of (Non-) Naive impostor generation."
     )
     parser.add_argument(
         "--path2dataset",

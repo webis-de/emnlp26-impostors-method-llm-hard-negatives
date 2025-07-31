@@ -14,11 +14,11 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 
-class ImposterBase(DetectorBase):
+class ImpostorBase(DetectorBase):
     def __init__(self):
         """
-        Initialize the ImposterBase detector.
-        Both the Imposter approach and its supervised and unsupervised baselines
+        Initialize the impostorBase detector.
+        Both the impostor approach and its supervised and unsupervised baselines
         extend this base class.
         """
         super().__init__()
@@ -96,9 +96,9 @@ class ImposterBase(DetectorBase):
         return 0.0 if denominator == 0 else numerator / denominator
 
 
-class ImposterBaselineBase(ImposterBase):
+class ImpostorBaselineBase(ImpostorBase):
     """
-    Base class for Imposter Baseline detectors.
+    Base class for impostor Baseline detectors.
     This class provides the basic structure for scoring and prediction methods.
     """
 

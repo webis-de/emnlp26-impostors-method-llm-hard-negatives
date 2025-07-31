@@ -20,8 +20,8 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 import torch
 
-from genai_detection.detectors.imposter_base import ImposterBase
-from genai_detection.imposter_generators import ImposterGenerator
+from genai_detection.detectors.impostor_base import ImpostorBase
+from genai_detection.impostor_generators import ImpostorGenerator
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from genai_detection.config import CONFIG
@@ -29,11 +29,11 @@ from genai_detection.config import CONFIG
 __all__ = ["ImpostorDetector"]
 
 
-class ImpostorDetector(ImposterBase):
+class ImpostorDetector(ImpostorBase):
     """
-    The Imposter method extends the ngram-unmasking method.
+    The Impostor method extends the ngram-unmasking method.
     It uses saves the most similar author to the disputed text for each of multiple random feature selection rounds,
-    where the disputed text is compared not only to the candidate text, but alos to a set of imposter texts.
+    where the disputed text is compared not only to the candidate text, but alos to a set of impostor texts.
     The final prediction is made based on of how often an author is predicted after each feature-elimination step.
 
     The input is a list of texts where text ``i`` and text ``i+1`` belong to a pair.
@@ -57,7 +57,7 @@ class ImpostorDetector(ImposterBase):
         tfidf_freqs=True,
         n_impostors=25,
         threshold=0.1,
-        imposter_technique: Literal[
+        impostor_technique: Literal[
             "llm",
             "text_len",
             "n_docs",
@@ -82,12 +82,12 @@ class ImpostorDetector(ImposterBase):
         :param tfidf_freqs: use tfidf term frequencies (Koppel et Al. (2014) use tfidf)
         :param n_impostors: number of impostors to use for each candidate TODO: allow specification type of LLM impostors; Koppel et Al. (2014) use 25 impostors
         :param threshold: threshold for the minimum similarity score to consider two texts same-author, TODO: not used yet, Koppel et Al. (2014) use 0.1
-        :param imposter_technique: which technique to use to generate impostors. Options are:
+        :param impostor_technique: which technique to use to generate impostors. Options are:
             - "llm": use LLMs to generate impostors to control both topic and genre
             - "naive_llm": use a naive LLM approach to generate impostors
             - "text_len": generate impostors of similar length from a predefined dataset (our baseline w/o reference, default)
             - "n_docs": generate impostors based on the number of documents written by the author (Kocher et Al. (2015), not implemented yet)
-            - "fixed": use a fixed set of impostors (Koppel et. A. (2014), not implemented yet), imposters are not related to the input text
+            - "fixed": use a fixed set of impostors (Koppel et. A. (2014), not implemented yet), impostors are not related to the input text
             - "on-the-fly": generate same-topic impostors on-the-fly (Koppel et. Al. (2014), not implemented yet)
             - "blogs": use blogs to obtain same genre impostors (Koppel et. Al. (2014), not implemented yet)
         :param path2imp: path to the impostor file, where fixed impostors are saved or where to save generated impostors
@@ -108,46 +108,46 @@ class ImpostorDetector(ImposterBase):
         self.real_time_generation = real_time_generation
         self.min_n_tokens = min_n_tokens
         self.upsample = upsample
-        self.imposter_technique = imposter_technique
+        self.impostor_technique = impostor_technique
         self._training_mode = True  # set to True if you are in training mode, False for validation of model
 
-        if imposter_technique == "llm":
-            self.imposter_generator = ImposterGenerator.LLMImposterGenerator(
+        if impostor_technique == "llm":
+            self.impostor_generator = ImpostorGenerator.LLMImpostorGenerator(
                 n_impostors=self.n_impostors
             )
-        elif imposter_technique == "naive_llm":
-            self.imposter_generator = ImposterGenerator.NaiveLLMImposterGenerator(
+        elif impostor_technique == "naive_llm":
+            self.impostor_generator = ImpostorGenerator.NaiveLLMImpostorGenerator(
                 n_impostors=self.n_impostors
             )
-        elif imposter_technique == "non_naive_llm":
-            self.imposter_generator = ImposterGenerator.NonNaiveLLMImposterGenerator(
+        elif impostor_technique == "non_naive_llm":
+            self.impostor_generator = ImpostorGenerator.NonNaiveLLMImpostorGenerator(
                 n_impostors=self.n_impostors
             )
-        elif imposter_technique == "n_docs":
+        elif impostor_technique == "n_docs":
             # TODO: I need author names for this
-            self.imposter_generator = ImposterGenerator.NDocsImposterGenerator(
+            self.impostor_generator = ImpostorGenerator.NDocsImpostorGenerator(
                 n_impostors=self.n_impostors
             )
-        elif imposter_technique == "fixed":
-            self.imposter_generator = ImposterGenerator.FixedImposterGenerator(
+        elif impostor_technique == "fixed":
+            self.impostor_generator = ImpostorGenerator.FixedImpostorGenerator(
                 n_impostors=self.n_impostors,
                 split="test" if self._training_mode else "train",
             )
-        elif imposter_technique == "on-the-fly":
-            self.imposter_generator = ImposterGenerator.GoogleSearchImposterGenerator(
+        elif impostor_technique == "on-the-fly":
+            self.impostor_generator = ImpostorGenerator.GoogleSearchImpostorGenerator(
                 api_key=CONFIG.SERPAPI_KEY
             )
-        elif imposter_technique == "blogs":
-            self.imposter_generator = ImposterGenerator.BlogImposterGenerator(
+        elif impostor_technique == "blogs":
+            self.impostor_generator = ImpostorGenerator.BlogImpostorGenerator(
                 n_impostors=self.n_impostors,
                 split="test" if self._training_mode else "train",
             )
-        elif imposter_technique == "content":
-            self.imposter_generator = ImposterGenerator.ContentImposterGenerator(
+        elif impostor_technique == "content":
+            self.impostor_generator = ImpostorGenerator.ContentImpostorGenerator(
                 n_impostors=self.n_impostors
             )
         else:
-            self.imposter_generator = ImposterGenerator.TextLenImposterGenerator(
+            self.impostor_generator = ImpostorGenerator.TextLenImpostorGenerator(
                 n_impostors=self.n_impostors
             )
 
@@ -160,13 +160,13 @@ class ImpostorDetector(ImposterBase):
         :param training_mode: True if in training mode, False otherwise.
         """
         self._training_mode = training_mode
-        if self.imposter_technique == "fixed":
-            self.imposter_generator = ImposterGenerator.FixedImposterGenerator(
+        if self.impostor_technique == "fixed":
+            self.impostor_generator = ImpostorGenerator.FixedImpostorGenerator(
                 n_impostors=self.n_impostors,
                 split="test" if self._training_mode else "train",
             )
-        elif imposter_technique == "blogs":
-            self.imposter_generator = ImposterGenerator.BlogImposterGenerator(
+        elif self.impostor_technique == "blogs":
+            self.impostor_generator = ImpostorGenerator.BlogImpostorGenerator(
                 n_impostors=self.n_impostors,
                 split="test" if self._training_mode else "train",
             )
@@ -209,12 +209,12 @@ class ImpostorDetector(ImposterBase):
         The final score is the number of rounds where the candidate text was the most similar to the disputed text.
         The final score for a pair is the average of the scores for both directions (disputed text vs. candidate text and vice versa).
 
-        While Koppel et Al. (2014) use (1) a fixed set of imposter documents without realtion to document pair,
-        (2) on-the-fly generated same content imposter via Google search,
-        (3) Blogs to obtain same genre imposters, and Kocher et Al. (2015) use (4) a set of imposter documents based on the number of documents written by the author,
-        we define different techniques to generate impostors, which can be specified via the `technique` parameter in the `_get_imposters` method:
+        While Koppel et Al. (2014) use (1) a fixed set of impostor documents without realtion to document pair,
+        (2) on-the-fly generated same content impostor via Google search,
+        (3) Blogs to obtain same genre impostors, and Kocher et Al. (2015) use (4) a set of impostor documents based on the number of documents written by the author,
+        we define different techniques to generate impostors, which can be specified via the `technique` parameter in the `_get_impostors` method:
         We currently support:
-        (1) `text_len`: generate impostors of similar length from a predefined dataset (default, see `_get_imposters` method).
+        (1) `text_len`: generate impostors of similar length from a predefined dataset (default, see `_get_impostors` method).
         (2) `llm`: use LLMs to generate impostors, extension of Koppel et Al. (2014).
         (3) `n_docs`: generate impostors based on the number of documents written by the author (TODO: not implemented yet), cf. Kocher et Al. (2015).
 
@@ -222,8 +222,8 @@ class ImpostorDetector(ImposterBase):
 
         Koppel et Al. (2014) exclude texts shorter than 500 words.
         Kocher et Al. (2015) exclude words appearing only once to prevent overfitting to words occuring only once.
-        Koppel et Al. (2014) select m most similar imposters in terms of min-max similarity as imposter candidates and then,
-        randomly select n actual imposters among potential imposters (because it has proven superior to using the top n imposters).
+        Koppel et Al. (2014) select m most similar impostors in terms of min-max similarity as impostor candidates and then,
+        randomly select n actual impostors among potential impostors (because it has proven superior to using the top n impostors).
         They claim the approach is not sensitive to the choice of m and n.
         Koppel et Al. (2014) compare using min-max and cosine simialrity.
 
@@ -321,12 +321,12 @@ class ImpostorDetector(ImposterBase):
                 self.top_n, shared_tokens, key=lambda x: freqs_left[x] + freqs_right[x]
             )
 
-            # TODO: muss man TFIDF gemeinsam (left, right, imposters) berechnen, wegen Dataset Normalierung?
+            # TODO: muss man TFIDF gemeinsam (left, right, impostors) berechnen, wegen Dataset Normalierung?
             x_left = self.tokens_to_matrix(tokens_left, top_tokens)
             x_right = self.tokens_to_matrix(tokens_right, top_tokens)
 
             store = {
-                # TODO: if I knew >=1 author, i could choose imposters based on similar number of documents written (like paper)
+                # TODO: if I knew >=1 author, i could choose impostors based on similar number of documents written (like paper)
                 "left": {
                     "tfidf": x_left,
                     "tokens": tokens_left,
@@ -341,13 +341,13 @@ class ImpostorDetector(ImposterBase):
                 },
             }
 
-            # two iterations, generating imposters for each candidate once
+            # two iterations, generating impostors for each candidate once
             for j, (disputed, candidate) in enumerate(
                 itertools.permutations(list(store.keys()), 2)
             ):
                 scores_over_different_rounds = 0
-                # get imposters for the candidate text, NOT the disputed text
-                impostor_candidates = self.imposter_generator.generate_imposters(
+                # get impostors for the candidate text, NOT the disputed text
+                impostor_candidates = self.impostor_generator.generate_impostors(
                     store[candidate]["text"],
                     real_time_generation=self.real_time_generation,
                     path2imp=self.path2imp,

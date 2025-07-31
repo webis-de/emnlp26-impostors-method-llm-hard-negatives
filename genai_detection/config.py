@@ -25,7 +25,7 @@ class BaseConfig:
     PATH2STUDENT_ESSAYS = (
         f"{DATA_BASE_PATH}/student_essays/Intro2006/student-essays-dataset-converted"
     )
-    PATH2GENERIC_ON_FLY_IMP = f"{DATA_BASE_PATH}/google-on-the-fly-imposters"
+    PATH2GENERIC_ON_FLY_IMP = f"{DATA_BASE_PATH}/google-on-the-fly-impostors"
     CROSS_GENRE = f"{DATA_BASE_PATH}/cross_genre/cross-genre-dataset"
     SAVE_PATH = "results/"
     PAN23 = "pan23"
@@ -35,7 +35,7 @@ class BaseConfig:
     BLOG = "blog"
     GUTENBERG = "gutenberg"
     STUDENT_ESSAYS = "student_essays"
-    IMPOSTER = "imposter"
+    IMPOSTOR = "impostor"
     UNMASKING = "unmasking"
     TEMPERATURE = 0.7
     MAX_LENGTH = 512  # Maximum length of the generated paraphrase

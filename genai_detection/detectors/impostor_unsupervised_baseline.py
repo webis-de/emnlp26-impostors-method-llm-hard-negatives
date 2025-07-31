@@ -4,15 +4,15 @@ import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 import torch
 from genai_detection.config import CONFIG
-from genai_detection.detectors.imposter_base import ImposterBaselineBase
+from genai_detection.detectors.impostor_base import ImpostorBaselineBase
 import typing as t
 
 
-class UnSupervisedImposterBaseline(ImposterBaselineBase):
+class UnSupervisedImpostorBaseline(ImpostorBaselineBase):
     """
-    Unsupervised Imposter Baseline detector class.
+    Unsupervised Impostor Baseline detector class.
 
-    This class extends the DetectorBase and implements an unsupervised baseline for the Imposter method by Koopel et. Al. (2014).
+    This class extends the DetectorBase and implements an unsupervised baseline for the Impostor method by Koopel et. Al. (2014).
     A document pair (i.e. disputed document and candidate author document) is represented as a vector of TF-IDF features.
     The frequenies are calculated based on the 100,000 most frequent space-free character 4-grams in the corpus.
     Similarities are than calculated using cosine similarity or min-max similarity.
@@ -28,7 +28,7 @@ class UnSupervisedImposterBaseline(ImposterBaselineBase):
 
     def __init__(self):
         """
-        Initialize the Unsupervised Imposter Baseline detector.
+        Initialize the Unsupervised Impostor Baseline detector.
         """
         super().__init__()
         self.threshold = (
@@ -39,7 +39,7 @@ class UnSupervisedImposterBaseline(ImposterBaselineBase):
         self, text: t.Iterable[str]
     ) -> t.Union[torch.Tensor, np.ndarray, t.Iterable[float]]:
         """
-        Scoring implementation for the Supervised Imposter Baseline detector.
+        Scoring implementation for the Supervised Impostor Baseline detector.
 
         :param text: An iterable of strings (texts) to score.
         :return: A list of scores for each text.
@@ -73,7 +73,7 @@ class UnSupervisedImposterBaseline(ImposterBaselineBase):
 
 if __name__ == "__main__":
     # Example usage
-    detector = UnSupervisedImposterBaseline()
+    detector = UnSupervisedImpostorBaseline()
     sample_texts = [
         "This is a sample text for testing.",
         "This is another sample text for testing.",

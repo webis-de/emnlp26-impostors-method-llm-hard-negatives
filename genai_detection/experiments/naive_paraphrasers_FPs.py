@@ -1,8 +1,8 @@
 """
 Experiment: Naive Paraphrasers and False Positives
 The goal of this experiment is to find out whether Naive Paraphrasers risk False Positives because they (hypothesis) know too much about the original text.
-Hence, we hypothesize if the imposter model uses only Naive Paraphrasers (i.e. T5, Ollama, etc.) to generate imposters, it will likely lead to a high number of False Positives.
-We therefore created (Non-)Naive LLM-based imposter generators in the `LLMImposterGenerator` class and use only the (Non-)Naive Paraphrasers.
+Hence, we hypothesize if the impostor model uses only Naive Paraphrasers (i.e. T5, Ollama, etc.) to generate impostors, it will likely lead to a high number of False Positives.
+We therefore created (Non-)Naive LLM-based impostor generators in the `LLMImpostorGenerator` class and use only the (Non-)Naive Paraphrasers.
 """
 
 import argparse
@@ -89,24 +89,24 @@ def load_detectors() -> dict[str, ImpostorDetector]:
     Load the detectors for the experiment.
     The detectors are expected to be in the `genai_detection.detectors` module.
     """
-    naive_imposter_detector = ImpostorDetector(
+    naive_impostor_detector = ImpostorDetector(
         path2imp=Path(os.getcwd()).resolve().parent / CONFIG.PATH2BLOG,
-        imposter_technique="naive_llm",  # Use only naive paraphrasers for imposter generation
+        impostor_technique="naive_llm",  # Use only naive paraphrasers for impostor generation
     )
-    non_naive_imposter_detector = ImpostorDetector(
+    non_naive_impostor_detector = ImpostorDetector(
         path2imp=Path(os.getcwd()).resolve().parent / CONFIG.PATH2BLOG,
-        imposter_technique="non_naive_llm",  # Use only non-naive paraphrasers for imposter generation
+        impostor_technique="non_naive_llm",  # Use only non-naive paraphrasers for impostor generation
     )
-    generalized_imposter_detector = ImpostorDetector(
+    generalized_impostor_detector = ImpostorDetector(
         path2imp=Path(os.getcwd()).resolve().parent / CONFIG.PATH2BLOG,
-        imposter_technique="llm",  # Use all paraphrasers for imposter generation
+        impostor_technique="llm",  # Use all paraphrasers for impostor generation
     )
     # unmasking_detector = UnmaskingDetector()
     # ppmd_detector = PPMdDetector()
     detector_dict = {
-        "naive": naive_imposter_detector,
-        "non_naive": non_naive_imposter_detector,
-        "generalized": generalized_imposter_detector,
+        "naive": naive_impostor_detector,
+        "non_naive": non_naive_impostor_detector,
+        "generalized": generalized_impostor_detector,
     }
     return detector_dict
 
@@ -120,12 +120,12 @@ def get_detector_scores(
     The scores are added to the datasets as new columns.
     """
 
-    # for detector in [imposter_detector, unmasking_detector, ppmd_detector]:
+    # for detector in [impostor_detector, unmasking_detector, ppmd_detector]:
     for detector_name, detector in detector_dict.items():
         for dataset_name, dataset in dataset_dict.items():
             dataset[f"{detector_name}_score"] = np.nan
             if detector_name == dataset_name:
-                continue  # Skip the detector if it is the same as the dataset name, bc candidate text has same author as some imposters
+                continue  # Skip the detector if it is the same as the dataset name, bc candidate text has same author as some impostors
             for i in tqdm(
                 dataset.index,
                 desc=f"Processing {detector_name} scores",
@@ -214,7 +214,7 @@ def run_FNs_experiment(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Assess effect of (Non-) Naive imposter generation."
+        description="Assess effect of (Non-) Naive impostor generation."
     )
     parser.add_argument(
         "--path2dataset",

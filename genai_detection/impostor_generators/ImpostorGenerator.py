@@ -42,8 +42,8 @@ from genai_detection.config import CONFIG
 load_dotenv()
 
 
-class BaseImposterGenerator(ABC):
-    """Abstract base class for generating imposters."""
+class BaseImpostorGenerator(ABC):
+    """Abstract base class for generating impostors."""
 
     def __init__(self, n_impostors: int, split: str = "test"):
         """
@@ -54,7 +54,7 @@ class BaseImposterGenerator(ABC):
         self.split = split
 
     @abstractmethod
-    def generate_imposters(
+    def generate_impostors(
         self, text: str, path2imp: str = None, real_time_generation: bool = False
     ) -> dict:
         """Get a dictionary of impostor texts for the given input text.
@@ -90,7 +90,7 @@ class BaseImposterGenerator(ABC):
         return ds
 
 
-class ContentImposterGenerator(BaseImposterGenerator):
+class ContentImpostorGenerator(BaseImpostorGenerator):
     def __init__(
         self,
         n_impostors: int,
@@ -105,15 +105,15 @@ class ContentImposterGenerator(BaseImposterGenerator):
         super().__init__(n_impostors=n_impostors, split=split)
         self.model = SentenceTransformer(model_name)
 
-    def generate_imposters(
+    def generate_impostors(
         self, text: str, path2imp: str = None, real_time_generation: bool = False
     ) -> Dict[str, str]:
         """
-        Generates imposters from a pre-defined dataset.
-        :param text: input text to generate imposters for (not used in this implementation)
-        :param path2imp: path to the dataset file containing imposters, i.e. fixed Huggingface dataset
+        Generates impostors from a pre-defined dataset.
+        :param text: input text to generate impostors for (not used in this implementation)
+        :param path2imp: path to the dataset file containing impostors, i.e. fixed Huggingface dataset
         :param real_time_generation: not used in this implementation, but kept for interface consistency
-        :return: dictionary of imposters with keys as ids and values as texts
+        :return: dictionary of impostors with keys as ids and values as texts
         """
         ds = self._get_dataset_split_from_path(path2imp)
         sampled = ds.shuffle().select(range(min(len(ds), self.n_impostors)))
@@ -140,10 +140,10 @@ class ContentImposterGenerator(BaseImposterGenerator):
         top_indices = similarities.topk(self.n_impostors).indices.tolist()
         selected_texts = [candidate_texts[i] for i in top_indices]
 
-        return {f"imposter_{i}": imp for i, imp in enumerate(selected_texts)}
+        return {f"impostor_{i}": imp for i, imp in enumerate(selected_texts)}
 
 
-class GoogleSearchImposterGenerator(BaseImposterGenerator):
+class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
     def __init__(
         self,
         api_key: str,
@@ -327,11 +327,11 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
                 all_results.extend(future.result())
         return all_results
 
-    def generate_imposters(
+    def generate_impostors(
         self, text: str, path2imp: str = None, real_time_generation: bool = False
     ) -> pd.DataFrame:
         """
-        Generates imposters for the given input text using Google search results.
+        Generates impostors for the given input text using Google search results.
 
         Steps:
         1. Extract medium-frequency words from the input text.
@@ -374,7 +374,7 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
                 else:
                     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                     path2imp = (
-                        path2imp / f"google_on_fly_imposter_results_{timestamp}.csv"
+                        path2imp / f"google_on_fly_impostor_results_{timestamp}.csv"
                     )
 
             path2imp.parent.mkdir(parents=True, exist_ok=True)
@@ -384,32 +384,32 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
             if "PUCK" in text:  # Midsummer Night's Dream
                 path2imp = (
                     path2imp
-                    / "imposter_A_Midsummer_Nights_Dream_William_Shakespeare_results_20250608_201352.csv"
+                    / "impostor_A_Midsummer_Nights_Dream_William_Shakespeare_results_20250608_201352.csv"
                 )
             elif "Frankenstein" in text:  # Frankenstein
                 path2imp = (
                     path2imp
-                    / "imposter_Frankenstein_Mary_Wollstonecraft_(Godwin)_Shelley_results_20250608_145350.csv"
+                    / "impostor_Frankenstein_Mary_Wollstonecraft_(Godwin)_Shelley_results_20250608_145350.csv"
                 )
             elif "unlineal" in text:  # Macbeth
                 path2imp = (
                     path2imp
-                    / "imposter_Macbeth_William_Shakespeare_results_20250608_211827.csv"
+                    / "impostor_Macbeth_William_Shakespeare_results_20250608_211827.csv"
                 )
             elif "auld" in text:  # Orthello
                 path2imp = (
                     path2imp
-                    / "imposter_Othello_the_Moor_of_Venice_William_Shakespeare_results_20250608_212040.csv"
+                    / "impostor_Othello_the_Moor_of_Venice_William_Shakespeare_results_20250608_212040.csv"
                 )
             else:  # A Lovers Complaint
                 path2imp = (
                     path2imp
-                    / "imposter_A_Lovers_Complaint_William_Shakespeare_results_20250608_202134.csv"
+                    / "impostor_A_Lovers_Complaint_William_Shakespeare_results_20250608_202134.csv"
                 )
             result_df = pd.read_csv(path2imp)
 
         # aggregate results' texts, preferably using full_text, if empty use snippet and return a list of texts
-        imposter_texts = {
+        impostor_texts = {
             f"{re.sub(' ', '_', string=row['query'])}_{row['position']}": row[
                 "full_text"
             ]
@@ -421,16 +421,16 @@ class GoogleSearchImposterGenerator(BaseImposterGenerator):
         for _, row in result_df.iterrows():
             if pd.isna(row.get("full_text")) and pd.notnull(row.get("snippet")):
                 key = f"{re.sub(' ', '_', row['query'])}_{row['position']}"
-                imposter_texts[key] = row["snippet"]
+                impostor_texts[key] = row["snippet"]
 
-        return imposter_texts
+        return impostor_texts
 
 
-class TextLenImposterGenerator(BaseImposterGenerator):
+class TextLenImpostorGenerator(BaseImpostorGenerator):
     def __init__(self, n_impostors: int, split: str = "test"):
         super().__init__(n_impostors=n_impostors, split=split)
 
-    def generate_imposters(
+    def generate_impostors(
         self,
         text: str,
         path2imp: str = None,
@@ -453,7 +453,7 @@ class TextLenImposterGenerator(BaseImposterGenerator):
             s for s in candidate_texts if abs(len(s) - text_len) < threshold
         ]
         if not filtered_candidates:
-            return self.generate_imposters(
+            return self.generate_impostors(
                 text=text,
                 path2imp=path2imp,
                 real_time_generation=path2imp,
@@ -470,10 +470,10 @@ class TextLenImposterGenerator(BaseImposterGenerator):
             filtered_candidates, size=num_to_sample, replace=False, p=probs
         )
 
-        return {f"imposter_{i}": imp for i, imp in enumerate(selected)}
+        return {f"impostor_{i}": imp for i, imp in enumerate(selected)}
 
 
-class NDocsImposterGenerator(BaseImposterGenerator):
+class NDocsImpostorGenerator(BaseImpostorGenerator):
     def __init__(self, n_impostors: int):
         """
         References:
@@ -482,13 +482,13 @@ class NDocsImposterGenerator(BaseImposterGenerator):
         """
         super().__init__(n_impostors=n_impostors)
 
-    def generate_imposters(
+    def generate_impostors(
         self, text: str, path2imp: str = None, real_time_generation: bool = False
     ) -> Dict[str, str]:
         pass
 
 
-class LLMImposterGenerator(BaseImposterGenerator):
+class LLMImpostorGenerator(BaseImpostorGenerator):
     def __init__(
         self, n_impostors: int, paraphrasers: Optional[List[Paraphraser]] = None
     ):
@@ -541,40 +541,40 @@ class LLMImposterGenerator(BaseImposterGenerator):
             "For the text above: Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence.",
         ]
 
-    def generate_imposters(
+    def generate_impostors(
         self, text: str, path2imp: str = None, real_time_generation: bool = False
     ) -> Dict[str, str]:
-        imposters = {}
+        impostors = {}
         paraphrases = []
         for i, paraphraser in enumerate(self.paraphrasers):
             if isinstance(paraphraser, NaiveParaphraser):
                 for prompt in self.prompts:
                     try:
-                        imposter_texts = paraphraser.paraphrase(text, prompt=prompt)
-                        paraphrases.extend(imposter_texts)
+                        impostor_texts = paraphraser.paraphrase(text, prompt=prompt)
+                        paraphrases.extend(impostor_texts)
                     except Exception as e:
-                        print(f"Error generating imposter with {paraphraser}: {e}")
+                        print(f"Error generating impostor with {paraphraser}: {e}")
                         continue
             else:  # Non-naive paraphrasers
                 try:
-                    imposter_texts = paraphraser.paraphrase(
+                    impostor_texts = paraphraser.paraphrase(
                         text, prompt=self.prompts[i], n_responses=1
                     )[0]
-                    paraphrases.extend(imposter_texts)
+                    paraphrases.extend(impostor_texts)
                 except Exception as e:
-                    print(f"Error generating imposter with {paraphraser}: {e}")
+                    print(f"Error generating impostor with {paraphraser}: {e}")
                     continue
 
-        imposters = {
-            f"imposter_{i}": imp for i, imp in enumerate(paraphrases) if len(imp) > 0
+        impostors = {
+            f"impostor_{i}": imp for i, imp in enumerate(paraphrases) if len(imp) > 0
         }
-        return imposters
+        return impostors
 
 
-class NonNaiveLLMImposterGenerator(LLMImposterGenerator):
+class NonNaiveLLMImpostorGenerator(LLMImpostorGenerator):
     def __init__(self, n_impostors: int):
         """
-        Naive LLM-based imposter generator that uses no naive paraphrasers (i.e. only two-step paraphrasers).
+        Naive LLM-based impostor generator that uses no naive paraphrasers (i.e. only two-step paraphrasers).
         :param n_impostors: number of impostors to generate
         """
         ollama_paraphraser = OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION)
@@ -611,10 +611,10 @@ class NonNaiveLLMImposterGenerator(LLMImposterGenerator):
         )
 
 
-class NaiveLLMImposterGenerator(LLMImposterGenerator):
+class NaiveLLMImpostorGenerator(LLMImpostorGenerator):
     def __init__(self, n_impostors: int):
         """
-        Naive LLM-based imposter generator that uses only naive paraphrasers.
+        Naive LLM-based impostor generator that uses only naive paraphrasers.
         :param n_impostors: number of impostors to generate
         """
         t5_chatgpt_paraphraser = T5ChatGPTParaphraser()
@@ -631,10 +631,10 @@ class NaiveLLMImposterGenerator(LLMImposterGenerator):
         )
 
 
-class FixedImposterGenerator(BaseImposterGenerator):
+class FixedImpostorGenerator(BaseImpostorGenerator):
     def __init__(self, n_impostors: int, split: str = "test"):
         """
-        :param n_impostors: number of imposters to generate
+        :param n_impostors: number of impostors to generate
         :param split: dataset split to use (default: 'test')
 
         References:
@@ -643,48 +643,48 @@ class FixedImposterGenerator(BaseImposterGenerator):
         """
         super().__init__(n_impostors=n_impostors, split=split)
 
-    def generate_imposters(
+    def generate_impostors(
         self, text: str, path2imp: Path = None, real_time_generation: bool = False
     ) -> Dict[str, str]:
         """
-        Generates imposters from a pre-defined dataset.
-        :param text: input text to generate imposters for (not used in this implementation)
-        :param path2imp: path to the dataset file containing imposters, i.e. fixed Huggingface dataset
+        Generates impostors from a pre-defined dataset.
+        :param text: input text to generate impostors for (not used in this implementation)
+        :param path2imp: path to the dataset file containing impostors, i.e. fixed Huggingface dataset
         :param real_time_generation: not used in this implementation, but kept for interface consistency
-        :return: dictionary of imposters with keys as ids and values as texts
+        :return: dictionary of impostors with keys as ids and values as texts
         """
         ds = self._get_dataset_split_from_path(path2imp)
 
         sampled = ds.shuffle().select(
             range(max(1, min(len(ds), self.n_impostors // 2)))
         )
-        imposters = {}
+        impostors = {}
         for i, entry in enumerate(sampled):
             if "pair" not in entry:
                 continue
-            key = entry.get("id", f"imposter_{i}")
-            imposters[f"{key}_left"] = entry["pair"][0]
-            imposters[f"{key}_right"] = entry["pair"][1]
+            key = entry.get("id", f"impostor_{i}")
+            impostors[f"{key}_left"] = entry["pair"][0]
+            impostors[f"{key}_right"] = entry["pair"][1]
 
-        if not imposters:
-            raise ValueError("No imposters found with 'pair' field.")
+        if not impostors:
+            raise ValueError("No impostors found with 'pair' field.")
 
-        return imposters
+        return impostors
 
 
-class BlogImposterGenerator(FixedImposterGenerator):
+class BlogImpostorGenerator(FixedImpostorGenerator):
     def __init__(self, n_impostors: int, split: str = "test"):
         super().__init__(n_impostors=n_impostors, split=split)
 
-    def generate_imposters(
+    def generate_impostors(
         self, text: str, path2imp: str = None, real_time_generation: bool = False
     ) -> List[str]:
-        """Generates imposters from the Blog dataset.
-        :param text: input text to generate imposters for (not used in this implementation)
+        """Generates impostors from the Blog dataset.
+        :param text: input text to generate impostors for (not used in this implementation)
         :param path2imp: not used in this implementation, but kept for interface consistency
         :param real_time_generation: not used in this implementation, but kept for interface consistency
-        :return: dictionary of imposters with keys as ids and values as texts"""
-        return super().generate_imposters(
+        :return: dictionary of impostors with keys as ids and values as texts"""
+        return super().generate_impostors(
             text=text,
             path2imp=os.path.join(os.path.abspath(".."), CONFIG.PATH2BLOG),
             real_time_generation=real_time_generation,
@@ -693,14 +693,14 @@ class BlogImposterGenerator(FixedImposterGenerator):
 
 # Example usage
 if __name__ == "__main__":
-    # Literary imposters
+    # Literary impostors
     # artwork_name = "Frankenstein_Mary_Wollstonecraft_(Godwin)_Shelley.txt"
     # # #"A_Midsummer_Nights_Dream_William_Shakespeare.txt"#"A_Lovers_Complaint_William_Shakespeare.txt"
     # path2lovers_shakespeare = Path(CONFIG.PATH2GUTENBERG) / artwork_name
     # with open(path2lovers_shakespeare) as f:
     #     input_text = f.read()
 
-    # Blog imposters
+    # Blog impostors
     # split = 'test'  # or 'train'
     # ds = load_from_disk(CONFIG.PATH2BLOG)[split].to_pandas()
     # print(f"Loaded {len(ds)} entries from the Blog dataset from {split} split.")
@@ -718,11 +718,11 @@ if __name__ == "__main__":
 
     #     # >=10 queries does not work, api error/ maybe local cert issue
     #     # do not stop bc some fetch errors, results are still saved for rest
-    #     generator = GoogleSearchImposterGenerator(api_key="CONFIG.SERPAPI_KEY", num_queries=5, results_per_query=25, max_workers=2, n_min_words=3, n_max_words=5)
-    #     imposters_a = generator.generate_imposters(input_text_a, real_time_generation=True, path2imp=Path(CONFIG.PATH2GENERIC_ON_FLY_IMP) / f"imposter_blog_converted_{split}_id{id}left_same{same}_results.csv")
-    #     imposters_b = generator.generate_imposters(input_text_b, real_time_generation=True, path2imp=Path(CONFIG.PATH2GENERIC_ON_FLY_IMP) / f"imposter_blog_converted_{split}_id{id}right_same{same}_results.csv")
-    #     print(f"Generated {len(imposters_a) + len(imposters_b)} imposters for Blog corpus example:")
+    #     generator = GoogleSearchImpostorGenerator(api_key="CONFIG.SERPAPI_KEY", num_queries=5, results_per_query=25, max_workers=2, n_min_words=3, n_max_words=5)
+    #     impostors_a = generator.generate_impostors(input_text_a, real_time_generation=True, path2imp=Path(CONFIG.PATH2GENERIC_ON_FLY_IMP) / f"impostor_blog_converted_{split}_id{id}left_same{same}_results.csv")
+    #     impostors_b = generator.generate_impostors(input_text_b, real_time_generation=True, path2imp=Path(CONFIG.PATH2GENERIC_ON_FLY_IMP) / f"impostor_blog_converted_{split}_id{id}right_same{same}_results.csv")
+    #     print(f"Generated {len(impostors_a) + len(impostors_b)} impostors for Blog corpus example:")
 
-    # for imposter_name, imposter_text in imposters.items():
-    #     print(f"Imposter {imposter_name}: {imposter_text[:100]}...")  # Print first 100 characters of each imposter
-    print("Imposter generation complete.")
+    # for impostor_name, impostor_text in impostors.items():
+    #     print(f"Impostor {impostor_name}: {impostor_text[:100]}...")  # Print first 100 characters of each impostor
+    print("Impostor generation complete.")
