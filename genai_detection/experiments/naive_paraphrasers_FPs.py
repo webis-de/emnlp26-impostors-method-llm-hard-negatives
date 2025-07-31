@@ -6,6 +6,7 @@ We therefore created (Non-)Naive LLM-based impostor generators in the `LLMImpost
 """
 
 import argparse
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 import os
 from pathlib import Path
 from typing import DefaultDict
@@ -111,6 +112,14 @@ def load_detectors() -> dict[str, ImpostorDetector]:
     return detector_dict
 
 
+# for parallelization
+def _compute_score(detector, row):
+    original_text = row["disputed_text"]
+    paraphrased_text = row["candidate_text"]
+    score = detector.get_score([original_text, paraphrased_text], normalize=False)
+    return row.name, np.round(score, 2)  # return index + score
+
+
 def get_detector_scores(
     detector_dict: dict[str, ImpostorDetector],
     dataset_dict: dict[str, pd.DataFrame],
@@ -119,25 +128,30 @@ def get_detector_scores(
     Calculate the scores for each detector on the given datasets.
     The scores are added to the datasets as new columns.
     """
+    all_dfs = []
 
-    # for detector in [impostor_detector, unmasking_detector, ppmd_detector]:
     for detector_name, detector in detector_dict.items():
         for dataset_name, dataset in dataset_dict.items():
-            dataset[f"{detector_name}_score"] = np.nan
+            score_col = f"{detector_name}_score"
+            dataset[score_col] = np.nan
             if detector_name == dataset_name:
                 continue  # Skip the detector if it is the same as the dataset name, bc candidate text has same author as some impostors
-            for i in tqdm(
-                dataset.index,
-                desc=f"Processing {detector_name} scores",
-            ):
-                original_text = dataset.loc[i, "disputed_text"]
-                paraphrased_text = dataset.loc[i, "candidate_text"]
-                score = detector.get_score(
-                    [original_text, paraphrased_text], normalize=False
-                )
-                dataset.loc[i, f"{detector_name}_score"] = np.round(score, 2)
+            rows = list(dataset.itertuples())  # Faster + safer for indexing
+            with ThreadPoolExecutor() as executor:
+                futures = [
+                    executor.submit(_compute_score, detector, row._asdict())
+                    for row in rows
+                ]
+                for future in tqdm(
+                    as_completed(futures),
+                    total=len(futures),
+                    desc=f"Processing {detector_name} scores",
+                ):
+                    idx, score = future.result()
+                    dataset.at[idx, score_col] = score
 
-    dataset = pd.concat([d for d in dataset_dict.values()], ignore_index=True)
+        all_dfs.append(dataset)
+    dataset = pd.concat(all_dfs, ignore_index=True)
 
     dataset.to_csv(
         SAVE_PATH / f"exp_imp_gen_av_scores_cross_genre_dataset_{TIMESTAMP}.csv",
@@ -235,16 +249,21 @@ if __name__ == "__main__":
     print("Detectors loaded successfully.")
 
     scores = get_detector_scores(detector_dict=detector_dict, dataset_dict=dataset_dict)
-    print("Scores calculated successfully.")
+    print("Scores calculated successfully (parallel).")
 
-    fp_results = run_FPs_experiment(
-        dataset=scores,
-        detector_dict=detector_dict,
-    )
-    print("False Positives experiment completed successfully.")
+    def run_fp():
+        return "FP", run_FPs_experiment(dataset=scores, detector_dict=detector_dict)
 
-    fn_results = run_FNs_experiment(
-        dataset=scores,
-        detector_dict=detector_dict,
-    )
-    print("False Negatives experiment completed successfully.")
+    def run_fn():
+        return "FN", run_FNs_experiment(dataset=scores, detector_dict=detector_dict)
+
+    results = {}
+    with ProcessPoolExecutor() as executor:
+        futures = [executor.submit(run_fp), executor.submit(run_fn)]
+        for future in as_completed(futures):
+            label, result = future.result()
+            results[label] = result
+            print(f"{label} experiment completed successfully.")
+
+    fp_results = results["FP"]
+    fn_results = results["FN"]

@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=exp_naive_paraphrasers
-#SBATCH --mem=64g
-#SBATCH --cpus-per-task=4
+#SBATCH --mem=128g
+#SBATCH --cpus-per-task=8
 #SBATCH --output=logs/log-exp-naive-paraphrasers-%j.log
 #SBATCH --container-image=registry.webis.de/code-teaching/theses/artificial-authorship-verification:latest
 #SBATCH --container-mounts=/mnt/ceph/storage/data-tmp/current/kgutekunst/dev/artificial-authorship-verification/:/src
