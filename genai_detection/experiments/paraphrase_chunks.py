@@ -6,6 +6,8 @@ The scores will be averaged to get a score for the whole text, which will be com
 """
 
 import argparse
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from functools import partial
 from pathlib import Path
 import os
 import textwrap
@@ -178,6 +180,25 @@ def split_text_into_chunks(text: str, n: int = 1) -> List[str]:
     return chunks
 
 
+# to parallelize
+def _evaluate_chunk(
+    chunk, paraphrasers, prompts, n_responses, max_len, temperature, num_chunks
+):
+    paraphrase_evaluator = ParaphrasingEvaluator(
+        paraphrasers=paraphrasers,
+        prompts=prompts,
+        original_text=chunk,
+        n_responses=n_responses,
+        max_length=max_len,
+        temperature=temperature,
+    )
+    df, _ = paraphrase_evaluator.evaluate(
+        save_extremest_paraphr_per_score=False, save_to_disk=False
+    )
+    df["n_chunks"] = num_chunks
+    return df
+
+
 def run_experiment(path2dataset: str) -> pd.DataFrame:
     """
     Run the paraphrasing experiment on the cross-genre dataset.
@@ -202,20 +223,25 @@ def run_experiment(path2dataset: str) -> pd.DataFrame:
             print(f"Number of chunks: {num_chunks}")
 
             res_for_chunks = []
-            for i, chunk in enumerate(chunks):
-                paraphrase_evaluator = ParaphrasingEvaluator(
-                    paraphrasers=paraphrasers,
-                    prompts=PROMPTS,
-                    original_text=chunk,
-                    n_responses=n_responses,
-                    max_length=CONFIG.MAX_LENGTH,
-                    temperature=CONFIG.TEMPERATURE,
-                )
-                df, _ = paraphrase_evaluator.evaluate(
-                    save_extremest_paraphr_per_score=False, save_to_disk=False
-                )
-                df["n_chunks"] = num_chunks
-                res_for_chunks.append(df)
+            evaluate_fn = partial(
+                _evaluate_chunk,
+                paraphrasers=paraphrasers,
+                prompts=PROMPTS,
+                n_responses=n_responses,
+                max_len=CONFIG.MAX_LENGTH,
+                temperature=CONFIG.TEMPERATURE,
+                num_chunks=num_chunks,
+            )
+
+            with ProcessPoolExecutor() as executor:
+                futures = [executor.submit(evaluate_fn, chunk) for chunk in chunks]
+                for future in tqdm(
+                    as_completed(futures),
+                    total=len(futures),
+                    desc="Evaluating paraphrases",
+                ):
+                    df = future.result()
+                    res_for_chunks.append(df)
 
             # Combine all dataframes
             df_concat = pd.concat(res_for_chunks)
@@ -258,6 +284,19 @@ def _save_modelwise_chunk_scores(
         model_df_sorted.to_csv(output_dir / file_name, index=False)
 
 
+# to parallelize
+def _save_text_chunk_score(i, text, n_paragraphs_df, data_category, output_dir):
+    path2results = output_dir / f"text_{i}"
+    os.makedirs(path2results, exist_ok=True)
+
+    with open(path2results / "text.txt", "w") as text_file:
+        text_file.write(text)
+
+    _save_modelwise_chunk_scores(
+        n_paragraphs_df, output_dir=path2results, data_category=data_category
+    )
+
+
 def save_textwise_chunk_scores(scores_per_text: dict, output_dir: str | Path):
     """
     Save the chunk scores for each text in a separate CSV file.
@@ -266,16 +305,16 @@ def save_textwise_chunk_scores(scores_per_text: dict, output_dir: str | Path):
     output_dir = Path(output_dir)
     assert output_dir.exists(), f"Output directory {output_dir} does not exist."
     output_dir.mkdir(parents=True, exist_ok=True)
-
-    for i, (k, v) in enumerate(scores_per_text.items()):
-        n_paragraphs_df, data_category = v
-        path2results = output_dir / f"text_{i}"
-        os.makedirs(path2results, exist_ok=True)
-        with open(path2results / "text.txt", "w") as text_file:
-            text_file.write(k)
-        _save_modelwise_chunk_scores(
-            n_paragraphs_df, output_dir=path2results, data_category=data_category
-        )
+    items = [
+        (i, k, v[0], v[1], output_dir)
+        for i, (k, v) in enumerate(scores_per_text.items())
+    ]
+    with ProcessPoolExecutor() as executor:
+        futures = [executor.submit(_save_text_chunk_score, *item) for item in items]
+        for _ in tqdm(
+            as_completed(futures), total=len(futures), desc="Saving modelwise scores"
+        ):
+            pass
 
 
 def get_slim_dfs_for_one_text(n_paragraphs_df: list) -> list:  # of dataframes
@@ -390,6 +429,18 @@ def plot_model_metrics(
             plt.close()
 
 
+#### only for parallel processing
+def _process_df(args):
+    text, (n_paragraphs_df, data_category) = args
+    slim_n_paragraphs_dfs = get_slim_dfs_for_one_text(n_paragraphs_df)
+    plot_model_metrics(
+        slim_n_paragraphs_dfs,
+        save_dir=SAVE_PATH,
+        data_category=data_category,
+        show=False,
+    )
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Assess effect of (Non-) Naive impostor generation."
@@ -409,16 +460,19 @@ if __name__ == "__main__":
         path2dataset=args.path2dataset,
     )
 
-    print(f"Obtained scores for {len(scores_per_text)} texts.")
+    print(
+        f"Obtained scores for {len(scores_per_text)} texts. Next, save them in parallel fashion."
+    )
     save_textwise_chunk_scores(scores_per_text=scores_per_text, output_dir=SAVE_PATH)
 
-    for i, (text, (n_paragraphs_df, data_category)) in tqdm(
-        enumerate(scores_per_text.items()), desc="Plotting model metrics per text"
-    ):
-        slim_n_paragraphs_dfs = get_slim_dfs_for_one_text(n_paragraphs_df)
-        plot_model_metrics(
-            slim_n_paragraphs_dfs,
-            save_dir=SAVE_PATH,
-            data_category=data_category,
-            show=False,
-        )
+    print("Next, plot model metrics per text (parallel).")
+    with ProcessPoolExecutor() as executor:
+        futures = [
+            executor.submit(_process_df, item) for item in list(scores_per_text.items())
+        ]
+        for _ in tqdm(
+            as_completed(futures),
+            total=len(futures),
+            desc="Plotting model metrics per text",
+        ):
+            pass
