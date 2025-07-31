@@ -118,8 +118,9 @@ class ParaphrasingEvaluator:
         print(f"Using device: {device}")
         # FIXME:
         self.sbert_model = SentenceTransformer(
-            "sentence-transformers/all-MiniLM-L6-v2", device=device
+            "sentence-transformers/all-MiniLM-L6-v2"
         )  # for cosine similarity
+        self.sbert_model.to(device)
         # https://pypi.org/project/word-mover-distance/ Word Mover's Distance (WMD)
         print("Loading pre-trained word vectors for WMD...")
         self.pretr_word_model = WMDReadyKeyedVectors(
