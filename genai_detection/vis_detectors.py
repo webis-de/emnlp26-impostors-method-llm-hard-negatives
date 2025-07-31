@@ -17,7 +17,7 @@ from sklearn.metrics import (
     roc_curve,
     accuracy_score,
 )
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 import seaborn as sns
 from genai_detection.detectors.detector_base import DetectorBase
 from genai_detection.detectors.impostor import ImpostorDetector
@@ -642,7 +642,7 @@ class VisDetectors:
             path2imp=path2imp,
             upsample=False,
         )
-        with ProcessPoolExecutor() as executor:
+        with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
             train_dataset["impostor_score"] = list(
                 executor.map(impostor_detector.get_score, train_dataset["pair"])
             )
@@ -664,7 +664,7 @@ class VisDetectors:
         impostor_detector.set_training_mode(
             False
         )  # set to False for validation: Use training set for impostor generation for fixed impostor technique‚
-        with ProcessPoolExecutor() as executor:
+        with ThreadPoolExecutor() as executor:
             test_dataset["impostor_score"] = list(
                 executor.map(impostor_detector.get_score, test_dataset["pair"])
             )
