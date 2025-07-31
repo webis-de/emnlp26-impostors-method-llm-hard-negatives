@@ -116,11 +116,18 @@ class ParaphrasingEvaluator:
             else ("mps" if torch.backends.mps.is_available() else "cpu")
         )
         print(f"Using device: {device}")
-        # FIXME:
-        self.sbert_model = SentenceTransformer(
-            "sentence-transformers/all-MiniLM-L6-v2"
-        )  # for cosine similarity
-        self.sbert_model.to(device)
+        # FIXME: NotImplementedError: Cannot copy out of meta tensor; no data! Please use torch.nn.Module.to_empty() instead of torch.nn.Module.to() when moving module from meta to a different device.
+
+        try:
+            self.sbert_model = SentenceTransformer(
+                "sentence-transformers/all-MiniLM-L6-v2"
+            )  # for cosine similarity
+        except Exception as e:
+            logger.error(
+                "Failed to load SentenceTransformer model. Setting it to None."
+            )
+            logger.exception(e)
+            self.sbert_model = None
         # https://pypi.org/project/word-mover-distance/ Word Mover's Distance (WMD)
         print("Loading pre-trained word vectors for WMD...")
         self.pretr_word_model = WMDReadyKeyedVectors(
@@ -694,6 +701,8 @@ class ParaphrasingEvaluator:
                 continue
 
         df = pd.DataFrame(results)
+        # drop any columns that are completely empty, i.e. all NaN
+        df.dropna(axis=1, how="all", inplace=True)
         if save_to_disk:
             save_base_path = (
                 Path(__file__).resolve().parent.parent.parent / CONFIG.SAVE_PATH
@@ -763,11 +772,14 @@ class ParaphrasingEvaluator:
         :return: A dictionary representing the result row.
         """
         # in [-1, 1] range, where 1 is identical, 0 is no similarity, -1 is opposite
-        cos_sim = torch.cosine_similarity(
-            self.sbert_model.encode(self.original_text, convert_to_tensor=True),
-            self.sbert_model.encode(paraphrase, convert_to_tensor=True),
-            dim=0,
-        ).item()
+        if self.sbert_model:
+            cos_sim = torch.cosine_similarity(
+                self.sbert_model.encode(self.original_text, convert_to_tensor=True),
+                self.sbert_model.encode(paraphrase, convert_to_tensor=True),
+                dim=0,
+            ).item()
+        else:
+            cos_sim = None
         res = {
             "model": name,
             "prompt": f"{prompt} <TEXT>",
@@ -808,19 +820,24 @@ class ParaphrasingEvaluator:
                 )
             ),  # semantic similarity metric: exp(-distance) stable version of 1/distance
             # normalize: (cos - (-1)) / (1 - (-1)), so that it is in [0, 1] range
-            "sbert_cos": (cos_sim + 1) / 2,  # semantic similarity metric
+            "sbert_cos": (
+                (cos_sim + 1) / 2 if cos_sim else None
+            ),  # semantic similarity metric
             # bertscore hashcode for the paraphrase
             "bertscore_hash": bert_scores["hashcode"],
         }
+        semantic_sim_average = [
+            res["bertscore_precision"],
+            res["bertscore_recall"],
+            res["bertscore_f1"],
+            res["sbert_wms"],
+            res["sbert_cos"],
+        ]
+        # cosine similarity can be None if SentenceTransformer model is not loaded (fails on cluster)
         semantic_sim_average = np.mean(
-            [
-                res["bertscore_precision"],
-                res["bertscore_recall"],
-                res["bertscore_f1"],
-                res["sbert_wms"],
-                res["sbert_cos"],
-            ]
+            [v for v in semantic_sim_average if v is not None]
         )
+
         res["sem_sim_avg"] = semantic_sim_average
         syntactic_sim_average = np.mean(
             [res["bleu_score"], res["rouge1"], res["rougeL"]]
