@@ -683,10 +683,17 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--dataset",
+        "--n_imposters",
+        type=int,
+        default=50,
+        help="Number of imposters to generate per candidate (default: %(default)s)",
+    )
+
+    parser.add_argument(
+        "--dataset_name",
         type=str,
         choices=[CONFIG.PAN20, CONFIG.PAN23, CONFIG.PAN25, CONFIG.KOPPEL, CONFIG.BLOG],
-        default=CONFIG.PAN20,
+        default=CONFIG.BLOG,
         help="Dataset to use for visualization (default: %(default)s)",
     )
 
@@ -709,7 +716,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--path2imp",
         type=str,
-        default=CONFIG.PATH2PAN20,
+        default=Path(os.getcwd()).resolve().parent / CONFIG.PATH2BLOG,
         help="Path to the imposter dataset (default: %(default)s)",
     )
 
@@ -729,34 +736,28 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    vis_det = VisDetectors(
-        dataset=args.dataset,
-        imposter_args={
-            "rounds": args.rounds,
-            "top_n": args.top_n,
-            "path2imp": args.path2imp,
-            "imposter_technique": args.imposter_technique,
-            "upsample": args.upsample,
-        },
-        detectors=[CONFIG.IMPOSTER, CONFIG.UNMASKING],
+    imposter = ImpostorDetector(
+        imposter_technique="fixed",
+        n_impostors=args.n_imposters,
+        rounds=args.rounds,
+        top_n=args.top_n,
+        path2imp=args.path2imp,
+        upsample=args.upsample,
     )
+
+    # vis_det = VisDetectors(
+    #     dataset_name=args.dataset_name,
+    #     detectors=[imposter],
+    # )
+    # print("Imposter Detector initialized.")
     # vis_det.visualize(balanced=args.balanced)
 
     # ugly, but only for reproduction of Figure 2 from Koppel et al. (2014)
-    imposter = ImpostorDetector(
-        imposter_technique="fixed",
-        n_impostors=50,
-        rounds=20,
-        top_n=100000,
-        path2imp=Path(os.getcwd()).resolve().parent / CONFIG.PATH2STUDENT_ESSAYS,
-        upsample=False,
-    )
-    print("Imposter Detector initialized.")
-
     vis_det = VisDetectors(
         dataset_name=CONFIG.BLOG,
         detectors=[imposter],
     )
+    print("Imposter Detector initialized.")
     vis_det.reproduce_fig2_prec_recall_dif_n_imp()
     print("Finished reproducing Figure 2 from Koppel et al. (2014) on BLOG data.")
 
@@ -764,5 +765,6 @@ if __name__ == "__main__":
         dataset_name=CONFIG.STUDENT_ESSAYS,
         detectors=[imposter],
     )
+    print("Imposter Detector initialized.")
     vis_det.reproduce_fig2_prec_recall_dif_n_imp()
     print("Finished reproducing Figure 2 from Koppel et al. (2014) on STUDENT data.")
