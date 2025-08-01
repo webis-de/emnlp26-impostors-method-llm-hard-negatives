@@ -1168,7 +1168,8 @@ def run_pan23(base_dir: str, save_path: str):
 def run_pan20():
     base_dir = (
         Path(__file__).resolve().parent.parent
-        / "data/datasets/pan20-authorship-verification/"
+        / CONFIG.DATA_BASE_PATH
+        / "pan20-authorship-verification/"
     )
     train_dir = os.path.join(base_dir, "pan20-authorship-verification-training-dataset")
     test_dir = os.path.join(base_dir, "pan20-authorship-verification-test-dataset")
@@ -1182,7 +1183,9 @@ def run_pan20():
 
 def run_pan25():
     base_dir = (
-        Path(__file__).resolve().parent / "data/datasets/dataset-extended-2025-part/"
+        Path(__file__).resolve().parent
+        / CONFIG.DATA_BASE_PATH
+        / "dataset-extended-2025-part/"
     )
     human_dir = os.path.join(base_dir, "human")
     machine_dir = os.path.join(base_dir, "machines")
@@ -1199,7 +1202,8 @@ def run_pan25():
 def run_koppel_webis():
     base_dir = (
         Path(__file__).resolve().parent.parent
-        / "data/datasets/corpus-webis-authorship/koppel/"
+        / CONFIG.DATA_BASE_PATH
+        / "corpus-webis-authorship/koppel/"
     )
     output_dir = os.path.join(base_dir, "koppel-webis-dataset-converted")
 
@@ -1211,7 +1215,9 @@ def run_koppel_webis():
 
 def run_blog_corpus():
     # sys.path.append(os.path.abspath(".."))
-    base_dir = Path(__file__).resolve().parent.parent / "data/datasets/Blog_corpus/"
+    base_dir = (
+        Path(__file__).resolve().parent.parent / CONFIG.DATA_BASE_PATH / "Blog_corpus/"
+    )
     assert (
         base_dir.exists()
     ), f"Base directory {base_dir} does not exist. Current path: {os.getcwd()}"
@@ -1224,7 +1230,9 @@ def run_blog_corpus():
 
 def run_gutenberg_corpus():
     # sys.path.append(os.path.abspath(".."))
-    base_dir = Path(__file__).resolve().parent.parent / "data/datasets/gutenberg/"
+    base_dir = (
+        Path(__file__).resolve().parent.parent / CONFIG.DATA_BASE_PATH / "gutenberg/"
+    )
     assert (
         base_dir.exists()
     ), f"Base directory {base_dir} does not exist. Current path: {os.getcwd()}"
