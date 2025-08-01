@@ -485,21 +485,6 @@ class TextLenImpostorGenerator(BaseImpostorGenerator):
         return {f"impostor_{i}": imp for i, imp in enumerate(selected)}
 
 
-class NDocsImpostorGenerator(BaseImpostorGenerator):
-    def __init__(self, n_impostors: int):
-        """
-        References:
-        ===========
-        Kocher, Mirco, and Jacques Savoy. ‘UniNE at CLEF 2015: Author Identification’, 2015.
-        """
-        super().__init__(n_impostors=n_impostors)
-
-    def generate_impostors(
-        self, text: str, path2imp: str = None, real_time_generation: bool = False
-    ) -> Dict[str, str]:
-        pass
-
-
 class LLMImpostorGenerator(BaseImpostorGenerator):
     def __init__(
         self, n_impostors: int, paraphrasers: Optional[List[Paraphraser]] = None

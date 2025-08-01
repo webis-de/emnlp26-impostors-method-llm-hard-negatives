@@ -60,7 +60,6 @@ class ImpostorDetector(ImpostorBase):
         impostor_technique: Literal[
             "llm",
             "text_len",
-            "n_docs",
             "on-the-fly",
             "blogs",
             "fixed",
@@ -86,7 +85,6 @@ class ImpostorDetector(ImpostorBase):
             - "llm": use LLMs to generate impostors to control both topic and genre
             - "naive_llm": use a naive LLM approach to generate impostors
             - "text_len": generate impostors of similar length from a predefined dataset (our baseline w/o reference, default)
-            - "n_docs": generate impostors based on the number of documents written by the author (Kocher et Al. (2015), not implemented yet)
             - "fixed": use a fixed set of impostors (Koppel et. A. (2014), not implemented yet), impostors are not related to the input text
             - "on-the-fly": generate same-topic impostors on-the-fly (Koppel et. Al. (2014), not implemented yet)
             - "blogs": use blogs to obtain same genre impostors (Koppel et. Al. (2014), not implemented yet)
@@ -121,11 +119,6 @@ class ImpostorDetector(ImpostorBase):
             )
         elif impostor_technique == "non_naive_llm":
             self.impostor_generator = ImpostorGenerator.NonNaiveLLMImpostorGenerator(
-                n_impostors=self.n_impostors
-            )
-        elif impostor_technique == "n_docs":
-            # TODO: I need author names for this
-            self.impostor_generator = ImpostorGenerator.NDocsImpostorGenerator(
                 n_impostors=self.n_impostors
             )
         elif impostor_technique == "fixed":
