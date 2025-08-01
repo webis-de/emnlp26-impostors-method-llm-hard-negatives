@@ -367,5 +367,7 @@ def preprocess_text(text: t.Union[str, t.Iterable[str]]) -> t.Union[str, t.List[
 
     if isinstance(text, str):
         return clean(text)
-    else:
+    elif isinstance(text, (list, tuple)):
         return [clean(t_) for t_ in text]
+    else:
+        return text
