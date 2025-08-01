@@ -1,6 +1,6 @@
 # ✅ TODOs
 
-## 📅 25.07.2025- 01.08.2025
+## 📅 01.08.2025- 08.08.2025
 ### 📚 Dataset
 - [ ] original MirrorMinds-LLMDetector dataset
 - [ ] Webis has newer and better fanfiction dataset than PAN20
@@ -8,6 +8,7 @@
 - [ ] second cleansed PAN20 dataset with only valid texts and better pair selection if possible
 
 ### ✍️ Written Work
+- [ ] Titel, Inhalt und Introduction an Martin schicken
 - [ ] Paraphrase metrics: Syntactic (BLEU, ROUGE-1, ROUGE-L), semantic (BERTScore, cosine similarity of SBERT vectors, WMS), human evaluation (TODO)
 - [ ] control dataset in terms of topic, genre, register
 - [ ] Difference register and tone (find literature of categories, cf. ceph)
@@ -66,46 +67,63 @@
 - [ ] why not using DeepL for rephrasing? [Need to specify tone in API](https://github.com/deeplcom/deepl-python), hence defeats the purpose of capturing the LLM's style
 - [ ] How PAN20 dataset was created? cf. [Bevendorff et. Al. 2020 (Chap. 2)](https://downloads.webis.de/publications/papers/bevendorff_2020d.pdf) 
 - [ ] lowercasing texts for unmasking or other AV/AA: [Janek's Two Paradigm of LLM Detection: AA vs. AV pg. 3768 left 1st paragraph](https://aclanthology.org/2025.findings-acl.194.pdf), [Janek's BA pg. 11](https://downloads.webis.de/theses/papers/bevendorff_2016.pdf)
-- [x] Minimum number of characters/ words for a text to qualify
-  -[Generalized Unmasking](https://aclanthology.org/N19-1068/) uses chunks between 300 and 1,000 words (**500-700 words** best without adding too much computational overhead)
-  - [Generalized Unmasking](https://www.degruyterbrill.com/document/doi/10.1515/itit-2019-0046/html?casa_token=pbCaF7FgUXoAAAAA:8Vw71FUWE5spAbSsEuGGTdIjjm_o1_eb_inHwU3BR6eSrdVMOYy3--iqvDJwCV7EQ1HWtQBh610) uses chunks of **700 words**
-  - [AV PAN 2023 Overview Paper (chap.2)](https://ceur-ws.org/Vol-3497/paper-199.pdf) emails of at least **2000 characters**
-  - [Janek's Two Paradigms of LLM Detection: AA vs. AV](https://aclanthology.org/2025.findings-acl.194.pdf) 
-    - p. 2767, left second last paragraph + Fig. 1,2: **2000-5000 characters** for separation of LLM entropies
-    - pg. 3768: texts with >= **3000 characters** 
+- [ ] What should happen using our extended Impostor Approach?
+  - Naive to believe in improvement
+  - Impostors are more difficult (i.e. hard negatives) than retrieved impostors/ approaches
+  - more generalized approaches?
+  - decisions are more correct?
+  - approach learns better hypersurface of same author texts?
+  - [ ] Think about what should happen using our extended Impostor Approach!
+- [ ] Extended impostor approach
+  - hypothesis: high precision
+  - maybe as good as Koppel et al. 2014's approach
+  - more robust: How can we measure this?
+    - c@1: 0.5 for no idea
+    - goal: Model uncertainty
+- [ ] lowercase: which conversion to plain text problems are solved by lowercasing? Or do I only loose authorial style?
+  - is capitalization important for AV/AA? Is a style feature of importance?
+    - if used often for one doctor maybe, but rather unlikely for majority of texts
+    - [ ] test via table of different preprocessing steps and their impact on vocabulary size (and scores)
+
 
 ### 🛠️ Implementation
+- [ ] LLM detection experiments: 
+  - 1. candidate is one LLM
+  - 2. subset of all LLMs is candidate: Can we detect all LLMs using subset of LLMs?
+    - subset of LLMs of same architecture, i.e. all LLMs are T5
+    - subset of LLMs trained on same data, i.e. all LLMs are trained on Wikipedia
+- [ ] ask Koppel about preprocessing steps of Blog (and Student Essay) dataset
+  - bc our results are worse than Koppel et al. 2014's results
+- [ ] scatter top accuracy of Koppel et Al. 2014's in our accuracy plot
+  - Blog
+  - Student Essay
+  - [ ] statistical significance test
+- [ ] table with all different preprocessing steps (incl. lowercasing, stemming, etc.) and their impact on vocabulary size (and scores)
+  - first column: preprocessing step
+  - second column: vocabulary size
+  - min/ max/ std/ vocabulary size/ token diversity
+- [ ] are texts that are heavily influenced by preprocessing steps bas (i.e. all caps texts)?
+- [ ] do not optimize one approach, but compare different approaches
+  - i.e. optimizing scores is not goal for the purpose of "the" AV model
+  - Precision-Recall curve can be better than F1 score, bc we can decide what is the focus (i.e. high precision)
 - [o] run `experiments/naive_paraphrasers_FPs.py` on cluster via `scripts/exp_naive_paraphrasers_FPs.sh`
   - cancelled due to time limitations
-- [x] run `dataset_util.py` on cluster via `scripts/run_dataset_creation.sh`
 - [o] run `experiments/run_evaluation.py`via `scripts/evaluate_paraphrasers.sh`
   - cancelled due to time limitations
+  - trying to get parallelization working
+- [o] run `experiments/paraphrase_chunks.py`via `scripts/exp_chunks_paraphrasing.sh`
+  - cancelled due to time limitations
+  - trying to get parallelization working
 - [ ] OpenAI
 - [ ] lowercasing texts for unmasking or other AV/AA: 
     - Yes: [Janek's Two Paradigms of LLM Detection: AA vs. AV pg. 3768 left 1st paragraph](https://aclanthology.org/2025.findings-acl.194.pdf), [Janek's BA pg. 11](https://downloads.webis.de/theses/papers/bevendorff_2016.pdf)
     - Currently no, bc loosing information, i.e. capitalization, all caps, etc.
-- [x] Do not lowercase the text to preserve authorial style such as capitalization or all caps `util.py`: `preprocess_text` function
-- [x] try pushing 20GB Docker container to webis registry from university network
-  - does not work, broken pipe
-- [x] Find number of words sufficient for LLM Detection from Janek's paper
-  - [Generalized Unmasking](https://aclanthology.org/N19-1068/) uses chunks between 300 and 1,000 words (**500-700 words** best without adding too much computational overhead)
-  - [Generalized Unmasking](https://www.degruyterbrill.com/document/doi/10.1515/itit-2019-0046/html?casa_token=pbCaF7FgUXoAAAAA:8Vw71FUWE5spAbSsEuGGTdIjjm_o1_eb_inHwU3BR6eSrdVMOYy3--iqvDJwCV7EQ1HWtQBh610) uses chunks of **700 words**
-  - [AV PAN 2023 Overview Paper (chap.2)](https://ceur-ws.org/Vol-3497/paper-199.pdf) emails of at least **2000 characters**
-  - [Janek's Two Paradigms of LLM Detection: AA vs. AV](https://aclanthology.org/2025.findings-acl.194.pdf) 
-    - p. 2767, left second last paragraph + Fig. 1,2: **2000-5000 characters** for separation of LLM entropies
-    - (Fig. 3: Unmasking on 250-500 most frequent character 3-grams)
-    - pg. 3768: texts with >= **3000 characters** 
-    - pg. 3768: texts: **lowercased** and stemmed
 - [ ] Backtranslation (2-step) paraphrasing: How good is LLM (Ollama?)
   - use only western languages, because LLMs are maybe better with them
-- [x] Backtranslation (2-step) paraphrasing: [Free DeepL API](https://www.deepl.com/en/your-account/keys)
-  - 500,000 max characters per month
-  - currently commented out in `paraphraser.py`
-  - when commented in, used only for first paraphrase, to save API calls/ characters
 - [o] What are impostor paper (Koppel et Al. 2014) baselines: Implement them
   - 1. Similarity-Based Baseline: Measure the similarity (1a cosine ca. 71% acc, 1b min-max ca. 74% acc) between the candidate text and the original text (space-free 4-gram tfidf of top 100,000 n-grams across corpus) and assign same-author label if similarity is above a certain threshold.
   - 2. Supervised Baseline: Train a supervised classifier (linear SVM) on 1,000 labeled sample pairs to distinguish between same-author and different-author pairs based on absolute element-wise differences in their top 100,000 tfidf embedding: 79.8% accuracy
-- Koppel et. Al. Studnt Essay dataset: 
+- Koppel et. Al. Student Essay dataset: 
   - [ ] Use only first 500 words of each text
   - [ ] corpus of 2000 pairs
   - [x] X,Y pairs: never from same task, regardless of same or different author
@@ -124,15 +142,7 @@
 - [ ] vertical prototype rather than horizontal prototype (get existing modules working rather than generating new modules)
 - [ ] Grid search for hyperparameters 
   - [ ] smart choice of hyperparameters, ggf. do not use all hyperparameters
-- [x] LLM generated impostors
-- [x] run evaluation of cluster 
-  - [x] make Docker container to smaller
-  - [x] script with parallel code
-  - [x] sbatch script
-  - [x] Docker container to run evaluation
 - [ ] [Answer by LLMDet collaborator](https://github.com/TrustedLLM/LLMDet/issues/14#issuecomment-3111760619)
-- [o] Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
-  - estimated 36h of runtime
 - [ ] experiment/ hypothesis: Text_extractor information will produce similar text to original text even though information is wrong because extractor/ generator LLM think alike
   - [ ] maybe generate "bad extractions via LLM prompt" and compare to original text (human evaluation)
 - [ ] compare MirrorMinds-LLMDetector paraphrases and our impostor generators
@@ -155,6 +165,46 @@
   - [ ] Gutenberg dataset **TODO: not enough memory on Macbook, run on cluster**
   - [ ] Student Essay dataset **TODO: crushes Macbook when running locally**
 
+
+## 📅 25.07.2025- 01.08.2025
+### 📚 Dataset
+-
+
+### ✍️ Written Work
+- [x] Minimum number of characters/ words for a text to qualify
+  -[Generalized Unmasking](https://aclanthology.org/N19-1068/) uses chunks between 300 and 1,000 words (**500-700 words** best without adding too much computational overhead)
+  - [Generalized Unmasking](https://www.degruyterbrill.com/document/doi/10.1515/itit-2019-0046/html?casa_token=pbCaF7FgUXoAAAAA:8Vw71FUWE5spAbSsEuGGTdIjjm_o1_eb_inHwU3BR6eSrdVMOYy3--iqvDJwCV7EQ1HWtQBh610) uses chunks of **700 words**
+  - [AV PAN 2023 Overview Paper (chap.2)](https://ceur-ws.org/Vol-3497/paper-199.pdf) emails of at least **2000 characters**
+  - [Janek's Two Paradigms of LLM Detection: AA vs. AV](https://aclanthology.org/2025.findings-acl.194.pdf) 
+    - p. 2767, left second last paragraph + Fig. 1,2: **2000-5000 characters** for separation of LLM entropies
+    - pg. 3768: texts with >= **3000 characters** 
+
+### 🛠️ Implementation
+- [x] run `dataset_util.py` on cluster via `scripts/run_dataset_creation.sh`
+- [x] Do not lowercase the text to preserve authorial style such as capitalization or all caps `util.py`: `preprocess_text` function
+- [x] try pushing 20GB Docker container to webis registry from university network
+  - does not work, broken pipe
+- [x] Find number of words sufficient for LLM Detection from Janek's paper
+  - [Generalized Unmasking](https://aclanthology.org/N19-1068/) uses chunks between 300 and 1,000 words (**500-700 words** best without adding too much computational overhead)
+  - [Generalized Unmasking](https://www.degruyterbrill.com/document/doi/10.1515/itit-2019-0046/html?casa_token=pbCaF7FgUXoAAAAA:8Vw71FUWE5spAbSsEuGGTdIjjm_o1_eb_inHwU3BR6eSrdVMOYy3--iqvDJwCV7EQ1HWtQBh610) uses chunks of **700 words**
+  - [AV PAN 2023 Overview Paper (chap.2)](https://ceur-ws.org/Vol-3497/paper-199.pdf) emails of at least **2000 characters**
+  - [Janek's Two Paradigms of LLM Detection: AA vs. AV](https://aclanthology.org/2025.findings-acl.194.pdf) 
+    - p. 2767, left second last paragraph + Fig. 1,2: **2000-5000 characters** for separation of LLM entropies
+    - (Fig. 3: Unmasking on 250-500 most frequent character 3-grams)
+    - pg. 3768: texts with >= **3000 characters** 
+    - pg. 3768: texts: **lowercased** and stemmed
+- [x] Backtranslation (2-step) paraphrasing: [Free DeepL API](https://www.deepl.com/en/your-account/keys)
+  - 500,000 max characters per month
+  - currently commented out in `paraphraser.py`
+  - when commented in, used only for first paraphrase, to save API calls/ characters
+- [x] LLM generated impostors
+- [x] run evaluation of cluster 
+  - [x] make Docker container to smaller
+  - [x] script with parallel code
+  - [x] sbatch script
+  - [x] Docker container to run evaluation
+- [o] Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
+  - estimated 36h of runtime
 
 ## 📅 22.07.2025- 01.08.2025
 
