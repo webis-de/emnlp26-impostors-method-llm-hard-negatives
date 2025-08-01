@@ -392,7 +392,7 @@ class VisDetectors:
         # scores: probability estimates of the positive class, confidence values, or non-thresholded measure of decisions (as returned by “decision_function” on some classifiers)
         # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.roc_curve.html (05.06.2025)
         fpr, tpr, roc_thresholds = roc_curve(labels, scores)
-        fig = plt.figure(figsize=(10, 5))
+        fig = plt.figure(figsize=(10, 6))
         plt.subplot(1, 2, 1)
         plt.gca().set_aspect("equal")
         plt.plot(fpr, tpr, label="ROC Curve")
@@ -415,28 +415,29 @@ class VisDetectors:
         plt.gca().set_aspect("equal")
         plt.plot(recall, precision, label="PR Curve", color="orange")
         plt.ylim(0, 1)
-        plt.scatter(
-            0.34,
-            0.95,
-            marker="o",
-            color="red",
-            label=r"$\sigma*=unknown$, $50$ authors$^1$",
-        )
-        plt.scatter(
-            0.222,
-            0.902,
-            marker="x",
-            color="red",
-            label=r"$\sigma^*=0.8$, $500$ authors$^1$",
-        )
-        plt.annotate(
-            "1: Koppel et. Al. (2014)",
-            xy=(1.0, -0.2),
-            xycoords="axes fraction",
-            ha="right",
-            va="center",
-            fontsize=10,
-        )
+        if self.dataset_name == CONFIG.BLOG:
+            plt.scatter(
+                0.34,
+                0.95,
+                marker="o",
+                color="red",
+                label=r"$\sigma*=unknown$, $50$ authors$^1$",
+            )
+            plt.scatter(
+                0.222,
+                0.902,
+                marker="x",
+                color="red",
+                label=r"$\sigma^*=0.8$, $500$ authors$^1$",
+            )
+            plt.annotate(
+                "1: Koppel et. Al. (2014)/ Blog dataset",
+                xy=(1.0, -0.2),
+                xycoords="axes fraction",
+                ha="right",
+                va="center",
+                fontsize=10,
+            )
 
         plt.xlabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
         plt.ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
