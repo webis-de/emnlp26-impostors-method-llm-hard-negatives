@@ -498,6 +498,47 @@ class VisDetectors:
         )
         axes[0, 1].set_title(title, fontsize=10)
         axes[0, 1].grid(True)
+        if self.dataset_name == CONFIG.BLOG:
+            axes[0, 1].axhline(
+                y=0.874,
+                linestyle="--",
+                color="red",
+                alpha=0.5,
+                label=r"$Fixed (Blog) Imposter Generation$^1$",
+            )
+            axes[0, 1].axhline(
+                y=0.832,
+                linestyle="--",
+                color="violet",
+                alpha=0.5,
+                label=r"$On-the-fly Imposter Generation$^1$",
+            )
+            axes[0, 1].annotate(
+                "1: Koppel et. Al. (2014)/ Blog dataset",
+                xy=(1.0, -0.2),
+                xycoords="axes fraction",
+                ha="right",
+                va="center",
+                fontsize=10,
+            )
+            axes[0, 1].legend()
+        elif self.dataset_name == CONFIG.STUDENT_ESSAYS:
+            axes[0, 1].axhline(
+                y=0.731,
+                color="red",
+                linestyle="--",
+                alpha=0.5,
+                label=r"$Fixed (Student Essay) Imposter Generation$^1$",
+            )
+            axes[0, 1].annotate(
+                "1: Koppel et. Al. (2014)/ Student Essay dataset",
+                xy=(1.0, -0.2),
+                xycoords="axes fraction",
+                ha="right",
+                va="center",
+                fontsize=10,
+            )
+            axes[0, 1].legend()
 
         # Plot 3: Precision vs Threshold
         axes[1, 0].plot(pr_thresholds, precision[:-1])
