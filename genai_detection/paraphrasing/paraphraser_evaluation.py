@@ -74,6 +74,7 @@ class ParaphrasingEvaluator:
         temperature: float = CONFIG.TEMPERATURE,
         config: Optional[dict[str, Any]] = None,
         ground_truth: Optional[dict[str, Any]] = None,
+        data_category: Optional[str] = None,
     ):
         """
         Initializes the ParaphrasingEvaluator with the given paraphrasers and prompts.
@@ -85,6 +86,7 @@ class ParaphrasingEvaluator:
         :param temperature: Controls the randomness of the output. Lower values make the output more deterministic.
         :param config: configuration object or dict, expects at least save_path attribute
         :param ground_truth: Optional ground truth data to compare against the generated paraphrases.
+        :param data_category: Optional category of the data being evaluated, used for logging and saving results.‚
         """
         assert isinstance(paraphrasers, dict) and all(
             isinstance(p, Paraphraser) for p in paraphrasers.values()
@@ -146,6 +148,7 @@ class ParaphrasingEvaluator:
             # / "data/datasets/student_essays/Intro2006/",
         }
         self.ground_truth = ground_truth or {}
+        self.data_category = data_category or "unknown"
 
     @staticmethod
     def _degree_of_similarity(a: str, b: str) -> float:
@@ -280,14 +283,16 @@ class ParaphrasingEvaluator:
                     prompt=paraphraser.extractor_prompt,
                     response_schema=TopicSchema.model_json_schema(),
                 )
-                # century = self._get_century(time_period)
             except Exception as e:
-                # Hopefully fixed:
-                # FIXME: Extraction failed for file '3581210': list index out of range
-                # FIXME: Extraction failed for file 'Pride_and_Prejudice_Jane_Austen': list index out of range
                 logger.warning(f"Extraction failed for file '{filename}': {e}")
                 continue
 
+            if (
+                "current" in str(century).lower()
+                or "present" in str(century).lower()
+                or "now" in str(century).lower()
+            ):
+                century = 21
             gt_genre = getattr(row, "genre", "") or ""
             gt_century = getattr(row, "century", 0) or 0
             gt_topic = getattr(row, "topic", "") or ""
@@ -640,7 +645,7 @@ class ParaphrasingEvaluator:
 
             except Exception as e:
                 logger.error(
-                    f"[ERROR] Paraphraser '{name}' with prompt '{prompt}' failed: {e}"
+                    f"[ERROR] Paraphraser '{name}' with prompt '{prompt}' for category '{self.data_category}' failed: {e}"
                 )
                 paraphrases = [
                     "" for _ in range(self.n_responses)
@@ -696,7 +701,7 @@ class ParaphrasingEvaluator:
 
             except Exception as e:
                 print(
-                    f"[ERROR] Scoring failed for '{name}' with prompt '{prompt}' and paraphrases '{paraphrases}': {e}"
+                    f"[ERROR] Scoring failed for '{name}' with prompt '{prompt}' for category '{self.data_category}' and paraphrases '{paraphrases}': {e}"
                 )
                 continue
 
@@ -714,7 +719,7 @@ class ParaphrasingEvaluator:
             os.makedirs(save_base_path, exist_ok=True)
             save_path = (
                 save_base_path
-                / f"paraphrasing_results_comparison_temp{self.temperature}_maxLength{self.max_length}.csv"
+                / f"paraphrasing_results_comparison_temp{self.temperature}_maxLength{self.max_length}_dataset_{self.data_category}.csv"
             )
             df.to_csv(save_path, index=False, float_format="%.4f")
             print(f"Results saved to {save_path}")
@@ -744,7 +749,7 @@ class ParaphrasingEvaluator:
         if save_extremest_paraphr_per_score:
             worst_save_path = (
                 save_base_path
-                / f"extremest_paraphrases_per_metric_temp{self.temperature}_maxLength{self.max_length}.csv"
+                / f"extremest_paraphrases_per_metric_temp{self.temperature}_maxLength{self.max_length}_dataset_{self.data_category}.csv"
             )
             extremest_paraphrases.to_csv(worst_save_path, index=False)
 
