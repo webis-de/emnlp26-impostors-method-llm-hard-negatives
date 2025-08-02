@@ -26,6 +26,7 @@ import matplotlib.lines as mlines
 
 from genai_detection.paraphrasing.paraphraser import (
     OllamaParaphraser,
+    T5ChatGPTParaphraser,
     TopicParaphraser,
     TaskParaphraser,
     TitleParaphraser,
@@ -469,8 +470,7 @@ class ParaphrasingEvaluator:
                 )
                 continue
 
-            # TODO: Use only first two rows for debugging (remove in production)
-            df = df.head(min(10, len(df)))  # For debugging, remove in production
+            df = df.head(min(30, len(df)))  # For debugging, remove in production
             if "id" in df.columns:
                 df.rename(columns={"id": "filename"}, inplace=True)
             logger.info(f"Dataset snapshot:\n{df.head()}")
@@ -1266,7 +1266,7 @@ if __name__ == "__main__":
     # models
     ollama_model_id = "zephyr:7b"  # "mistral:7b"  # "default:latest"
     paraphrasers = {
-        # 'T5_ChatGPT': T5ChatGPTParaphraser(),
+        "T5_ChatGPT": T5ChatGPTParaphraser(),
         # 'T5_Google_PAWS': T5GooglePAWSParaphraser(),
         # 'Blablador': BlabladorParaphraser(model_id="1 - Llama3 405 the best general model and big context size"),
         "Ollama": OllamaParaphraser(model_id=ollama_model_id),
@@ -1311,5 +1311,6 @@ if __name__ == "__main__":
         },
     )
     evaluator.evaluate_extractors(save_to_disk=True)
+    print("Evaluation complete.")
     # paraphrase_evaluator = ParaphrasingEvaluator(paraphrasers=paraphrasers, prompts=prompts, original_text=original_text, n_responses=n_responses, max_length=max_length, temperature=temperature)
     # paraphrase_evaluator.evaluate()
