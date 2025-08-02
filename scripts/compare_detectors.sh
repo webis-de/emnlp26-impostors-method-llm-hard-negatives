@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=imposter_pan23
+#SBATCH --job-name=detectors
 #SBATCH --mem=64g
 #SBATCH --cpus-per-task=4
 #SBATCH --output=logs/log-comp-detectors-%j.log
