@@ -121,11 +121,18 @@ def evaluate_category(data_category, data_root, save_path):
             evaluator.plot_models_metrics(
                 df, save_path, data_category, group_by=group, display_plot=False
             )
+            print(f"Plot metrics for {data_category} by {group}: metrics plotted")
             evaluator.plot_metric_scatter(
                 df, save_path, data_category, group_by=group, display_plot=False
             )
+            print(
+                f"Plot metric scatter for {data_category} by {group}: scatter plotted"
+            )
             evaluator.plot_metric_distributions(
                 df, save_path, data_category, group_by=group, display_plot=False
+            )
+            print(
+                f"Plot metric distributions for {data_category} by {group}: distributions plotted"
             )
 
         return f"Completed: {data_category}"
