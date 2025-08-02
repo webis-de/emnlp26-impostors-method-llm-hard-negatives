@@ -425,6 +425,7 @@ class ImpostorDetector(ImpostorBase):
 
         # avoid fitting a new vectorizer every time (costly)
         if not hasattr(self, "_vectorizer") or self._vectorizer_vocab != top_token_list:
+            print(f"Fitting vectorizer with {len(top_token_list)} top tokens.")
             self._vectorizer = TfidfVectorizer(
                 vocabulary=top_token_list,
                 input="content",
@@ -432,10 +433,12 @@ class ImpostorDetector(ImpostorBase):
                 lowercase=False,
             )
             self._vectorizer_vocab = top_token_list
+            print("Vectorizer initiliazed.")
 
         tfidf_matrix = self._vectorizer.fit_transform(
             [" ".join(tokens)]
         )  # format (n_samples=1, n_features=self.top_n)
+        print("fitted vectorizer with top tokens.")
 
         assert tfidf_matrix.shape[1] == len(
             top_token_list
