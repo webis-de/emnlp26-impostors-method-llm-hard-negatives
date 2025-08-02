@@ -108,6 +108,7 @@ def evaluate_category(data_category, data_root, save_path):
             max_length=MAX_LENGTH,
             temperature=TEMPERATURE,
             ground_truth=metadata,
+            data_category=data_category,
         )
         print(f"Starting evaluation for {data_category}")
 
