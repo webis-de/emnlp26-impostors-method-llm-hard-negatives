@@ -52,19 +52,17 @@ class UnSupervisedImpostorBaseline(ImpostorBaselineBase):
         if isinstance(text, str):
             text = [text]
 
-        vectors = [self.get_tfidf_vector_for_text(t) for t in text]
         scores_per_pair = (
             []
         )  # id is index of pair (i.e, length is half of the input text list)
-        for i, vecs in enumerate(ichunked(vectors, 2)):
-            vecs = list(
-                vecs
-            )  # generator object is not subscriptable, so convert to list
-            assert len(vecs) == 2, "Input text must be a list of pairs of texts."
+        pairs = list(ichunked(vectors, 2)) if type(text[0]) == str else text
+        for text_pair in pairs:
+            vectors = [self.get_tfidf_vector_for_text(t) for t in text_pair]
+            assert len(vectors) == 2, "Input text must be a list of pairs of texts."
             if self.cosine:
-                scores_per_pair.append(self.cosine_similarity(vecs[0], vecs[1]))
+                scores_per_pair.append(self.cosine_similarity(vectors[0], vectors[1]))
             else:
-                scores_per_pair.append(self.minmax_similarity(vecs[0], vecs[1]))
+                scores_per_pair.append(self.minmax_similarity(vectors[0], vectors[1]))
 
         return np.array(scores_per_pair)
 
