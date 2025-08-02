@@ -504,14 +504,14 @@ class VisDetectors:
                 linestyle="--",
                 color="red",
                 alpha=0.5,
-                label=r"$Fixed (Blog) Imposter Generation$^1$",
+                label=r"Fixed (Blog) Imposter Generation$^1$",
             )
             axes[0, 1].axhline(
                 y=0.832,
                 linestyle="--",
                 color="violet",
                 alpha=0.5,
-                label=r"$On-the-fly Imposter Generation$^1$",
+                label=r"On-the-fly Imposter Generation$^1$",
             )
             axes[0, 1].annotate(
                 "1: Koppel et. Al. (2014)/ Blog dataset",
@@ -528,7 +528,7 @@ class VisDetectors:
                 color="red",
                 linestyle="--",
                 alpha=0.5,
-                label=r"$Fixed (Student Essay) Imposter Generation$^1$",
+                label=r"Fixed (Student Essay) Imposter Generation$^1$",
             )
             axes[0, 1].annotate(
                 "1: Koppel et. Al. (2014)/ Student Essay dataset",
@@ -589,7 +589,7 @@ class VisDetectors:
             )
             return {"n_imp": n_imp, "precision": precs, "recall": recs}
         except Exception as e:
-            print(f"[ERROR] Failed for n_imp = {n_imp}:\n{traceback.format_exc()}")
+            print(f"[ERROR] Failed for n_imp = {n_imp}:\n{traceback.format_exc()}\n{e}")
             return None
 
     # ugly, but only for reproduction of Figure 2 from Koppel et al. (2014)
