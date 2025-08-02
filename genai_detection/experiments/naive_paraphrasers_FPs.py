@@ -6,6 +6,7 @@ We therefore created (Non-)Naive LLM-based impostor generators in the `LLMImpost
 """
 
 import argparse
+import collections
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 import os
 from pathlib import Path
@@ -113,11 +114,11 @@ def load_detectors() -> dict[str, ImpostorDetector]:
 
 
 # for parallelization
-def _compute_score(detector, row):
+def _compute_score(detector, row: collections.OrderedDict) -> tuple[int, float]:
     original_text = row["disputed_text"]
     paraphrased_text = row["candidate_text"]
     score = detector.get_score([original_text, paraphrased_text], normalize=False)
-    return row.name, np.round(score, 2)  # return index + score
+    return row.Index, np.round(score, 2)  # return index + score
 
 
 def get_detector_scores(
