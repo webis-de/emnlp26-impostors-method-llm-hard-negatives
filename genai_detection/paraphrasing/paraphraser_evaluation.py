@@ -436,6 +436,8 @@ class ParaphrasingEvaluator:
                 fig.savefig(out, bbox_inches="tight", transparent=True, format=format)
                 print(f"Saved KDE grid to {out}")
 
+        else:
+            print("No save path provided, plot not saved.")
         if display_plot:
             plt.show()
 
@@ -572,6 +574,7 @@ class ParaphrasingEvaluator:
                 df_all=df_all,
                 metrics=["genre_match", "time_match", "topic_match", "length_diff"],
                 display_plot=display_plot,
+                save_path=save_base_path,
             )
 
     def _save_results(self, results: dict, dataset_type: str, save_base_path: Path):
@@ -1310,6 +1313,7 @@ if __name__ == "__main__":
             / CONFIG.SAVE_PATH
         },
     )
+    print("Starting evaluation of paraphrasers...")
     evaluator.evaluate_extractors(save_to_disk=True)
     print("Evaluation complete.")
     # paraphrase_evaluator = ParaphrasingEvaluator(paraphrasers=paraphrasers, prompts=prompts, original_text=original_text, n_responses=n_responses, max_length=max_length, temperature=temperature)
