@@ -438,7 +438,6 @@ class ImpostorDetector(ImpostorBase):
         tfidf_matrix = self._vectorizer.fit_transform(
             [" ".join(tokens)]
         )  # format (n_samples=1, n_features=self.top_n)
-        print("fitted vectorizer with top tokens.")
 
         assert tfidf_matrix.shape[1] == len(
             top_token_list
