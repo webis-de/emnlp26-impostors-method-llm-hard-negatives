@@ -92,16 +92,16 @@
   - 2. subset of all LLMs is candidate: Can we detect all LLMs using subset of LLMs?
     - subset of LLMs of same architecture, i.e. all LLMs are T5
     - subset of LLMs trained on same data, i.e. all LLMs are trained on Wikipedia
-- [ ] ask Koppel about preprocessing steps of Blog (and Student Essay) dataset
+- [x] ask Koppel about preprocessing steps of Blog (and Student Essay) dataset
   - bc our results are worse than Koppel et al. 2014's results
-- [ ] scatter top accuracy of Koppel et Al. 2014's in our accuracy plot
+- [x] scatter top accuracy of Koppel et Al. 2014's in our accuracy plot
   - Blog
   - Student Essay
   - [ ] statistical significance test
-- [ ] table with all different preprocessing steps (incl. lowercasing, stemming, etc.) and their impact on vocabulary size (and scores)
+- [x] table with all different preprocessing steps (incl. lowercasing, stemming, etc.) and their impact on vocabulary size (and scores)
   - first column: preprocessing step
   - second column: vocabulary size
-  - min/ max/ std/ vocabulary size/ token diversity
+  - ~~min/ max/ std/ vocabulary size/ token diversity~~
 - [ ] are texts that are heavily influenced by preprocessing steps bas (i.e. all caps texts)?
 - [ ] do not optimize one approach, but compare different approaches
   - i.e. optimizing scores is not goal for the purpose of "the" AV model
@@ -114,6 +114,9 @@
 - [o] run `experiments/paraphrase_chunks.py`via `scripts/exp_chunks_paraphrasing.sh`
   - cancelled due to time limitations
   - trying to get parallelization working
+- [ ] run `impact_preprocessing.py` via `scripts/preprocessing_impact.sh`
+  - [ ] run on cluster (PAN20, Student Essay, Blog, Gutenberg)
+  - [x] run locally (Student Essay, Blog, Gutenberg)
 - [ ] OpenAI
 - [ ] lowercasing texts for unmasking or other AV/AA: 
     - Yes: [Janek's Two Paradigms of LLM Detection: AA vs. AV pg. 3768 left 1st paragraph](https://aclanthology.org/2025.findings-acl.194.pdf), [Janek's BA pg. 11](https://downloads.webis.de/theses/papers/bevendorff_2016.pdf)
@@ -124,8 +127,8 @@
   - 1. Similarity-Based Baseline: Measure the similarity (1a cosine ca. 71% acc, 1b min-max ca. 74% acc) between the candidate text and the original text (space-free 4-gram tfidf of top 100,000 n-grams across corpus) and assign same-author label if similarity is above a certain threshold.
   - 2. Supervised Baseline: Train a supervised classifier (linear SVM) on 1,000 labeled sample pairs to distinguish between same-author and different-author pairs based on absolute element-wise differences in their top 100,000 tfidf embedding: 79.8% accuracy
 - Koppel et. Al. Student Essay dataset: 
-  - [ ] Use only first 500 words of each text
-  - [ ] corpus of 2000 pairs
+  - [x] ~~Use only first 500 words of each text~~ we use the first 700 words
+  - [x] ~~corpus of 2000 pairs~~ we have 224 pairs
   - [x] X,Y pairs: never from same task, regardless of same or different author
 - [ ] scatter semantic/ syntactic scores
   - [x] change "model" to "Paraphraser" in plot legend
