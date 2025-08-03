@@ -12,12 +12,12 @@ class UnSupervisedImpostorBaseline(ImpostorBaselineBase):
     """
     Unsupervised Impostor Baseline detector class.
 
-    This class extends the DetectorBase and implements an unsupervised baseline for the Impostor method by Koopel et. Al. (2014).
+    This class extends the DetectorBase and implements an unsupervised baseline for the Impostor method by Koopel et al. (2014).
     A document pair (i.e. disputed document and candidate author document) is represented as a vector of TF-IDF features.
     The frequenies are calculated based on the 100,000 most frequent space-free character 4-grams in the corpus.
     Similarities are than calculated using cosine similarity or min-max similarity.
     Classification is carried out using a threshold on the similarity score.
-    Koppel et Al. (2014) have achieved (with the best threshold) a maximum of an accuracy of 70.6% using cosine similarity
+    Koppel et al. (2014) have achieved (with the best threshold) a maximum of an accuracy of 70.6% using cosine similarity
     and a maximum an accuracy of 74.2% using min-max simialrity on a deployment set.
 
     References:

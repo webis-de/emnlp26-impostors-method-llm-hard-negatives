@@ -433,7 +433,7 @@ class VisDetectors:
                 label=r"$\sigma^*=0.8$, $500$ authors$^1$",
             )
             plt.annotate(
-                "1: Koppel et. Al. (2014)/ Blog dataset",
+                "1: Koppel et al. (2014)/ Blog dataset",
                 xy=(1.0, -0.2),
                 xycoords="axes fraction",
                 ha="right",
@@ -516,7 +516,7 @@ class VisDetectors:
                 label=r"On-the-fly Imposter Generation$^1$",
             )
             axes[0, 1].annotate(
-                "1: Koppel et. Al. (2014)/ Blog dataset",
+                "1: Koppel et al. (2014)/ Blog dataset",
                 xy=(1.0, -0.2),
                 xycoords="axes fraction",
                 ha="right",
@@ -533,7 +533,7 @@ class VisDetectors:
                 label=r"Fixed (Student Essay) Imposter Generation$^1$",
             )
             axes[0, 1].annotate(
-                "1: Koppel et. Al. (2014)/ Student Essay dataset",
+                "1: Koppel et al. (2014)/ Student Essay dataset",
                 xy=(1.0, -0.2),
                 xycoords="axes fraction",
                 ha="right",
@@ -647,7 +647,7 @@ class VisDetectors:
             label=r"$\sigma^*=0.8$, $500$ authors$^1$",
         )
         plt.annotate(
-            "1: Koppel et. Al. (2014)",
+            "1: Koppel et al. (2014)",
             xy=(1.0, -0.2),
             xycoords="axes fraction",
             ha="right",

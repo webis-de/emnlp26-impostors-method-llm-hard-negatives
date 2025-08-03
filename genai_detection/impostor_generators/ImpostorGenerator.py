@@ -348,7 +348,7 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
         4. Save the results to a CSV file.
         5. Format results into a dictionary with keys as query and position, and values as the full text (or snippets) of the search result.
 
-        While Koppel et Al. (2014) randomly choose n imposters among the top m imposter, we use all of them.
+        While Koppel et al. (2014) randomly choose n imposters among the top m imposter, we use all of them.
 
         :param text (str): input text to generate impostors for
         :param path2imp (str or Path, optional): Path to save the CSV. If a directory or None, appends a timestamped filename.

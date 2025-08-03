@@ -29,7 +29,7 @@ class ImpostorBase(DetectorBase):
     ):
         """
         Tokenize input text into character n-grams.
-        Koppel et Al. (2014) use space-free character 4-grams tfidf values to represent each document as a numerical vector.
+        Koppel et al. (2014) use space-free character 4-grams tfidf values to represent each document as a numerical vector.
         A space-free n-grams is a (1) sequence of n characters without any whitespace in it, (2) a sequence of <= n characters surrounded by spaces.
 
         References:
@@ -73,7 +73,7 @@ class ImpostorBase(DetectorBase):
     def cosine_similarity(vec1, vec2):
         """
         Calculate cosine similarity between two vectors.
-        Koppel et Al. (2014) have use cosine similarity as a baseline.
+        Koppel et al. (2014) have use cosine similarity as a baseline.
         """
         return (
             cosine_similarity(vec1, vec2).flatten()[0]
@@ -84,7 +84,7 @@ class ImpostorBase(DetectorBase):
     def minmax_similarity(self, vec1, vec2):
         """
         Calculate min-max similarity between two vectors in TFIDF format.
-        Koppel et Al. (2014) use min-max similarity.
+        Koppel et al. (2014) use min-max similarity.
         """
         if vec1 is None or vec2 is None:
             return 0.0

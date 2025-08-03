@@ -34,7 +34,7 @@
   - Koppel task (old)
   - Our task (new)
   - controlled/ uncontrolled variables
-- [ ] don't scale to big data, prepare (controlled) two examples where (pre)processing steps are visible: Motivate with [Bevendorff et. Al. 2025](https://downloads.webis.de/publications/papers/bevendorff_2025a.pdf) "existing data is bad"
+- [ ] don't scale to big data, prepare (controlled) two examples where (pre)processing steps are visible: Motivate with [Bevendorff et al. 2025](https://downloads.webis.de/publications/papers/bevendorff_2025a.pdf) "existing data is bad"
   - [ ] specify constraints to data
 - [ ] slides with dataset discussion
   - controlled variables: topic, genre (e.g., play, fiction, non-fiction), register, time period denoted "Textgattungvariablen"
@@ -65,7 +65,7 @@
   - compare different paradigmen of paraphrasing and compare 1-2 implementations per paradigm
   - 1 x graph/ slide with steps, concrete task per step and approach per step
 - [ ] why not using DeepL for rephrasing? [Need to specify tone in API](https://github.com/deeplcom/deepl-python), hence defeats the purpose of capturing the LLM's style
-- [ ] How PAN20 dataset was created? cf. [Bevendorff et. Al. 2020 (Chap. 2)](https://downloads.webis.de/publications/papers/bevendorff_2020d.pdf) 
+- [ ] How PAN20 dataset was created? cf. [Bevendorff et al. 2020 (Chap. 2)](https://downloads.webis.de/publications/papers/bevendorff_2020d.pdf) 
 - [ ] lowercasing texts for unmasking or other AV/AA: [Janek's Two Paradigm of LLM Detection: AA vs. AV pg. 3768 left 1st paragraph](https://aclanthology.org/2025.findings-acl.194.pdf), [Janek's BA pg. 11](https://downloads.webis.de/theses/papers/bevendorff_2016.pdf)
 - [ ] What should happen using our extended Impostor Approach?
   - Naive to believe in improvement
@@ -94,7 +94,7 @@
     - subset of LLMs trained on same data, i.e. all LLMs are trained on Wikipedia
 - [x] ask Koppel about preprocessing steps of Blog (and Student Essay) dataset
   - bc our results are worse than Koppel et al. 2014's results
-- [x] scatter top accuracy of Koppel et Al. 2014's in our accuracy plot
+- [x] scatter top accuracy of Koppel et al. 2014's in our accuracy plot
   - Blog
   - Student Essay
   - [ ] statistical significance test
@@ -124,10 +124,10 @@
     - Currently no, bc loosing information, i.e. capitalization, all caps, etc.
 - [ ] Backtranslation (2-step) paraphrasing: How good is LLM (Ollama?)
   - use only western languages, because LLMs are maybe better with them
-- [o] What are impostor paper (Koppel et Al. 2014) baselines: Implement them
+- [o] What are impostor paper (Koppel et al. 2014) baselines: Implement them
   - 1. Similarity-Based Baseline: Measure the similarity (1a cosine ca. 71% acc, 1b min-max ca. 74% acc) between the candidate text and the original text (space-free 4-gram tfidf of top 100,000 n-grams across corpus) and assign same-author label if similarity is above a certain threshold.
   - 2. Supervised Baseline: Train a supervised classifier (linear SVM) on 1,000 labeled sample pairs to distinguish between same-author and different-author pairs based on absolute element-wise differences in their top 100,000 tfidf embedding: 79.8% accuracy
-- Koppel et. Al. Student Essay dataset: 
+- Koppel et al. Student Essay dataset: 
   - [x] ~~Use only first 500 words of each text~~ we use the first 700 words
   - [x] ~~corpus of 2000 pairs~~ we have 224 pairs
   - [x] X,Y pairs: never from same task, regardless of same or different author

@@ -31,7 +31,7 @@ student_essay_df = student_essay_loader._load_student_essays(min_num_words=0)[
 ]  # normally, texts < 700 words are filtered out after preprocessing
 student_essay_texts = [
     t["text"] for t in student_essay_df.to_dict("records") if t["task"] != "Ass5"
-]  # filter out Ass5 task cf. Koppel et Al. (2014)
+]  # filter out Ass5 task cf. Koppel et al. (2014)
 print(f"student essay dataset: {len(student_essay_texts)} texts")
 
 

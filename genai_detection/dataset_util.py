@@ -34,9 +34,9 @@ from genai_detection.paraphrasing.paraphraser import (
 from genai_detection.util import preprocess_text as _preprocess_text
 
 random.seed(42)
-# Koppel et. Al. (2004): 500 words
-# Bevendorff et. Al. (2019): 700 words (https://www.degruyterbrill.com/document/doi/10.1515/itit-2019-0046/html?casa_token=pbCaF7FgUXoAAAAA:8Vw71FUWE5spAbSsEuGGTdIjjm_o1_eb_inHwU3BR6eSrdVMOYy3--iqvDJwCV7EQ1HWtQBh610)
-# Bevendorff et. Al. (2025): 3000 characters (https://aclanthology.org/2025.findings-acl.194.pdf)
+# Koppel et al. (2004): 500 words
+# Bevendorff et al. (2019): 700 words (https://www.degruyterbrill.com/document/doi/10.1515/itit-2019-0046/html?casa_token=pbCaF7FgUXoAAAAA:8Vw71FUWE5spAbSsEuGGTdIjjm_o1_eb_inHwU3BR6eSrdVMOYy3--iqvDJwCV7EQ1HWtQBh610)
+# Bevendorff et al. (2025): 3000 characters (https://aclanthology.org/2025.findings-acl.194.pdf)
 MIN_NUM_WORDS = 700  # minimum number of words in a text to be considered valid
 
 # === BASE CLASS ===
@@ -887,7 +887,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
                 global_author_texts[author_id].append(item)
                 author_group_map[author_id] = group_id
 
-        # Prepare cross-task (cf. Koppel et Al. (2014)) different-author pairs
+        # Prepare cross-task (cf. Koppel et al. (2014)) different-author pairs
         authors = list(global_author_texts.keys())
         author_pairs = []
         for i in range(len(authors)):

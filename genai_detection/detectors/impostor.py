@@ -73,25 +73,25 @@ class ImpostorDetector(ImpostorBase):
         upsample: bool = True,  # whether to upsample short texts (default: True, i.e. upsample) or skip them
     ):
         """
-        :param rounds: number of random feature selection rounds, Koppel et Al. (2014) use 100
-        :param top_n: number of top space-free character 4-grams to consider, Koppel et Al. (2014) use 100,000
-        :param portion_delete: portion of features to eliminate in each round (reset in each round); Koppel et Al. (2014) use 50% of features
-        :param tokenizer: custom tokenizer function (must accept exactly one parameter, defaults to space-free character 4-grams cf. Koppel et Al. (2014))
-        :param shared_vocab_only: restrict analysis to shared vocabulary across pairs of texts (Koppel et Al. (2014): all texts in the corpus, i.e. shared)
-        :param tfidf_freqs: use tfidf term frequencies (Koppel et Al. (2014) use tfidf)
-        :param n_impostors: number of impostors to use for each candidate TODO: allow specification type of LLM impostors; Koppel et Al. (2014) use 25 impostors
-        :param threshold: threshold for the minimum similarity score to consider two texts same-author, TODO: not used yet, Koppel et Al. (2014) use 0.1
+        :param rounds: number of random feature selection rounds, Koppel et al. (2014) use 100
+        :param top_n: number of top space-free character 4-grams to consider, Koppel et al. (2014) use 100,000
+        :param portion_delete: portion of features to eliminate in each round (reset in each round); Koppel et al. (2014) use 50% of features
+        :param tokenizer: custom tokenizer function (must accept exactly one parameter, defaults to space-free character 4-grams cf. Koppel et al. (2014))
+        :param shared_vocab_only: restrict analysis to shared vocabulary across pairs of texts (Koppel et al. (2014): all texts in the corpus, i.e. shared)
+        :param tfidf_freqs: use tfidf term frequencies (Koppel et al. (2014) use tfidf)
+        :param n_impostors: number of impostors to use for each candidate TODO: allow specification type of LLM impostors; Koppel et al. (2014) use 25 impostors
+        :param threshold: threshold for the minimum similarity score to consider two texts same-author, TODO: not used yet, Koppel et al. (2014) use 0.1
         :param impostor_technique: which technique to use to generate impostors. Options are:
             - "llm": use LLMs to generate impostors to control both topic and genre
             - "naive_llm": use a naive LLM approach to generate impostors
             - "text_len": generate impostors of similar length from a predefined dataset (our baseline w/o reference, default)
             - "fixed": use a fixed set of impostors (Koppel et. A. (2014), not implemented yet), impostors are not related to the input text
-            - "on-the-fly": generate same-topic impostors on-the-fly (Koppel et. Al. (2014), not implemented yet)
-            - "blogs": use blogs to obtain same genre impostors (Koppel et. Al. (2014), not implemented yet)
+            - "on-the-fly": generate same-topic impostors on-the-fly (Koppel et al. (2014), not implemented yet)
+            - "blogs": use blogs to obtain same genre impostors (Koppel et al. (2014), not implemented yet)
         :param path2imp: path to the impostor file, where fixed impostors are saved or where to save generated impostors
         :param real_time_generation: whether to generate impostors in real-time or use pre-generated ones (default: False, i.e. use pre-generated impostors)
-        :param min_n_tokens: minimum number of tokens to consider input sequence valid, defaults to 500 (Bevendorff et Al. (2019): 500 words)
-        :param upsample: whether to upsample short texts (default: True, i.e. upsample acc. to Bevendorff (2019)) or skip them (Bevendorff et Al. (2019)/ Koppel et. Al (2014) at 500 words)
+        :param min_n_tokens: minimum number of tokens to consider input sequence valid, defaults to 500 (Bevendorff et al. (2019): 500 words)
+        :param upsample: whether to upsample short texts (default: True, i.e. upsample acc. to Bevendorff (2019)) or skip them (Bevendorff et al. (2019)/ Koppel et al (2014) at 500 words)
         """
 
         self.rounds = rounds
@@ -195,30 +195,30 @@ class ImpostorDetector(ImpostorBase):
         Called by get_score from detecor_base parent class to compute the score for the input text(s).
 
         Get scores for text pairs. A higher score indicates that the input text pair is more likely to be authored by the same author.
-        The algorithm stems from Koppel et Al. (2014)[, where some details are adapted from Kocher et Al. (2015)]:
+        The algorithm stems from Koppel et al. (2014)[, where some details are adapted from Kocher et al. (2015)]:
         Each text from the pair is the disputed text and the candidate text once.
         For the candidate text, a set of impostors is generated.
         For each round, a portion of features is randomly deleted, and the most similar candidate text is determined.
         The final score is the number of rounds where the candidate text was the most similar to the disputed text.
         The final score for a pair is the average of the scores for both directions (disputed text vs. candidate text and vice versa).
 
-        While Koppel et Al. (2014) use (1) a fixed set of impostor documents without realtion to document pair,
+        While Koppel et al. (2014) use (1) a fixed set of impostor documents without realtion to document pair,
         (2) on-the-fly generated same content impostor via Google search,
-        (3) Blogs to obtain same genre impostors, and Kocher et Al. (2015) use (4) a set of impostor documents based on the number of documents written by the author,
+        (3) Blogs to obtain same genre impostors, and Kocher et al. (2015) use (4) a set of impostor documents based on the number of documents written by the author,
         we define different techniques to generate impostors, which can be specified via the `technique` parameter in the `_get_impostors` method:
         We currently support:
         (1) `text_len`: generate impostors of similar length from a predefined dataset (default, see `_get_impostors` method).
-        (2) `llm`: use LLMs to generate impostors, extension of Koppel et Al. (2014).
-        (3) `n_docs`: generate impostors based on the number of documents written by the author (TODO: not implemented yet), cf. Kocher et Al. (2015).
+        (2) `llm`: use LLMs to generate impostors, extension of Koppel et al. (2014).
+        (3) `n_docs`: generate impostors based on the number of documents written by the author (TODO: not implemented yet), cf. Kocher et al. (2015).
 
         TODO: If the score is above a certain threshold, the input text is classified as same-author, which is not implemented yet/ not the purpose of this method.
 
-        Koppel et Al. (2014) exclude texts shorter than 500 words.
-        Kocher et Al. (2015) exclude words appearing only once to prevent overfitting to words occuring only once.
-        Koppel et Al. (2014) select m most similar impostors in terms of min-max similarity as impostor candidates and then,
+        Koppel et al. (2014) exclude texts shorter than 500 words.
+        Kocher et al. (2015) exclude words appearing only once to prevent overfitting to words occuring only once.
+        Koppel et al. (2014) select m most similar impostors in terms of min-max similarity as impostor candidates and then,
         randomly select n actual impostors among potential impostors (because it has proven superior to using the top n impostors).
         They claim the approach is not sensitive to the choice of m and n.
-        Koppel et Al. (2014) compare using min-max and cosine simialrity.
+        Koppel et al. (2014) compare using min-max and cosine simialrity.
 
         References:
         ===========
@@ -242,7 +242,7 @@ class ImpostorDetector(ImpostorBase):
             len_ws_token_left = len(self.tokenize_whitespace(text_left))
             len_ws_token_right = len(self.tokenize_whitespace(text_right))
 
-            # check text length, if too short, i.e. less than 500 `words` (acc. to Koppel et. Al. (2014) -> invalid; acc. to Bevendorff (2019) -> upsample)
+            # check text length, if too short, i.e. less than 500 `words` (acc. to Koppel et al. (2014) -> invalid; acc. to Bevendorff (2019) -> upsample)
             if (
                 len_ws_token_left + len_ws_token_right < 2 * self.min_n_tokens
             ) and not self.upsample:  # skip
@@ -271,11 +271,11 @@ class ImpostorDetector(ImpostorBase):
                 )
 
             # TODO: preprocessing: remove punctuation, lowercasing, remove html tags (e.g., <nl>), etc.?
-            # Koppel et Al. (2014) do not normalize text pairs, but without normalization, the results are terrible.
+            # Koppel et al. (2014) do not normalize text pairs, but without normalization, the results are terrible.
             # Does not make sense, bc 	idiosyncrasies of authors are not captured when using stemmed text.
             # Kontrolliere Situation
 
-            # Koppel et Al. (2014) use documents of length 500 words exactly -> we DON'T crop at min_n_tokens to keep more information
+            # Koppel et al. (2014) use documents of length 500 words exactly -> we DON'T crop at min_n_tokens to keep more information
             # preprocess_text omits all layour/ structural information to keep only style
             tokens_left = self.tokenizer(self.preprocess_text(text_left))
             tokens_right = self.tokenizer(self.preprocess_text(text_right))
@@ -300,7 +300,7 @@ class ImpostorDetector(ImpostorBase):
             freqs_left = Counter(tokens_left)
             freqs_right = Counter(tokens_right)
 
-            # Kocher et Al. (2015) exclude words appearing only once
+            # Kocher et al. (2015) exclude words appearing only once
             freqs_left = Counter({k: v for k, v in freqs_left.items() if v > 1})
             freqs_right = Counter({k: v for k, v in freqs_right.items() if v > 1})
 
@@ -389,8 +389,8 @@ class ImpostorDetector(ImpostorBase):
     def normalize_text(self, text):
         """
         Normalize input text by lowercasing and stemming.
-        Koppel et Al. (2014) do (explicitly) not normalize text pairs, but without normalization, the results are terrible.
-        Kocher et Al. (2015) use isolated words without stemming but with punctuation symbols.
+        Koppel et al. (2014) do (explicitly) not normalize text pairs, but without normalization, the results are terrible.
+        Kocher et al. (2015) use isolated words without stemming but with punctuation symbols.
         """
         stemmer = SnowballStemmer("english")
         return " ".join(stemmer.stem(w) for w in text.lower().split())
@@ -408,7 +408,7 @@ class ImpostorDetector(ImpostorBase):
     def tokens_to_matrix(self, tokens, top_token_list):
         """
         Transform list of tokens into matrix of term tfidf values of the top tokens.
-        Koppel et Al. (2014) use space-free character 4-grams tfidf values to represent each document as a numerical vector.
+        Koppel et al. (2014) use space-free character 4-grams tfidf values to represent each document as a numerical vector.
 
         References:
         ===========
@@ -452,7 +452,7 @@ class ImpostorDetector(ImpostorBase):
     def tokenize_whitespace(text: str, normalize_ws: bool = True):
         """
         Tokenize input text by any whitespace character (including \n \r \t \f and spaces).
-        Kocher et Al. (2015) use isolated words without stemming but with punctuation symbols.
+        Kocher et al. (2015) use isolated words without stemming but with punctuation symbols.
 
         References:
         ===========

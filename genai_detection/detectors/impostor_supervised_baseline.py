@@ -17,12 +17,12 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
     """
     Supervised Impostor Baseline detector class.
 
-    This class extends the DetectorBase and implements a supervised baseline for the Impostor method by Koopel et. Al. (2014).
+    This class extends the DetectorBase and implements a supervised baseline for the Impostor method by Koopel et al. (2014).
     A document pair (i.e. disputed document and candidate author document) is represented as a vector of TF-IDF features.
     The frequenies are calculated based on the 100,000 most frequent space-free character 4-grams in the corpus.
     The representation of a text pair is the element-wise difference of the two TF-IDF vectors.
     Classification is carried out using a trained model, like a linear SVM.
-    Koppel et Al. (2014) have achieved (with a linear SVM) a maximum of an accuracy of 79.8% test set.
+    Koppel et al. (2014) have achieved (with a linear SVM) a maximum of an accuracy of 79.8% test set.
 
     References:
     ===========
