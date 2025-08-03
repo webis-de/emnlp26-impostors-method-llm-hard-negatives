@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 
 
-preproc_impact = pd.DataFrame(columns=["Student Essay", "Blog", "Gutenberg"])
+preproc_impact = pd.DataFrame(columns=["Student Essay", "Blog", "Gutenberg", "PAN20"])
 
 # student data
 path2student_essays = (
