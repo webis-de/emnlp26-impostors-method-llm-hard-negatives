@@ -114,7 +114,8 @@
 - [o] run `experiments/paraphrase_chunks.py`via `scripts/exp_chunks_paraphrasing.sh`
   - cancelled due to time limitations
   - trying to get parallelization working
-- [ ] run `impact_preprocessing.py` via `scripts/preprocessing_impact.sh`
+  - cannot download `SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")` or `gensim.downloader.load("glove-twitter-25")`
+- [o] run `impact_preprocessing.py` via `scripts/preprocessing_impact.sh`
   - [ ] run on cluster (PAN20, Student Essay, Blog, Gutenberg)
   - [x] run locally (Student Essay, Blog, Gutenberg)
 - [ ] OpenAI
