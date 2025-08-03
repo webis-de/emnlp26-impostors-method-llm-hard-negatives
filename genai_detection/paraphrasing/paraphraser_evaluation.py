@@ -13,6 +13,7 @@ from collections import defaultdict
 from itertools import chain, product
 from matplotlib import pyplot as plt
 import numpy as np
+import openai
 import pandas as pd
 import sklearn
 from word_mover_distance import model  # https://pypi.org/project/word-mover-distance/
@@ -305,7 +306,15 @@ class ParaphrasingEvaluator:
             time_match = self._similar(century, gt_century)
             topic_match = self._degree_of_similarity(str(gt_topic).lower(), extra)
 
-            paraphrase = paraphraser.paraphrase(text=text, temperature=self.temperature)
+            try:
+                paraphrase = paraphraser.paraphrase(
+                    text=text, temperature=self.temperature
+                )
+            except (
+                openai.BadRequestError
+            ) as e:  # e.g. Internal Server Error for https://zephyr-7b-llm.srv.webis.de/api/chat
+                paraphrase = None
+
             if (
                 paraphrase
                 and isinstance(paraphrase, (list, tuple))
