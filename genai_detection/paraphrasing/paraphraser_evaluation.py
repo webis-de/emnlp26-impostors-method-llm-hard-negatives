@@ -122,21 +122,26 @@ class ParaphrasingEvaluator:
         print(f"Using device: {device}")
         # FIXME: NotImplementedError: Cannot copy out of meta tensor; no data! Please use torch.nn.Module.to_empty() instead of torch.nn.Module.to() when moving module from meta to a different device.
 
-        try:
-            self.sbert_model = SentenceTransformer(
-                "sentence-transformers/all-MiniLM-L6-v2"
-            )  # for cosine similarity
-        except Exception as e:
-            logger.error(
-                "Failed to load SentenceTransformer model. Setting it to None."
-            )
-            logger.exception(e)
-            self.sbert_model = None
+        tries = 0
+        while not self.sbert_model and tries < 3:
+            try:
+                self.sbert_model = SentenceTransformer(
+                    "sentence-transformers/all-MiniLM-L6-v2"
+                )  # for cosine similarity
+            except Exception as e:
+                print("Failed to load SentenceTransformer model. Setting it to None.")
+                tries += 1
         # https://pypi.org/project/word-mover-distance/ Word Mover's Distance (WMD)
         print("Loading pre-trained word vectors for WMD...")
-        self.pretr_word_model = WMDReadyKeyedVectors(
-            gensim.downloader.load("glove-twitter-25")
-        )
+        tries = 0
+        while not self.pretr_word_model and tries < 3:
+            try:
+                self.pretr_word_model = WMDReadyKeyedVectors(
+                    gensim.downloader.load("glove-twitter-25")
+                )
+            except Exception as e:
+                print("Failed to load gensim glove-twitter-25. Retrying...")
+                tries += 1
         self.wmd_model = model.WordEmbedding(model=self.pretr_word_model)
         self.config = config
         self.base_dirs = {
