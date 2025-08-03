@@ -66,6 +66,9 @@ class VisDetectors:
         :return: A formatted title string excluding path2imp, because paths are too long.
         """
         assert isinstance(kwargs, dict), "kwargs must be a dictionary"
+        assert (
+            kwargs.get("dataset_name", self.dataset_name) == self.dataset_name
+        ), f"dataset parameter from kwargs ({kwargs.get('dataset')}) must match self.dataset_name ({self.dataset_name})"
         assert len(base) > 0, "Base title must not be empty"
         items = [
             f"{k}={v:.2f}" if (isinstance(v, float) or k == "threshold") else f"{k}={v}"
@@ -114,7 +117,6 @@ class VisDetectors:
                     impostor_detector=detector,
                     train_dataset=train_dataset,
                     test_dataset=test_dataset,
-                    dataset_name=self.dataset_name,
                 )
             elif isinstance(detector, UnmaskingDetector):
                 self.plot_unmasking_curves(
@@ -181,7 +183,6 @@ class VisDetectors:
         impostor_detector,
         train_dataset: pd.DataFrame,
         test_dataset: pd.DataFrame,
-        dataset_name: str,
     ) -> None:
         """
         Visualizes the impostor detection results.
@@ -191,7 +192,6 @@ class VisDetectors:
             train_dataset (pd.DataFrame): The training dataset.
             test_dataset (pd.DataFrame): The test dataset.
             impostor_detector (ImpostorDetector): The impostor detector to use.
-            dataset_name (str): The name of the dataset for visualization.
         """
         with ProcessPoolExecutor() as executor:
             train_dataset["impostor_score"] = list(
@@ -206,7 +206,7 @@ class VisDetectors:
             "impostor_technique": impostor_detector.impostor_technique,
             "upsample": impostor_detector.upsample,
             "n_impostors": impostor_detector.n_impostors,
-            "dataset": dataset_name,
+            "dataset_name": self.dataset_name,
         }
         fpr, tpr, thresholds, best_f1_thres = self.plot_decision_threshold_impostor(
             scores=train_dataset["impostor_score"],
@@ -377,11 +377,11 @@ class VisDetectors:
         """
         assert isinstance(title_kwargs, dict), "title_kwargs must be a dictionary"
         sys.path.append(os.path.abspath(".."))
-        save_path = (
-            self.savefig_base
-            / "impostor_scores"
-            / title_kwargs.get("dataset", "unknown")
-        )
+        dataset_name = title_kwargs.get("dataset_name", self.dataset_name)
+        assert (
+            dataset_name == self.dataset_name
+        ), "dataset_name must match self.dataset_name"
+        save_path = self.savefig_base / "impostor_scores" / dataset_name
 
         # pd.Series to numpy arrays
         labels = labels.values
@@ -500,7 +500,7 @@ class VisDetectors:
         )
         axes[0, 1].set_title(title, fontsize=10)
         axes[0, 1].grid(True)
-        if self.dataset_name == CONFIG.BLOG:
+        if dataset_name == CONFIG.BLOG:
             axes[0, 1].axhline(
                 y=0.874,
                 linestyle="--",
@@ -524,7 +524,7 @@ class VisDetectors:
                 fontsize=10,
             )
             axes[0, 1].legend()
-        elif self.dataset_name == CONFIG.STUDENT_ESSAYS:
+        elif dataset_name == CONFIG.STUDENT_ESSAYS:
             axes[0, 1].axhline(
                 y=0.731,
                 color="red",
@@ -578,12 +578,12 @@ class VisDetectors:
 
     #####################################################################################################################
     def _run_fig_2_worker(
-        self, n_imp, train_dataset, test_dataset, dataset_name, path2imp, args: dict
+        self, n_imp, train_dataset, test_dataset, path2imp, args: dict
     ):
         try:
             print(f"Using {n_imp} impostors from {path2imp}")
             precs, recs = self._fig_2_for_fixed_n_imposters(
-                train_dataset, test_dataset, dataset_name, path2imp, n_imp, args=args
+                train_dataset, test_dataset, path2imp, n_imp, args=args
             )
             return {"n_imp": n_imp, "precision": precs, "recall": recs}
         except Exception as e:
@@ -596,8 +596,13 @@ class VisDetectors:
         Visualizes the impostor detection results via Precision-Recall curves for different numbers of impostors (cf. Figure 2 from Koppel et al. (2014)).
         """
         assert isinstance(args, dict), "args must be a dictionary"
+        assert self.dataset_name in [
+            CONFIG.BLOG,
+            CONFIG.STUDENT_ESSAYS,
+        ], "This method is only implemented for BLOG and Student Essays datasets."
         train_dataset, test_dataset = self._load_datasets(balanced=True)
-        dataset_name = self.dataset_name
+        # could be initially different, bc args are from argparse which are irrespective from calling thsi function with defined dataset_name
+        args["dataset_name"] = self.dataset_name
         n_imp_options = [50, 500, 5000]
         precisions, recalls = {}, {}
         path2imp = (
@@ -613,7 +618,6 @@ class VisDetectors:
                     n_imp,
                     train_dataset,
                     test_dataset,
-                    dataset_name,
                     path2imp,
                     args,
                 ): n_imp
@@ -627,39 +631,44 @@ class VisDetectors:
                     recalls[result["n_imp"]] = result["recall"]
 
         fig = plt.figure(figsize=(10, 5))
-        for n_imp, precision in precisions.items():
+        for n_imp, precision in dict(
+            sorted(precisions.items())
+        ).items():  # start legend with 50, then 500, then 5000
             recall = recalls[n_imp]
             plt.plot(recall, precision, label="# impostors = " + str(n_imp))
         plt.ylim(0, 1)
         plt.gca().set_aspect("equal", "box")
-        plt.scatter(
-            0.34,
-            0.95,
-            marker="o",
-            color="red",
-            label=r"$\sigma*=unknown$, $50$ authors$^1$",
-        )
-        plt.scatter(
-            0.222,
-            0.902,
-            marker="x",
-            color="red",
-            label=r"$\sigma^*=0.8$, $500$ authors$^1$",
-        )
-        plt.annotate(
-            "1: Koppel et al. (2014)",
-            xy=(1.0, -0.2),
-            xycoords="axes fraction",
-            ha="right",
-            va="center",
-            fontsize=10,
-        )
+        if self.dataset_name == CONFIG.BLOG:
+            plt.scatter(
+                0.34,
+                0.95,
+                marker="o",
+                color="red",
+                label=r"$\sigma*=unknown$, $50$ authors$^1$",
+            )
+            plt.scatter(
+                0.222,
+                0.902,
+                marker="x",
+                color="red",
+                label=r"$\sigma^*=0.8$, $500$ authors$^1$",
+            )
+            plt.annotate(
+                "1: Koppel et al. (2014)/ Blog dataset",
+                xy=(1.0, -0.3),
+                xycoords="axes fraction",
+                ha="right",
+                va="center",
+                fontsize=10,
+            )
 
         plt.xlabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
         plt.ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
         title = self._format_title(base="Precision-Recall Curve", kwargs=args)
         plt.title(title)
-        plt.legend()
+        plt.legend(
+            loc="center left", bbox_to_anchor=(1.0, 0.5), borderaxespad=0.0, fontsize=10
+        )
         plt.tight_layout()
         save_path = self.savefig_base / "impostor_scores" / self.dataset_name
         save_path.mkdir(parents=True, exist_ok=True)
@@ -673,7 +682,7 @@ class VisDetectors:
         plt.close(fig)
 
     def _fig_2_for_fixed_n_imposters(
-        self, train_dataset, test_dataset, dataset_name, path2imp, n_imp, args: dict
+        self, train_dataset, test_dataset, path2imp, n_imp, args: dict
     ):
         assert isinstance(args, dict), "args must be a dictionary"
         impostor_detector = ImpostorDetector(
@@ -755,9 +764,7 @@ class VisDetectors:
         return precision, recall
 
     #################################################################################
-    def _run_fig_4_worker(
-        self, imp_gen, train_dataset, test_dataset, dataset_name, path2imp
-    ):
+    def _run_fig_4_worker(self, imp_gen, train_dataset, test_dataset, path2imp):
         try:
             print(
                 f"Using {imp_gen} impostor generation with path to imposters: {path2imp}"
@@ -775,7 +782,10 @@ class VisDetectors:
                 train_dataset["impostor_score"] = list(
                     executor.map(impostor_detector.get_score, train_dataset["pair"])
                 )
-            print("Calculated impostor scores on training data.")
+            print(
+                "Calculated impostor scores on training data for imposter generation:",
+                imp_gen,
+            )
 
             # find threshold that best separates impostors from non-impostors in the training set (targets are in the 'same' column)
             args = {
@@ -785,7 +795,7 @@ class VisDetectors:
                 "upsample": impostor_detector.upsample,
                 "n_impostors": impostor_detector.n_impostors,
             }
-            args["dataset"] = dataset_name
+            args["dataset_name"] = self.dataset_name
             fpr, tpr, thresholds, best_f1_thres = self.plot_decision_threshold_impostor(
                 scores=train_dataset["impostor_score"],
                 labels=train_dataset["same"],
@@ -850,7 +860,8 @@ class VisDetectors:
         """
         assert isinstance(args, dict), "args must be a dictionary"
         train_dataset, test_dataset = self._load_datasets(balanced=True)
-        dataset_name = self.dataset_name
+        # could be initially different, bc args are from argparse which are irrespective from calling thsi function with defined dataset_name
+        args["dataset_name"] = self.dataset_name
         imp_gen_options = ["fixed", "on-the-fly"]
         baselines = [
             "unsupervised baseline min-max",
@@ -872,7 +883,6 @@ class VisDetectors:
                     imp_gen,
                     train_dataset,
                     test_dataset,
-                    dataset_name,
                     path2imp,
                 ): imp_gen
                 for imp_gen in imp_gen_options
@@ -916,6 +926,7 @@ class VisDetectors:
                 )
                 train_dataset, test_dataset = self._load_datasets(balanced=True)
                 preds = baseline.get_prediction(test_dataset["pair"])
+
             test_dataset[f"{baseline_name.replace(' ','_')}_score"] = preds
 
             # both same and different author pairs
@@ -933,6 +944,15 @@ class VisDetectors:
                     f"{baseline_name.replace(' ','_')}_score"
                 ],
             )
+            print(
+                "Number of same author pairs:", len(test_dataset[test_dataset["same"]])
+            )
+            print(
+                "Number of same author precisions/recalls:",
+                len(precision),
+                "/",
+                len(recall),
+            )
             same_author_precisions[baseline_name.replace(" ", "_")] = precision
             same_author_recalls[baseline_name.replace(" ", "_")] = recall
 
@@ -942,6 +962,16 @@ class VisDetectors:
                 test_dataset[~test_dataset["same"]][
                     f"{baseline_name.replace(' ','_')}_score"
                 ],
+            )
+            print(
+                "Number of different author pairs:",
+                len(test_dataset[~test_dataset["same"]]),
+            )
+            print(
+                "Number of different author precisions/recalls:",
+                len(precision),
+                "/",
+                len(recall),
             )
             different_author_precisions[baseline_name.replace(" ", "_")] = precision
             different_author_recalls[baseline_name.replace(" ", "_")] = recall
