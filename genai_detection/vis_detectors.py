@@ -58,13 +58,15 @@ class VisDetectors:
         self.detectors = detectors if detectors is not None else []
         self.savefig_base = Path(__file__).resolve().parent.parent / CONFIG.SAVE_PATH
 
-    def _format_title(self, base, kwargs):
+    def _format_title(self, base: str, kwargs: dict) -> str:
         """
         Formats the title for the plots.
         :param base: The base title.
         :param kwargs: Additional keyword arguments to include in the title. Structured as a dictionary.
         :return: A formatted title string excluding path2imp, because paths are too long.
         """
+        assert isinstance(kwargs, dict), "kwargs must be a dictionary"
+        assert len(base) > 0, "Base title must not be empty"
         items = [
             f"{k}={v:.2f}" if (isinstance(v, float) or k == "threshold") else f"{k}={v}"
             for k, v in kwargs.items()
@@ -593,10 +595,11 @@ class VisDetectors:
             return None
 
     # ugly, but only for reproduction of Figure 2 from Koppel et al. (2014)
-    def reproduce_fig2_prec_recall_dif_n_imp(self) -> None:
+    def reproduce_fig2_prec_recall_dif_n_imp(self, args: dict) -> None:
         """
         Visualizes the impostor detection results via Precision-Recall curves for different numbers of impostors (cf. Figure 2 from Koppel et al. (2014)).
         """
+        assert isinstance(args, dict), "args must be a dictionary"
         train_dataset, test_dataset = self._load_datasets(balanced=True)
         dataset_name = self.dataset_name
         n_imp_options = [50, 500, 5000]
@@ -664,7 +667,7 @@ class VisDetectors:
         for format in ["svg"]:  # "png",
             figure_name = (
                 f"roc_prec_recall_curve_dif_n_imp.{format}"
-                if not args
+                if len(args.keys()) == 0
                 else f"roc_prec_recall_curve_r{args['rounds']}_top{args['top_n']}_dif_n_imp.{format}"
             )
             savefig = os.path.join(
@@ -844,10 +847,11 @@ class VisDetectors:
             return None
 
     # ugly, but only for reproduction of Figure 4 a, b from Koppel et al. (2014)
-    def reproduce_fig4_prec_recall_dif_imp_appr(self) -> None:
+    def reproduce_fig4_prec_recall_dif_imp_appr(self, args: dict) -> None:
         """
         Visualizes the impostor detection results via Precision-Recall curves for different impostor generation techniques (cf. Figures 4 a, b from Koppel et al. (2014)).
         """
+        assert isinstance(args, dict), "args must be a dictionary"
         train_dataset, test_dataset = self._load_datasets(balanced=True)
         dataset_name = self.dataset_name
         imp_gen_options = ["fixed", "on-the-fly"]
@@ -982,7 +986,7 @@ class VisDetectors:
             for format in ["svg"]:  # "png",
                 figure_name = (
                     f"roc_prec_recall_curve_dif_{kind.replace(' ', '_')}_imp_gen.{format}"
-                    if not args
+                    if len(args.keys()) == 0
                     else f"roc_prec_recall_curve_r{args['rounds']}_top{args['top_n']}_{kind.replace(' ', '_')}_dif_imp_gen.{format}"
                 )
                 savefig = os.path.join(
@@ -1084,8 +1088,8 @@ if __name__ == "__main__":
         detectors=[impostor],
     )
     print("impostor Detector initialized.")
-    # vis_det.reproduce_fig2_prec_recall_dif_n_imp()
-    vis_det.reproduce_fig4_prec_recall_dif_imp_appr()
+    # vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=vars(args))
+    vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=vars(args))
     print("Finished reproducing Figure 2 from Koppel et al. (2014) on BLOG data.")
 
     vis_det = VisDetectors(
@@ -1093,6 +1097,6 @@ if __name__ == "__main__":
         detectors=[impostor],
     )
     print("impostor Detector initialized.")
-    # vis_det.reproduce_fig2_prec_recall_dif_n_imp()
-    vis_det.reproduce_fig4_prec_recall_dif_imp_appr()
+    # vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=vars(args))
+    vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=vars(args))
     print("Finished reproducing Figure 2 from Koppel et al. (2014) on STUDENT data.")
