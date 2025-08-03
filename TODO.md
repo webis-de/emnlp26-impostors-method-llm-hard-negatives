@@ -118,6 +118,7 @@
 - [o] run `impact_preprocessing.py` via `scripts/preprocessing_impact.sh`
   - [ ] run on cluster (PAN20, Student Essay, Blog, Gutenberg)
   - [x] run locally (Student Essay, Blog, Gutenberg)
+- [ ] run `genai_detection/vis_detectors.py`via `scripts/vis_detectors.sh` on cluster again, bc annotation changed
 - [ ] OpenAI
 - [ ] lowercasing texts for unmasking or other AV/AA: 
     - Yes: [Janek's Two Paradigms of LLM Detection: AA vs. AV pg. 3768 left 1st paragraph](https://aclanthology.org/2025.findings-acl.194.pdf), [Janek's BA pg. 11](https://downloads.webis.de/theses/papers/bevendorff_2016.pdf)
