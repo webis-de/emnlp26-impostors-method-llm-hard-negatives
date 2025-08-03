@@ -79,7 +79,7 @@ train_dir = os.path.join(
 test_dir = os.path.join(path2pan20base, "pan20-authorship-verification-test-dataset")
 
 
-def _load_texts_from_directory(self, directory_path: str):
+def _load_texts_from_directory(directory_path: str):
     pair_name = "pan20-authorship-verification-test.jsonl"
     if not os.path.exists(os.path.join(directory_path, pair_name)):
         pair_name = "pan20-authorship-verification-training-small.jsonl"
