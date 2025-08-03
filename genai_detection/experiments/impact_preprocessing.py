@@ -372,6 +372,9 @@ ax2.set_xticklabels(preproc_impact.index, rotation=45)
 
 # Only show the legend once
 ax2.legend(loc="lower right")
+for ax in [ax1, ax2]:
+    ax.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.6)
+
 
 plt.tight_layout()
 plt.savefig(
