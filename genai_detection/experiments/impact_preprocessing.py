@@ -84,7 +84,7 @@ def _load_texts_from_directory(directory_path: str):
     if not os.path.exists(os.path.join(directory_path, pair_name)):
         pair_name = "pan20-authorship-verification-training-small.jsonl"
     pairs = _load_jsonl(os.path.join(directory_path, pair_name))
-    texts = [[pair[0], pair[1]] for pair in pairs["pair"]]
+    texts = [[pair["pair"][0], pair["pair"][1]] for pair in pairs]
 
     return [item for sublist in texts for item in sublist]
 
