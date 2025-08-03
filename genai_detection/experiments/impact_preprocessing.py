@@ -25,6 +25,7 @@ path2student_essays = (
     / CONFIG.DATA_BASE_PATH
     / "student_essays/Intro2006"
 )
+assert path2student_essays.exists(), f"Path {path2student_essays} does not exist."
 student_essay_loader = StudentEssayDatasetLoader(path=path2student_essays)
 student_essay_df = student_essay_loader._load_student_essays(min_num_words=0)[
     ["text", "task"]
@@ -49,8 +50,11 @@ print(f"Blog dataset: {len(blog_texts)} texts")
 
 # Gutenberg dataset
 path2gutenberg = (
-    Path(__file__).resolve().parent.parent / CONFIG.DATA_BASE_PATH / "gutenberg/"
+    Path(__file__).resolve().parent.parent.parent / CONFIG.DATA_BASE_PATH / "gutenberg/"
 )
+assert (
+    path2gutenberg.exists()
+), f"Gutenberg dataset path {path2gutenberg} does not exist."
 gutenberg_texts = []
 for file in path2gutenberg.glob("*.txt"):
     if "Complete_Works_of_William_Shakespeare" in file.name:
@@ -66,6 +70,7 @@ path2pan20base = (
     / CONFIG.DATA_BASE_PATH
     / "pan20-authorship-verification/"
 )
+assert path2pan20base.exists(), f"PAN 20 dataset path {path2pan20base} does not exist."
 
 
 def _load_jsonl(path: str):
@@ -313,11 +318,12 @@ preproc_impact.loc["8 lowercase"] = [
     step8_pan_length,
 ]
 
+save_path = (
+    Path(__file__).resolve().parent.parent.parent / CONFIG.SAVE_PATH / "datasets"
+)
+save_path.mkdir(parents=True, exist_ok=True)
 preproc_impact.to_csv(
-    Path(__file__).resolve().parent.parent
-    / CONFIG.SAVE_PATH
-    / "datasets"
-    / "preprocessed_steps_impact.csv",
+    save_path / "preprocessed_steps_impact.csv",
     index_label="step",
 )
 
