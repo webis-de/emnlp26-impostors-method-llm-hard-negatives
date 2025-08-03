@@ -21,7 +21,7 @@ preproc_impact = pd.DataFrame(columns=["Student Essay", "Blog", "Gutenberg"])
 
 # student data
 path2student_essays = (
-    Path(__file__).resolve().parent.parent
+    Path(__file__).resolve().parent.parent.parent
     / CONFIG.DATA_BASE_PATH
     / "student_essays/Intro2006"
 )
@@ -37,7 +37,7 @@ print(f"student essay dataset: {len(student_essay_texts)} texts")
 
 # Blog dataset
 path2blog = (
-    Path(__file__).resolve().parent.parent
+    Path(__file__).resolve().parent.parent.parent
     / CONFIG.DATA_BASE_PATH
     / "Blog_corpus/blogtext.csv"
 )
@@ -62,7 +62,7 @@ print(f"Gutenberg dataset: {len(gutenberg_texts)} texts")
 
 # PAN 20 dataset
 path2pan20base = (
-    Path(__file__).resolve().parent.parent
+    Path(__file__).resolve().parent.parent.parent
     / CONFIG.DATA_BASE_PATH
     / "pan20-authorship-verification/"
 )
