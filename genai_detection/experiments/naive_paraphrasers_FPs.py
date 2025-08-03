@@ -118,7 +118,12 @@ def _compute_score(detector, row: collections.OrderedDict) -> tuple[int, float]:
     original_text = row["disputed_text"]
     paraphrased_text = row["candidate_text"]
     score = detector.get_score([original_text, paraphrased_text], normalize=False)
-    return row.Index, np.round(score, 2)  # return index + score
+    try:
+        id = row["Index"]
+    except Exception as e:
+        print(f"Error getting index from row: {e}")
+        print(f"Row keys: {row.keys()}")
+    return id, np.round(score, 2)  # return index + score
 
 
 def get_detector_scores(
