@@ -123,6 +123,7 @@ class ParaphrasingEvaluator:
         # FIXME: NotImplementedError: Cannot copy out of meta tensor; no data! Please use torch.nn.Module.to_empty() instead of torch.nn.Module.to() when moving module from meta to a different device.
 
         tries = 0
+        self.sbert_model = None
         while not self.sbert_model and tries < 3:
             try:
                 self.sbert_model = SentenceTransformer(
@@ -134,6 +135,7 @@ class ParaphrasingEvaluator:
         # https://pypi.org/project/word-mover-distance/ Word Mover's Distance (WMD)
         print("Loading pre-trained word vectors for WMD...")
         tries = 0
+        self.pretr_word_model = None
         while not self.pretr_word_model and tries < 3:
             try:
                 self.pretr_word_model = WMDReadyKeyedVectors(
