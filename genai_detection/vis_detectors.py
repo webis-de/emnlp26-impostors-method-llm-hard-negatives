@@ -578,16 +578,12 @@ class VisDetectors:
 
     #####################################################################################################################
     def _run_fig_2_worker(
-        self, n_imp, train_dataset, test_dataset, dataset_name, path2imp
+        self, n_imp, train_dataset, test_dataset, dataset_name, path2imp, args: dict
     ):
         try:
             print(f"Using {n_imp} impostors from {path2imp}")
             precs, recs = self._fig_2_for_fixed_n_imposters(
-                train_dataset,
-                test_dataset,
-                dataset_name,
-                path2imp,
-                n_imp,
+                train_dataset, test_dataset, dataset_name, path2imp, n_imp, args=args
             )
             return {"n_imp": n_imp, "precision": precs, "recall": recs}
         except Exception as e:
@@ -619,6 +615,7 @@ class VisDetectors:
                     test_dataset,
                     dataset_name,
                     path2imp,
+                    args,
                 ): n_imp
                 for n_imp in n_imp_options
             }
@@ -677,8 +674,9 @@ class VisDetectors:
         plt.close(fig)
 
     def _fig_2_for_fixed_n_imposters(
-        self, train_dataset, test_dataset, dataset_name, path2imp, n_imp
+        self, train_dataset, test_dataset, dataset_name, path2imp, n_imp, args: dict
     ):
+        assert isinstance(args, dict), "args must be a dictionary"
         impostor_detector = ImpostorDetector(
             impostor_technique="fixed",
             n_impostors=n_imp,
@@ -1083,13 +1081,14 @@ if __name__ == "__main__":
     # vis_det.visualize(balanced=args.balanced)
 
     # ugly, but only for reproduction of Figure 2 from Koppel et al. (2014)
+    args = vars(args)  # namespace to dict conversion
     vis_det = VisDetectors(
         dataset_name=CONFIG.BLOG,
         detectors=[impostor],
     )
     print("impostor Detector initialized.")
-    vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=vars(args))
-    # vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=vars(args))
+    vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
+    # vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args)
     print("Finished reproducing Figure 2 from Koppel et al. (2014) on BLOG data.")
 
     vis_det = VisDetectors(
@@ -1097,6 +1096,6 @@ if __name__ == "__main__":
         detectors=[impostor],
     )
     print("impostor Detector initialized.")
-    vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=vars(args))
-    # vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=vars(args))
+    vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
+    # vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args)
     print("Finished reproducing Figure 2 from Koppel et al. (2014) on STUDENT data.")
