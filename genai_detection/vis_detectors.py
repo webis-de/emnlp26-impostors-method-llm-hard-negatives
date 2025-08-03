@@ -264,7 +264,7 @@ class VisDetectors:
             save_path.mkdir(parents=True, exist_ok=True)
             for format in ["svg"]:  # "png",
                 print(f"Saving confusion matrix to {save_path / filename}.{format}")
-                plt.savefig((save_path / filename).with_suffix(f".{format}"))
+                plt.savefig(save_path / f"{filename}.{format}")
             plt.close()
 
     def plot_unmasking_curves(
@@ -306,7 +306,7 @@ class VisDetectors:
         save_path = self.savefig_base / "unmasking_curves" / dataset_name
         save_path.mkdir(parents=True, exist_ok=True)
         filename = title.replace("\n", "_").replace(" ", "_")
-        plt.savefig((save_path / filename).with_suffix(".svg"))
+        plt.savefig(save_path / f"{filename}.svg")
         plt.close()
 
     def load_data(self, split: Literal["train", "test", "val"]):
@@ -375,13 +375,13 @@ class VisDetectors:
         :param title_kwargs: Additional keyword arguments for the plot title.
         :return: fpr, tpr, roc_thresholds, best threshold for F1 score.
         """
+        assert isinstance(title_kwargs, dict), "title_kwargs must be a dictionary"
         sys.path.append(os.path.abspath(".."))
         save_path = (
             self.savefig_base
             / "impostor_scores"
             / title_kwargs.get("dataset", "unknown")
         )
-        save_path.mkdir(parents=True, exist_ok=True)
 
         # pd.Series to numpy arrays
         labels = labels.values
@@ -447,14 +447,14 @@ class VisDetectors:
         plt.title(title)
         plt.legend()
         plt.tight_layout()
+        save_path.mkdir(parents=True, exist_ok=True)
         for format in ["svg"]:  # "png",
             figure_name = (
                 f"roc_prec_recall_curve.{format}"
                 if not title_kwargs
                 else f"roc_prec_recall_curve_r{title_kwargs['rounds']}_top{title_kwargs['top_n']}_n_imp{title_kwargs['n_impostors']}.{format}"
             )
-            savefig = os.path.join(save_path, figure_name)
-            plt.savefig(savefig)
+            plt.savefig(save_path / figure_name)
         plt.close(fig)
 
         # Threshold vs (1) F1 score, (2) Accuracy, (3) Precision, (4) Recall
@@ -566,12 +566,12 @@ class VisDetectors:
         axes[1, 1].set_title(title, fontsize=10)
         axes[1, 1].grid(True)
 
+        save_path.mkdir(parents=True, exist_ok=True)
         for format in ["svg"]:  # "png",
             filename = f"thres_vs_f1_acc_prec_recall.{format}"
             if title_kwargs:
                 filename = f"thres_vs_f1_acc_prec_recall_r{title_kwargs['rounds']}_top{title_kwargs['top_n']}_n_imp{title_kwargs['n_impostors']}.{format}"
-            savefig = os.path.join(save_path, filename)
-            plt.savefig(savefig)
+            plt.savefig(save_path / filename)
 
         plt.close(fig)
         return fpr, tpr, roc_thresholds, thresholds[1:-1][np.argmax(f1s[1:-1])]
@@ -661,16 +661,15 @@ class VisDetectors:
         plt.title(title)
         plt.legend()
         plt.tight_layout()
+        save_path = self.savefig_base / "impostor_scores" / self.dataset_name
+        save_path.mkdir(parents=True, exist_ok=True)
         for format in ["svg"]:  # "png",
             figure_name = (
                 f"roc_prec_recall_curve_dif_n_imp.{format}"
                 if len(args.keys()) == 0
                 else f"roc_prec_recall_curve_r{args['rounds']}_top{args['top_n']}_dif_n_imp.{format}"
             )
-            savefig = os.path.join(
-                self.savefig_base / "impostor_scores" / self.dataset_name, figure_name
-            )
-            plt.savefig(savefig)
+            plt.savefig(save_path / figure_name)
         plt.close(fig)
 
     def _fig_2_for_fixed_n_imposters(
@@ -751,7 +750,7 @@ class VisDetectors:
             save_path.mkdir(parents=True, exist_ok=True)
             for format in ["svg"]:  # "png",
                 print(f"Saving confusion matrix to {save_path / filename}.{format}")
-                plt.savefig((save_path / filename).with_suffix(f".{format}"))
+                plt.savefig(save_path / f"{filename}.{format}")
             plt.close()
         return precision, recall
 
@@ -981,17 +980,15 @@ class VisDetectors:
             plt.title(title)
             plt.legend()
             plt.tight_layout()
+            save_path = self.savefig_base / "impostor_scores" / self.dataset_name
+            save_path.mkdir(parents=True, exist_ok=True)
             for format in ["svg"]:  # "png",
                 figure_name = (
                     f"roc_prec_recall_curve_dif_{kind.replace(' ', '_')}_imp_gen.{format}"
                     if len(args.keys()) == 0
                     else f"roc_prec_recall_curve_r{args['rounds']}_top{args['top_n']}_{kind.replace(' ', '_')}_dif_imp_gen.{format}"
                 )
-                savefig = os.path.join(
-                    self.savefig_base / "impostor_scores" / self.dataset_name,
-                    figure_name,
-                )
-                plt.savefig(savefig)
+                plt.savefig(save_path / figure_name)
             plt.close(fig)
 
 
