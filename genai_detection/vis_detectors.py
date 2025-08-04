@@ -919,13 +919,15 @@ class VisDetectors:
             ],
         ):
             try:
-                preds = baseline.get_prediction(test_dataset["pair"])
+                preds = baseline.get_score(test_dataset["pair"])
+                # get_prediction(test_dataset["pair"])
             except Exception as e:
                 print(
                     f"[ERROR] Failed for baseline {baseline_name}:\n{e}\n{traceback.format_exc()}\nReloading datasets..."
                 )
                 train_dataset, test_dataset = self._load_datasets(balanced=True)
-                preds = baseline.get_prediction(test_dataset["pair"])
+                preds = baseline.get_score(test_dataset["pair"])
+                # get_prediction(test_dataset["pair"])
 
             test_dataset[f"{baseline_name.replace(' ','_')}_score"] = preds
 
