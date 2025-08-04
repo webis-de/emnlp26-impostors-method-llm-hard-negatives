@@ -384,7 +384,7 @@ for ax in [ax1, ax2]:
 
 plt.tight_layout()
 plt.savefig(
-    Path(__file__).resolve().parent.parent
+    Path(__file__).resolve().parent.parent.parent
     / CONFIG.SAVE_PATH
     / "datasets"
     / "impact_preprocessing_steps.svg",
