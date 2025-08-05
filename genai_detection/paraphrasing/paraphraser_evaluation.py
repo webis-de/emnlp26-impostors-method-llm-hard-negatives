@@ -781,7 +781,7 @@ class ParaphrasingEvaluator:
         paraphrase: str,
         original_split: List[str],
         bert_scores: dict,
-        rouge_score: dict,
+        rouge_scores: dict,
         idx: int,
     ) -> dict:
         """
@@ -825,10 +825,10 @@ class ParaphrasingEvaluator:
             "meteor_score": meteor_score.single_meteor_score(
                 original_split, paraphrase.split()
             ),  # in [0, 1]
-            "rouge1": rouge_score["rouge1"],  # syntactic similarity metric # in [0, 1]
-            "rouge2": rouge_score["rouge2"],  # in [0, 1]
-            "rougeL": rouge_score["rougeL"],  # syntactic similarity metric # in [0, 1]
-            "rougeLsum": rouge_score["rougeLsum"],  # in [0, 1]
+            "rouge1": rouge_scores["rouge1"],  # syntactic similarity metric # in [0, 1]
+            "rouge2": rouge_scores["rouge2"],  # in [0, 1]
+            "rougeL": rouge_scores["rougeL"],  # syntactic similarity metric # in [0, 1]
+            "rougeLsum": rouge_scores["rougeLsum"],  # in [0, 1]
             # bertscore metrics in range [0, 1] cf. https://docs.kolena.com/metrics/bertscore/ (03.07.2025)
             "bertscore_precision": bert_scores["precision"][
                 idx
