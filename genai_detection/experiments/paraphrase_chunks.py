@@ -22,6 +22,7 @@ import seaborn as sns
 from matplotlib import cm
 from matplotlib.ticker import MaxNLocator
 from datasets import load_from_disk
+from genai_detection.util import preprocess_text as _preprocess_text
 
 nltk.download("punkt")
 from nltk.tokenize import sent_tokenize, word_tokenize
@@ -241,7 +242,9 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
                     for chunk_id, chunk in enumerate(chunks):
                         print(f"Paraphrasing chunk {chunk_id+1}/{len(chunks)}")
                         paraphrased_chunk = paraphraser.paraphrase(
-                            text=chunk, prompt=prompt, n_responses=n_responses
+                            text=chunk,
+                            prompt=prompt,
+                            n_responses=n_responses,  # TODO:, temperature=temperature
                         )[0]
                         rows.append(
                             {
@@ -258,6 +261,82 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
         text_paraphrases_df = pd.DataFrame(rows)
         # Save the results for this text
         text_paraphrases_df.to_csv(save_path / f"text_{i}_paraphrases.csv", index=False)
+
+
+def evaluate_paraphrases(
+    path2dataset: str, save_path: Path
+) -> Dict[str, List[pd.DataFrame]]:
+    assert os.path.exists(path2dataset), f"Dataset path {path2dataset} does not exist."
+
+    # iterate over all csv file containing paraphrases
+    rows = []  # of dicts
+    for paraphrases_file in tqdm(
+        path2dataset.glob("*.csv"), desc="Evaluating paraphrases"
+    ):
+        # paraphases of one text
+        df = pd.read_csv(paraphrases_file)
+        text_id = paraphrases_file.stem.split("_")[1]  # e.g. text_0_paraphrases.csv
+        original_text = _preprocess_text(df["original_text"].iloc[0])
+        paraphrase_evaluator = ParaphrasingEvaluator(
+            paraphrasers=get_paraphraser_dict(),
+            prompts=PROMPTS,
+            original_text=original_text,
+            n_responses=1,
+        )
+        for i in range(len(df)):
+            original_row = df.iloc[i]
+            paraphrased_chunk = _preprocess_text(df["paraphrased_chunk"].iloc[i])
+
+            try:
+                # input is list of strings, each string is a paraphrase/ reference
+                bert_scores = paraphrase_evaluator.bertscore.compute(
+                    predictions=paraphrased_chunk,
+                    references=original_text,
+                    model_type="distilbert-base-uncased",
+                )
+            except Exception as e:
+                print("[ERROR] BERTScore computation failed:", e)
+                bert_scores = {
+                    "precision": [0.0],
+                    "recall": [0.0],
+                    "f1": [0.0],
+                    "hashcode": "",
+                }
+            try:
+                # rouge returns one value for all paraphrases, hence: list comprehension
+                rouge_scores = [
+                    paraphrased_chunk.rouge_score.compute(
+                        predictions=[paraphrased_chunk], references=[original_text]
+                    )
+                ]
+            except Exception as e:
+                print("[ERROR] ROUGE computation failed:", e)
+                rouge_scores = [
+                    {
+                        "rouge1": 0.0,
+                        "rouge2": 0.0,
+                        "rougeL": 0.0,
+                        "rougeLsum": 0.0,
+                    }
+                ]
+
+            res = paraphrase_evaluator._build_result_row(
+                name=df["paraphraser"].iloc[0],
+                prompt=df["prompt"].iloc[0],
+                paraphrase=paraphrased_chunk,
+                original_split=original_text.split(),
+                bert_scores=bert_scores,
+                rouge_scores=rouge_scores,
+                i=0,
+            )
+            original_row.update(res)
+            original_row["text_id"] = text_id
+            rows.append(original_row)
+    df = pd.DataFrame(rows)
+    # Save the results to a CSV file
+    save_path.mkdir(parents=True, exist_ok=True)
+    df.to_csv(save_path / f"text_paraphrases_evaluation_results.csv", index=False)
+    return df
 
 
 def run_experiment(path2dataset: str) -> pd.DataFrame:
@@ -532,6 +611,15 @@ if __name__ == "__main__":
     print(
         f"Paraphrasers created and saved to {paraphrase_save_path}. Next, run the evaluation."
     )
+
+    results = evaluate_paraphrases(
+        path2dataset=paraphrase_save_path,
+        save_path=SAVE_PATH / "cross_genre",
+    )
+    print(
+        f"Evaluation results saved to {SAVE_PATH / 'cross_genre' / 'text_paraphrases_evaluation_results.csv'}."
+    )
+    print(results.head())
 
     # scores_per_text = run_experiment(
     #     path2dataset=args.path2dataset,
