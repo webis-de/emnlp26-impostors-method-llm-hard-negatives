@@ -216,7 +216,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
 
     # work on each text individually
     for i, original_text, category in enumerate(
-        zip(dataset["disputed_text"], dataset["category"]), desc="Processing texts"
+        zip(dataset["disputed_text"], dataset["category"])
     ):
         print(f"Processing text {i+1}/{len(dataset)}: {category}")
         text_paraphrases_df = pd.DataFrame()
