@@ -817,6 +817,7 @@ class VisDetectors:
                 top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
                 path2imp=path2imp,
                 upsample=False,
+                real_time_generation=True,  # otherwise on-the-fly generation is not possible
             )
             with ProcessPoolExecutor() as executor:
                 train_dataset["impostor_score"] = list(
@@ -1022,6 +1023,7 @@ class VisDetectors:
         # scores: non-thresholded measure of decisions, relative ranking of predictions
         # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.precision_recall_curve.html (05.06.2025)
 
+        line_styles = dict(zip(baselines, [":", "--", "-."]))
         for kind, data in zip(
             ["Complete", "Same Author", "Different Author"],
             [
@@ -1039,7 +1041,15 @@ class VisDetectors:
                     recall,
                     precision,
                     label=imp_gen,
-                    linestyle="-" if imp_gen in imp_gen_options else "--",
+                    linestyle=(
+                        "-"
+                        if imp_gen in imp_gen_options
+                        else (
+                            line_styles[imp_gen]
+                            if imp_gen in line_styles.keys()
+                            else "--"
+                        )
+                    ),
                 )
 
             plt.ylim(0, 1)
