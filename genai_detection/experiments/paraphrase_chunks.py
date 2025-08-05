@@ -327,7 +327,7 @@ def evaluate_paraphrases(
                 original_split=original_text.split(),
                 bert_scores=bert_scores,
                 rouge_scores=rouge_scores,
-                i=0,
+                idx=0,
             )
             original_row.update(res)
             original_row["text_id"] = text_id
