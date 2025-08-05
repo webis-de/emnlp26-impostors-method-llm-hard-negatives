@@ -692,11 +692,28 @@ class BlogImpostorGenerator(FixedImpostorGenerator):
 if __name__ == "__main__":
     # Literary impostors
     # artwork_name = "Frankenstein_Mary_Wollstonecraft_(Godwin)_Shelley.txt"
-    # # #"A_Midsummer_Nights_Dream_William_Shakespeare.txt"#"A_Lovers_Complaint_William_Shakespeare.txt"
-    # path2lovers_shakespeare = Path(CONFIG.PATH2GUTENBERG) / artwork_name
+    # #"A_Midsummer_Nights_Dream_William_Shakespeare.txt"#"A_Lovers_Complaint_William_Shakespeare.txt"
+    # path2lovers_shakespeare = Path(CONFIG.DATA_BASE_PATH) / "gutenberg" / artwork_name
     # with open(path2lovers_shakespeare) as f:
     #     input_text = f.read()
 
+    # generator = GoogleSearchImpostorGenerator(
+    #     api_key=CONFIG.SERPAPI_KEY,
+    #     num_queries=1,
+    #     results_per_query=25,
+    #     max_workers=2,
+    #     n_min_words=3,
+    #     n_max_words=5,
+    # )
+    # impostors = generator.generate_impostors(
+    #     input_text,
+    #     real_time_generation=True,
+    #     path2imp=Path(CONFIG.PATH2GENERIC_ON_FLY_IMP)
+    #     / f"impostor_{artwork_name}_results.csv",
+    # )
+    # print(f"Generated {len(impostors)} impostors for '{artwork_name}':")
+    # for impostor_name, impostor_text in impostors.items():
+    #     print(f"{impostor_name}: {impostor_text[:100]}...")
     # Blog impostors
     # split = 'test'  # or 'train'
     # ds = load_from_disk(CONFIG.PATH2BLOG)[split].to_pandas()
