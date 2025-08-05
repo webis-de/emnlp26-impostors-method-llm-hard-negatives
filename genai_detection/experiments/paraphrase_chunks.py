@@ -603,11 +603,11 @@ if __name__ == "__main__":
     # only create paraphrasers and save them
     paraphrase_save_path = SAVE_PATH / "cross_genre" / "paraphrases_per_text"
     paraphrase_save_path.mkdir(parents=True, exist_ok=True)
-    print(f"Creating and saving paraphrasers to {paraphrase_save_path}.")
-    create_and_save_paraphrasers(
-        path2dataset=args.path2dataset,
-        save_path=paraphrase_save_path,
-    )
+    # print(f"Creating and saving paraphrasers to {paraphrase_save_path}.")
+    # create_and_save_paraphrasers(
+    #     path2dataset=args.path2dataset,
+    #     save_path=paraphrase_save_path,
+    # )
     print(
         f"Paraphrasers created and saved to {paraphrase_save_path}. Next, run the evaluation."
     )
