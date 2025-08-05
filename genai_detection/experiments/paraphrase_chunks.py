@@ -199,10 +199,67 @@ def _evaluate_chunk(
     return df
 
 
+def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
+    """
+    Create paraphrasers and save them to the specified path.
+
+    :param path2dataset: Path to the cross-genre dataset.
+    :param save_path: Path to save the results.
+    """
+    assert os.path.exists(path2dataset), f"Dataset path {path2dataset} does not exist."
+    assert save_path.exists(), f"Save path {save_path} does not exist."
+    dataset = get_dataset(path2dataset)
+    n_responses = 1
+
+    # Initialize paraphrasers and prompts
+    paraphrasers = get_paraphraser_dict()
+
+    # work on each text individually
+    for i, original_text, category in enumerate(
+        zip(dataset["disputed_text"], dataset["category"]), desc="Processing texts"
+    ):
+        print(f"Processing text {i+1}/{len(dataset)}: {category}")
+        text_paraphrases_df = pd.DataFrame()
+        for num_chunks in tqdm(
+            range(1, 6), desc="Evaluating with different chunk sizes"
+        ):
+            chunks = split_text_into_chunks(original_text, n=num_chunks)
+            print(f"Number of chunks: {num_chunks}")
+            for paraphraser_name, paraphraser in paraphrasers.items():
+                print(f"Evaluating paraphraser: {paraphraser_name}")
+                for chunk_id, chunk in enumerate(chunks):
+                    print(f"Evaluating chunk {chunk_id+1}/{len(chunks)}")
+                    paraphrased_chunk = paraphraser.paraphrase(
+                        text=chunk, prompt=None, n_responses=n_responses
+                    )[0]
+                    text_paraphrases_df = pd.concat(
+                        [
+                            text_paraphrases_df,
+                            pd.DataFrame(
+                                {
+                                    "original_text": original_text,
+                                    "num_chunks": num_chunks,
+                                    "paraphraser": paraphraser_name,
+                                    "chunk_id": chunk_id,
+                                    "chunk": chunk,
+                                    "paraphrased_chunk": paraphrased_chunk,
+                                    "category": category,
+                                }
+                            ),
+                        ],
+                        ignore_index=True,
+                    )
+        # Save the results for this text
+        text_paraphrases_df.to_csv(save_path / f"text_{i}_paraphrases.csv", index=False)
+
+
 def run_experiment(path2dataset: str) -> pd.DataFrame:
     """
     Run the paraphrasing experiment on the cross-genre dataset.
     The results are saved in a CSV file.
+
+    :param path2dataset: Path to the cross-genre dataset.
+    :return: A dictionary with scores for each text.
     """
     assert os.path.exists(path2dataset), f"Dataset path {path2dataset} does not exist."
     dataset = get_dataset(path2dataset)
@@ -456,23 +513,36 @@ if __name__ == "__main__":
     # Run the experiment
     if not SAVE_PATH.exists():
         SAVE_PATH.mkdir(parents=True, exist_ok=True)
-    scores_per_text = run_experiment(
+
+    # only create paraphrasers and save them
+    paraphrase_save_path = SAVE_PATH / "cross_genre" / "paraphrases_per_text"
+    paraphrase_save_path.mkdir(parents=True, exist_ok=True)
+    print(f"Creating and saving paraphrasers to {paraphrase_save_path}.")
+    create_and_save_paraphrasers(
         path2dataset=args.path2dataset,
+        save_path=paraphrase_save_path,
     )
-
     print(
-        f"Obtained scores for {len(scores_per_text)} texts. Next, save them in parallel fashion."
+        f"Paraphrasers created and saved to {paraphrase_save_path}. Next, run the evaluation."
     )
-    save_textwise_chunk_scores(scores_per_text=scores_per_text, output_dir=SAVE_PATH)
 
-    print("Next, plot model metrics per text (parallel).")
-    with ProcessPoolExecutor() as executor:
-        futures = [
-            executor.submit(_process_df, item) for item in list(scores_per_text.items())
-        ]
-        for _ in tqdm(
-            as_completed(futures),
-            total=len(futures),
-            desc="Plotting model metrics per text",
-        ):
-            pass
+    # scores_per_text = run_experiment(
+    #     path2dataset=args.path2dataset,
+    # )
+
+    # print(
+    #     f"Obtained scores for {len(scores_per_text)} texts. Next, save them in parallel fashion."
+    # )
+    # save_textwise_chunk_scores(scores_per_text=scores_per_text, output_dir=SAVE_PATH)
+
+    # print("Next, plot model metrics per text (parallel).")
+    # with ProcessPoolExecutor() as executor:
+    #     futures = [
+    #         executor.submit(_process_df, item) for item in list(scores_per_text.items())
+    #     ]
+    #     for _ in tqdm(
+    #         as_completed(futures),
+    #         total=len(futures),
+    #         desc="Plotting model metrics per text",
+    #     ):
+    #         pass
