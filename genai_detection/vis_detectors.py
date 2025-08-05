@@ -58,6 +58,20 @@ class VisDetectors:
         self.detectors = detectors if detectors is not None else []
         self.savefig_base = Path(__file__).resolve().parent.parent / CONFIG.SAVE_PATH
 
+    def _title2filename(self, title: str) -> str:
+        """
+        Converts a title string to a filename-friendly format.
+        :param title: The title to convert.
+        :return: A filename-friendly string.
+        """
+        return (
+            title.replace("\n", "_")
+            .replace(" ", "_")
+            .replace("'", "")
+            .replace(".", "_")
+            .replace(",", "_")
+        )
+
     def _format_title(self, base: str, kwargs: dict) -> str:
         """
         Formats the title for the plots.
@@ -254,13 +268,7 @@ class VisDetectors:
             plt.title(title)
             plt.tight_layout()
             save_path = self.savefig_base / "impostor_scores" / self.dataset_name
-            filename = (
-                title.replace(",", "")
-                .replace(".", "_")
-                .replace("\n", "_")
-                .replace(" ", "_")
-                .replace("'", "")
-            )
+            filename = self._title2filename(title=title)
             save_path.mkdir(parents=True, exist_ok=True)
             for format in ["svg"]:  # "png",
                 print(f"Saving confusion matrix to {save_path / filename}.{format}")
@@ -305,7 +313,7 @@ class VisDetectors:
         plt.subplots_adjust(wspace=0.025, hspace=0.05)
         save_path = self.savefig_base / "unmasking_curves" / dataset_name
         save_path.mkdir(parents=True, exist_ok=True)
-        filename = title.replace("\n", "_").replace(" ", "_")
+        filename = self._title2filename(title=title)
         plt.savefig(save_path / f"{filename}.svg")
         plt.close()
 
@@ -574,7 +582,10 @@ class VisDetectors:
         for format in ["svg"]:  # "png",
             filename = f"thres_vs_f1_acc_prec_recall.{format}"
             if title_kwargs:
-                filename = f"thres_vs_f1_acc_prec_recall_r{title_kwargs['rounds']}_top{title_kwargs['top_n']}_n_imp{title_kwargs['n_impostors']}.{format}"
+                b = self._format_title(
+                    base=f"thres_vs_f1_acc_prec_recall", kwargs=title_kwargs
+                )
+                filename = self._title2filename(title=f"{b}.{format}")
             plt.savefig(save_path / filename)
 
         plt.close(fig)
@@ -586,8 +597,10 @@ class VisDetectors:
     ):
         try:
             print(f"Using {n_imp} impostors from {path2imp}")
+            updated_args = args.copy()
+            updated_args["n_impostors"] = n_imp
             precs, recs = self._fig_2_for_fixed_n_imposters(
-                train_dataset, test_dataset, path2imp, n_imp, args=args
+                train_dataset, test_dataset, path2imp, n_imp, args=updated_args
             )
             return {"n_imp": n_imp, "precision": precs, "recall": recs}
         except Exception as e:
@@ -633,6 +646,10 @@ class VisDetectors:
                 if result:
                     precisions[result["n_imp"]] = result["precision"]
                     recalls[result["n_imp"]] = result["recall"]
+                else:
+                    print(
+                        f"[ERROR] Failed to compute precision and recall for n_imp = {futures[future]}"
+                    )
 
         fig = plt.figure(figsize=(10, 5))
         for n_imp, precision in dict(
@@ -659,7 +676,7 @@ class VisDetectors:
             )
             plt.annotate(
                 "1: Koppel et al. (2014)/ Blog dataset",
-                xy=(1.0, -0.3),
+                xy=(1.0, -0.5),
                 xycoords="axes fraction",
                 ha="right",
                 va="center",
@@ -689,6 +706,9 @@ class VisDetectors:
         self, train_dataset, test_dataset, path2imp, n_imp, args: dict
     ):
         assert isinstance(args, dict), "args must be a dictionary"
+        assert (
+            args.get("n_impostors", n_imp) == n_imp
+        ), f"n_impostors={args['n_impostors']} in args must match n_imp={n_imp} in function call"
         impostor_detector = ImpostorDetector(
             impostor_technique="fixed",
             n_impostors=n_imp,
@@ -707,6 +727,9 @@ class VisDetectors:
             scores=train_dataset["impostor_score"],
             labels=train_dataset["same"],
             title_kwargs=args,
+        )
+        print(
+            f"Plotted decision threshold for impostor detection for n_imp: {n_imp} (Fig 2)."
         )
 
         best_f1_thres = np.round(best_f1_thres, 2)
@@ -754,12 +777,7 @@ class VisDetectors:
             plt.title(title)
             plt.tight_layout()
             save_path = self.savefig_base / "impostor_scores" / self.dataset_name
-            filename = (
-                title.replace(",", "")
-                .replace("\n", "_")
-                .replace(" ", "_")
-                .replace("'", "")
-            )
+            filename = self._title2filename(title=title)
             save_path.mkdir(parents=True, exist_ok=True)
             for format in ["svg"]:  # "png",
                 print(f"Saving confusion matrix to {save_path / filename}.{format}")
