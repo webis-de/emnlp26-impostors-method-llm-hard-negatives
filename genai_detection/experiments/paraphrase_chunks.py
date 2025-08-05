@@ -27,6 +27,8 @@ nltk.download("punkt")
 from nltk.tokenize import sent_tokenize, word_tokenize
 from genai_detection.config import CONFIG
 from genai_detection.paraphrasing.paraphraser import (
+    NaiveParaphraser,
+    NonNaiveParaphraser,
     T5ChatGPTParaphraser,
     T5GooglePAWSParaphraser,
     BlabladorParaphraser,
@@ -226,29 +228,39 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
             chunks = split_text_into_chunks(original_text, n=num_chunks)
             print(f"Number of chunks: {num_chunks}")
             for paraphraser_name, paraphraser in paraphrasers.items():
-                print(f"Evaluating paraphraser: {paraphraser_name}")
-                for chunk_id, chunk in enumerate(chunks):
-                    print(f"Evaluating chunk {chunk_id+1}/{len(chunks)}")
-                    paraphrased_chunk = paraphraser.paraphrase(
-                        text=chunk, prompt=None, n_responses=n_responses
-                    )[0]
-                    text_paraphrases_df = pd.concat(
-                        [
-                            text_paraphrases_df,
-                            pd.DataFrame(
-                                {
-                                    "original_text": original_text,
-                                    "num_chunks": num_chunks,
-                                    "paraphraser": paraphraser_name,
-                                    "chunk_id": chunk_id,
-                                    "chunk": chunk,
-                                    "paraphrased_chunk": paraphrased_chunk,
-                                    "category": category,
-                                }
-                            ),
-                        ],
-                        ignore_index=True,
+                if isinstance(paraphraser, NonNaiveParaphraser):
+                    prompt_options = [None]
+                elif isinstance(paraphraser, NaiveParaphraser):
+                    prompt_options = PROMPTS
+                else:
+                    raise ValueError(f"Unknown paraphraser type: {type(paraphraser)}")
+                for prompt in prompt_options:
+                    print(
+                        f"Using paraphraser: {paraphraser_name} with prompt: {prompt}"
                     )
+                    for chunk_id, chunk in enumerate(chunks):
+                        print(f"Evaluating chunk {chunk_id+1}/{len(chunks)}")
+                        paraphrased_chunk = paraphraser.paraphrase(
+                            text=chunk, prompt=prompt, n_responses=n_responses
+                        )[0]
+                        text_paraphrases_df = pd.concat(
+                            [
+                                text_paraphrases_df,
+                                pd.DataFrame(
+                                    {
+                                        "original_text": original_text,
+                                        "num_chunks": num_chunks,
+                                        "paraphraser": paraphraser_name,
+                                        "prompt": prompt,
+                                        "chunk_id": chunk_id,
+                                        "chunk": chunk,
+                                        "paraphrased_chunk": paraphrased_chunk,
+                                        "category": category,
+                                    }
+                                ),
+                            ],
+                            ignore_index=True,
+                        )
         # Save the results for this text
         text_paraphrases_df.to_csv(save_path / f"text_{i}_paraphrases.csv", index=False)
 
