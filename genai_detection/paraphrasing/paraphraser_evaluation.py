@@ -642,7 +642,7 @@ class ParaphrasingEvaluator:
             desc="Evaluating Paraphrasers",
             total=len(test_configurations),
         ):
-            # FIXME: experiment notebook: predictions format bad (list of words), refernce format ok
+            # FIXME: experiment notebook: predictions format bad (list of words), reference format ok
             try:
                 logger.info(
                     f"[DEBUG] Using paraphraser '{name}' with prompt '{prompt}'"
