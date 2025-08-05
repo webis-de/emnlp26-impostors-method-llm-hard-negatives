@@ -378,6 +378,7 @@ class VisDetectors:
         assert isinstance(title_kwargs, dict), "title_kwargs must be a dictionary"
         sys.path.append(os.path.abspath(".."))
         dataset_name = title_kwargs.get("dataset_name", self.dataset_name)
+        n_impostors = title_kwargs.get("n_impostors", None)
         assert (
             dataset_name == self.dataset_name
         ), "dataset_name must match self.dataset_name"
@@ -418,28 +419,31 @@ class VisDetectors:
         plt.plot(recall, precision, label="PR Curve", color="orange")
         plt.ylim(0, 1)
         if self.dataset_name == CONFIG.BLOG:
-            plt.scatter(
-                0.34,
-                0.95,
-                marker="o",
-                color="red",
-                label=r"$\sigma*=unknown$, $50$ authors$^1$",
-            )
-            plt.scatter(
-                0.222,
-                0.902,
-                marker="x",
-                color="red",
-                label=r"$\sigma^*=0.8$, $500$ authors$^1$",
-            )
-            plt.annotate(
-                "1: Koppel et al. (2014)/ Blog dataset",
-                xy=(1.0, -0.2),
-                xycoords="axes fraction",
-                ha="right",
-                va="center",
-                fontsize=10,
-            )
+            if not n_impostors or n_impostors == 50:
+                plt.scatter(
+                    0.34,
+                    0.95,
+                    marker="o",
+                    color="red",
+                    label=r"$\sigma*=unknown$, $50$ authors$^1$",
+                )
+            elif not n_impostors or n_impostors == 500:
+                plt.scatter(
+                    0.222,
+                    0.902,
+                    marker="x",
+                    color="red",
+                    label=r"$\sigma^*=0.8$, $500$ authors$^1$",
+                )
+            if not n_impostors or n_impostors in [50, 5000]:
+                plt.annotate(
+                    "1: Koppel et al. (2014)/ Blog dataset",
+                    xy=(1.0, -0.2),
+                    xycoords="axes fraction",
+                    ha="right",
+                    va="center",
+                    fontsize=10,
+                )
 
         plt.xlabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
         plt.ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
