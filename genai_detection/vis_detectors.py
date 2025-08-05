@@ -817,7 +817,7 @@ class VisDetectors:
                 top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
                 path2imp=path2imp,
                 upsample=False,
-                real_time_generation=True,  # otherwise on-the-fly generation is not possible
+                real_time_generation=False,  # TODO: turn True, otherwise on-the-fly generation is not possible (currently too much data for too few free api calls)
             )
             with ProcessPoolExecutor() as executor:
                 train_dataset["impostor_score"] = list(
@@ -1257,8 +1257,8 @@ if __name__ == "__main__":
         detectors=[impostor],
     )
     print("impostor Detector initialized.")
-    vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
-    # vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args)
+    # vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
+    vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args)
     print("Finished reproducing Figure 2 from Koppel et al. (2014) on BLOG data.")
 
     vis_det = VisDetectors(
@@ -1266,6 +1266,6 @@ if __name__ == "__main__":
         detectors=[impostor],
     )
     print("impostor Detector initialized.")
-    vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
-    # vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args)
+    # vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
+    vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args)
     print("Finished reproducing Figure 2 from Koppel et al. (2014) on STUDENT data.")
