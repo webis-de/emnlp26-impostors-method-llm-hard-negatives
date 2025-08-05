@@ -221,7 +221,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
         zip(dataset["disputed_text"], dataset["category"])
     ):
         print(f"Processing text {i+1}/{len(dataset)}: {category}")
-        text_paraphrases_df = pd.DataFrame()
+        rows = []
         for num_chunks in tqdm(
             range(1, 6), desc="Evaluating with different chunk sizes"
         ):
@@ -239,28 +239,23 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
                         f"Using paraphraser: {paraphraser_name} with prompt: {prompt}"
                     )
                     for chunk_id, chunk in enumerate(chunks):
-                        print(f"Evaluating chunk {chunk_id+1}/{len(chunks)}")
+                        print(f"Paraphrasing chunk {chunk_id+1}/{len(chunks)}")
                         paraphrased_chunk = paraphraser.paraphrase(
                             text=chunk, prompt=prompt, n_responses=n_responses
                         )[0]
-                        text_paraphrases_df = pd.concat(
-                            [
-                                text_paraphrases_df,
-                                pd.DataFrame(
-                                    {
-                                        "original_text": original_text,
-                                        "num_chunks": num_chunks,
-                                        "paraphraser": paraphraser_name,
-                                        "prompt": prompt,
-                                        "chunk_id": chunk_id,
-                                        "chunk": chunk,
-                                        "paraphrased_chunk": paraphrased_chunk,
-                                        "category": category,
-                                    }
-                                ),
-                            ],
-                            ignore_index=True,
+                        rows.append(
+                            {
+                                "original_text": original_text,
+                                "num_chunks": num_chunks,
+                                "paraphraser": paraphraser_name,
+                                "prompt": prompt,
+                                "chunk_id": chunk_id,
+                                "chunk": chunk,
+                                "paraphrased_chunk": paraphrased_chunk,
+                                "category": category,
+                            }
                         )
+        text_paraphrases_df = pd.DataFrame(rows)
         # Save the results for this text
         text_paraphrases_df.to_csv(save_path / f"text_{i}_paraphrases.csv", index=False)
 
