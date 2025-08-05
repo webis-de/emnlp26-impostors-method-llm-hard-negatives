@@ -652,9 +652,15 @@ class VisDetectors:
                     )
 
         fig = plt.figure(figsize=(10, 5))
-        for n_imp, precision in dict(
-            sorted(precisions.items())
-        ).items():  # start legend with 50, then 500, then 5000
+        assert (
+            list(precisions.keys()) == n_imp_options
+        ), f"Expected precisions keys {n_imp_options}, but got {list(precisions.keys())}"
+        assert (
+            list(recalls.keys()) == n_imp_options
+        ), f"Expected recalls keys {n_imp_options}, but got {list(recalls.keys())}"
+
+        for n_imp in sorted(n_imp_options):  # start legend with 50, then 500, then 5000
+            precision = precisions[n_imp]
             recall = recalls[n_imp]
             plt.plot(recall, precision, label="# impostors = " + str(n_imp))
         plt.ylim(0, 1)
@@ -685,13 +691,20 @@ class VisDetectors:
 
         plt.xlabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
         plt.ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
-        title = self._format_title(base="Precision-Recall Curve", kwargs=args)
+        diff_n_imp_args = args.copy()
+        # remove n_impostors from args for title, bc we compare different n_imp
+        diff_n_imp_args.pop("n_impostors", None)
+        title = self._format_title(
+            base="Precision-Recall Curve", kwargs=diff_n_imp_args
+        )
         plt.title(title)
         plt.legend(
-            loc="center left", bbox_to_anchor=(1.0, 0.5), borderaxespad=0.0, fontsize=10
+            loc="best", bbox_to_anchor=(1.0, 0.5), borderaxespad=0.0, fontsize=10
         )
         plt.tight_layout()
-        save_path = self.savefig_base / "impostor_scores" / self.dataset_name
+        save_path = (
+            self.savefig_base / "impostor_scores" / self.dataset_name / "koppel_fig2"
+        )
         save_path.mkdir(parents=True, exist_ok=True)
         for format in ["svg"]:  # "png",
             figure_name = (
@@ -776,7 +789,12 @@ class VisDetectors:
             )
             plt.title(title)
             plt.tight_layout()
-            save_path = self.savefig_base / "impostor_scores" / self.dataset_name
+            save_path = (
+                self.savefig_base
+                / "impostor_scores"
+                / self.dataset_name
+                / "koppel_fig2"
+            )
             filename = self._title2filename(title=title)
             save_path.mkdir(parents=True, exist_ok=True)
             for format in ["svg"]:  # "png",
@@ -1034,7 +1052,12 @@ class VisDetectors:
             plt.title(title)
             plt.legend()
             plt.tight_layout()
-            save_path = self.savefig_base / "impostor_scores" / self.dataset_name
+            save_path = (
+                self.savefig_base
+                / "impostor_scores"
+                / self.dataset_name
+                / "koppel_fig4"
+            )
             save_path.mkdir(parents=True, exist_ok=True)
             for format in ["svg"]:  # "png",
                 figure_name = (
