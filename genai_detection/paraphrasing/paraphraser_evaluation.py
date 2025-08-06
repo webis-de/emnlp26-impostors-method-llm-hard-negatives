@@ -77,6 +77,7 @@ class ParaphrasingEvaluator:
         config: Optional[dict[str, Any]] = None,
         ground_truth: Optional[dict[str, Any]] = None,
         data_category: Optional[str] = None,
+        original_file_name: Optional[str] = None,
     ):
         """
         Initializes the ParaphrasingEvaluator with the given paraphrasers and prompts.
@@ -88,7 +89,8 @@ class ParaphrasingEvaluator:
         :param temperature: Controls the randomness of the output. Lower values make the output more deterministic.
         :param config: configuration object or dict, expects at least save_path attribute
         :param ground_truth: Optional ground truth data to compare against the generated paraphrases.
-        :param data_category: Optional category of the data being evaluated, used for logging and saving results.‚
+        :param data_category: Optional category of the data being evaluated, used for logging and saving results.
+        :param original_file_name: Optional name of the original file, used for logging and saving results.
         """
         assert isinstance(paraphrasers, dict) and all(
             isinstance(p, Paraphraser) for p in paraphrasers.values()
@@ -111,6 +113,7 @@ class ParaphrasingEvaluator:
         ), "max_length must be a positive integer."
         self.max_length = max_length
         self.temperature = temperature
+        self.original_file_name = original_file_name or "unknown"
 
         self.rouge_score = evaluate.load("rouge")
         self.bertscore = evaluate.load("bertscore")
@@ -626,6 +629,13 @@ class ParaphrasingEvaluator:
         results = []
         references = [self.original_text] * self.n_responses
         original_split = self.original_text.split()
+        paraphrases_save_base_path = (
+            Path(__file__).resolve().parent.parent.parent
+            / CONFIG.SAVE_PATH
+            / "paraphrases"
+            / self.data_category
+        )
+        paraphrases_save_base_path.mkdir(parents=True, exist_ok=True)
 
         # Naive paraphrasers take different prompts
         test_configurations = list(product(self.paraphrasers.items(), self.prompts))
@@ -657,20 +667,38 @@ class ParaphrasingEvaluator:
                 logger.info(
                     f"[DEBUG] Using paraphraser '{name}' with prompt '{prompt}'"
                 )
-                paraphrase_config = {
-                    "text": self.original_text,
-                    "n_responses": self.n_responses,
-                    "prompt": prompt,
-                    "temperature": temperature,
-                }
-                if isinstance(paraphraser, NonNaiveParaphraser):
-                    paraphrase_config["ground_truth"] = self.ground_truth
-                paraphrases = [
-                    _preprocess_text(p)
-                    for p in paraphraser.paraphrase(**paraphrase_config)
-                ]
-                if not paraphrases:
-                    raise ValueError("Empty paraphrase list.")
+                path2paraphrase_file = (
+                    paraphrases_save_base_path
+                    / f"{name}_paraphrases_{self.original_file_name}.csv"
+                )
+                if path2paraphrase_file.exists():
+                    logger.info(
+                        f"Paraphrases for {name} already exist at {path2paraphrase_file}, skipping."
+                    )
+                    tmp_df = pd.read_csv(path2paraphrase_file)
+                    paraphrases = tmp_df["paraphrases"].tolist()
+                else:
+                    paraphrase_config = {
+                        "text": self.original_text,
+                        "n_responses": self.n_responses,
+                        "prompt": prompt,
+                        "temperature": temperature,
+                    }
+                    if isinstance(paraphraser, NonNaiveParaphraser):
+                        paraphrase_config["ground_truth"] = self.ground_truth
+                    paraphrases = [
+                        _preprocess_text(p)
+                        for p in paraphraser.paraphrase(**paraphrase_config)
+                    ]
+                    if not paraphrases:
+                        raise ValueError("Empty paraphrase list.")
+                    tmp_df = pd.DataFrame(
+                        paraphrase_config.update({"paraphrases": paraphrases})
+                    )
+                    tmp_df.to_csv(
+                        path2paraphrase_file,
+                        index=False,
+                    )
 
             except Exception as e:
                 logger.error(
