@@ -595,8 +595,8 @@ class VisDetectors:
     def _run_fig_2_worker(
         self, n_imp, train_dataset, test_dataset, path2imp, args: dict
     ):
+        print(f"Using {n_imp} impostors from {path2imp}")
         try:
-            print(f"Using {n_imp} impostors from {path2imp}")
             updated_args = args.copy()
             updated_args["n_impostors"] = n_imp
             precs, recs = self._fig_2_for_fixed_n_imposters(
@@ -618,6 +618,7 @@ class VisDetectors:
             CONFIG.STUDENT_ESSAYS,
         ], "This method is only implemented for BLOG and Student Essays datasets."
         train_dataset, test_dataset = self._load_datasets(balanced=True)
+        print("Loaded datasets for Figure 2:", self.dataset_name)
         # could be initially different, bc args are from argparse which are irrespective from calling thsi function with defined dataset_name
         args["dataset_name"] = self.dataset_name
         n_imp_options = [50, 500, 5000]
@@ -627,7 +628,7 @@ class VisDetectors:
             if self.dataset_name == CONFIG.BLOG
             else Path(os.getcwd()).resolve() / CONFIG.PATH2STUDENT_ESSAYS
         )
-
+        print("Start parallel computation for different n_impostors.")
         with ProcessPoolExecutor() as executor:
             futures = {
                 executor.submit(
@@ -730,6 +731,7 @@ class VisDetectors:
             path2imp=path2imp,
             upsample=False,
         )
+        print("Initialized impostor detector with fixed impostors:", n_imp)
         with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
             train_dataset["impostor_score"] = list(
                 executor.map(impostor_detector.get_score, train_dataset["pair"])
