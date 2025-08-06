@@ -367,30 +367,37 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
             queries = self._generate_queries_based_on_candidate_words(
                 medium_frequency_words
             )
-            result_df = pd.DataFrame(self._parallel_fetch(queries))
-            result_df.drop_duplicates(subset="url", inplace=True)
+            try:
+                result_df = pd.DataFrame(self._parallel_fetch(queries))
+                result_df.drop_duplicates(subset="url", inplace=True)
 
-            if result_df.empty:
-                print("Warning: No results fetched. CSV not saved.")
-                return result_df
+                if result_df.empty:
+                    print("Warning: No results fetched. CSV not saved.")
+                    return result_df
 
-            if path2imp is None:
-                path2imp = (
-                    Path(__file__).resolve().parents[2] / CONFIG.PATH2GENERIC_ON_FLY_IMP
-                )
-            else:
-                path2imp = Path(path2imp)
-            if path2imp.suffix != ".csv" or path2imp.is_dir():
-                if path2imp.is_file():
-                    path2imp = path2imp.with_suffix(".csv")
-                else:
-                    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                if path2imp is None:
                     path2imp = (
-                        path2imp / f"google_on_fly_impostor_results_{timestamp}.csv"
+                        Path(__file__).resolve().parents[2]
+                        / CONFIG.PATH2GENERIC_ON_FLY_IMP
                     )
+                else:
+                    path2imp = Path(path2imp)
+                if path2imp.suffix != ".csv" or path2imp.is_dir():
+                    if path2imp.is_file():
+                        path2imp = path2imp.with_suffix(".csv")
+                    else:
+                        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                        path2imp = (
+                            path2imp / f"google_on_fly_impostor_results_{timestamp}.csv"
+                        )
 
-            path2imp.parent.mkdir(parents=True, exist_ok=True)
-            result_df.to_csv(path2imp, index=False)
+                path2imp.parent.mkdir(parents=True, exist_ok=True)
+                result_df.to_csv(path2imp, index=False)
+            except Exception as e:
+                print(
+                    f"Error during fetching results (probabily no more free API calls): {e}"
+                )
+                return {"imposter": "Error during fetching results, check logs."}
         else:  # use precomputed results
             # TODO for debugging purposes, delete later:
             if "PUCK" in text:  # Midsummer Night's Dream
