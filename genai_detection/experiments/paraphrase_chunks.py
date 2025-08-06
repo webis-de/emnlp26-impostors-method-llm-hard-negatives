@@ -290,7 +290,7 @@ def evaluate_paraphrases(
             n_responses=1,
         )
         for i in range(len(df)):
-            original_row = df.iloc[i]
+            original_row = df.iloc[i].to_dict()
             paraphrased_chunk = _preprocess_text(original_row["paraphrased_chunk"])
             if not paraphrased_chunk or pd.isna(paraphrased_chunk):
                 print(
@@ -345,6 +345,8 @@ def evaluate_paraphrases(
                 rouge_scores=rouge_scores,
                 idx=0,
             )
+            assert res is not None, "Result row should not be None."
+            assert isinstance(original_row, dict), "Original row should be a dict."
             original_row.update(res)
             original_row["text_id"] = text_id
             rows.append(original_row)
