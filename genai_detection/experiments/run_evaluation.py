@@ -109,6 +109,7 @@ def evaluate_category(data_category, data_root, save_path):
             temperature=TEMPERATURE,
             ground_truth=metadata,
             data_category=data_category,
+            original_file_name=file_name,
         )
         print(f"Starting evaluation for {data_category}")
 
