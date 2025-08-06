@@ -128,7 +128,10 @@ class ImpostorDetector(ImpostorBase):
             )
         elif impostor_technique == "on-the-fly":
             self.impostor_generator = ImpostorGenerator.GoogleSearchImpostorGenerator(
-                api_key=CONFIG.SERPAPI_KEY
+                api_key=CONFIG.SERPAPI_KEY,
+                num_queries=max(
+                    1, int(self.n_impostors / 25)
+                ),  # 25 responses per query
             )
         elif impostor_technique == "blogs":
             self.impostor_generator = ImpostorGenerator.BlogImpostorGenerator(
