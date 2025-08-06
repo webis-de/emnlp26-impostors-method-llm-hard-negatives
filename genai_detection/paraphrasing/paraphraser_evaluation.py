@@ -949,6 +949,8 @@ class ParaphrasingEvaluator:
         :param display_plot: Whether to display the plot (default is True).
         :return: A list of matplotlib figures.
         """
+        save_path = save_path / "radar_charts"
+        save_path.mkdir(parents=True, exist_ok=True)
         # Enforce fixed metric order
         all_labels = self.get_metric_names()
         labels = [metric for metric in all_labels if metric in df.columns]
@@ -1034,6 +1036,8 @@ class ParaphrasingEvaluator:
         :param display_plot: Whether to display the plot (default is True).
         :return: matplotlib Figure object.
         """
+        save_path = save_path / "metric_scatter"
+        save_path.mkdir(parents=True, exist_ok=True)
         if group_by == "model" and "Paraphraser" not in df.columns:
             data = df.rename(columns={group_by: "Paraphraser"}, inplace=False)
             group_by = "Paraphraser"
@@ -1175,6 +1179,8 @@ class ParaphrasingEvaluator:
         :param display_plot: Whether to display the plot (default is True).
         :return: None
         """
+        save_path = save_path / "metric_distributions"
+        save_path.mkdir(parents=True, exist_ok=True)
         metric_names = [
             metric for metric in self.get_metric_names() if metric in df.columns
         ]
