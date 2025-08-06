@@ -838,9 +838,11 @@ class VisDetectors:
                 real_time_generation=True,  # TODO: turn True, otherwise on-the-fly generation is not possible (currently too much data for too few free api calls)
             )
             print(
-                f"Initialized impostor detector with {imp_gen} impostors generation technique.")
+                f"Initialized impostor detector with {imp_gen} impostors generation technique."
+            )
             # FIXME: all but fixed fail here silently
-            with ProcessPoolExecutor() as executor:
+            # element not pickable -> do not use ProcessPoolExecutor, but ThreadPoolExecutor
+            with ThreadPoolExecutor() as executor:
                 train_dataset["impostor_score"] = list(
                     executor.map(impostor_detector.get_score, train_dataset["pair"])
                 )
