@@ -337,8 +337,8 @@ fig, (ax1, ax2) = plt.subplots(
 )
 
 # Define the break points
-break_low = int(preproc_impact["PAN20"].max() * 1.1)
-break_high = int(preproc_impact["Blog"].min() * 0.9)
+break_low = int(preproc_impact["Gutenberg"].max() * 1.1)
+break_high = int(preproc_impact["PAN20"].min() * 0.9)
 
 # Plot each series on both axes
 for ax in [ax1, ax2]:
