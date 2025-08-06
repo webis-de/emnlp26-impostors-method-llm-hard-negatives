@@ -41,7 +41,7 @@ CATEGORY2DIRECTORY = {
     ],  # Dalai Lama; "cnn_230625"    # USA attacks Iran
     "Blog": ["Blog_corpus", 27],
     "Gutenberg": ["gutenberg", "Othello_the_Moor_of_Venice_William_Shakespeare"],
-    "Student Essay": [
+    "Student Essays": [
         "student_essays/Intro2006",
         "Ass1/2006_AB4847",
     ],  # stream of consciousness essay: 18 years old girl who writes about her bipolar ex-boyfriend of 8 months and her new boyfriend who loves music like her but is not catholic; she wants to live in the present
@@ -92,7 +92,7 @@ def evaluate_category(data_category, data_root, save_path):
         if not path2datasets.exists():
             raise FileNotFoundError(f"Missing dataset path: {path2datasets}")
 
-        use_ground_truth = not (data_category in ["Blog", "Student Essay"])
+        use_ground_truth = not (data_category in ["Blog", "Student Essays"])
         metadata = load_metadata(path2datasets, file_name) if use_ground_truth else {}
         text = load_text(data_category, path2datasets, file_name)
         model = OllamaParaphraser(model_id=OLLAMA_VERSION)
