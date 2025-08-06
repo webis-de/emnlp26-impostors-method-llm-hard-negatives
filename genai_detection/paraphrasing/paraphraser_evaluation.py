@@ -113,7 +113,9 @@ class ParaphrasingEvaluator:
         ), "max_length must be a positive integer."
         self.max_length = max_length
         self.temperature = temperature
-        self.original_file_name = original_file_name or "unknown"
+        self.original_file_name = (
+            original_file_name.replace("/", "_").replace(".", "_") or "unknown"
+        )
 
         self.rouge_score = evaluate.load("rouge")
         self.bertscore = evaluate.load("bertscore")
@@ -699,6 +701,7 @@ class ParaphrasingEvaluator:
                         path2paraphrase_file,
                         index=False,
                     )
+                    print(f"Paraphrases saved to {path2paraphrase_file}")
 
             except Exception as e:
                 logger.error(
