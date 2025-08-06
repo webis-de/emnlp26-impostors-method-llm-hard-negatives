@@ -675,7 +675,10 @@ class ParaphrasingEvaluator:
                     paraphrases_save_base_path
                     / f"{name}_paraphrases_{self.original_file_name}.csv"
                 )
-                if path2paraphrase_file.exists():
+                if (
+                    path2paraphrase_file.exists()
+                    and os.stat(path2paraphrase_file).st_size > 0
+                ):
                     logger.info(
                         f"Paraphrases for {name} already exist at {path2paraphrase_file}, skipping."
                     )
@@ -688,7 +691,10 @@ class ParaphrasingEvaluator:
                         "prompt": prompt,
                         "temperature": temperature,
                     }
-                    if isinstance(paraphraser, NonNaiveParaphraser):
+                    if (
+                        isinstance(paraphraser, NonNaiveParaphraser)
+                        and self.ground_truth
+                    ):
                         paraphrase_config["ground_truth"] = self.ground_truth
                     paraphrases = [
                         _preprocess_text(p)
@@ -696,9 +702,8 @@ class ParaphrasingEvaluator:
                     ]
                     if not paraphrases:
                         raise ValueError("Empty paraphrase list.")
-                    tmp_df = pd.DataFrame(
-                        paraphrase_config.update({"paraphrases": paraphrases})
-                    )
+                    paraphrase_config.update({"paraphrases": paraphrases})
+                    tmp_df = pd.DataFrame([paraphrase_config])
                     tmp_df.to_csv(
                         path2paraphrase_file,
                         index=False,
