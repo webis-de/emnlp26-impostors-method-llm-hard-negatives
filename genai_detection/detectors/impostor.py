@@ -322,7 +322,6 @@ class ImpostorDetector(ImpostorBase):
             x_right = self.tokens_to_matrix(tokens_right, top_tokens)
 
             store = {
-                # TODO: if I knew >=1 author, i could choose impostors based on similar number of documents written (like paper)
                 "left": {
                     "tfidf": x_left,
                     "tokens": tokens_left,
@@ -343,6 +342,9 @@ class ImpostorDetector(ImpostorBase):
             ):
                 scores_over_different_rounds = 0
                 # get impostors for the candidate text, NOT the disputed text
+                print(
+                    f"Generating impostors for candidate (real-time: {self.real_time_generation})"
+                )
                 impostor_candidates = self.impostor_generator.generate_impostors(
                     text=store[candidate]["text"],
                     real_time_generation=self.real_time_generation,
