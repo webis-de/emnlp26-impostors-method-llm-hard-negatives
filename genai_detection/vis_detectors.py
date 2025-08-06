@@ -1231,6 +1231,13 @@ if __name__ == "__main__":
         help="Whether texts below 500 words should be skipped or upsampled (default: %(default)s)",
     )
 
+    parser.add_argument(
+        "--fig2reproduce",
+        type=int,
+        default=2,
+        help="Number of Figure from Koppel et al. (2014) to reproduce (default: %(default)s)",
+    )
+
     args = parser.parse_args()
 
     impostor = ImpostorDetector(
@@ -1249,22 +1256,33 @@ if __name__ == "__main__":
     # print("impostor Detector initialized.")
     # vis_det.visualize(balanced=args.balanced)
 
-    # ugly, but only for reproduction of Figure 2 from Koppel et al. (2014)
+    # reproduction of Figure 2/ 4 from Koppel et al. (2014)
+    fig = args.fig2reproduce
+    assert fig in [
+        2,
+        4,
+    ], "Only Figures 2 and 4 can be reproduced from Koppel et al. (2014)."
     args = vars(args)  # namespace to dict conversion
     vis_det = VisDetectors(
         dataset_name=CONFIG.BLOG,
         detectors=[impostor],
     )
-    print("impostor Detector initialized.")
-    # vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
-    vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args)
-    print("Finished reproducing Figure 2 from Koppel et al. (2014) on BLOG data.")
+    print(f"impostor Detector initialized for figure {fig}.")
+    if fig == 2:
+        vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
+    elif fig == 4:
+        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args)
+    print(f"Finished reproducing Figure {fig} from Koppel et al. (2014) on BLOG data.")
 
     vis_det = VisDetectors(
         dataset_name=CONFIG.STUDENT_ESSAYS,
         detectors=[impostor],
     )
-    print("impostor Detector initialized.")
-    # vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
-    vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args)
-    print("Finished reproducing Figure 2 from Koppel et al. (2014) on STUDENT data.")
+    print(f"impostor Detector initialized for fig {fig}.")
+    if fig == 2:
+        vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
+    elif fig == 4:
+        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args)
+    print(
+        f"Finished reproducing Figure {fig} from Koppel et al. (2014) on STUDENT data."
+    )
