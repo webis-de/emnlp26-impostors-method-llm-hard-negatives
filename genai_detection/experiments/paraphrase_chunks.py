@@ -221,6 +221,10 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
     for i, (original_text, category) in enumerate(
         zip(dataset["disputed_text"], dataset["category"])
     ):
+        # TODO: First only process Student Essays
+        if category != "Student Essays":
+            print(f"Skipping text {i+1}/{len(dataset)}: {category} (not Student Essay)")
+            continue
         print(f"Processing text {i+1}/{len(dataset)}: {category}")
         rows = []
         if (save_path / f"text_{i}_paraphrases.csv").exists():
