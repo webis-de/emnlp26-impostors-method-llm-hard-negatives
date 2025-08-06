@@ -114,7 +114,7 @@ class ParaphrasingEvaluator:
         self.max_length = max_length
         self.temperature = temperature
         self.original_file_name = (
-            original_file_name.replace("/", "_").replace(".", "_")
+            str(original_file_name).replace("/", "_").replace(".", "_")
             if original_file_name
             else "unknown"
         )
