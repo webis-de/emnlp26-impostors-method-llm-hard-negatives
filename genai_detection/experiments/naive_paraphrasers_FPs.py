@@ -135,35 +135,54 @@ def get_detector_scores(
     The scores are added to the datasets as new columns.
     """
     all_dfs = []
+    detector_scores_save_path = SAVE_PATH / "detector_scores"
+    detector_scores_save_path.mkdir(parents=True, exist_ok=True)
 
     for detector_name, detector in detector_dict.items():
         for dataset_name, dataset in dataset_dict.items():
-            score_col = f"{detector_name}_score"
-            dataset[score_col] = np.nan
             if detector_name == dataset_name:
                 continue  # Skip the detector if it is the same as the dataset name, bc candidate text has same author as some impostors
-            rows = list(dataset.itertuples())  # Faster + safer for indexing
-            with ThreadPoolExecutor() as executor:
-                futures = [
-                    executor.submit(_compute_score, detector, row._asdict())
-                    for row in rows
-                ]
-                for future in tqdm(
-                    as_completed(futures),
-                    total=len(futures),
-                    desc=f"Processing {detector_name} scores",
-                ):
-                    idx, score = future.result()
-                    dataset.at[idx, score_col] = score
 
-        all_dfs.append(dataset)
-    dataset = pd.concat(all_dfs, ignore_index=True)
+            # Skip if already computed
+            output_file = (
+                detector_scores_save_path
+                / f"scores_{detector_name}_on_{dataset_name}.csv"
+            )
+            if output_file.exists():
+                print(f"Loading existing file: {output_file}")
+                dataset_scored = pd.read_csv(output_file)
 
-    dataset.to_csv(
-        SAVE_PATH / f"exp_imp_gen_av_scores_cross_genre_dataset_{TIMESTAMP}.csv",
+            else:
+                score_col = f"{detector_name}_score"
+                dataset_scored = dataset.copy()
+                dataset_scored[score_col] = np.nan
+                rows = list(dataset_scored.itertuples())  # Faster + safer for indexing
+                with ThreadPoolExecutor() as executor:
+                    futures = [
+                        executor.submit(_compute_score, detector, row._asdict())
+                        for row in rows
+                    ]
+                    for future in tqdm(
+                        as_completed(futures),
+                        total=len(futures),
+                        desc=f"Scoring {detector_name} on {dataset_name}",
+                    ):
+                        idx, score = future.result()
+                        dataset.at[idx, score_col] = score
+
+                dataset_scored.to_csv(output_file, index=False)
+        all_dfs.append(dataset_scored)
+    final_dataset = pd.concat(all_dfs, ignore_index=True)
+
+    final_output_path = (
+        SAVE_PATH / f"exp_imp_gen_av_scores_cross_genre_dataset_{TIMESTAMP}.csv"
+    )
+    final_dataset.to_csv(
+        final_output_path,
         index=False,
     )
-    return dataset
+    print(f"Saved final dataset to: {final_output_path}")
+    return final_dataset
 
 
 def _get_rsme_per_paraphraser(
