@@ -1020,14 +1020,14 @@ class ParaphrasingEvaluator:
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path.parent.mkdir(parents=True, exist_ok=True)
             for format in ["png", "svg"]:
-                save_path = (
+                file_name = (
                     save_path
                     / f"{data_category}_paraphrasing_metrics_grouped_by_{group_by}_radar_chart_{timestamp}.{format}"
                 )
                 plt.savefig(
-                    save_path, bbox_inches="tight", transparent=True, format=format
+                    file_name, bbox_inches="tight", transparent=True, format=format
                 )
-                print(f"Plot saved to {save_path}")
+                print(f"Plot saved to {file_name}")
         if display_plot:
             plt.show()
 
