@@ -245,7 +245,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
                             text=chunk,
                             prompt=prompt,
                             n_responses=n_responses,  # TODO:, temperature=temperature
-                        )[0]
+                        )
                         rows.append(
                             {
                                 "original_text": original_text,
@@ -254,7 +254,9 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
                                 "prompt": prompt,
                                 "chunk_id": chunk_id,
                                 "chunk": chunk,
-                                "paraphrased_chunk": paraphrased_chunk,
+                                "paraphrased_chunk": (
+                                    paraphrased_chunk[0] if paraphrased_chunk else ""
+                                ),
                                 "category": category,
                             }
                         )
