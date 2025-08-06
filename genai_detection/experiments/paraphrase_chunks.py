@@ -263,24 +263,30 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
                                 and temperature is not None
                             ):
                                 p_config["temperature"] = temperature
-                            paraphrased_chunk = paraphraser.paraphrase(**p_config)
-                            rows.append(
-                                {
-                                    "original_text": original_text,
-                                    "num_chunks": num_chunks,
-                                    "paraphraser": paraphraser_name,
-                                    "prompt": prompt,
-                                    "chunk_id": chunk_id,
-                                    "chunk": chunk,
-                                    "temperature": temperature,
-                                    "paraphrased_chunk": (
-                                        paraphrased_chunk[0]
-                                        if paraphrased_chunk
-                                        else ""
-                                    ),
-                                    "category": category,
-                                }
-                            )
+                            try:
+                                paraphrased_chunk = paraphraser.paraphrase(**p_config)
+                                rows.append(
+                                    {
+                                        "original_text": original_text,
+                                        "num_chunks": num_chunks,
+                                        "paraphraser": paraphraser_name,
+                                        "prompt": prompt,
+                                        "chunk_id": chunk_id,
+                                        "chunk": chunk,
+                                        "temperature": temperature,
+                                        "paraphrased_chunk": (
+                                            paraphrased_chunk[0]
+                                            if paraphrased_chunk
+                                            else ""
+                                        ),
+                                        "category": category,
+                                    }
+                                )
+                            except Exception as e:
+                                print(
+                                    f"Error paraphrasing chunk {chunk_id+1}/{len(chunks)} with {paraphraser_name}: {e}"
+                                )
+
         text_paraphrases_df = pd.DataFrame(rows)
         # Save the results for this text
         text_paraphrases_df.to_csv(save_path / f"text_{i}_paraphrases.csv", index=False)
