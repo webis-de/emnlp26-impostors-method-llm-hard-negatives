@@ -76,15 +76,18 @@ class DetectorBase:
         return_single = isinstance(text, str)
         _text = self.preprocess_text(text)
         _text = [_text] if return_single else _text
-        scores = self._get_score_impl(_text)
-        if normalize and scores is not NotImplemented:
-            scores = self._normalize_scores(scores)
-        scores = (
-            _to_numpy(scores, np.float32)
-            if scores is not NotImplemented
-            else _create_nan_array(len(_text))
-        )
-        return scores[0] if return_single else scores
+        try:
+            scores = self._get_score_impl(_text)
+            if normalize and scores is not NotImplemented:
+                scores = self._normalize_scores(scores)
+            scores = (
+                _to_numpy(scores, np.float32)
+                if scores is not NotImplemented
+                else _create_nan_array(len(_text))
+            )
+            return scores[0] if return_single else scores
+        except Exception as e:
+            print(f"Error in {self.__class__.__name__}.get_score: {e}")
 
     def _predict_impl(
         self, text: t.Iterable[str]
