@@ -300,12 +300,15 @@ class T5ChatGPTParaphraser(NaiveParaphraser):
             self.device = torch.device("cuda")  # NVIDIA GPU
         else:
             self.device = torch.device("cpu")
+        print("Using T5ChatGPTParaphraser")
         self.tokenizer = AutoTokenizer.from_pretrained(
             "humarin/chatgpt_paraphraser_on_T5_base"
         )
+        print("Loaded T5ChatGPTParaphraser tokenizer")
         self.model = AutoModelForSeq2SeqLM.from_pretrained(
             "humarin/chatgpt_paraphraser_on_T5_base"
         ).to(self.device)
+        print("Loaded T5ChatGPTParaphraser model")
 
     def paraphrase(
         self,
@@ -375,10 +378,13 @@ class T5GooglePAWSParaphraser(NaiveParaphraser):
             self.device = torch.device("cuda")  # NVIDIA GPU
         else:
             self.device = torch.device("cpu")
+        print("Using T5GooglePAWSParaphraser")
         self.tokenizer = AutoTokenizer.from_pretrained("Vamsi/T5_Paraphrase_Paws")
+        print("Loaded T5GooglePAWSParaphraser tokenizer")
         self.model = AutoModelForSeq2SeqLM.from_pretrained(
             "Vamsi/T5_Paraphrase_Paws"
         ).to(self.device)
+        print("Loaded T5GooglePAWSParaphraser model")
 
     def paraphrase(
         self,
