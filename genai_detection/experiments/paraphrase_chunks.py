@@ -235,35 +235,48 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
             for paraphraser_name, paraphraser in paraphrasers.items():
                 if isinstance(paraphraser, NonNaiveParaphraser):
                     prompt_options = [None]
+                    temperature_options = [0, 0.5, 1.0]
                 elif isinstance(paraphraser, NaiveParaphraser):
                     prompt_options = PROMPTS
+                    temperature_options = [None]
                 else:
                     raise ValueError(f"Unknown paraphraser type: {type(paraphraser)}")
                 for prompt in prompt_options:
-                    print(
-                        f"Using paraphraser: {paraphraser_name} with prompt: {prompt}"
-                    )
-                    for chunk_id, chunk in enumerate(chunks):
-                        print(f"Paraphrasing chunk {chunk_id+1}/{len(chunks)}")
-                        paraphrased_chunk = paraphraser.paraphrase(
-                            text=chunk,
-                            prompt=prompt,
-                            n_responses=n_responses,  # TODO:, temperature=temperature
+                    for temperature in temperature_options:
+                        print(
+                            f"Using paraphraser: {paraphraser_name} with temperature={temperature}, prompt={prompt}"
                         )
-                        rows.append(
-                            {
-                                "original_text": original_text,
-                                "num_chunks": num_chunks,
-                                "paraphraser": paraphraser_name,
+
+                        for chunk_id, chunk in enumerate(chunks):
+                            print(f"Paraphrasing chunk {chunk_id+1}/{len(chunks)}")
+                            p_config = {
+                                "text": chunk,
                                 "prompt": prompt,
-                                "chunk_id": chunk_id,
-                                "chunk": chunk,
-                                "paraphrased_chunk": (
-                                    paraphrased_chunk[0] if paraphrased_chunk else ""
-                                ),
-                                "category": category,
+                                "n_responses": n_responses,
                             }
-                        )
+                            if (
+                                isinstance(paraphraser, NonNaiveParaphraser)
+                                and temperature is not None
+                            ):
+                                p_config["temperature"] = temperature
+                            paraphrased_chunk = paraphraser.paraphrase(**p_config)
+                            rows.append(
+                                {
+                                    "original_text": original_text,
+                                    "num_chunks": num_chunks,
+                                    "paraphraser": paraphraser_name,
+                                    "prompt": prompt,
+                                    "chunk_id": chunk_id,
+                                    "chunk": chunk,
+                                    "temperature": temperature,
+                                    "paraphrased_chunk": (
+                                        paraphrased_chunk[0]
+                                        if paraphrased_chunk
+                                        else ""
+                                    ),
+                                    "category": category,
+                                }
+                            )
         text_paraphrases_df = pd.DataFrame(rows)
         # Save the results for this text
         text_paraphrases_df.to_csv(save_path / f"text_{i}_paraphrases.csv", index=False)
