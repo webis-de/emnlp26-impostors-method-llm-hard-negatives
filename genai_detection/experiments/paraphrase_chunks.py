@@ -305,22 +305,17 @@ def evaluate_paraphrases(
                     "hashcode": "",
                 }
             try:
-                # rouge returns one value for all paraphrases, hence: list comprehension
-                rouge_scores = [
-                    paraphrased_chunk.rouge_score.compute(
-                        predictions=[paraphrased_chunk], references=[original_text]
-                    )
-                ]
+                rouge_scores = paraphrased_chunk.rouge_score.compute(
+                    predictions=[paraphrased_chunk], references=[original_text]
+                )
             except Exception as e:
                 print("[ERROR] ROUGE computation failed:", e)
-                rouge_scores = [
-                    {
-                        "rouge1": 0.0,
-                        "rouge2": 0.0,
-                        "rougeL": 0.0,
-                        "rougeLsum": 0.0,
-                    }
-                ]
+                rouge_scores = {
+                    "rouge1": 0.0,
+                    "rouge2": 0.0,
+                    "rougeL": 0.0,
+                    "rougeLsum": 0.0,
+                }
 
             res = paraphrase_evaluator._build_result_row(
                 name=df["paraphraser"].iloc[0],
