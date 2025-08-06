@@ -223,6 +223,10 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
     ):
         print(f"Processing text {i+1}/{len(dataset)}: {category}")
         rows = []
+        if save_path / f"text_{i}_paraphrases.csv".exists():
+            print(f"Paraphrases for text {i} already exist, skipping.")
+            continue
+
         for num_chunks in tqdm(
             range(1, 6), desc="Evaluating with different chunk sizes"
         ):
@@ -606,32 +610,43 @@ if __name__ == "__main__":
         default=Path(__file__).resolve().parents[2] / CONFIG.CROSS_GENRE,
         help="Path to cross-genre dataset (default: %(default)s).",
     )
+
+    parser.add_argument(
+        "--task",
+        type=str,
+        default="evaluate",
+        help="Whether to create and save or to load an evaluate paraphrases (default: %(default)s).",
+    )
+
     args = parser.parse_args()
 
     # Run the experiment
     if not SAVE_PATH.exists():
         SAVE_PATH.mkdir(parents=True, exist_ok=True)
 
-    # only create paraphrasers and save them
     paraphrase_save_path = SAVE_PATH / "cross_genre" / "paraphrases_per_text"
     paraphrase_save_path.mkdir(parents=True, exist_ok=True)
-    # print(f"Creating and saving paraphrasers to {paraphrase_save_path}.")
-    # create_and_save_paraphrasers(
-    #     path2dataset=args.path2dataset,
-    #     save_path=paraphrase_save_path,
-    # )
-    print(
-        f"Paraphrasers created and saved to {paraphrase_save_path}. Next, run the evaluation."
-    )
 
-    results = evaluate_paraphrases(
-        path2dataset=paraphrase_save_path,
-        save_path=SAVE_PATH / "cross_genre",
-    )
-    print(
-        f"Evaluation results saved to {SAVE_PATH / 'cross_genre' / 'text_paraphrases_evaluation_results.csv'}."
-    )
-    print(results.head())
+    if args.task == "create":
+        # only create paraphrasers and save them
+        print(f"Creating and saving paraphrasers to {paraphrase_save_path}.")
+        create_and_save_paraphrasers(
+            path2dataset=args.path2dataset,
+            save_path=paraphrase_save_path,
+        )
+    elif args.task == "evaluate":
+        print(
+            f"Paraphrasers created and saved to {paraphrase_save_path}. Next, run the evaluation."
+        )
+
+        results = evaluate_paraphrases(
+            path2dataset=paraphrase_save_path,
+            save_path=SAVE_PATH / "cross_genre",
+        )
+        print(
+            f"Evaluation results saved to {SAVE_PATH / 'cross_genre' / 'text_paraphrases_evaluation_results.csv'}."
+        )
+        print(results.head())
 
     # scores_per_text = run_experiment(
     #     path2dataset=args.path2dataset,
