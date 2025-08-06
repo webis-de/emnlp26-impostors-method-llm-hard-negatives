@@ -287,7 +287,7 @@ def evaluate_paraphrases(
         )
         for i in range(len(df)):
             original_row = df.iloc[i]
-            paraphrased_chunk = _preprocess_text(df["paraphrased_chunk"].iloc[i])
+            paraphrased_chunk = _preprocess_text(original_row["paraphrased_chunk"])
 
             try:
                 # input is list of strings, each string is a paraphrase/ reference
@@ -305,7 +305,7 @@ def evaluate_paraphrases(
                     "hashcode": "",
                 }
             try:
-                rouge_scores = paraphrased_chunk.rouge_score.compute(
+                rouge_scores = paraphrase_evaluator.rouge_score.compute(
                     predictions=[paraphrased_chunk], references=[original_text]
                 )
             except Exception as e:
