@@ -148,7 +148,7 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
     def __init__(
         self,
         api_key: str,
-        num_queries: int = 2,
+        num_queries: int = 1,
         results_per_query: int = 25,
         max_workers: int = 2,
         n_min_words: int = 3,
