@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 import sys
 import traceback
-from typing import Literal
+from typing import Literal, Optional
 from datasets import load_from_disk
 from matplotlib import pyplot as plt
 import numpy as np
@@ -896,21 +896,29 @@ class VisDetectors:
             return None
 
     # ugly, but only for reproduction of Figure 4 a, b from Koppel et al. (2014)
-    def reproduce_fig4_prec_recall_dif_imp_appr(self, args: dict) -> None:
+    def reproduce_fig4_prec_recall_dif_imp_appr(
+        self,
+        args: dict,
+        save_path: Optional[Path],
+        imp_gen_options: list = ["fixed", "on-the-fly"],
+    ) -> None:
         """
         Visualizes the impostor detection results via Precision-Recall curves for different impostor generation techniques (cf. Figures 4 a, b from Koppel et al. (2014)).
         """
         assert isinstance(args, dict), "args must be a dictionary"
-        save_path = (
-            self.savefig_base / "impostor_scores" / self.dataset_name / "koppel_fig4"
-        )
+        if not save_path:
+            save_path = (
+                self.savefig_base
+                / "impostor_scores"
+                / self.dataset_name
+                / "koppel_fig4"
+            )
         save_path.mkdir(parents=True, exist_ok=True)
         pr_save_path = save_path / "precision_recall_values"
         pr_save_path.mkdir(parents=True, exist_ok=True)
         train_dataset, test_dataset = self._load_datasets(balanced=True)
         # could be initially different, bc args are from argparse which are irrespective from calling thsi function with defined dataset_name
         args["dataset_name"] = self.dataset_name
-        imp_gen_options = ["fixed", "on-the-fly"]
         baselines = [
             "unsupervised baseline min-max",
             "unsupervised baseline cosine",
@@ -1225,10 +1233,19 @@ if __name__ == "__main__":
     # vis_det.visualize(balanced=args.balanced)
 
     # reproduction of Figure 2/ 4 from Koppel et al. (2014)
+    our_figure_impostor_options = [
+        # "on-the-fly",
+        "fixed",
+        "naive_llm",
+        "naive_llm",
+        "non_naive_llm",
+        "non_naive_llm",
+    ]
     fig = args.fig2reproduce
     assert fig in [
         2,
         4,
+        5,  # not really figure 5, but figure 4 with our contributions (LLM based impostors)
     ], "Only Figures 2 and 4 can be reproduced from Koppel et al. (2014)."
     args = vars(args)  # namespace to dict conversion
     vis_det = VisDetectors(
@@ -1240,6 +1257,16 @@ if __name__ == "__main__":
         vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
     elif fig == 4:
         vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args)
+    elif fig == 5:
+        # not really figure 5, but figure 4 with our contributions (LLM based impostors)
+        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
+            args=args,
+            imp_gen_options=our_figure_impostor_options,
+            save_path=vis_det.savefig_base
+            / "impostor_scores"
+            / vis_det.dataset_name
+            / "our_contributions_scores",
+        )
     print(f"Finished reproducing Figure {fig} from Koppel et al. (2014) on BLOG data.")
 
     vis_det = VisDetectors(
@@ -1251,6 +1278,16 @@ if __name__ == "__main__":
         vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
     elif fig == 4:
         vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args)
+    elif fig == 5:
+        # not really figure 5, but figure 4 with our contributions (LLM based impostors)
+        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
+            args=args,
+            imp_gen_options=our_figure_impostor_options,
+            save_path=vis_det.savefig_base
+            / "impostor_scores"
+            / vis_det.dataset_name
+            / "our_contributions_scores",
+        )
     print(
         f"Finished reproducing Figure {fig} from Koppel et al. (2014) on STUDENT data."
     )
