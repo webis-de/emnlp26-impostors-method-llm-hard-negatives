@@ -294,6 +294,9 @@ def evaluate_paraphrases(
                 )
                 continue
 
+            print(
+                "Paraphrased chunk:", paraphrased_chunk[:100], "..."
+            )  # print first 100 characters
             try:
                 # input is list of strings, each string is a paraphrase/ reference
                 bert_scores = paraphrase_evaluator.bertscore.compute(
@@ -309,18 +312,25 @@ def evaluate_paraphrases(
                     "f1": [0.0],
                     "hashcode": "",
                 }
+            # placeholder/ fallback
+            rouge_scores = {
+                "rouge1": 0.0,
+                "rouge2": 0.0,
+                "rougeL": 0.0,
+                "rougeLsum": 0.0,
+            }
             try:
-                rouge_scores = paraphrase_evaluator.rouge_score.compute(
-                    predictions=[paraphrased_chunk], references=[original_text]
-                )
+                # TODO: shouldnt be nan... obsolete?
+                if paraphrased_chunk and original_text:
+                    rouge_scores = paraphrase_evaluator.rouge_score.compute(
+                        predictions=[paraphrased_chunk], references=[original_text]
+                    )
+                else:
+                    print(
+                        f"[WARNING] Paraphrased chunk or original text is empty for text ID {text_id}, skipping ROUGE evaluation."
+                    )
             except Exception as e:
                 print("[ERROR] ROUGE computation failed:", e)
-                rouge_scores = {
-                    "rouge1": 0.0,
-                    "rouge2": 0.0,
-                    "rougeL": 0.0,
-                    "rougeLsum": 0.0,
-                }
 
             res = paraphrase_evaluator._build_result_row(
                 name=df["paraphraser"].iloc[0],
