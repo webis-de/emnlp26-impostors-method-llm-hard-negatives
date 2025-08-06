@@ -299,7 +299,7 @@ def evaluate_paraphrases(
                 continue
 
             print(
-                "Paraphrased chunk:", paraphrased_chunk[:100], "..."
+                "Paraphrased chunk:", paraphrased_chunk, "..."
             )  # print first 100 characters
             try:
                 # input is list of strings, each string is a paraphrase/ reference
