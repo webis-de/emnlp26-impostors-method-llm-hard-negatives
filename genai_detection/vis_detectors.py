@@ -863,17 +863,18 @@ class VisDetectors:
                 )
 
             # both same and different author pairs
-            total_precisions, total_recalls, total_pr_thresholds = (
-                precision_recall_curve(
-                    test_dataset["same"], test_dataset["impostor_score"]
-                )
-            )
+            # total_precisions, total_recalls, total_pr_thresholds = (
+            #     precision_recall_curve(
+            #         test_dataset["same"], test_dataset["impostor_score"]
+            #     )
+            # )
 
             # same author pairs
             same_author_precisions, same_author_recalls, same_pr_thresholds = (
                 precision_recall_curve(
-                    test_dataset[test_dataset["same"]]["same"],
-                    test_dataset[test_dataset["same"]]["impostor_score"],
+                    test_dataset["same"],
+                    test_dataset["impostor_score"],
+                    pos_label=1,
                 )
             )
 
@@ -883,15 +884,16 @@ class VisDetectors:
                 different_author_recalls,
                 different_pr_thresholds,
             ) = precision_recall_curve(
-                test_dataset[~test_dataset["same"]]["same"],
-                test_dataset[~test_dataset["same"]]["impostor_score"],
+                test_dataset["same"],
+                test_dataset["impostor_score"],
+                pos_label=0,
             )
 
             return {
                 "imp_gen": imp_gen,
-                "total_precisions": total_precisions,
-                "total_recalls": total_recalls,
-                "total_pr_thresholds": total_pr_thresholds,
+                # "total_precisions": total_precisions,
+                # "total_recalls": total_recalls,
+                # "total_pr_thresholds": total_pr_thresholds,
                 "same_author_precisions": same_author_precisions,
                 "same_author_recalls": same_author_recalls,
                 "same_pr_thresholds": same_pr_thresholds,
@@ -924,7 +926,7 @@ class VisDetectors:
             "unsupervised baseline cosine",
             "supervised baseline",
         ]
-        total_precisions, total_recalls = {}, {}
+        # total_precisions, total_recalls = {}, {}
         same_author_precisions, same_author_recalls = {}, {}
         different_author_precisions, different_author_recalls = {}, {}
         path2imp = (
@@ -948,19 +950,19 @@ class VisDetectors:
                 result = future.result()
                 if result:
                     # last value is one, often does not exist in reality, so we remove it
-                    total_precisions[result["imp_gen"]] = result["total_precisions"][
-                        :-1
-                    ]
-                    total_recalls[result["imp_gen"]] = result["total_recalls"][:-1]
-                    # save precision and recall for total pairs
-                    self._save_prec_recall_values(
-                        pr_save_path=pr_save_path,
-                        appr_name=result["imp_gen"],
-                        precision_vals=total_precisions[result["imp_gen"]],
-                        recall_vals=total_recalls[result["imp_gen"]],
-                        pr_thresholds=result["total_pr_thresholds"],
-                        portion="total",
-                    )
+                    # total_precisions[result["imp_gen"]] = result["total_precisions"][
+                    #     :-1
+                    # ]
+                    # total_recalls[result["imp_gen"]] = result["total_recalls"][:-1]
+                    # # save precision and recall for total pairs
+                    # self._save_prec_recall_values(
+                    #     pr_save_path=pr_save_path,
+                    #     appr_name=result["imp_gen"],
+                    #     precision_vals=total_precisions[result["imp_gen"]],
+                    #     recall_vals=total_recalls[result["imp_gen"]],
+                    #     pr_thresholds=result["total_pr_thresholds"],
+                    #     portion="total",
+                    # )
 
                     same_author_precisions[result["imp_gen"]] = result[
                         "same_author_precisions"
@@ -1019,30 +1021,29 @@ class VisDetectors:
             test_dataset[f"{baseline_name.replace(' ','_')}_score"] = preds
 
             # both same and different author pairs
-            precision, recall, pr_thresholds = precision_recall_curve(
-                test_dataset["same"],
-                test_dataset[f"{baseline_name.replace(' ','_')}_score"],
-            )
+            # precision, recall, pr_thresholds = precision_recall_curve(
+            #     test_dataset["same"],
+            #     test_dataset[f"{baseline_name.replace(' ','_')}_score"],
+            # )
 
-            # save precision and recall for total pairs
-            self._save_prec_recall_values(
-                pr_save_path=pr_save_path,
-                appr_name=baseline_name,
-                precision_vals=precision[:-1],
-                recall_vals=recall[:-1],
-                pr_thresholds=pr_thresholds,
-                portion="total",
-            )
+            # # save precision and recall for total pairs
+            # self._save_prec_recall_values(
+            #     pr_save_path=pr_save_path,
+            #     appr_name=baseline_name,
+            #     precision_vals=precision[:-1],
+            #     recall_vals=recall[:-1],
+            #     pr_thresholds=pr_thresholds,
+            #     portion="total",
+            # )
 
-            total_precisions[baseline_name.replace(" ", "_")] = precision[:-1]
-            total_recalls[baseline_name.replace(" ", "_")] = recall[:-1]
+            # total_precisions[baseline_name.replace(" ", "_")] = precision[:-1]
+            # total_recalls[baseline_name.replace(" ", "_")] = recall[:-1]
 
             # same author pairs
             precision, recall, pr_thresholds = precision_recall_curve(
-                test_dataset[test_dataset["same"]]["same"],
-                test_dataset[test_dataset["same"]][
-                    f"{baseline_name.replace(' ','_')}_score"
-                ],
+                test_dataset["same"],
+                test_dataset[f"{baseline_name.replace(' ','_')}_score"],
+                pos_label=1,
             )
             # save precision and recall for same pairs
             self._save_prec_recall_values(
@@ -1067,10 +1068,9 @@ class VisDetectors:
 
             # different author pairs
             precision, recall, pr_thresholds = precision_recall_curve(
-                test_dataset[~test_dataset["same"]]["same"],
-                test_dataset[~test_dataset["same"]][
-                    f"{baseline_name.replace(' ','_')}_score"
-                ],
+                test_dataset["same"],
+                test_dataset[f"{baseline_name.replace(' ','_')}_score"],
+                pos_label=0,
             )
             # save precision and recall for different pairs
             self._save_prec_recall_values(
@@ -1102,9 +1102,9 @@ class VisDetectors:
 
         line_styles = dict(zip(baselines, [":", "--", "-."]))
         for kind, data in zip(
-            ["Complete", "Same Author", "Different Author"],
+            ["Same Author", "Different Author"],  # "Complete",
             [
-                (total_precisions, total_recalls),
+                # (total_precisions, total_recalls),
                 (same_author_precisions, same_author_recalls),
                 (different_author_precisions, different_author_recalls),
             ],
