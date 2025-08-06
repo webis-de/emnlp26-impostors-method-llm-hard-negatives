@@ -837,6 +837,9 @@ class VisDetectors:
                 upsample=False,
                 real_time_generation=True,  # TODO: turn True, otherwise on-the-fly generation is not possible (currently too much data for too few free api calls)
             )
+            print(
+                f"Initialized impostor detector with {imp_gen} impostors generation technique.")
+            # FIXME: all but fixed fail here silently
             with ProcessPoolExecutor() as executor:
                 train_dataset["impostor_score"] = list(
                     executor.map(impostor_detector.get_score, train_dataset["pair"])
@@ -921,6 +924,10 @@ class VisDetectors:
         """
         Visualizes the impostor detection results via Precision-Recall curves for different impostor generation techniques (cf. Figures 4 a, b from Koppel et al. (2014)).
         """
+        print(
+            "Reproducing Figure 4 with different impostor generation techniques:",
+            imp_gen_options,
+        )
         assert isinstance(args, dict), "args must be a dictionary"
         if not save_path:
             save_path = (
@@ -992,6 +999,9 @@ class VisDetectors:
                         recall_vals=different_author_recalls[result["imp_gen"]],
                         pr_thresholds=result["different_pr_thresholds"],
                         portion="different",
+                    )
+                    print(
+                        f"Computed and saved precision and recall for {result['imp_gen']} impostor generation. "
                     )
 
         for baseline_name, baseline in zip(
@@ -1136,6 +1146,7 @@ class VisDetectors:
         pr_thresholds: list,
         portion: str = "same",
     ):
+        print("Saving precision and recall values for", appr_name, portion)
         assert (
             len(precision_vals) == len(recall_vals) == len(pr_thresholds)
         ), "Precision, recall, and thresholds must have the same length."
@@ -1253,8 +1264,6 @@ if __name__ == "__main__":
         # "on-the-fly",
         "fixed",
         "naive_llm",
-        "naive_llm",
-        "non_naive_llm",
         "non_naive_llm",
     ]
     fig = args.fig2reproduce
