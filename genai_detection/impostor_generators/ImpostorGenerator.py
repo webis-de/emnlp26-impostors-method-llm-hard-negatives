@@ -363,6 +363,7 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
         if not isinstance(text, str) or not text.strip():
             raise ValueError("Input text must be a non-empty string.")
         if real_time_generation:
+            print("Generating impostors in real-time.")
             medium_frequency_words = self.get_medium_frequency_words(text)
             queries = self._generate_queries_based_on_candidate_words(
                 medium_frequency_words
@@ -400,6 +401,7 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
                 return {"imposter": "Error during fetching results, check logs."}
         else:  # use precomputed results
             # TODO for debugging purposes, delete later:
+            print("Using precomputed results from path2imp. No real-time generation.")
             if "PUCK" in text:  # Midsummer Night's Dream
                 path2imp = (
                     path2imp
