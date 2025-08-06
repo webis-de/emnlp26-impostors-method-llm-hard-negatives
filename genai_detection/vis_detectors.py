@@ -652,7 +652,7 @@ class VisDetectors:
                         f"[ERROR] Failed to compute precision and recall for n_imp = {futures[future]}"
                     )
 
-        fig = plt.figure(figsize=(10, 5))
+        fig = plt.figure()
         assert (
             list(precisions.keys()) == n_imp_options
         ), f"Expected precisions keys {n_imp_options}, but got {list(precisions.keys())}"
@@ -1065,7 +1065,7 @@ class VisDetectors:
         ):
             print(f"Plotting Precision-Recall Curve for {kind} pairs")
             precisions, recalls = data
-            fig = plt.figure(figsize=(10, 5))
+            fig = plt.figure()
             for imp_gen, precision in precisions.items():
                 recall = recalls[imp_gen]
                 plt.plot(
