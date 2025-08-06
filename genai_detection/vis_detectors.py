@@ -1010,7 +1010,6 @@ class VisDetectors:
                 )
                 train_dataset, test_dataset = self._load_datasets(balanced=True)
                 preds = baseline.get_score(test_dataset["pair"])
-                # get_prediction(test_dataset["pair"])
 
             test_dataset[f"{baseline_name.replace(' ','_')}_score"] = preds
 
