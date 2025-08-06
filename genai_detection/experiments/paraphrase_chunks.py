@@ -292,7 +292,7 @@ def evaluate_paraphrases(
         for i in range(len(df)):
             original_row = df.iloc[i]
             paraphrased_chunk = _preprocess_text(original_row["paraphrased_chunk"])
-            if not paraphrased_chunk:
+            if not paraphrased_chunk or pd.isna(paraphrased_chunk):
                 print(
                     f"[WARNING] Paraphrased chunk is empty for text ID {text_id}, skipping evaluation."
                 )
