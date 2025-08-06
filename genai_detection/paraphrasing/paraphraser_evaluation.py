@@ -134,7 +134,7 @@ class ParaphrasingEvaluator:
         while not self.sbert_model and tries < 10:
             try:
                 self.sbert_model = SentenceTransformer(
-                    "sentence-transformers/all-MiniLM-L6-v2"
+                    "sentence-transformers/all-MiniLM-L6-v2", device=device
                 )  # for cosine similarity
             except Exception as e:
                 print(
