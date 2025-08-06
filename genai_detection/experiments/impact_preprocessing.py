@@ -337,7 +337,7 @@ fig, (ax1, ax2) = plt.subplots(
 )
 
 # Define the break points
-break_low = int(preproc_impact["Gutenberg"].max() * 1.1)
+break_low = int(preproc_impact["PAN20"].max() * 1.1)
 break_high = int(preproc_impact["Blog"].min() * 0.9)
 
 # Plot each series on both axes
@@ -352,6 +352,7 @@ for ax in [ax1, ax2]:
     ax.plot(
         preproc_impact.index, preproc_impact["Gutenberg"], marker="o", label="Gutenberg"
     )
+    ax.plot(preproc_impact.index, preproc_impact["PAN20"], marker="o", label="PAN20")
 
 # Set the y-limits to create the "break"
 ax1.set_ylim(break_high, preproc_impact["Blog"].max() * 1.1)
