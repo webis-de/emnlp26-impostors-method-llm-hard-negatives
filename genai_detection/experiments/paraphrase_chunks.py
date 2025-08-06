@@ -223,7 +223,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
     ):
         print(f"Processing text {i+1}/{len(dataset)}: {category}")
         rows = []
-        if save_path / f"text_{i}_paraphrases.csv".exists():
+        if (save_path / f"text_{i}_paraphrases.csv").exists():
             print(f"Paraphrases for text {i} already exist, skipping.")
             continue
 
