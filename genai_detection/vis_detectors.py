@@ -945,8 +945,11 @@ class VisDetectors:
             for future in as_completed(futures):
                 result = future.result()
                 if result:
-                    total_precisions[result["imp_gen"]] = result["total_precisions"]
-                    total_recalls[result["imp_gen"]] = result["total_recalls"]
+                    # last value is one, often does not exist in reality, so we remove it
+                    total_precisions[result["imp_gen"]] = result["total_precisions"][
+                        :-1
+                    ]
+                    total_recalls[result["imp_gen"]] = result["total_recalls"][:-1]
                     # save precision and recall for total pairs
                     self._save_prec_recall_values(
                         pr_save_path=pr_save_path,
@@ -959,10 +962,10 @@ class VisDetectors:
 
                     same_author_precisions[result["imp_gen"]] = result[
                         "same_author_precisions"
-                    ]
+                    ][:-1]
                     same_author_recalls[result["imp_gen"]] = result[
                         "same_author_recalls"
-                    ]
+                    ][:-1]
                     # save precision and recall for same pairs
                     self._save_prec_recall_values(
                         pr_save_path=pr_save_path,
@@ -975,10 +978,10 @@ class VisDetectors:
 
                     different_author_precisions[result["imp_gen"]] = result[
                         "different_author_precisions"
-                    ]
+                    ][:-1]
                     different_author_recalls[result["imp_gen"]] = result[
                         "different_author_recalls"
-                    ]
+                    ][:-1]
                     # save precision and recall for different pairs
                     self._save_prec_recall_values(
                         pr_save_path=pr_save_path,
@@ -1023,14 +1026,14 @@ class VisDetectors:
             self._save_prec_recall_values(
                 pr_save_path=pr_save_path,
                 appr_name=baseline_name,
-                precision_vals=precision,
-                recall_vals=recall,
+                precision_vals=precision[:-1],
+                recall_vals=recall[:-1],
                 pr_thresholds=pr_thresholds,
                 portion="total",
             )
 
-            total_precisions[baseline_name.replace(" ", "_")] = precision
-            total_recalls[baseline_name.replace(" ", "_")] = recall
+            total_precisions[baseline_name.replace(" ", "_")] = precision[:-1]
+            total_recalls[baseline_name.replace(" ", "_")] = recall[:-1]
 
             # same author pairs
             precision, recall, pr_thresholds = precision_recall_curve(
@@ -1043,8 +1046,8 @@ class VisDetectors:
             self._save_prec_recall_values(
                 pr_save_path=pr_save_path,
                 appr_name=baseline_name,
-                precision_vals=precision,
-                recall_vals=recall,
+                precision_vals=precision[:-1],
+                recall_vals=recall[:-1],
                 pr_thresholds=pr_thresholds,
                 portion="same",
             )
@@ -1057,8 +1060,8 @@ class VisDetectors:
                 "/",
                 len(recall),
             )
-            same_author_precisions[baseline_name.replace(" ", "_")] = precision
-            same_author_recalls[baseline_name.replace(" ", "_")] = recall
+            same_author_precisions[baseline_name.replace(" ", "_")] = precision[:-1]
+            same_author_recalls[baseline_name.replace(" ", "_")] = recall[:-1]
 
             # different author pairs
             precision, recall, pr_thresholds = precision_recall_curve(
@@ -1071,8 +1074,8 @@ class VisDetectors:
             self._save_prec_recall_values(
                 pr_save_path=pr_save_path,
                 appr_name=baseline_name,
-                precision_vals=precision,
-                recall_vals=recall,
+                precision_vals=precision[:-1],
+                recall_vals=recall[:-1],
                 pr_thresholds=pr_thresholds,
                 portion="different",
             )
@@ -1086,8 +1089,10 @@ class VisDetectors:
                 "/",
                 len(recall),
             )
-            different_author_precisions[baseline_name.replace(" ", "_")] = precision
-            different_author_recalls[baseline_name.replace(" ", "_")] = recall
+            different_author_precisions[baseline_name.replace(" ", "_")] = precision[
+                :-1
+            ]
+            different_author_recalls[baseline_name.replace(" ", "_")] = recall[:-1]
 
         # Precision-Recall Curve: 	Imbalanced
         # scores: non-thresholded measure of decisions, relative ranking of predictions
@@ -1151,11 +1156,19 @@ class VisDetectors:
         pr_thresholds: list,
         portion: str = "total",
     ):
+        assert (
+            len(precision_vals) == len(recall_vals) == len(pr_thresholds)
+        ), "Precision, recall, and thresholds must have the same length."
+        assert portion in [
+            "total",
+            "same",
+            "different",
+        ], "Portion must be one of 'total', 'same', or 'different'."
         df = pd.DataFrame(
             {
                 "threshold": pr_thresholds,
-                "precision": precision_vals[:-1],
-                "recall": recall_vals[:-1],
+                "precision": precision_vals,
+                "recall": recall_vals,
             }
         )
         df.to_csv(
