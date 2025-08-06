@@ -297,8 +297,8 @@ def evaluate_paraphrases(
             try:
                 # input is list of strings, each string is a paraphrase/ reference
                 bert_scores = paraphrase_evaluator.bertscore.compute(
-                    predictions=paraphrased_chunk,
-                    references=original_text,
+                    predictions=[paraphrased_chunk],
+                    references=[original_text],
                     model_type="distilbert-base-uncased",
                 )
             except Exception as e:
