@@ -56,7 +56,10 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
         for text_pair in pairs:
             vectors = [self.get_tfidf_vector_for_text(t) for t in text_pair]
             assert len(vectors) == 2, "Input text must be a list of pairs of texts."
-            scores_per_pair.append(self.model.predict(abs(vectors[0] - vectors[1])))
+            # get score for potive class: https://scikit-learn.org/stable/modules/svm.html#classification (06.08.2025)
+            scores_per_pair.append(
+                self.model.decision_function(abs(vectors[0] - vectors[1]))
+            )
         return np.array(scores_per_pair)
 
     def get_prediction(self, text: t.Iterable[str]) -> t.List[bool]:
@@ -66,8 +69,18 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
         :param text: input text or batch of input texts
         :return: boolean classifications of whether inputs are likely same author TODO: machine-generated
         """
-        scores = self.get_score(text)
-        return [bool(item) for sublist in scores for item in sublist]
+        if isinstance(text, str):
+            text = [text]
+
+        scores_per_pair = (
+            []
+        )  # id is index of pair (i.e, length is half of the input text list)
+        pairs = list(ichunked(vectors, 2)) if type(text[0]) == str else text
+        for text_pair in pairs:
+            vectors = [self.get_tfidf_vector_for_text(t) for t in text_pair]
+            assert len(vectors) == 2, "Input text must be a list of pairs of texts."
+            scores_per_pair.append(self.model.predict(abs(vectors[0] - vectors[1])))
+        return np.array(scores_per_pair)
 
     def get_trained_linear_svc(self):
         """
@@ -81,7 +94,7 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
             return pickle.load(path2model)
         else:
             path2model.parent.mkdir(parents=True, exist_ok=True)
-            model = LinearSVC()
+            model = LinearSVC()  # probabilty=True)
             # Load training data
             disputed_texts = self.dataset[["disputed_text", "candidate_text", "same"]]
             # sample texts
