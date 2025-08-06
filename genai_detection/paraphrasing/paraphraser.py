@@ -381,9 +381,14 @@ class T5GooglePAWSParaphraser(NaiveParaphraser):
         print("Using T5GooglePAWSParaphraser")
         self.tokenizer = AutoTokenizer.from_pretrained("Vamsi/T5_Paraphrase_Paws")
         print("Loaded T5GooglePAWSParaphraser tokenizer")
-        self.model = AutoModelForSeq2SeqLM.from_pretrained(
-            "Vamsi/T5_Paraphrase_Paws"
-        ).to(self.device)
+        try:
+            self.model = AutoModelForSeq2SeqLM.from_pretrained(
+                "Vamsi/T5_Paraphrase_Paws"
+            ).to(self.device)
+        except Exception as e:
+            print(f"[ERROR] Failed to load T5GooglePAWSParaphraser model: {e}")
+            self.model = None
+
         print("Loaded T5GooglePAWSParaphraser model")
 
     def paraphrase(
