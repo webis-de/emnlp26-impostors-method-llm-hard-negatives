@@ -342,9 +342,6 @@ class ImpostorDetector(ImpostorBase):
             ):
                 scores_over_different_rounds = 0
                 # get impostors for the candidate text, NOT the disputed text
-                print(
-                    f"Generating impostors for candidate (real-time: {self.real_time_generation})"
-                )
                 impostor_candidates = self.impostor_generator.generate_impostors(
                     text=store[candidate]["text"],
                     real_time_generation=self.real_time_generation,
