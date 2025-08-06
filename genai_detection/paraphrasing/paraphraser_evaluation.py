@@ -368,7 +368,7 @@ class ParaphrasingEvaluator:
 
         return results_df, summary, lengths
 
-    def plot_metric_kdes_per_dataset(
+    def plot_metric_hists_per_dataset(
         self,
         df_all: pd.DataFrame,
         metrics: list[str],
@@ -402,14 +402,24 @@ class ParaphrasingEvaluator:
             sub_df = df_all[[dataset_col, metric]].dropna()
 
             # KDE per dataset
-            sns.kdeplot(
+            # sns.kdeplot(
+            #     data=sub_df,
+            #     x=metric,
+            #     hue=dataset_col,
+            #     fill=True,
+            #     common_norm=False,
+            #     alpha=0.4,
+            #     palette=label_to_color,
+            #     ax=ax,
+            #     legend=False,
+            # )
+            sns.histplot(
                 data=sub_df,
                 x=metric,
                 hue=dataset_col,
-                fill=True,
-                common_norm=False,
-                alpha=0.4,
+                multiple="dodge",  # side-by-side bars
                 palette=label_to_color,
+                alpha=0.7,
                 ax=ax,
                 legend=False,
             )
@@ -420,7 +430,7 @@ class ParaphrasingEvaluator:
 
             ax.set_title(metric)
             ax.set_xlabel(metric)
-            ax.set_ylabel("Density")
+            ax.set_ylabel("Count")
 
         legend_patches = [
             mpatches.Patch(color=color, label=self._wrap_label(label))
@@ -439,7 +449,7 @@ class ParaphrasingEvaluator:
         for j in range(i + 1, len(axes)):
             fig.delaxes(axes[j])
 
-        title = "KDE Metric Distributions by Dataset"
+        title = "Histogram of Metric Distributions by Dataset"
         fig.suptitle(title, fontsize=16)
         plt.tight_layout(rect=[0, 0, 1, 0.95])
 
@@ -448,9 +458,9 @@ class ParaphrasingEvaluator:
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path.mkdir(parents=True, exist_ok=True)
             for format in ["png", "svg"]:
-                out = save_path / f"kde_metric_dists_{timestamp}.{format}"
+                out = save_path / f"hist_metric_dists_{timestamp}.{format}"
                 fig.savefig(out, bbox_inches="tight", transparent=True, format=format)
-                print(f"Saved KDE grid to {out}")
+                print(f"Saved Histogram grid to {out}")
 
         else:
             print("No save path provided, plot not saved.")
@@ -586,7 +596,7 @@ class ParaphrasingEvaluator:
 
             # Long / tidy combined DataFrame
             df_all = pd.concat(dfs.values(), ignore_index=True)
-            self.plot_metric_kdes_per_dataset(
+            self.plot_metric_hists_per_dataset(
                 df_all=df_all,
                 metrics=["genre_match", "time_match", "topic_match", "length_diff"],
                 display_plot=display_plot,
