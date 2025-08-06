@@ -131,19 +131,22 @@ class ParaphrasingEvaluator:
 
         tries = 0
         self.sbert_model = None
-        while not self.sbert_model and tries < 3:
+        while not self.sbert_model and tries < 10:
             try:
                 self.sbert_model = SentenceTransformer(
                     "sentence-transformers/all-MiniLM-L6-v2"
                 )  # for cosine similarity
             except Exception as e:
-                print("Failed to load SentenceTransformer model. Setting it to None.")
+                print(
+                    "Failed to load SentenceTransformer model. Setting it to None. with error:",
+                    e,
+                )
                 tries += 1
         # https://pypi.org/project/word-mover-distance/ Word Mover's Distance (WMD)
         print("Loading pre-trained word vectors for WMD...")
         tries = 0
         self.pretr_word_model = None
-        while not self.pretr_word_model and tries < 3:
+        while not self.pretr_word_model and tries < 10:
             try:
                 self.pretr_word_model = WMDReadyKeyedVectors(
                     gensim.downloader.load("glove-twitter-25")
