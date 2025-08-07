@@ -675,6 +675,9 @@ class FixedImpostorGenerator(BaseImpostorGenerator):
         for i, entry in enumerate(sampled):
             if "pair" not in entry:
                 continue
+            assert isinstance(
+                entry, dict
+            ), "Each entry in the dataset must be a dictionary."
             key = entry.get("id", f"impostor_{i}")
             impostors[f"{key}_left"] = entry["pair"][0]
             impostors[f"{key}_right"] = entry["pair"][1]

@@ -352,6 +352,7 @@ class ImpostorDetector(ImpostorBase):
                     real_time_generation=self.real_time_generation,
                     path2imp=self.path2imp,
                 )
+                print("Generated impostors for candidate.")
 
                 tmp_store = {
                     impostor_name: {
