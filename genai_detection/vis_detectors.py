@@ -87,7 +87,7 @@ class VisDetectors:
         items = [
             f"{k}={v:.2f}" if (isinstance(v, float) or k == "threshold") else f"{k}={v}"
             for k, v in kwargs.items()
-            if k != "path2imp"
+            if k != "path2imp" and k != "fig2reproduce"
         ]
         # newline after every 2 items, for better readability
         lines = []
