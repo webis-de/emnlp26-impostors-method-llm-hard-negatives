@@ -2,12 +2,13 @@ from collections import Counter, defaultdict
 from more_itertools import ichunked
 import itertools
 import json
+from datasets import load_from_disk
 import os
 from pathlib import Path
 from random import choices, sample
 import re
 import sys
-from typing import Iterable, List, Literal
+from typing import Iterable, List, Literal, Optional
 import heapq
 from nltk.stem.snowball import SnowballStemmer
 import pandas as pd
@@ -407,7 +408,7 @@ class ImpostorDetector(ImpostorBase):
         scores = self.get_score(text)
         return [score > self.threshold for score in scores]
 
-    def tokens_to_matrix(self, tokens, top_token_list):
+    def tokens_to_matrix(self, tokens, top_token_list, path2imp: Optional[str] = None):
         """
         Transform list of tokens into matrix of term tfidf values of the top tokens.
         Koppel et al. (2014) use space-free character 4-grams tfidf values to represent each document as a numerical vector.
@@ -434,10 +435,25 @@ class ImpostorDetector(ImpostorBase):
                 lowercase=False,
             )
             self._vectorizer_vocab = top_token_list
+            # TODO: get more data to fit?
 
-        tfidf_matrix = self._vectorizer.fit_transform(
-            [" ".join(tokens)]
-        )  # format (n_samples=1, n_features=self.top_n)
+            if path2imp.exists():
+                split = "train" if self._training_mode else "test"
+                train_data = load_from_disk(path2imp, split=split)[split].to_pandas()
+                candidate_texts = []
+                for entry in train_data:
+                    pair = entry.get("pair", [])
+                    candidate_texts.extend(pair)
+            else:
+                candidate_texts = [" ".join(tokens)]
+            self._vectorizer = self._vectorizer.fit(candidate_texts)
+
+        # FIXME: fit_transform does not work, raises not fitted error
+        # tfidf_matrix = self._vectorizer.fit_transform(
+        #     [" ".join(tokens)]
+        # )  # format (n_samples=1, n_features=self.top_n)
+        # format (n_samples=1, n_features=self.top_n)
+        tfidf_matrix = self._vectorizer.transform([" ".join(tokens)])
 
         assert tfidf_matrix.shape[1] == len(
             top_token_list
