@@ -956,6 +956,9 @@ class VisDetectors:
             if self.dataset_name == CONFIG.BLOG
             else Path(os.getcwd()).resolve() / CONFIG.PATH2STUDENT_ESSAYS
         )
+        print(
+            "Start parallel computation for different impostor generation techniques."
+        )
         with ProcessPoolExecutor() as executor:
             futures = {
                 executor.submit(
