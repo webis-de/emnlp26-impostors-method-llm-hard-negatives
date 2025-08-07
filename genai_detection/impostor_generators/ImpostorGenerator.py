@@ -19,6 +19,7 @@ from datasets import load_from_disk
 from spacy.cli import download
 import serpapi
 from dotenv import load_dotenv
+import torch
 from genai_detection.paraphrasing.paraphraser import (
     T5ChatGPTParaphraser,
     T5GooglePAWSParaphraser,
@@ -104,7 +105,13 @@ class ContentImpostorGenerator(BaseImpostorGenerator):
         :param split: dataset split to use (default: 'test')
         """
         super().__init__(n_impostors=n_impostors, split=split)
-        self.model = SentenceTransformer(model_name)
+        device = (
+            "cuda"
+            if torch.cuda.is_available()
+            else ("mps" if torch.backends.mps.is_available() else "cpu")
+        )
+        print(f"Using device: {device}")
+        self.model = SentenceTransformer(model_name, device=device)
 
     def generate_impostors(
         self, text: str, path2imp: str = None, real_time_generation: bool = False
