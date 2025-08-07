@@ -445,7 +445,7 @@ class ImpostorDetector(ImpostorBase):
 
             if path2imp and path2imp.exists():
                 split = "train" if self._training_mode else "test"
-                train_data = load_from_disk(path2imp, split=split)[split].to_pandas()
+                train_data = load_from_disk(path2imp)[split].to_pandas()
                 candidate_texts = []
                 for entry in train_data:
                     pair = entry.get("pair", [])
