@@ -1096,6 +1096,10 @@ class VisDetectors:
         # Precision-Recall Curve: 	Imbalanced
         # scores: non-thresholded measure of decisions, relative ranking of predictions
         # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.precision_recall_curve.html (05.06.2025)
+        print(
+            "DEBUG Plotting Precision-Recall Curves for different impostor generation techniques:",
+            same_author_precisions.keys(),
+        )
 
         line_styles = dict(zip(baselines, [":", "--", "-."]))
         for kind, data in zip(
