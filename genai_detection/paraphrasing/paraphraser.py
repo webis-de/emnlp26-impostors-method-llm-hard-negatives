@@ -682,14 +682,21 @@ class BulletPointParaphraser(NonNaiveParaphraser):
 
         logger.info(f"\n[DEBUG] Using text extractor with prompt: {prompt}")
         try:
-            res = self.text_extractor.paraphrase(
-                text=text,
-                prompt=prompt,
-                n_responses=1,
-                max_length=CONFIG.MAX_LENGTH,
-                temperature=temperature,
-                response_schema=response_schema,
-            )[0]
+            res = None
+            tries = 0
+            while not res:
+                res = self.text_extractor.paraphrase(
+                    text=text,
+                    prompt=prompt,
+                    n_responses=1,
+                    max_length=CONFIG.MAX_LENGTH,
+                    temperature=temperature,
+                    response_schema=response_schema,
+                )
+                tries += 1
+                if tries > 7:
+                    return [], "", "", "", "", ""
+            res = res[0]
         except IndexError as e:
             logger.error(f"Error extracting bullet points: {e}")
             return [], "", "", "", "", ""
