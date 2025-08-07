@@ -222,7 +222,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
         zip(dataset["disputed_text"], dataset["category"])
     ):
         # TODO: First only process Student Essays
-        filter_cat = "Pan 20"  # "Gutenberg"  # "Student Essays"
+        filter_cat = "Student Essays"  # "Gutenberg"  # "Pan 20"
         if category != filter_cat:
             print(f"Skipping text {i+1}/{len(dataset)}: {category} (not {filter_cat})")
             continue
@@ -235,7 +235,13 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
         for num_chunks in tqdm(
             range(1, 6), desc="Evaluating with different chunk sizes"
         ):
-            chunks = split_text_into_chunks(original_text, n=num_chunks)
+            try:
+                chunks = split_text_into_chunks(original_text, n=num_chunks)
+            except Exception as e:
+                print(
+                    f"ERROR (paraphrase_chunks, create and save) splitting text into chunks: {e}"
+                )
+                continue
             print(f"Number of chunks: {num_chunks}")
             for paraphraser_name, paraphraser in paraphrasers.items():
                 if isinstance(paraphraser, NonNaiveParaphraser):
