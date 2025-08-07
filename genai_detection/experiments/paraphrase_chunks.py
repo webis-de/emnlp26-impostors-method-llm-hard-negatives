@@ -222,7 +222,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
         zip(dataset["disputed_text"], dataset["category"])
     ):
         # TODO: First only process Student Essays
-        filter_cat = "Student Essays"  # "Gutenberg"  # "Pan 20"
+        filter_cat = "Pan 20"  # "Student Essays"  # "Gutenberg"  # "Pan 20"
         if category != filter_cat:
             print(f"Skipping text {i+1}/{len(dataset)}: {category} (not {filter_cat})")
             continue
