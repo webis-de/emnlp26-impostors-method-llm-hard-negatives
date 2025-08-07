@@ -394,9 +394,12 @@ class VisDetectors:
 
         # pd.Series to numpy arrays
         labels = labels.values
-        scores = np.concatenate(
-            scores.values
-        )  # each entry in scores is a one-element list
+        try:
+            scores = np.concatenate(
+                scores.values
+            )  # each entry in scores is a one-element list
+        except Exception as e:
+            raise ValueError(f"Failed to concatenate (vis_detectors) scores: {e}.")
 
         # ROC Curve: Balanced classes or when you care about TPR vs. FPR
         # displayed for different thresholds

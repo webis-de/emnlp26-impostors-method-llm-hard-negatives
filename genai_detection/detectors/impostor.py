@@ -384,6 +384,12 @@ class ImpostorDetector(ImpostorBase):
                         for c in list(tmp_store.keys())
                     }
                     # increase score if the most similar candidate is the actual candidate
+                    assert (
+                        type(scores) is dict
+                    ), "Scores must be a dictionary (imposter _get_score_impl)."
+                    assert not any(
+                        isinstance(v, str) for v in scores.values()
+                    ), "Scores must not contain strings (imposter _get_score_impl)."
                     max_similar_candidate = max(scores, key=scores.get)
                     scores_over_different_rounds += max_similar_candidate == candidate
                 # average after second loop
