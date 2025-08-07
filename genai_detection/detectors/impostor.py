@@ -319,8 +319,12 @@ class ImpostorDetector(ImpostorBase):
             )
 
             # TODO: muss man TFIDF gemeinsam (left, right, impostors) berechnen, wegen Dataset Normalierung?
-            x_left = self.tokens_to_matrix(tokens_left, top_tokens)
-            x_right = self.tokens_to_matrix(tokens_right, top_tokens)
+            x_left = self.tokens_to_matrix(
+                tokens_left, top_tokens, path2imp=self.path2imp
+            )
+            x_right = self.tokens_to_matrix(
+                tokens_right, top_tokens, path2imp=self.path2imp
+            )
 
             store = {
                 "left": {
@@ -352,7 +356,9 @@ class ImpostorDetector(ImpostorBase):
                 tmp_store = {
                     impostor_name: {
                         "tfidf": self.tokens_to_matrix(
-                            self.tokenizer(impostor_text), top_tokens
+                            self.tokenizer(impostor_text),
+                            top_tokens,
+                            path2imp=self.path2imp,
                         ),
                         "text": impostor_text,
                         "tokens": self.tokenizer(impostor_text),
@@ -437,7 +443,7 @@ class ImpostorDetector(ImpostorBase):
             self._vectorizer_vocab = top_token_list
             # TODO: get more data to fit?
 
-            if path2imp.exists():
+            if path2imp and path2imp.exists():
                 split = "train" if self._training_mode else "test"
                 train_data = load_from_disk(path2imp, split=split)[split].to_pandas()
                 candidate_texts = []
