@@ -157,18 +157,24 @@ def get_detector_scores(
                 dataset_scored = dataset.copy()
                 dataset_scored[score_col] = np.nan
                 rows = list(dataset_scored.itertuples())  # Faster + safer for indexing
-                with ThreadPoolExecutor() as executor:
-                    futures = [
-                        executor.submit(_compute_score, detector, row._asdict())
-                        for row in rows
-                    ]
-                    for future in tqdm(
-                        as_completed(futures),
-                        total=len(futures),
-                        desc=f"Scoring {detector_name} on {dataset_name}",
-                    ):
-                        idx, score = future.result()
-                        dataset.at[idx, score_col] = score
+                # FIXME: Paraphrasers multiple times given (borrowed): Maybe multiple inits?
+                # with ThreadPoolExecutor() as executor:
+                #     futures = [
+                #         executor.submit(_compute_score, detector, row._asdict())
+                #         for row in rows
+                #     ]
+                #     for future in tqdm(
+                #         as_completed(futures),
+                #         total=len(futures),
+                #         desc=f"Scoring {detector_name} on {dataset_name}",
+                #     ):
+                #         idx, score = future.result()
+                #         dataset.at[idx, score_col] = score
+
+                # FIXME: try sequential processing for simplicity
+                for row in dataset_scored.itertuples():
+                    idx, score = _compute_score(detector, row._asdict())
+                    dataset.at[idx, score_col] = score
 
                 dataset_scored.to_csv(output_file, index=False)
         all_dfs.append(dataset_scored)
