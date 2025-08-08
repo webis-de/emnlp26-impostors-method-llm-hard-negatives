@@ -123,7 +123,12 @@ def _compute_score(detector, row: collections.OrderedDict) -> tuple[int, float]:
     except Exception as e:
         print(f"Error getting index from row: {e}")
         print(f"Row keys: {row.keys()}")
-    return id, np.round(score, 2)  # return index + score
+    try:
+        return id, np.round(score, 2)  # return index + score
+    except TypeError as e:
+        raise TypeError(
+            f"Error rounding score: {score}. Ensure the score is a number. Row: {row}. Error: {str(e)}"
+        ) from e
 
 
 def get_detector_scores(
