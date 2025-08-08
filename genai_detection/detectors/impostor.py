@@ -441,7 +441,7 @@ class ImpostorDetector(ImpostorBase):
 
         # avoid fitting a new vectorizer every time (costly)
         if not hasattr(self, "_vectorizer") or self._vectorizer_vocab != top_token_list:
-            train_data
+            train_data = None
             if path2imp and path2imp.exists():
                 split = "train" if self._training_mode else "test"
                 train_data = load_from_disk(path2imp)[split].to_pandas()
