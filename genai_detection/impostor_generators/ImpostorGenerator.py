@@ -128,6 +128,9 @@ class ContentImpostorGenerator(BaseImpostorGenerator):
         # select n_impostors entries which are most similar to the input text in terms of content
         candidate_texts = []
         for entry in sampled:
+            assert isinstance(
+                entry, dict
+            ), "Each entry in the dataset must be a dictionary (generate_impostors)."
             pair = entry.get("pair", [])
             candidate_texts.extend(pair)
 
