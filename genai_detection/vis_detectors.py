@@ -588,8 +588,8 @@ class VisDetectors:
                 b = self._format_title(
                     base=f"thres_vs_f1_acc_prec_recall", kwargs=title_kwargs
                 )
-                filename = self._title2filename(title=f"{b}.{format}")
-            plt.savefig(save_path / filename)
+                filename = self._title2filename(title=b)
+            plt.savefig(save_path / f"{filename}.{format}")
 
         plt.close(fig)
         return fpr, tpr, roc_thresholds, thresholds[1:-1][np.argmax(f1s[1:-1])]
