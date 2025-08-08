@@ -441,15 +441,7 @@ class ImpostorDetector(ImpostorBase):
 
         # avoid fitting a new vectorizer every time (costly)
         if not hasattr(self, "_vectorizer") or self._vectorizer_vocab != top_token_list:
-            self._vectorizer = TfidfVectorizer(
-                vocabulary=top_token_list,
-                input="content",
-                dtype=np.float32,
-                lowercase=False,
-            )
-            self._vectorizer_vocab = top_token_list
-            # TODO: get more data to fit?
-
+            train_data
             if path2imp and path2imp.exists():
                 split = "train" if self._training_mode else "test"
                 train_data = load_from_disk(path2imp)[split].to_pandas()
@@ -460,9 +452,29 @@ class ImpostorDetector(ImpostorBase):
                     ), "Each entry in the dataset must be a dictionary (tokens_to_matrix)."
                     pair = entry.get("pair", [])
                     candidate_texts.extend(pair)
-            else:
+                tokens = [
+                    token
+                    for t in candidate_texts
+                    for token in self.tokenizer(self.preprocess_text(t))
+                ]
+                freqs = Counter(tokens)
+                freqs = Counter({k: v for k, v in freqs.items() if v > 1})
+                top_token_list = heapq.nlargest(
+                    self.top_n, list(freqs.keys()), key=lambda x: freqs[x]
+                )
+            self._vectorizer = TfidfVectorizer(
+                vocabulary=top_token_list,
+                input="content",
+                dtype=np.float32,
+                lowercase=False,  # do not lowercase all, treat tokens as case-sensitive
+            )
+            self._vectorizer_vocab = top_token_list
+            # TODO: get more data to fit?
+
+            if not train_data:
                 candidate_texts = [" ".join(tokens)]
             self._vectorizer = self._vectorizer.fit(candidate_texts)
+            print("Fitted TFIDF vectorizer on candidate texts.")
 
         # FIXME: fit_transform does not work, raises not fitted error
         # tfidf_matrix = self._vectorizer.fit_transform(
