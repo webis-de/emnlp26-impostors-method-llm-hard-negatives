@@ -80,7 +80,7 @@ class BaseImpostorGenerator(ABC):
                 os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")),
                 path2imp,
             )
-        )  # TODO: for notebook ..
+        )
         if self.split not in dataset:
             raise ValueError(
                 f"Dataset {path2imp} does not contain '{self.split}' split."
@@ -127,7 +127,8 @@ class ContentImpostorGenerator(BaseImpostorGenerator):
         sampled = ds.shuffle().select(range(min(len(ds), self.n_impostors)))
         # select n_impostors entries which are most similar to the input text in terms of content
         candidate_texts = []
-        for entry in sampled:
+        for _, row in sampled.to_pandas().iterrows():
+            entry = row.to_dict()
             assert isinstance(
                 entry, dict
             ), "Each entry in the dataset must be a dictionary (generate_impostors)."
@@ -675,12 +676,13 @@ class FixedImpostorGenerator(BaseImpostorGenerator):
             range(max(1, min(len(ds), self.n_impostors // 2)))
         )
         impostors = {}
-        for i, entry in enumerate(sampled):
-            if "pair" not in entry:
-                continue
+        for i, row in sampled.to_pandas().iterrows():
+            entry = row.to_dict()
             assert isinstance(
                 entry, dict
             ), "Each entry in the dataset must be a dictionary."
+            if "pair" not in entry:
+                continue
             key = entry.get("id", f"impostor_{i}")
             impostors[f"{key}_left"] = entry["pair"][0]
             impostors[f"{key}_right"] = entry["pair"][1]

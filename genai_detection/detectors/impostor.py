@@ -446,7 +446,8 @@ class ImpostorDetector(ImpostorBase):
                 split = "train" if self._training_mode else "test"
                 train_data = load_from_disk(path2imp)[split].to_pandas()
                 candidate_texts = []
-                for entry in train_data:
+                for _, row in train_data.iterrows():
+                    entry = row.to_dict()
                     assert isinstance(
                         entry, dict
                     ), f"Each entry in the dataset must be a dictionary (tokens_to_matrix). But is {type(entry)}/{entry}."
