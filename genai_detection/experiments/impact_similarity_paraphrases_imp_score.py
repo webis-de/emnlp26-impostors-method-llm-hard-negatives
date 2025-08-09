@@ -262,20 +262,19 @@ if __name__ == "__main__":
     if not SAVE_PATH.exists():
         SAVE_PATH.mkdir(parents=True, exist_ok=True)
 
-    paraphrase_save_path = SAVE_PATH / "cross_genre" / "paraphrases_per_text"
-    paraphrase_save_path.mkdir(parents=True, exist_ok=True)
+    SAVE_PATH.mkdir(parents=True, exist_ok=True)
 
     # Student Essays
     print("Running experiment for Student Essays dataset.")
     student_test_df = create_df(
         path2dataset=CONFIG.PATH2STUDENT_ESSAYS,
         dataset_name=CONFIG.STUDENT_ESSAYS,
-        save_path=paraphrase_save_path,
+        save_path=SAVE_PATH,
     )
     print("Visualizing accuracy per syntactic similarity for Student Essays dataset.")
     vis_acc_per_syn_sim(
         score_sim_df=student_test_df,
-        save_path=paraphrase_save_path,
+        save_path=SAVE_PATH,
         dataset_name=CONFIG.STUDENT_ESSAYS,
     )
 
@@ -284,13 +283,13 @@ if __name__ == "__main__":
     blog_test_df = create_df(
         path2dataset=CONFIG.PATH2BLOG,
         dataset_name=CONFIG.BLOG,
-        save_path=paraphrase_save_path,
+        save_path=SAVE_PATH,
     )
     print("Visualizing accuracy per syntactic similarity for Blog dataset.")
     vis_acc_per_syn_sim(
         score_sim_df=blog_test_df,
-        save_path=paraphrase_save_path,
+        save_path=SAVE_PATH,
         dataset_name=CONFIG.BLOG,
     )
 
-    print("Experiment completed. Results saved to:", paraphrase_save_path)
+    print("Experiment completed. Results saved to:", SAVE_PATH)
