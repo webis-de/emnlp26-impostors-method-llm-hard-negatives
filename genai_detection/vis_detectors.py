@@ -1296,7 +1296,7 @@ if __name__ == "__main__":
     if fig == 2:
         vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
     elif fig == 4:
-        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args)
+        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args, save_path=None)
     elif fig == 5:
         # not really figure 5, but figure 4 with our contributions (LLM based impostors)
         vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
@@ -1317,7 +1317,7 @@ if __name__ == "__main__":
     if fig == 2:
         vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
     elif fig == 4:
-        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args)
+        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args, save_path=None)
     elif fig == 5:
         # not really figure 5, but figure 4 with our contributions (LLM based impostors)
         vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
