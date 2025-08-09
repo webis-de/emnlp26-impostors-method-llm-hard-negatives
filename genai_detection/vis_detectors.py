@@ -960,57 +960,60 @@ class VisDetectors:
             else Path(os.getcwd()).resolve() / CONFIG.PATH2STUDENT_ESSAYS
         )
         print(
-            "Start parallel computation for different impostor generation techniques."
+            "Start sequential computation (else OOM) for different impostor generation techniques."
         )
-        with ProcessPoolExecutor() as executor:
-            futures = {
-                executor.submit(
-                    self._run_fig_4_worker,
-                    imp_gen,
-                    train_dataset,
-                    test_dataset,
-                    path2imp,
-                ): imp_gen
-                for imp_gen in imp_gen_options
-            }
+        # with ProcessPoolExecutor() as executor:
+        #     futures = {
+        #         executor.submit(
+        #             self._run_fig_4_worker,
+        #             imp_gen,
+        #             train_dataset,
+        #             test_dataset,
+        #             path2imp,
+        #         ): imp_gen
+        #         for imp_gen in imp_gen_options
+        #     }
 
-            for future in as_completed(futures):
-                result = future.result()
-                if result:
-                    same_author_precisions[result["imp_gen"]] = result[
-                        "same_author_precisions"
-                    ][:-1]
-                    same_author_recalls[result["imp_gen"]] = result[
-                        "same_author_recalls"
-                    ][:-1]
-                    # save precision and recall for same pairs
-                    self._save_prec_recall_values(
-                        pr_save_path=pr_save_path,
-                        appr_name=result["imp_gen"],
-                        precision_vals=same_author_precisions[result["imp_gen"]],
-                        recall_vals=same_author_recalls[result["imp_gen"]],
-                        pr_thresholds=result["same_pr_thresholds"],
-                        portion="same",
-                    )
+        #     for future in as_completed(futures):
+        #         result = future.result()
+        #         if result:
+        for imp_gen in imp_gen_options:
+            result = self._run_fig_4_worker(
+                imp_gen, train_dataset, test_dataset, path2imp
+            )
+            assert result is not None, f"Failed for imp_gen: {imp_gen}"
+            same_author_precisions[result["imp_gen"]] = result[
+                "same_author_precisions"
+            ][:-1]
+            same_author_recalls[result["imp_gen"]] = result["same_author_recalls"][:-1]
+            # save precision and recall for same pairs
+            self._save_prec_recall_values(
+                pr_save_path=pr_save_path,
+                appr_name=result["imp_gen"],
+                precision_vals=same_author_precisions[result["imp_gen"]],
+                recall_vals=same_author_recalls[result["imp_gen"]],
+                pr_thresholds=result["same_pr_thresholds"],
+                portion="same",
+            )
 
-                    different_author_precisions[result["imp_gen"]] = result[
-                        "different_author_precisions"
-                    ][:-1]
-                    different_author_recalls[result["imp_gen"]] = result[
-                        "different_author_recalls"
-                    ][:-1]
-                    # save precision and recall for different pairs
-                    self._save_prec_recall_values(
-                        pr_save_path=pr_save_path,
-                        appr_name=result["imp_gen"],
-                        precision_vals=different_author_precisions[result["imp_gen"]],
-                        recall_vals=different_author_recalls[result["imp_gen"]],
-                        pr_thresholds=result["different_pr_thresholds"],
-                        portion="different",
-                    )
-                    print(
-                        f"Computed and saved precision and recall for {result['imp_gen']} impostor generation. "
-                    )
+            different_author_precisions[result["imp_gen"]] = result[
+                "different_author_precisions"
+            ][:-1]
+            different_author_recalls[result["imp_gen"]] = result[
+                "different_author_recalls"
+            ][:-1]
+            # save precision and recall for different pairs
+            self._save_prec_recall_values(
+                pr_save_path=pr_save_path,
+                appr_name=result["imp_gen"],
+                precision_vals=different_author_precisions[result["imp_gen"]],
+                recall_vals=different_author_recalls[result["imp_gen"]],
+                pr_thresholds=result["different_pr_thresholds"],
+                portion="different",
+            )
+            print(
+                f"Computed and saved precision and recall for {result['imp_gen']} impostor generation. "
+            )
 
         for baseline_name, baseline in zip(
             baselines,
