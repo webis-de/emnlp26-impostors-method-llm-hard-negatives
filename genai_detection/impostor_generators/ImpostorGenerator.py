@@ -21,6 +21,7 @@ import serpapi
 from dotenv import load_dotenv
 import torch
 from genai_detection.paraphrasing.paraphraser import (
+    SAIAParaphraser,
     T5ChatGPTParaphraser,
     T5GooglePAWSParaphraser,
     OllamaParaphraser,
@@ -514,30 +515,32 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
             self.t5_chatgpt_paraphraser = T5ChatGPTParaphraser()
             self.t5_google_paws_paraphraser = T5GooglePAWSParaphraser()
             self.ollama_paraphraser = OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION)
+            self.saia_paraphraser = SAIAParaphraser()
             self.topic_paraphraser = TopicParaphraser(
-                text_extractor=self.ollama_paraphraser,
-                text_generator=self.ollama_paraphraser,
+                text_extractor=self.saia_paraphraser,
+                text_generator=self.saia_paraphraser,
             )
             self.task_paraphraser = TaskParaphraser(
-                text_extractor=self.ollama_paraphraser,
-                text_generator=self.ollama_paraphraser,
+                text_extractor=self.saia_paraphraser,
+                text_generator=self.saia_paraphraser,
             )
             self.title_paraphraser = TitleParaphraser(
-                text_extractor=self.ollama_paraphraser,
-                text_generator=self.ollama_paraphraser,
+                text_extractor=self.saia_paraphraser,
+                text_generator=self.saia_paraphraser,
             )
             self.bullet_point_paraphraser = BulletPointParaphraser(
-                text_extractor=self.ollama_paraphraser,
-                text_generator=self.ollama_paraphraser,
+                text_extractor=self.saia_paraphraser,
+                text_generator=self.saia_paraphraser,
             )
             self.translation_paraphraser = TranslationParaphraser(
-                text_extractor=self.ollama_paraphraser,
-                text_generator=self.ollama_paraphraser,
+                text_extractor=self.saia_paraphraser,
+                text_generator=self.saia_paraphraser,
             )
             self.paraphrasers = [
                 self.t5_chatgpt_paraphraser,
                 self.t5_google_paws_paraphraser,
                 self.ollama_paraphraser,
+                self.saia_paraphraser,
                 self.topic_paraphraser,
                 self.task_paraphraser,
                 self.title_paraphraser,
@@ -594,26 +597,26 @@ class NonNaiveLLMImpostorGenerator(LLMImpostorGenerator):
         Naive LLM-based impostor generator that uses no naive paraphrasers (i.e. only two-step paraphrasers).
         :param n_impostors: number of impostors to generate
         """
-        ollama_paraphraser = OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION)
+        saia_paraphraser = SAIAParaphraser()
         topic_paraphraser = TopicParaphraser(
-            text_extractor=ollama_paraphraser,
-            text_generator=ollama_paraphraser,
+            text_extractor=saia_paraphraser,
+            text_generator=saia_paraphraser,
         )
         task_paraphraser = TaskParaphraser(
-            text_extractor=ollama_paraphraser,
-            text_generator=ollama_paraphraser,
+            text_extractor=saia_paraphraser,
+            text_generator=saia_paraphraser,
         )
         title_paraphraser = TitleParaphraser(
-            text_extractor=ollama_paraphraser,
-            text_generator=ollama_paraphraser,
+            text_extractor=saia_paraphraser,
+            text_generator=saia_paraphraser,
         )
         bullet_point_paraphraser = BulletPointParaphraser(
-            text_extractor=ollama_paraphraser,
-            text_generator=ollama_paraphraser,
+            text_extractor=saia_paraphraser,
+            text_generator=saia_paraphraser,
         )
         translation_paraphraser = TranslationParaphraser(
-            text_extractor=ollama_paraphraser,
-            text_generator=ollama_paraphraser,
+            text_extractor=saia_paraphraser,
+            text_generator=saia_paraphraser,
         )
 
         super().__init__(
@@ -637,6 +640,7 @@ class NaiveLLMImpostorGenerator(LLMImpostorGenerator):
         t5_chatgpt_paraphraser = T5ChatGPTParaphraser()
         t5_google_paws_paraphraser = T5GooglePAWSParaphraser()
         ollama_paraphraser = OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION)
+        saiai_paraphraser = SAIAParaphraser()
 
         super().__init__(
             n_impostors=n_impostors,
@@ -644,6 +648,7 @@ class NaiveLLMImpostorGenerator(LLMImpostorGenerator):
                 t5_chatgpt_paraphraser,
                 t5_google_paws_paraphraser,
                 ollama_paraphraser,
+                saiai_paraphraser,
             ],
         )
 

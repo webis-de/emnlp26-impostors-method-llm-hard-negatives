@@ -24,12 +24,14 @@ from genai_detection.config import CONFIG
 from genai_detection.paraphrasing.paraphraser import (
     BulletPointParaphraser,
     OllamaParaphraser,
+    SAIAParaphraser,
     T5ChatGPTParaphraser,
     T5GooglePAWSParaphraser,
     TaskParaphraser,
     TitleParaphraser,
     TopicParaphraser,
     TranslationParaphraser,
+    get_paraphraser_dict,
 )
 from genai_detection.util import preprocess_text as _preprocess_text
 
@@ -1046,21 +1048,18 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
                 )
         dataset.reset_index(drop=True, inplace=True)
 
-        # artificial generation
-        def create_paraphrasers(model):
-            return {
-                "T5_ChatGPT": T5ChatGPTParaphraser(),
-                "T5_Google_PAWS": T5GooglePAWSParaphraser(),
-                "Ollama": model,
-                "BulletPoint": BulletPointParaphraser(model, model),
-                # "Task": TaskParaphraser(model, model),
-                # "Topic": TopicParaphraser(model, model),
-                # "Title": TitleParaphraser(model, model),
-                "Translation": TranslationParaphraser(model, model),
-            }
-
-        model = OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION)
-        paraphrasers = create_paraphrasers(model)
+        all_paraphrasers_dict = get_paraphraser_dict()
+        paraphrasers = {
+            k: all_paraphrasers_dict[k]
+            for k in [
+                "T5_ChatGPT",
+                "T5_Google_PAWS",
+                "Ollama",
+                "BulletPoint",
+                "Translation",
+            ]
+            if k in all_paraphrasers_dict
+        }
         # only as many artificial samples as normal ones (multiplied by number of paraphrasers)
         unique_rows = dataset.drop_duplicates(subset=["disputed_text"])
         unique_rows = unique_rows.sample(

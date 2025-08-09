@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import re
 import sys
-from typing import Any, List, Literal, Optional, get_args
+from typing import Any, Dict, List, Literal, Optional, get_args
 import unicodedata
 import openai
 from pydantic import BaseModel
@@ -1205,6 +1205,48 @@ class TranslationParaphraser(NonNaiveParaphraser):
             )
 
         return paraphrased_texts
+
+
+def get_paraphraser_dict() -> Dict[str, Paraphraser]:
+    """
+    Returns a dictionary of paraphrasers with their names as keys and instances as values.
+    """
+    paraphrasers = {
+        "T5_ChatGPT": T5ChatGPTParaphraser(),
+        "T5_Google_PAWS": T5GooglePAWSParaphraser(),
+        "Ollama": OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
+        "SAIA": SAIAParaphraser(),
+    }
+    bullet_point_paraphraser = BulletPointParaphraser(
+        text_extractor=paraphrasers["SAIA"],
+        text_generator=paraphrasers["SAIA"],
+    )
+    task_paraphraser = TaskParaphraser(
+        text_extractor=paraphrasers["SAIA"],
+        text_generator=paraphrasers["SAIA"],
+    )
+    topic_paraphraser = TopicParaphraser(
+        text_extractor=paraphrasers["SAIA"],
+        text_generator=paraphrasers["SAIA"],
+    )
+    title_paraphraser = TitleParaphraser(
+        text_extractor=paraphrasers["SAIA"],
+        text_generator=paraphrasers["SAIA"],
+    )
+    translation_paraphraser = TranslationParaphraser(
+        text_extractor=paraphrasers["SAIA"],
+        text_generator=paraphrasers["SAIA"],
+    )
+    paraphrasers.update(
+        {
+            "BulletPoint": bullet_point_paraphraser,
+            "Task": task_paraphraser,
+            "Topic": topic_paraphraser,
+            "Title": title_paraphraser,
+            "Translation": translation_paraphraser,
+        }
+    )
+    return paraphrasers
 
 
 if __name__ == "__main__":

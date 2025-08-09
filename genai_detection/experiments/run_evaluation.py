@@ -15,10 +15,12 @@ from genai_detection.paraphrasing.paraphraser import (
     BlabladorParaphraser,
     BulletPointParaphraser,
     OllamaParaphraser,
+    SAIAParaphraser,
     TaskParaphraser,
     TopicParaphraser,
     TitleParaphraser,
     TranslationParaphraser,
+    get_paraphraser_dict,
 )
 from genai_detection.paraphrasing.paraphraser_evaluation import ParaphrasingEvaluator
 
@@ -71,19 +73,6 @@ def load_metadata(path, file_name):
         return {}
 
 
-def create_paraphrasers(model):
-    return {
-        "T5_ChatGPT": T5ChatGPTParaphraser(),
-        "T5_Google_PAWS": T5GooglePAWSParaphraser(),
-        "Ollama": model,
-        "BulletPoint": BulletPointParaphraser(model, model),
-        "Task": TaskParaphraser(model, model),
-        "Topic": TopicParaphraser(model, model),
-        "Title": TitleParaphraser(model, model),
-        "Translation": TranslationParaphraser(model, model),
-    }
-
-
 def evaluate_category(data_category, data_root, save_path):
     print(f"Evaluating category: {data_category}")
     try:
@@ -95,9 +84,7 @@ def evaluate_category(data_category, data_root, save_path):
         use_ground_truth = not (data_category in ["Blog", "Student Essays"])
         metadata = load_metadata(path2datasets, file_name) if use_ground_truth else {}
         text = load_text(data_category, path2datasets, file_name)
-        model = OllamaParaphraser(model_id=OLLAMA_VERSION)
-        print(f"Loaded ollama model: {model}")
-        paraphrasers = create_paraphrasers(model)
+        paraphrasers = get_paraphraser_dict()
         print(f"Loaded paraphrasers for {data_category}")
 
         evaluator = ParaphrasingEvaluator(
@@ -143,7 +130,7 @@ def evaluate_category(data_category, data_root, save_path):
 
 
 def run_extraction_evaluation(save_path):
-    model = OllamaParaphraser(model_id=OLLAMA_VERSION)
+    model = SAIAParaphraser()
     paraphrasers = {
         "TopicParaphraser": TopicParaphraser(model, model),
         "TaskParaphraser": TaskParaphraser(model, model),

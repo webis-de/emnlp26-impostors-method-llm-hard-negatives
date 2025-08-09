@@ -30,16 +30,8 @@ from genai_detection.config import CONFIG
 from genai_detection.paraphrasing.paraphraser import (
     NaiveParaphraser,
     NonNaiveParaphraser,
-    T5ChatGPTParaphraser,
-    T5GooglePAWSParaphraser,
-    BlabladorParaphraser,
-    BulletPointParaphraser,
-    OllamaParaphraser,
-    TaskParaphraser,
-    TopicParaphraser,
-    TitleParaphraser,
-    TranslationParaphraser,
     Paraphraser,
+    get_paraphraser_dict,
 )
 from genai_detection.paraphrasing.paraphraser_evaluation import ParaphrasingEvaluator
 
@@ -80,47 +72,6 @@ def get_dataset(path2dataset: str) -> pd.DataFrame:
     )
     print(f"Loaded Cross-genre dataset with {len(dataset)} examples.")
     return dataset
-
-
-def get_paraphraser_dict() -> Dict[str, Paraphraser]:
-    """
-    Returns a dictionary of paraphrasers with their names as keys and instances as values.
-    """
-    paraphrasers = {
-        "T5_ChatGPT": T5ChatGPTParaphraser(),
-        "T5_Google_PAWS": T5GooglePAWSParaphraser(),
-        "Ollama": OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
-    }
-    bullet_point_paraphraser = BulletPointParaphraser(
-        text_extractor=paraphrasers["Ollama"],
-        text_generator=paraphrasers["Ollama"],
-    )
-    task_paraphraser = TaskParaphraser(
-        text_extractor=paraphrasers["Ollama"],
-        text_generator=paraphrasers["Ollama"],
-    )
-    topic_paraphraser = TopicParaphraser(
-        text_extractor=paraphrasers["Ollama"],
-        text_generator=paraphrasers["Ollama"],
-    )
-    title_paraphraser = TitleParaphraser(
-        text_extractor=paraphrasers["Ollama"],
-        text_generator=paraphrasers["Ollama"],
-    )
-    translation_paraphraser = TranslationParaphraser(
-        text_extractor=paraphrasers["Ollama"],
-        text_generator=paraphrasers["Ollama"],
-    )
-    paraphrasers.update(
-        {
-            "BulletPoint": bullet_point_paraphraser,
-            "Task": task_paraphraser,
-            "Topic": topic_paraphraser,
-            "Title": title_paraphraser,
-            "Translation": translation_paraphraser,
-        }
-    )
-    return paraphrasers
 
 
 def init_paraphrase_evaluator(
