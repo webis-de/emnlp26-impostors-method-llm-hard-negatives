@@ -450,7 +450,7 @@ class ImpostorDetector(ImpostorBase):
                     entry = row.to_dict()
                     assert isinstance(
                         entry, dict
-                    ), f"Each entry in the dataset must be a dictionary (tokens_to_matrix). But is {type(entry)}/{entry}."
+                    ), f"Each entry in the dataset must be a dictionary (tokens_to_matrix). But is {type(entry)}/entry:{entry}/row:{row}."
                     pair = entry.get("pair", [])
                     candidate_texts.extend(pair)
                 tokens = [
