@@ -1257,6 +1257,7 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+    print("Arguments for impostor detector:", args)
 
     impostor = ImpostorDetector(
         impostor_technique="fixed",
