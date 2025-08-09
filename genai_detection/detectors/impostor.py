@@ -148,6 +148,15 @@ class ImpostorDetector(ImpostorBase):
                 n_impostors=self.n_impostors
             )
 
+    def set_treshold(self, threshold: float):
+        """
+        Set the threshold for the minimum similarity score to consider two texts same-author.
+        :param threshold: threshold value
+        """
+        if not (0 <= threshold <= 1):
+            raise ValueError("Threshold must be in [0, 1].")
+        self.threshold = threshold
+
     def set_training_mode(self, training_mode: bool):
         """
         Set the training mode for the detector.
@@ -239,6 +248,8 @@ class ImpostorDetector(ImpostorBase):
         scores_per_pair = defaultdict(
             int
         )  # id is index of pair (i.e, length is half of the input text list)
+        # for evaluating the impact of text similarity on the scores
+        impostors_per_candidate = {}
         for i, t in enumerate(ichunked(text, 2)):
             t = list(t)  # generator object is not subscriptable, so convert to list
             assert len(t) == 2, "Input text must be a list of pairs of texts."
@@ -274,13 +285,10 @@ class ImpostorDetector(ImpostorBase):
                     )
                 )
 
-            # TODO: preprocessing: remove punctuation, lowercasing, remove html tags (e.g., <nl>), etc.?
-            # Koppel et al. (2014) do not normalize text pairs, but without normalization, the results are terrible.
-            # Does not make sense, bc 	idiosyncrasies of authors are not captured when using stemmed text.
-            # Kontrolliere Situation
-
+            # Controll situation via preprocessing: remove genre artifacts, remove html tags (e.g., <nl>), etc.
+            # Koppel et al. (2014) do not normalize text pairs.
+            # preprocess_text omits all layout/ structural information to keep only style
             # Koppel et al. (2014) use documents of length 500 words exactly -> we DON'T crop at min_n_tokens to keep more information
-            # preprocess_text omits all layour/ structural information to keep only style
             tokens_left = self.tokenizer(self.preprocess_text(text_left))
             tokens_right = self.tokenizer(self.preprocess_text(text_right))
 
@@ -313,12 +321,11 @@ class ImpostorDetector(ImpostorBase):
             else:
                 shared_tokens = freqs_left.keys() | freqs_right.keys()
 
-            # TODO: Use complete corpus for Student Essays
             top_tokens = heapq.nlargest(
                 self.top_n, shared_tokens, key=lambda x: freqs_left[x] + freqs_right[x]
             )
 
-            # TODO: muss man TFIDF gemeinsam (left, right, impostors) berechnen, wegen Dataset Normalierung?
+            # TFIDF vectorizer fit on training corpus
             x_left = self.tokens_to_matrix(
                 tokens_left, top_tokens, path2imp=self.path2imp
             )
@@ -341,6 +348,8 @@ class ImpostorDetector(ImpostorBase):
                 },
             }
 
+            # for evaluating the impact of text similarity on the scores
+            impostors_per_candidate[f"text_pair_{i}"] = {}
             # two iterations, generating impostors for each candidate once
             for j, (disputed, candidate) in enumerate(
                 itertools.permutations(list(store.keys()), 2)
@@ -352,6 +361,11 @@ class ImpostorDetector(ImpostorBase):
                     real_time_generation=self.real_time_generation,
                     path2imp=self.path2imp,
                 )
+                impostors_per_candidate[f"text_pair_{i}"][j] = {
+                    "reference_text": store[candidate]["text"],
+                    "other_text": store[disputed]["text"],
+                    "paraphrases": impostor_candidates,
+                }
                 print("Generated impostors for candidate.")
 
                 tmp_store = {
@@ -398,9 +412,12 @@ class ImpostorDetector(ImpostorBase):
                 scores_per_pair[i] /= j + 1
 
         # one elmenent = averaged score of X,Y and Y,X pair (score=number of rounds where the candidate was the most similar)
-        # TODO: threshold is in [0,1], maybe normalize by rounds?
         # return list(scores_per_pair.values())
-        return [v / self.rounds for v in scores_per_pair.values()]
+        # threshold is in [0,1], hence: normalized by rounds
+        # TODO: Omit second return value if not evaluating the impact of text similarity on the scores
+        return [
+            v / self.rounds for v in scores_per_pair.values()
+        ], impostors_per_candidate
 
     def normalize_text(self, text):
         """
@@ -440,6 +457,15 @@ class ImpostorDetector(ImpostorBase):
             )  # return empty matrix if no top tokens
 
         # avoid fitting a new vectorizer every time (costly)
+        self._update_vectorizer_if_necessary(
+            top_token_list=top_token_list, path2imp=path2imp, input_tokens=tokens
+        )
+
+        tfidf_matrix = self._vectorizer.transform([" ".join(tokens)])
+
+        return tfidf_matrix.toarray()
+
+    def _update_vectorizer_if_necessary(self, top_token_list, path2imp, input_tokens):
         if not hasattr(self, "_vectorizer") or self._vectorizer_vocab != top_token_list:
             train_data = None
             if path2imp and path2imp.exists():
@@ -470,28 +496,11 @@ class ImpostorDetector(ImpostorBase):
                 lowercase=False,  # do not lowercase all, treat tokens as case-sensitive
             )
             self._vectorizer_vocab = top_token_list
-            # TODO: get more data to fit?
 
             if not train_data:
-                candidate_texts = [" ".join(tokens)]
+                candidate_texts = [" ".join(input_tokens)]
             self._vectorizer = self._vectorizer.fit(candidate_texts)
             print("Fitted TFIDF vectorizer on candidate texts.")
-
-        # FIXME: fit_transform does not work, raises not fitted error
-        # tfidf_matrix = self._vectorizer.fit_transform(
-        #     [" ".join(tokens)]
-        # )  # format (n_samples=1, n_features=self.top_n)
-        # format (n_samples=1, n_features=self.top_n)
-        tfidf_matrix = self._vectorizer.transform([" ".join(tokens)])
-
-        assert tfidf_matrix.shape[1] == len(
-            top_token_list
-        ), "TFIDF matrix shape mismatch with top token list length."
-        assert (
-            tfidf_matrix.shape[0] == 1
-        ), "TFIDF matrix should have one row for the single input document."
-
-        return tfidf_matrix.toarray()
 
     @staticmethod
     def tokenize_whitespace(text: str, normalize_ws: bool = True):
