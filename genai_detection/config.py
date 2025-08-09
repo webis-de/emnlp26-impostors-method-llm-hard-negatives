@@ -10,6 +10,7 @@ class BaseConfig:
     SERPAPI_KEY = os.getenv("SERPAPI_KEY")
     BLABLADOR_KEY = os.getenv("BLABLADOR_KEY")
     OPENAI_KEY = os.getenv("OPENAI_KEY")
+    SAIA_KEY = os.getenv("SAIA_KEY")
     DEEPL_API_KEY = os.getenv("DEEPL_KEY")
     DATA_BASE_PATH = "data/datasets"
     PATH2PAN25 = f"{DATA_BASE_PATH}/pan25-genai-identification/pan25-dataset-converted"
@@ -40,6 +41,7 @@ class BaseConfig:
     TEMPERATURE = 0.7
     MAX_LENGTH = 512  # Maximum length of the generated paraphrase
     OLLAMA_VERSION = "zephyr:7b"  # "mistral:7b"  # "default:latest"
+    SAIAI_VERSION = "openai-gpt-oss-120b"
 
 
 class ServerConfig(BaseConfig):

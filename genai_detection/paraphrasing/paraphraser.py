@@ -472,7 +472,7 @@ class OllamaParaphraser(NaiveParaphraser):
     Ollama paraphrasing model hosted by Webis.
     """
 
-    def __init__(self, model_id: str = "default:latest"):
+    def __init__(self, model_id: str = CONFIG.OLLAMA_VERSION):
         self.client = OpenAI(
             base_url="https://llm.web.webis.de/api",
             api_key=CONFIG.OPENAI_KEY,
@@ -534,6 +534,76 @@ class OllamaParaphraser(NaiveParaphraser):
                 continue
             # print(f"[DEBUG] Response from Ollama paraphraser: {response.choices[0].message.content}")
             # print(f"[DEBUG] Response format: {format.model_json_schema()}/{type(format)}")
+            resp = response.choices[0].message.content
+            resp = re.sub("'", " ", resp)  # replace single quotes with double quotes
+            resp = re.sub(r"\s+", " ", resp)  # remove excessive whitespaces
+
+            try:
+                data = json.loads(resp)
+                responses.append(data)
+            except json.JSONDecodeError:
+                responses.append(response.choices[0].message.content)
+
+        return responses
+
+
+class SAIAParaphraser(NaiveParaphraser):
+    """
+    SAIA paraphrasing model hosted by GWDG (Gesellschaft für wissenschaftliche Datenverarbeitung mbH Göttingen).
+    SAIA is the Scalable Artificial Intelligence (AI) Accelerator that hosts our AI services.
+
+    For more information, see https://docs.hpc.gwdg.de/services/saia/index.html#api-request (09.08.2025).
+    """
+
+    def __init__(self, model_id: str = CONFIG.SAIAI_VERSION):
+        self.client = OpenAI(
+            base_url="https://chat-ai.academiccloud.de/v1",
+            api_key=CONFIG.SAIA_KEY,
+        )
+        self.model_id = model_id
+
+    def paraphrase(
+        self,
+        text: str,
+        prompt: str = 'Paraphrase the following text. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","paraphrase":"<paraphrased version of the text>"}. Text to paraphrase:',
+        max_length: int = CONFIG.MAX_LENGTH,
+        temperature: float = CONFIG.TEMPERATURE,
+        n_responses: int = 1,
+        response_schema: Optional[dict[str, Any]] = None,
+    ) -> List[str]:
+        """
+        Generate paraphrased versions of the input text.
+
+        :param text: The input text to be paraphrased.
+        :param prompt: The prompt to be used for paraphrasing. This model allows for JSON structured ouput, hence, specify here the prompt to be used for paraphrasing.
+        The prompt is inserted after the text to enforce its importance in the LLM's context when working on long texts.
+        :param max_length: The maximum number of tokens to generate in the paraphrase.
+        :param temperature: Controls the randomness of the output. Lower values make the output more deterministic
+        :param n_responses: The number of paraphrases to generate.
+        :return: A list of paraphrased versions of the input text.
+        """
+        print("SAIA model")
+        responses = []
+        for i in range(n_responses):
+            body = {
+                "model": self.model_id,
+                "messages": [{"role": "user", "content": f"{text}\n{prompt.strip()}"}],
+                "temperature": temperature,
+            }
+            # if response_schema:
+            #      # text={"format": {"type": "json_object"}},  # FIXME: keyword unknwon even though: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#json-mode
+            #     body['response_format'] = {"type": "json_schema", "json_schema": response_schema}  # use pydantic schema to validate the response, https://ollama.com/blog/structured-outputs
+            try:
+                response = self.client.chat.completions.create(**body)
+            except openai.InternalServerError as e:
+                print(
+                    f"[ERROR] Failed to generate paraphrase with SAIA: {e}. Skipping..."
+                )
+                continue
+            # print(
+            #     f"[DEBUG] Response from SAIA paraphraser: {response.choices[0].message.content}"
+            # )
+
             resp = response.choices[0].message.content
             resp = re.sub("'", " ", resp)  # replace single quotes with double quotes
             resp = re.sub(r"\s+", " ", resp)  # remove excessive whitespaces
@@ -1139,33 +1209,33 @@ class TranslationParaphraser(NonNaiveParaphraser):
 
 if __name__ == "__main__":
     # models
-    ollama_model_id = "default:latest"  # "mistral:7b"  #
     paraphrasers = {
         # 'T5_ChatGPT': T5ChatGPTParaphraser(),
         # 'T5_Google_PAWS': T5GooglePAWSParaphraser(),
         # 'Blablador': BlabladorParaphraser(model_id="1 - Llama3 405 the best general model and big context size"),
-        "Ollama": OllamaParaphraser(model_id=ollama_model_id),
+        # "Ollama": OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
+        "SAIA": SAIAParaphraser(model_id=CONFIG.SAIAI_VERSION),
         # "TopicParaphraser": TopicParaphraser(
-        #     text_extractor=OllamaParaphraser(model_id=ollama_model_id),
-        #     text_generator=OllamaParaphraser(model_id=ollama_model_id),
+        #     text_extractor=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
+        #     text_generator=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
         # ),
         # "TaskParaphraser": TaskParaphraser(
-        #     text_extractor=OllamaParaphraser(model_id=ollama_model_id),
-        #     text_generator=OllamaParaphraser(model_id=ollama_model_id),
+        #     text_extractor=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
+        #     text_generator=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
         # ),
         # "TitleParaphraser": TitleParaphraser(
-        #     text_extractor=OllamaParaphraser(model_id=ollama_model_id),
-        #     text_generator=OllamaParaphraser(model_id=ollama_model_id),
+        #     text_extractor=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
+        #     text_generator=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
         # ),
         # "BulletPointParaphraser": BulletPointParaphraser(
-        #     text_extractor=OllamaParaphraser(model_id=ollama_model_id),
-        #     text_generator=OllamaParaphraser(model_id=ollama_model_id),
+        #     text_extractor=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
+        #     text_generator=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
         # ),
-        "TranslationParaphraser": TranslationParaphraser(
-            text_extractor=OllamaParaphraser(model_id=ollama_model_id),
-            text_generator=OllamaParaphraser(model_id=ollama_model_id),
-            language="French",
-        ),
+        # "TranslationParaphraser": TranslationParaphraser(
+        #     text_extractor=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
+        #     text_generator=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
+        #     language="French",
+        # ),
     }
     # paraphrasers.update({f'Blablador_{name}': BlabladorParaphraser(model_id=name) for name in list(get_args(ModelName))})
 
@@ -1182,7 +1252,8 @@ if __name__ == "__main__":
     # file_name = "cnn_230625"
     # original_text = open(path2datasets / f"{file_name}.txt").read()
     text = "Dear Santa, I wish for a big red nosed reindeer that can fly and a sleigh full of toys for all the children in the world. I promise to be good and help others. Love, Timmy."
-    p = paraphrasers["TranslationParaphraser"]
+    # p = paraphrasers["TranslationParaphraser"]
+    p = paraphrasers["SAIA"]
     print(f"[DEBUG] Paraphrasing text with {p.__class__.__name__}")
     paraphrased_texts = p.paraphrase(text=text, n_responses=2)
     print(f"[DEBUG] Paraphrased texts: {paraphrased_texts}")
