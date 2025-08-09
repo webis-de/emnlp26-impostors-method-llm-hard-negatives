@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=fig_4_koppel
-#SBATCH --mem=64g
+#SBATCH --mem=128g
 #SBATCH --cpus-per-task=4
 #SBATCH --output=logs/%j-fig4-koppel.log
 #SBATCH --container-image=registry.webis.de/code-teaching/theses/artificial-authorship-verification:latest
