@@ -32,10 +32,6 @@ def get_dataset(path2dataset: str, split: str = "train") -> pd.DataFrame:
     """
     assert os.path.exists(path2dataset), f"Dataset path {path2dataset} does not exist."
     dataset = load_from_disk(path2dataset)[split].to_pandas()
-    dataset.drop(
-        columns=["candidate_text", "same", "pair", "artificial_generation"],
-        inplace=True,
-    )
     print(f"Loaded dataset with {len(dataset)} examples.")
     return dataset
 
@@ -116,7 +112,7 @@ def _avg_sim_ref_paraphrases(impostor_entry):
         paraphrases = sub_entry["paraphrases"].values()
 
         for para in paraphrases:
-            scores.append(_sym_sim(ref_text, para))
+            scores.append(_syn_sim(ref_text, para))
 
     return sum(scores) / len(scores) if scores else None
 
