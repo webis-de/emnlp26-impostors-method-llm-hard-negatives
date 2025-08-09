@@ -21,18 +21,7 @@ from tqdm import tqdm
 
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from genai_detection.config import CONFIG
-from genai_detection.paraphrasing.paraphraser import (
-    BulletPointParaphraser,
-    OllamaParaphraser,
-    SAIAParaphraser,
-    T5ChatGPTParaphraser,
-    T5GooglePAWSParaphraser,
-    TaskParaphraser,
-    TitleParaphraser,
-    TopicParaphraser,
-    TranslationParaphraser,
-    get_paraphraser_dict,
-)
+from genai_detection.paraphrasing.paraphraser import get_paraphraser_dict
 from genai_detection.util import preprocess_text as _preprocess_text
 
 random.seed(42)
