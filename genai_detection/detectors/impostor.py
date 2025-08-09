@@ -497,7 +497,7 @@ class ImpostorDetector(ImpostorBase):
             )
             self._vectorizer_vocab = top_token_list
 
-            if not train_data:
+            if train_data is None or train_data.empty:
                 candidate_texts = [" ".join(input_tokens)]
             self._vectorizer = self._vectorizer.fit(candidate_texts)
             print("Fitted TFIDF vectorizer on candidate texts.")
