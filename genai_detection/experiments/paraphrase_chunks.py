@@ -211,6 +211,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
     """
     assert os.path.exists(path2dataset), f"Dataset path {path2dataset} does not exist."
     assert save_path.exists(), f"Save path {save_path} does not exist."
+    # TODO: only to run second job, delete after
     n = 20
     dataset = get_dataset(path2dataset).iloc[n:]
     n_responses = 1
