@@ -211,7 +211,8 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
     """
     assert os.path.exists(path2dataset), f"Dataset path {path2dataset} does not exist."
     assert save_path.exists(), f"Save path {save_path} does not exist."
-    dataset = get_dataset(path2dataset)
+    n = 20
+    dataset = get_dataset(path2dataset).iloc[n:]
     n_responses = 1
 
     # Initialize paraphrasers and prompts
@@ -219,10 +220,10 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
 
     # work on each text individually
     for i, (original_text, category) in enumerate(
-        zip(dataset["disputed_text"], dataset["category"])
+        zip(dataset["disputed_text"], dataset["category"]), start=n
     ):
         # TODO: First only process Student Essays
-        filter_cat = "Gutenberg"  # "Student Essays"  # "Gutenberg"  # "Pan 20"
+        filter_cat = "Gutenberg"
         if category != filter_cat:
             print(f"Skipping text {i+1}/{len(dataset)}: {category} (not {filter_cat})")
             continue
