@@ -1,6 +1,6 @@
 # ✅ TODOs
 
-## 📅 01.08.2025- 08.08.2025
+## 📅 09.08.2025- 16.08.2025
 ### 📚 Dataset
 - [ ] original MirrorMinds-LLMDetector dataset
 - [ ] Webis has newer and better fanfiction dataset than PAN20
@@ -84,7 +84,7 @@
   - is capitalization important for AV/AA? Is a style feature of importance?
     - if used often for one doctor maybe, but rather unlikely for majority of texts
     - [ ] test via table of different preprocessing steps and their impact on vocabulary size (and scores)
-
+- [ ] cite [KISSKI](https://docs.hpc.gwdg.de/acknowledgements/index.html) in thesis (for SAIAI paraphraser)
 
 ### 🛠️ Implementation
 - [ ] LLM detection experiments: 
@@ -92,16 +92,7 @@
   - 2. subset of all LLMs is candidate: Can we detect all LLMs using subset of LLMs?
     - subset of LLMs of same architecture, i.e. all LLMs are T5
     - subset of LLMs trained on same data, i.e. all LLMs are trained on Wikipedia
-- [x] ask Koppel about preprocessing steps of Blog (and Student Essay) dataset
-  - bc our results are worse than Koppel et al. 2014's results
-- [x] scatter top accuracy of Koppel et al. 2014's in our accuracy plot
-  - Blog
-  - Student Essay
-  - [ ] statistical significance test
-- [x] table with all different preprocessing steps (incl. lowercasing, stemming, etc.) and their impact on vocabulary size (and scores)
-  - first column: preprocessing step
-  - second column: vocabulary size
-  - ~~min/ max/ std/ vocabulary size/ token diversity~~
+- [ ] statistical significance test: top accuracy of Koppel et al. 2014's in our accuracy plot
 - [ ] are texts that are heavily influenced by preprocessing steps bas (i.e. all caps texts)?
 - [ ] do not optimize one approach, but compare different approaches
   - i.e. optimizing scores is not goal for the purpose of "the" AV model
@@ -113,15 +104,18 @@
   - trying to get parallelization working
 - [o] run `experiments/paraphrase_chunks.py`via `scripts/exp_chunks_paraphrasing.sh`
   - cancelled due to time limitations
-  - trying to get parallelization working
-  - cannot download `SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")` or `gensim.downloader.load("glove-twitter-25")`
-- [o] run `impact_preprocessing.py` via `scripts/preprocessing_impact.sh`
-  - [ ] run on cluster (PAN20, Student Essay, Blog, Gutenberg)
-  - [x] run locally (Student Essay, Blog, Gutenberg)
+  - ~~trying to get parallelization working~~
+  - trying to save paraphrases and compute scores separately
+    - evaluation works
+    - creation of paraphrases takes too long
+    - creation of Student Essays: Done, Rest: incomplete
+  - ~~cannot download `SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")` or `gensim.downloader.load("glove-twitter-25")`~~
 - [ ] run `genai_detection/vis_detectors.py`via `scripts/vis_detectors.sh` on cluster again, bc annotation changed
   - [o] Fig 2
-  - [o] Fig 4
-- [ ] OpenAI
+  - [o] Fig 4 (TODO: on on-the-fly generated impostors)
+    - find error for on-the fly generated impostors
+- [o] Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
+  - estimated 36h of runtime
 - [ ] lowercasing texts for unmasking or other AV/AA: 
     - Yes: [Janek's Two Paradigms of LLM Detection: AA vs. AV pg. 3768 left 1st paragraph](https://aclanthology.org/2025.findings-acl.194.pdf), [Janek's BA pg. 11](https://downloads.webis.de/theses/papers/bevendorff_2016.pdf)
     - Currently no, bc loosing information, i.e. capitalization, all caps, etc.
@@ -130,10 +124,6 @@
 - [o] What are impostor paper (Koppel et al. 2014) baselines: Implement them
   - 1. Similarity-Based Baseline: Measure the similarity (1a cosine ca. 71% acc, 1b min-max ca. 74% acc) between the candidate text and the original text (space-free 4-gram tfidf of top 100,000 n-grams across corpus) and assign same-author label if similarity is above a certain threshold.
   - 2. Supervised Baseline: Train a supervised classifier (linear SVM) on 1,000 labeled sample pairs to distinguish between same-author and different-author pairs based on absolute element-wise differences in their top 100,000 tfidf embedding: 79.8% accuracy
-- Koppel et al. Student Essay dataset: 
-  - [x] ~~Use only first 500 words of each text~~ we use the first 700 words
-  - [x] ~~corpus of 2000 pairs~~ we have 224 pairs
-  - [x] X,Y pairs: never from same task, regardless of same or different author
 - [ ] scatter semantic/ syntactic scores
   - [x] change "model" to "Paraphraser" in plot legend
   - [ ] artificial bins of similarity
@@ -173,6 +163,33 @@
   - [ ] Student Essay dataset **TODO: crushes Macbook when running locally**
 
 
+
+## 📅 01.08.2025- 08.08.2025
+### 📚 Dataset
+-
+
+### ✍️ Written Work
+-
+
+### 🛠️ Implementation
+- [x] ask Koppel about preprocessing steps of Blog (and Student Essay) dataset
+  - bc our results are worse than Koppel et al. 2014's results
+- [x] scatter top accuracy of Koppel et al. 2014's in our accuracy plot
+  - Blog
+  - Student Essay
+- [x] table with all different preprocessing steps (incl. lowercasing, stemming, etc.) and their impact on vocabulary size (and scores)
+  - first column: preprocessing step
+  - second column: vocabulary size
+  - ~~min/ max/ std/ vocabulary size/ token diversity~~
+- [x] run `impact_preprocessing.py` via `scripts/preprocessing_impact.sh`
+  - [x] run on cluster (PAN20, Student Essay, Blog, Gutenberg)
+  - [x] run locally (Student Essay, Blog, Gutenberg)
+- Koppel et al. Student Essay dataset: 
+  - [x] ~~Use only first 500 words of each text~~ we use the first 700 words
+  - [x] ~~corpus of 2000 pairs~~ we have 224 pairs
+  - [x] X,Y pairs: never from same task, regardless of same or different author
+
+
 ## 📅 25.07.2025- 01.08.2025
 ### 📚 Dataset
 -
@@ -210,8 +227,7 @@
   - [x] script with parallel code
   - [x] sbatch script
   - [x] Docker container to run evaluation
-- [o] Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
-  - estimated 36h of runtime
+
 
 ## 📅 22.07.2025- 01.08.2025
 
