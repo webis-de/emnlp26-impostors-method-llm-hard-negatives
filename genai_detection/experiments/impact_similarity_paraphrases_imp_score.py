@@ -196,46 +196,65 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
         score_sim_df["syn_sim_ref_paraphrases"]
         - score_sim_df["syn_sim_disputed_candidate"]
     )
-    # Choose number of bins (e.g., quartiles = 4 bins)
-    n_bins = 4
 
-    score_sim_df["diff_bin"] = pd.qcut(
-        score_sim_df["syn_sim_diff"],
-        q=n_bins,
-        labels=[f"Bin {i+1}" for i in range(n_bins)],
-    )
-    bin_ranges = score_sim_df.groupby("diff_bin")["syn_sim_diff"].agg(["min", "max"])
-    accuracy_by_bin = (
-        score_sim_df.groupby("diff_bin")
-        .apply(lambda g: (g["prediction"] == g["true_label"]).mean())
-        .reset_index(name="accuracy")
-    )
+    for col in [
+        "syn_sim_diff",
+        "syn_sim_ref_paraphrases",
+        "syn_sim_disputed_candidate",
+    ]:
+        # Choose number of bins (e.g., quartiles = 4 bins)
+        n_bins = 4
 
-    bin_stats = accuracy_by_bin.merge(bin_ranges, on="diff_bin")
-    fig, ax1 = plt.subplots(figsize=(8, 5))
-
-    # Accuracy bars
-    ax1.bar(
-        bin_stats["diff_bin"], bin_stats["accuracy"], color="skyblue", label="Accuracy"
-    )
-    ax1.set_ylabel("Accuracy")
-    ax1.set_ylim(0, 1)
-    ax1.tick_params(axis="y")
-
-    # Bin range annotations above bars
-    for i, row in bin_stats.iterrows():
-        ax1.text(
-            i,
-            row["accuracy"] + 0.02,
-            f"[{row['min']:.2f}, {row['max']:.2f}]",
-            ha="center",
-            fontsize=9,
-            color="black",
+        score_sim_df["diff_bin"] = pd.qcut(
+            score_sim_df[col],
+            q=n_bins,
+            labels=[f"Bin {i+1}" for i in range(n_bins)],
+        )
+        bin_ranges = score_sim_df.groupby("diff_bin")[col].agg(["min", "max"])
+        accuracy_by_bin = (
+            score_sim_df.groupby("diff_bin")
+            .apply(lambda g: (g["prediction"] == g["true_label"]).mean())
+            .reset_index(name="accuracy")
         )
 
-    plt.title("Accuracy by Syn Sim Diff Quantile (Bin Ranges Annotated)")
-    plt.tight_layout()
-    plt.savefig(save_path / f"{dataset_name}_syn_sim_accuracy.svg")
+        bin_stats = accuracy_by_bin.merge(bin_ranges, on="diff_bin")
+        fig, ax1 = plt.subplots(figsize=(8, 5))
+
+        # Accuracy bars
+        ax1.bar(
+            bin_stats["diff_bin"],
+            bin_stats["accuracy"],
+            color="skyblue",
+            label="Accuracy",
+        )
+        ax1.set_ylabel("Accuracy")
+        ax1.set_ylim(0, 1)
+        ax1.tick_params(axis="y")
+
+        # Bin range annotations above bars
+        for i, row in bin_stats.iterrows():
+            ax1.text(
+                i,
+                row["accuracy"] + 0.02,
+                f"[{row['min']:.2f}, {row['max']:.2f}]",
+                ha="center",
+                fontsize=9,
+                color="black",
+            )
+        type = (
+            "Syn Sim Diff"
+            if col == "syn_sim_diff"
+            else (
+                "Syn Sim Ref Paraphrases"
+                if col == "syn_sim_ref_paraphrases"
+                else "Syn Sim Disputed Candidate"
+            )
+        )
+        plt.title(f"Accuracy by {type} Quantile (Bin Ranges Annotated)")
+        plt.tight_layout()
+        plt.savefig(
+            save_path / f"{dataset_name}_syn_sim_{type.replace(' ', '_')}_accuracy.svg"
+        )
 
 
 if __name__ == "__main__":
