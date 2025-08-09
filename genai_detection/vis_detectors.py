@@ -1288,6 +1288,9 @@ if __name__ == "__main__":
         5,  # not really figure 5, but figure 4 with our contributions (LLM based impostors)
     ], "Only Figures 2 and 4 can be reproduced from Koppel et al. (2014)."
     args = vars(args)  # namespace to dict conversion
+    print(
+        f"Reproducing Figure {fig} from Koppel et al. (2014) on BLOG and STUDENT data."
+    )
     vis_det = VisDetectors(
         dataset_name=CONFIG.BLOG,
         detectors=[impostor],
