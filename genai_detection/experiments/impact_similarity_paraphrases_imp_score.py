@@ -139,16 +139,20 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     print(f"Running experiment for {dataset_name} dataset.")
 
     with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
-        results = list(executor.map(impostor_detector.get_score, train_dataset["pair"]))
+        results = list(
+            executor.map(impostor_detector._get_score_impl, train_dataset["pair"])
+        )
 
+    # print(f"Computed impostor scores for {len(results)} pairs:", results)
     # results is a list of tuples: (impostor_score, impostor_dict)
     train_dataset["impostor_score"] = [score for score, _ in results]
     train_dataset["impostor_dict"] = [impostor_dict for _, impostor_dict in results]
 
-    scores = (train_dataset["impostor_score"],)
     labels = train_dataset["same"]
     labels = labels.values
-    scores = np.concatenate(scores.values)  # each entry in scores is a one-element list
+    scores = np.concatenate(
+        train_dataset["impostor_score"].values
+    )  # each entry in scores is a one-element list
 
     fpr, tpr, roc_thresholds = roc_curve(y_true=labels, y_score=scores)
     opt_thres = _get_opt_imp_threshold(fpr, tpr, roc_thresholds)
