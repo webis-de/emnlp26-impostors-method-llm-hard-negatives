@@ -513,7 +513,7 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
         self.n_impostors = n_impostors
         if paraphrasers is None:
             self.t5_chatgpt_paraphraser = T5ChatGPTParaphraser()
-            self.t5_google_paws_paraphraser = T5GooglePAWSParaphraser()
+            # self.t5_google_paws_paraphraser = T5GooglePAWSParaphraser()
             # self.ollama_paraphraser = OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION)
             self.saia_paraphraser = SAIAParaphraser()
             self.topic_paraphraser = TopicParaphraser(
@@ -538,7 +538,7 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
             )
             self.paraphrasers = [
                 self.t5_chatgpt_paraphraser,
-                self.t5_google_paws_paraphraser,
+                # self.t5_google_paws_paraphraser,
                 # self.ollama_paraphraser,
                 self.saia_paraphraser,
                 self.topic_paraphraser,
@@ -638,7 +638,7 @@ class NaiveLLMImpostorGenerator(LLMImpostorGenerator):
         :param n_impostors: number of impostors to generate
         """
         t5_chatgpt_paraphraser = T5ChatGPTParaphraser()
-        t5_google_paws_paraphraser = T5GooglePAWSParaphraser()
+        # t5_google_paws_paraphraser = T5GooglePAWSParaphraser()
         # ollama_paraphraser = OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION)
         saiai_paraphraser = SAIAParaphraser()
 
@@ -646,7 +646,7 @@ class NaiveLLMImpostorGenerator(LLMImpostorGenerator):
             n_impostors=n_impostors,
             paraphrasers=[
                 t5_chatgpt_paraphraser,
-                t5_google_paws_paraphraser,
+                # t5_google_paws_paraphraser,
                 # ollama_paraphraser,
                 saiai_paraphraser,
             ],
