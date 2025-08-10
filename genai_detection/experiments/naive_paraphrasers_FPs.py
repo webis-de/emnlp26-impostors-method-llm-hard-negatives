@@ -213,9 +213,15 @@ def _get_rsme_per_paraphraser(
     paraphraser_names = NAIVE_PARAPHRASER_NAMES + NON_NAIVE_PARAPHRASER_NAMES
     for paraphraser in dataset["paraphraser"].unique():
         if paraphraser not in paraphraser_names:
+            print(
+                f"Skipping paraphraser {paraphraser} as it is not in the expected list."
+            )
             continue  # Skip if the paraphrasers that are actually human authors
         for detector_name, detector in detector_dict.items():
             fp_for_paraphraser = dataset[dataset["paraphraser"] == paraphraser]
+            assert (
+                not fp_for_paraphraser.empty
+            ), f"No data found for paraphraser {paraphraser} with detector {detector_name}."
             scores = fp_for_paraphraser[f"{detector_name}_score"]
             rmse = np.sqrt(np.mean((scores - fp_for_paraphraser["same"]) ** 2))
             rmse_per_paraphraser[paraphraser][detector_name] = rmse
@@ -223,6 +229,8 @@ def _get_rsme_per_paraphraser(
     rmse_df = pd.DataFrame(rmse_per_paraphraser).T
     rmse_df.reset_index(inplace=True)
     rmse_df.rename(columns={"index": "paraphraser"}, inplace=True)
+    print("RMSE per paraphraser and detector:")
+    print(rmse_df)
     return rmse_df
 
 
@@ -263,6 +271,9 @@ def run_FNs_experiment(
     fn_dataset = dataset[dataset["same"]]
 
     rmse_df = _get_rsme_per_paraphraser(fn_dataset, detector_dict)
+    assert (
+        not rmse_df.empty
+    ), "RMSE DataFrame is empty. Check the dataset and detectors."
 
     rmse_df.to_csv(
         SAVE_PATH / f"exp_naive_paraphrasers_rmse_per_paraphraser_FNs_{TIMESTAMP}.csv",
