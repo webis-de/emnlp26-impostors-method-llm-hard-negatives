@@ -179,6 +179,10 @@ def get_detector_scores(
 
                 # FIXME: try sequential processing for simplicity
                 for row in rows:
+                    assert "candidate_paraphraser" in row._asdict(), (
+                        "Row does not contain 'candidate_paraphraser' key. Ensure the dataset has been processed correctly.",
+                        row._asdict(),
+                    )
                     idx, score = _compute_score(detector, row._asdict())
                     try:
                         dataset.at[idx, score_col] = score
