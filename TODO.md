@@ -116,10 +116,10 @@
     - [o] running on 15 element subset of each dataset
     - [o] running on complete dataset (maybe old code)
   - [o] Fig 4 
-    - [o] run all but on-the-fly on complete dataset
+    - [o] run all but on-the-fly on complete dataset (Student Essay looks good, Blog TODO)
     - [ ] run on-the-fly on subset bc free API calls limited to 250 queries per month
 - [o] Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
-  - estimated 36h of runtime
+- [o] Compare Impostor generators and MirrorMinds-LLMDetector paraphrase' effect on impostor detector scores (`comp_imp_generators.py`)
 - [ ] lowercasing texts for unmasking or other AV/AA: 
     - Yes: [Janek's Two Paradigms of LLM Detection: AA vs. AV pg. 3768 left 1st paragraph](https://aclanthology.org/2025.findings-acl.194.pdf), [Janek's BA pg. 11](https://downloads.webis.de/theses/papers/bevendorff_2016.pdf)
     - Currently no, bc loosing information, i.e. capitalization, all caps, etc.
