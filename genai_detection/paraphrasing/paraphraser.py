@@ -1215,27 +1215,30 @@ def get_paraphraser_dict() -> Dict[str, Paraphraser]:
         "T5_ChatGPT": T5ChatGPTParaphraser(),
         "T5_Google_PAWS": T5GooglePAWSParaphraser(),
         "Ollama": OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
-        "SAIA": SAIAParaphraser(),
+        "qwen3-32b": SAIAParaphraser("qwen3-32b"),
+        "mistral-large-instruct": SAIAParaphraser("mistral-large-instruct"),
+        "openai-gpt-oss-120b": SAIAParaphraser("openai-gpt-oss-120b"),
+        "meta-llama-3.1-8b-instruct": SAIAParaphraser("meta-llama-3.1-8b-instruct"),
     }
     bullet_point_paraphraser = BulletPointParaphraser(
-        text_extractor=paraphrasers["SAIA"],
-        text_generator=paraphrasers["SAIA"],
+        text_extractor=paraphrasers["openai-gpt-oss-120b"],
+        text_generator=paraphrasers["openai-gpt-oss-120b"],
     )
     task_paraphraser = TaskParaphraser(
-        text_extractor=paraphrasers["SAIA"],
-        text_generator=paraphrasers["SAIA"],
+        text_extractor=paraphrasers["openai-gpt-oss-120b"],
+        text_generator=paraphrasers["openai-gpt-oss-120b"],
     )
     topic_paraphraser = TopicParaphraser(
-        text_extractor=paraphrasers["SAIA"],
-        text_generator=paraphrasers["SAIA"],
+        text_extractor=paraphrasers["openai-gpt-oss-120b"],
+        text_generator=paraphrasers["openai-gpt-oss-120b"],
     )
     title_paraphraser = TitleParaphraser(
-        text_extractor=paraphrasers["SAIA"],
-        text_generator=paraphrasers["SAIA"],
+        text_extractor=paraphrasers["openai-gpt-oss-120b"],
+        text_generator=paraphrasers["openai-gpt-oss-120b"],
     )
     translation_paraphraser = TranslationParaphraser(
-        text_extractor=paraphrasers["SAIA"],
-        text_generator=paraphrasers["SAIA"],
+        text_extractor=paraphrasers["openai-gpt-oss-120b"],
+        text_generator=paraphrasers["openai-gpt-oss-120b"],
     )
     paraphrasers.update(
         {
