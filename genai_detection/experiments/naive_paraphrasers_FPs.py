@@ -91,10 +91,11 @@ def load_detectors() -> dict[str, ImpostorDetector]:
     Load the detectors for the experiment.
     The detectors are expected to be in the `genai_detection.detectors` module.
     """
-    naive_impostor_detector = ImpostorDetector(
-        path2imp=Path(os.getcwd()).resolve().parent / CONFIG.PATH2BLOG,
-        impostor_technique="naive_llm",  # Use only naive paraphrasers for impostor generation
-    )
+    # TODO: only commented to fix error with non-naive paraphrasers
+    # naive_impostor_detector = ImpostorDetector(
+    #     path2imp=Path(os.getcwd()).resolve().parent / CONFIG.PATH2BLOG,
+    #     impostor_technique="naive_llm",  # Use only naive paraphrasers for impostor generation
+    # )
     non_naive_impostor_detector = ImpostorDetector(
         path2imp=Path(os.getcwd()).resolve().parent / CONFIG.PATH2BLOG,
         impostor_technique="non_naive_llm",  # Use only non-naive paraphrasers for impostor generation
@@ -106,7 +107,7 @@ def load_detectors() -> dict[str, ImpostorDetector]:
     # unmasking_detector = UnmaskingDetector()
     # ppmd_detector = PPMdDetector()
     detector_dict = {
-        "naive": naive_impostor_detector,
+        # "naive": naive_impostor_detector,
         "non_naive": non_naive_impostor_detector,
         "generalized": generalized_impostor_detector,
     }
@@ -177,9 +178,16 @@ def get_detector_scores(
                 #         dataset.at[idx, score_col] = score
 
                 # FIXME: try sequential processing for simplicity
-                for row in dataset_scored.itertuples():
+                for row in rows:
                     idx, score = _compute_score(detector, row._asdict())
-                    dataset.at[idx, score_col] = score
+                    try:
+                        dataset.at[idx, score_col] = score
+                    except Exception as e:
+                        print(
+                            f"Error setting score for index {idx} in {detector_name} on {dataset_name}: {e}"
+                        )
+                        print(f"Row: {row._asdict()}")
+                        continue
 
                 dataset_scored.to_csv(output_file, index=False)
         all_dfs.append(dataset_scored)
