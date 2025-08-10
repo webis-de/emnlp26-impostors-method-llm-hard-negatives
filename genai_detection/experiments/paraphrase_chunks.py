@@ -261,81 +261,46 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
                 )
                 continue
             print(f"Number of chunks: {num_chunks}")
-            # Usage of ThreadPoolExecutor to parallelize over paraphrasers
-            with ThreadPoolExecutor(max_workers=len(paraphrasers)) as executor:
-                futures = []
-                for paraphraser_name in paraphrasers.keys():
-                    if paraphraser_name not in [
-                        "T5_ChatGPT",
-                        "T5_Google_PAWS",
-                        "Ollama",
-                    ]:
-                        futures.append(
-                            executor.submit(
-                                paraphrase_with_config,
-                                paraphraser_name,
-                                chunks,
-                                original_text,
-                                num_chunks,
-                                n_responses,
-                                category,
-                            )
-                        )
-                for future in as_completed(futures):
-                    all_rows.extend(future.result())
-            # for paraphraser_name, paraphraser in paraphrasers.items():
-            #     if paraphraser_name in ["T5_ChatGPT", "T5_Google_PAWS", "Ollama"]:
-            #         continue  # skip these paraphrasers, they are not used in this experiment
-            #     if isinstance(paraphraser, NonNaiveParaphraser):
-            #         prompt_options = [None]
-            #         temperature_options = [0, 0.5, 1.0]
-            #     elif isinstance(paraphraser, NaiveParaphraser):
-            #         prompt_options = PROMPTS
-            #         temperature_options = [None]
-            #     else:
-            #         raise ValueError(f"Unknown paraphraser type: {type(paraphraser)}")
-            #     for prompt in prompt_options:
-            #         for temperature in temperature_options:
-            #             print(
-            #                 f"Using paraphraser: {paraphraser_name} with temperature={temperature}, prompt={prompt}"
+            # Usage of ThreadPoolExecutor to parallelize over paraphrasers -> SAIA API Rate Limit Error
+            # with ThreadPoolExecutor(max_workers=len(paraphrasers)) as executor:
+            #     futures = []
+            #     for paraphraser_name in paraphrasers.keys():
+            #         if paraphraser_name not in [
+            #             "T5_ChatGPT",
+            #             "T5_Google_PAWS",
+            #             "Ollama",
+            #         ]:
+            #             futures.append(
+            #                 executor.submit(
+            #                     paraphrase_with_config,
+            #                     paraphraser_name,
+            #                     chunks,
+            #                     original_text,
+            #                     num_chunks,
+            #                     n_responses,
+            #                     category,
+            #                 )
             #             )
+            #     for future in as_completed(futures):
+            #         all_rows.extend(future.result())
 
-            #             for chunk_id, chunk in enumerate(chunks):
-            #                 print(f"Paraphrasing chunk {chunk_id+1}/{len(chunks)}")
-            #                 p_config = {
-            #                     "text": chunk,
-            #                     "prompt": prompt,
-            #                     "n_responses": n_responses,
-            #                 }
-            #                 if (
-            #                     isinstance(paraphraser, NonNaiveParaphraser)
-            #                     and temperature is not None
-            #                 ):
-            #                     p_config["temperature"] = temperature
-            #                 try:
-            #                     paraphrased_chunk = paraphraser.paraphrase(**p_config)
-            #                     rows.append(
-            #                         {
-            #                             "original_text": original_text,
-            #                             "num_chunks": num_chunks,
-            #                             "paraphraser": paraphraser_name,
-            #                             "prompt": prompt,
-            #                             "chunk_id": chunk_id,
-            #                             "chunk": chunk,
-            #                             "temperature": temperature,
-            #                             "paraphrased_chunk": (
-            #                                 paraphrased_chunk[0]
-            #                                 if paraphrased_chunk
-            #                                 else ""
-            #                             ),
-            #                             "category": category,
-            #                         }
-            #                     )
-            #                 except Exception as e:
-            #                     print(
-            #                         f"Error paraphrasing chunk {chunk_id+1}/{len(chunks)} with {paraphraser_name}: {e}"
-            #                     )
-
+            # Sequentially iterate over paraphrasers to avoid API rate limits
+            for paraphraser_name in paraphrasers.keys():
+                if paraphraser_name not in [
+                    "T5_ChatGPT",
+                    "T5_Google_PAWS",
+                    "Ollama",
+                ]:
+                    res = paraphrase_with_config(
+                        paraphraser_name,
+                        chunks,
+                        original_text,
+                        num_chunks,
+                        n_responses,
+                        category,
+                    )
+                    if res:
+                        all_rows.extend(res)
         text_paraphrases_df = pd.DataFrame(rows)
         # Save the results for this text
         text_paraphrases_df.to_csv(save_path / f"text_{i}_paraphrases.csv", index=False)
