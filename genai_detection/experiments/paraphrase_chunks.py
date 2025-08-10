@@ -42,11 +42,11 @@ CATEGORIES = [
     "Student Essay",
 ]
 PROMPTS = [
-    "Paraphrase the following text and output only the paraphrased version:",
-    "First, extract bullet points capturing the main ideas, then create a text based on these bullet points. Only output the final text (i.e. do not output the bullet points or any additional chain of thoughts):",
-    "Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
-    "Paraphrase the sentence using the same tone as the original with approximately the same number of words:",
-    "Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence:",
+    "Paraphrase the text above and output only the paraphrased version.",
+    "For the text above: First, extract bullet points capturing the main ideas, then create a text based on these bullet points. Only output the final text (i.e. do not output the bullet points or any additional chain of thoughts).",
+    "For the text above: Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
+    "For the text above: Paraphrase the sentence using the same tone as the original with approximately the same number of words.",
+    "For the text above: Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence.",
 ]
 SAVE_PATH = (
     Path(__file__).resolve().parents[2]
