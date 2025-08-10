@@ -27,6 +27,10 @@ NAIVE_PARAPHRASER_NAMES = [
     "T5_ChatGPT",
     "T5_Google_PAWS",
     "Ollama",
+    "qwen3-32b",
+    "mistral-large-instruct",
+    "openai-gpt-oss-120b",
+    "meta-llama-3.1-8b-instruct",
 ]
 NON_NAIVE_PARAPHRASER_NAMES = [
     "BulletPoint",
