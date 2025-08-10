@@ -839,7 +839,7 @@ class VisDetectors:
         )
         impostor_detector.set_training_mode(training_mode)
         res = impostor_detector._get_score_impl(pair)
-        return [score for score, _ in res]
+        return [r[0] if isinstance(r, (tuple, list)) else r for r in res]
 
     def _run_fig_4_worker(self, imp_gen, train_dataset, test_dataset, path2imp):
         try:
