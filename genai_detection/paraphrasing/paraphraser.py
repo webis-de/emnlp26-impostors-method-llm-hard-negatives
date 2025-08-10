@@ -585,9 +585,12 @@ class SAIAParaphraser(NaiveParaphraser):
         print("SAIA model")
         responses = []
         for i in range(n_responses):
+            # max token differs across models but usually at least 40k tokens, so we crop at less to be safe
             body = {
                 "model": self.model_id,
-                "messages": [{"role": "user", "content": f"{text}\n{prompt.strip()}"}],
+                "messages": [
+                    {"role": "user", "content": f"{text[:30000]}\n{prompt.strip()}"}
+                ],
                 "temperature": temperature,
             }
             # if response_schema:
@@ -1206,8 +1209,9 @@ def get_paraphraser_dict() -> Dict[str, Paraphraser]:
     Returns a dictionary of paraphrasers with their names as keys and instances as values.
     """
     paraphrasers = {
-        "T5_ChatGPT": T5ChatGPTParaphraser(),
-        "T5_Google_PAWS": T5GooglePAWSParaphraser(),
+        # often fail with NotImplementedError: Cannot copy out of meta tensor; no data! ...
+        #     "T5_ChatGPT": T5ChatGPTParaphraser(),
+        #     "T5_Google_PAWS": T5GooglePAWSParaphraser(),
         "Ollama": OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
         "qwen3-32b": SAIAParaphraser("qwen3-32b"),
         "mistral-large-instruct": SAIAParaphraser("mistral-large-instruct"),
