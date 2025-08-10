@@ -525,30 +525,39 @@ class VisDetectors:
         axes[0, 1].set_title(title, fontsize=10)
         axes[0, 1].grid(True)
         if dataset_name == CONFIG.BLOG:
-            axes[0, 1].axhline(
-                y=0.874,
-                linestyle="--",
-                color="red",
-                alpha=0.5,
-                label=r"Fixed (Blog) Imposter Generation$^1$",
-            )
-            axes[0, 1].axhline(
-                y=0.832,
-                linestyle="--",
-                color="violet",
-                alpha=0.5,
-                label=r"On-the-fly Imposter Generation$^1$",
-            )
-            axes[0, 1].annotate(
-                "1: Koppel et al. (2014)/ Blog dataset",
-                xy=(1.0, -0.2),
-                xycoords="axes fraction",
-                ha="right",
-                va="center",
-                fontsize=10,
-            )
-            axes[0, 1].legend()
-        elif dataset_name == CONFIG.STUDENT_ESSAYS:
+            if title_kwargs.get("impostor_technique", "fixed") == "fixed":
+                axes[0, 1].axhline(
+                    y=0.874,
+                    linestyle="--",
+                    color="red",
+                    alpha=0.5,
+                    label=r"Fixed (Blog) Imposter Generation$^1$",
+                )
+            elif title_kwargs.get("impostor_technique", "on-the-fly") == "on-the-fly":
+                axes[0, 1].axhline(
+                    y=0.832,
+                    linestyle="--",
+                    color="violet",
+                    alpha=0.5,
+                    label=r"On-the-fly Imposter Generation$^1$",
+                )
+            if title_kwargs.get("impostor_technique", "fixed") in [
+                "fixed",
+                "on-the-fly",
+            ]:
+                axes[0, 1].annotate(
+                    "1: Koppel et al. (2014)/ Blog dataset",
+                    xy=(1.0, -0.2),
+                    xycoords="axes fraction",
+                    ha="right",
+                    va="center",
+                    fontsize=10,
+                )
+                axes[0, 1].legend()
+        elif (
+            dataset_name == CONFIG.STUDENT_ESSAYS
+            and title_kwargs.get("impostor_technique", "fixed") == "fixed"
+        ):
             axes[0, 1].axhline(
                 y=0.731,
                 color="red",
@@ -1379,35 +1388,14 @@ if __name__ == "__main__":
     print(
         f"Reproducing Figure {fig} from Koppel et al. (2014) on BLOG and STUDENT data."
     )
-    vis_det = VisDetectors(
-        dataset_name=CONFIG.BLOG,
-        detectors=[impostor],
-    )
-    print(f"impostor Detector initialized for figure {fig}.")
-    print(
-        "Figr 2 currently sequential computation for different n_impostors to find bottleneck."
-    )
-    # if fig == 2:
-    #     vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
-    # elif fig == 4:
-    #     vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args, save_path=None)
-    # elif fig == 5:
-    #     # not really figure 5, but figure 4 with our contributions (LLM based impostors)
-    #     vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
-    #         args=args,
-    #         imp_gen_options=our_figure_impostor_options,
-    #         save_path=vis_det.savefig_base
-    #         / "impostor_scores"
-    #         / vis_det.dataset_name
-    #         / "our_contributions_scores",
-    #     )
-    # print(f"Finished reproducing Figure {fig} from Koppel et al. (2014) on BLOG data.")
 
     vis_det = VisDetectors(
         dataset_name=CONFIG.STUDENT_ESSAYS,
         detectors=[impostor],
     )
-    print(f"impostor Detector initialized for fig {fig}.")
+    print(
+        f"impostor Detector initialized for fig {fig} and dataset {CONFIG.STUDENT_ESSAYS}."
+    )
     if fig == 2:
         vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
     elif fig == 4:
@@ -1425,3 +1413,25 @@ if __name__ == "__main__":
     print(
         f"Finished reproducing Figure {fig} from Koppel et al. (2014) on STUDENT data."
     )
+
+    vis_det = VisDetectors(
+        dataset_name=CONFIG.BLOG,
+        detectors=[impostor],
+    )
+    print(f"impostor Detector initialized for fig {fig} and dataset {CONFIG.BLOG}.")
+
+    if fig == 2:
+        vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
+    elif fig == 4:
+        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args, save_path=None)
+    elif fig == 5:
+        # not really figure 5, but figure 4 with our contributions (LLM based impostors)
+        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
+            args=args,
+            imp_gen_options=our_figure_impostor_options,
+            save_path=vis_det.savefig_base
+            / "impostor_scores"
+            / vis_det.dataset_name
+            / "our_contributions_scores",
+        )
+    print(f"Finished reproducing Figure {fig} from Koppel et al. (2014) on BLOG data.")
