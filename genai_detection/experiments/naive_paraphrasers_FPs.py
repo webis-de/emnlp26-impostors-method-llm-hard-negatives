@@ -176,34 +176,35 @@ def get_detector_scores(
                 dataset_scored = dataset.copy()
                 dataset_scored[score_col] = np.nan
                 rows = list(dataset_scored.itertuples())  # Faster + safer for indexing
-                with ThreadPoolExecutor() as executor:
-                    futures = [
-                        executor.submit(_compute_score, detector_name, row._asdict())
-                        for row in rows
-                    ]
-                    for future in tqdm(
-                        as_completed(futures),
-                        total=len(futures),
-                        desc=f"Scoring {detector_name} on {dataset_name}",
-                    ):
-                        idx, score = future.result()
-                        dataset_scored.at[idx, score_col] = score
-                print(
-                    f"Created {detector_name} scores:",
-                    dataset_scored[f"{detector_name}_score"].head(),
-                )
+                # Exceeds API rate limits if too many requests are sent in parallel
+                # with ThreadPoolExecutor() as executor:
+                #     futures = [
+                #         executor.submit(_compute_score, detector_name, row._asdict())
+                #         for row in rows
+                #     ]
+                #     for future in tqdm(
+                #         as_completed(futures),
+                #         total=len(futures),
+                #         desc=f"Scoring {detector_name} on {dataset_name}",
+                #     ):
+                #         idx, score = future.result()
+                #         dataset_scored.at[idx, score_col] = score
+                # print(
+                #     f"Created {detector_name} scores:",
+                #     dataset_scored[f"{detector_name}_score"].head(),
+                # )
 
-                # FIXME: try sequential processing for simplicity
-                # for row in rows:
-                #     idx, score = _compute_score(detector, row._asdict())
-                #     try:
-                #         dataset.at[idx, score_col] = score
-                #     except Exception as e:
-                #         print(
-                #             f"Error setting score for index {idx} in {detector_name} on {dataset_name}: {e}"
-                #         )
-                #         print(f"Row: {row._asdict()}")
-                #         continue
+                # sequential processing to avoid SAIA API rate limits
+                for row in rows:
+                    idx, score = _compute_score(detector_name, row._asdict())
+                    try:
+                        dataset_scored.at[idx, score_col] = score
+                    except Exception as e:
+                        print(
+                            f"Error setting score for index {idx} in {detector_name} on {dataset_name}: {e}"
+                        )
+                        print(f"Row: {row._asdict()}")
+                        continue
 
                 dataset_scored.to_csv(output_file, index=False)
         all_dfs.append(dataset_scored)
