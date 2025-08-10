@@ -370,9 +370,6 @@ def evaluate_paraphrases(
                 )
                 continue
 
-            print(
-                "Paraphrased chunk:", paraphrased_chunk, "..."
-            )  # print first 100 characters
             try:
                 # input is list of strings, each string is a paraphrase/ reference
                 bert_scores = paraphrase_evaluator.bertscore.compute(
