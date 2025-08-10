@@ -306,7 +306,7 @@ class T5ChatGPTParaphraser(NaiveParaphraser):
         )
         print("Loaded T5ChatGPTParaphraser tokenizer")
         self.model = AutoModelForSeq2SeqLM.from_pretrained(
-            "humarin/chatgpt_paraphraser_on_T5_base"
+            "humarin/chatgpt_paraphraser_on_T5_base", device_map=None  # force CPU load
         ).to(self.device)
         print("Loaded T5ChatGPTParaphraser model")
 
