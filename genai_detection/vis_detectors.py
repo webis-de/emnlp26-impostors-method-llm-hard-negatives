@@ -986,13 +986,13 @@ class VisDetectors:
         train_dataset, test_dataset = self._load_datasets(balanced=True)
 
         # TODO: Test on small data subsets
-        train_dataset = pd.concat(
-            [
-                train_dataset.loc[train_dataset["same"]].head(5),
-                train_dataset.loc[~train_dataset["same"]].head(5),
-            ],
-            ignore_index=False,
-        )
+        # train_dataset = pd.concat(
+        #     [
+        #         train_dataset.loc[train_dataset["same"]].head(5),
+        #         train_dataset.loc[~train_dataset["same"]].head(5),
+        #     ],
+        #     ignore_index=False,
+        # )
 
         test_dataset = pd.concat(
             [
@@ -1093,13 +1093,13 @@ class VisDetectors:
                 )
                 train_dataset, test_dataset = self._load_datasets(balanced=True)
                 # TODO: Test on small data subsets
-                test_dataset = pd.concat(
-                    [
-                        test_dataset.loc[test_dataset["same"]].head(5),
-                        test_dataset.loc[~test_dataset["same"]].head(5),
-                    ],
-                    ignore_index=False,
-                )
+                # test_dataset = pd.concat(
+                #     [
+                #         test_dataset.loc[test_dataset["same"]].head(5),
+                #         test_dataset.loc[~test_dataset["same"]].head(5),
+                #     ],
+                #     ignore_index=False,
+                # )
                 preds = baseline.get_score(test_dataset["pair"])
 
             test_dataset[f"{baseline_name.replace(' ','_')}_score"] = preds
