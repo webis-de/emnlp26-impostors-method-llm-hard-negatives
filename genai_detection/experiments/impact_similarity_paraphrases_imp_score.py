@@ -131,7 +131,23 @@ def _helper_impostor(path2imp, pair, training_mode=True):
 
 
 def create_df(path2dataset: str, dataset_name: str, save_path: Path):
-    train_dataset = get_dataset(path2dataset)
+    train_dataset = get_dataset(path2dataset, split="train")
+    test_dataset = get_dataset(path2dataset, split="test")
+    train_dataset = pd.concat(
+        [
+            train_dataset.loc[train_dataset["same"]].head(15),
+            train_dataset.loc[~train_dataset["same"]].head(15),
+        ],
+        ignore_index=False,
+    )
+
+    test_dataset = pd.concat(
+        [
+            test_dataset.loc[test_dataset["same"]].head(15),
+            test_dataset.loc[~test_dataset["same"]].head(15),
+        ],
+        ignore_index=False,
+    )
     path2imp = (
         Path(os.getcwd()).resolve() / CONFIG.PATH2BLOG
         if dataset_name == CONFIG.BLOG
@@ -165,7 +181,6 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     fpr, tpr, roc_thresholds = roc_curve(y_true=labels, y_score=scores)
     opt_thres = _get_opt_imp_threshold(fpr, tpr, roc_thresholds)
 
-    test_dataset = get_dataset(path2dataset, split="test")
     test_dataset["thres"] = opt_thres
     print(f"Set threshold to optimal threshold for {dataset_name} dataset: {opt_thres}")
     with ThreadPoolExecutor() as executor:

@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=syn_acc
-#SBATCH --mem=64g
+#SBATCH --mem=128g
 #SBATCH --cpus-per-task=4
 #SBATCH --output=logs/%j-syn_p_acc.log
 #SBATCH --container-image=registry.webis.de/code-teaching/theses/artificial-authorship-verification:latest
