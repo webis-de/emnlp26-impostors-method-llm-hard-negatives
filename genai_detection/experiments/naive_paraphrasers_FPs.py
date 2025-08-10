@@ -214,6 +214,7 @@ def _get_rsme_per_paraphraser(
         dataset.columns,
         detector_dict.keys(),
     )
+    print("Non-naive scores:", dataset["non_naive_score"])
     rmse_per_paraphraser = DefaultDict(dict)
     paraphraser_names = NAIVE_PARAPHRASER_NAMES + NON_NAIVE_PARAPHRASER_NAMES
     if not any(dataset["paraphraser"].isin(paraphraser_names)):
@@ -227,11 +228,15 @@ def _get_rsme_per_paraphraser(
         print(f"Calculating RMSE for paraphraser: {paraphraser}")
         for detector_name, detector in detector_dict.items():
             fp_for_paraphraser = dataset[dataset["paraphraser"] == paraphraser]
-            print(fp_for_paraphraser)
-            assert (
-                not fp_for_paraphraser.empty
-            ), f"No data found for paraphraser {paraphraser} with detector {detector_name}."
+            if fp_for_paraphraser.empty:
+                print(
+                    f"No data found for paraphraser {paraphraser} with detector {detector_name}. Skipping."
+                )
+                continue
+            print("Juhee", fp_for_paraphraser.columns, fp_for_paraphraser)
+
             scores = fp_for_paraphraser[f"{detector_name}_score"]
+            print(f"scores calculated with {detector_name} detector", scores)
             rmse = np.sqrt(np.mean((scores - fp_for_paraphraser["same"]) ** 2))
             rmse_per_paraphraser[paraphraser][detector_name] = rmse
     # to dataframe
