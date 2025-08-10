@@ -867,8 +867,6 @@ class VisDetectors:
             print(
                 f"Initialized impostor detector with {imp_gen} impostors generation technique."
             )
-            # FIXME: all but fixed fail here silently
-            # element not pickable -> do not use ProcessPoolExecutor, but ThreadPoolExecutor
             with ThreadPoolExecutor() as executor:
                 train_dataset["impostor_score"] = list(
                     executor.map(
@@ -986,6 +984,24 @@ class VisDetectors:
         pr_save_path = save_path / "precision_recall_values"
         pr_save_path.mkdir(parents=True, exist_ok=True)
         train_dataset, test_dataset = self._load_datasets(balanced=True)
+
+        # TODO: Test on small data subsets
+        train_dataset = pd.concat(
+            [
+                train_dataset.loc[train_dataset["same"]].head(5),
+                train_dataset.loc[~train_dataset["same"]].head(5),
+            ],
+            ignore_index=False,
+        )
+
+        test_dataset = pd.concat(
+            [
+                test_dataset.loc[test_dataset["same"]].head(5),
+                test_dataset.loc[~test_dataset["same"]].head(5),
+            ],
+            ignore_index=False,
+        )
+
         # could be initially different, bc args are from argparse which are irrespective from calling thsi function with defined dataset_name
         args["dataset_name"] = self.dataset_name
         baselines = [
@@ -1076,6 +1092,14 @@ class VisDetectors:
                     f"[ERROR] Failed for baseline {baseline_name}:\n{e}\n{traceback.format_exc()}\nReloading datasets..."
                 )
                 train_dataset, test_dataset = self._load_datasets(balanced=True)
+                # TODO: Test on small data subsets
+                test_dataset = pd.concat(
+                    [
+                        test_dataset.loc[test_dataset["same"]].head(5),
+                        test_dataset.loc[~test_dataset["same"]].head(5),
+                    ],
+                    ignore_index=False,
+                )
                 preds = baseline.get_score(test_dataset["pair"])
 
             test_dataset[f"{baseline_name.replace(' ','_')}_score"] = preds
