@@ -86,16 +86,15 @@ def split_dataset_by_paraphraser_naivety(
     return dataset_dict
 
 
-def load_detectors() -> dict[str, ImpostorDetector]:
+def load_detectors(detector_name: str = "all") -> dict[str, ImpostorDetector]:
     """
     Load the detectors for the experiment.
     The detectors are expected to be in the `genai_detection.detectors` module.
     """
-    # TODO: only commented to fix error with non-naive paraphrasers
-    # naive_impostor_detector = ImpostorDetector(
-    #     path2imp=Path(os.getcwd()).resolve().parent / CONFIG.PATH2BLOG,
-    #     impostor_technique="naive_llm",  # Use only naive paraphrasers for impostor generation
-    # )
+    naive_impostor_detector = ImpostorDetector(
+        path2imp=Path(os.getcwd()).resolve().parent / CONFIG.PATH2BLOG,
+        impostor_technique="naive_llm",  # Use only naive paraphrasers for impostor generation
+    )
     non_naive_impostor_detector = ImpostorDetector(
         path2imp=Path(os.getcwd()).resolve().parent / CONFIG.PATH2BLOG,
         impostor_technique="non_naive_llm",  # Use only non-naive paraphrasers for impostor generation
@@ -107,17 +106,23 @@ def load_detectors() -> dict[str, ImpostorDetector]:
     # unmasking_detector = UnmaskingDetector()
     # ppmd_detector = PPMdDetector()
     detector_dict = {
-        # "naive": naive_impostor_detector,
+        "naive": naive_impostor_detector,
         "non_naive": non_naive_impostor_detector,
         "generalized": generalized_impostor_detector,
     }
+    if detector_name != "all":
+        assert (
+            detector_name in detector_dict.keys()
+        ), f"Detector {detector_name} not found in {list(detector_dict.keys())}."
+        return {detector_name: detector_dict[detector_name]}
     return detector_dict
 
 
 # for parallelization
-def _compute_score(detector, row: collections.OrderedDict) -> tuple[int, float]:
+def _compute_score(detector_name, row: collections.OrderedDict) -> tuple[int, float]:
     original_text = row["disputed_text"]
     paraphrased_text = row["candidate_text"]
+    detector = load_detectors(detector_name)[detector_name]
     score = detector.get_score([original_text, paraphrased_text], normalize=False)
     try:
         id = row["Index"]
@@ -144,7 +149,7 @@ def get_detector_scores(
     detector_scores_save_path = SAVE_PATH / "detector_scores"
     detector_scores_save_path.mkdir(parents=True, exist_ok=True)
 
-    for detector_name, detector in detector_dict.items():
+    for detector_name in detector_dict.keys():
         for dataset_name, dataset in dataset_dict.items():
             if detector_name == dataset_name:
                 continue  # Skip the detector if it is the same as the dataset name, bc candidate text has same author as some impostors
@@ -167,10 +172,9 @@ def get_detector_scores(
                 dataset_scored = dataset.copy()
                 dataset_scored[score_col] = np.nan
                 rows = list(dataset_scored.itertuples())  # Faster + safer for indexing
-                # FIXME: Paraphrasers multiple times given (borrowed): Maybe multiple inits?
                 with ThreadPoolExecutor() as executor:
                     futures = [
-                        executor.submit(_compute_score, detector, row._asdict())
+                        executor.submit(_compute_score, detector_name, row._asdict())
                         for row in rows
                     ]
                     for future in tqdm(
