@@ -118,7 +118,6 @@ def _avg_sim_ref_paraphrases(impostor_entry):
 
 
 def _helper_impostor(path2imp, pair, training_mode=True):
-    print(f"Processing pair: {pair} of path: {path2imp}")
     impostor_detector = ImpostorDetector(
         impostor_technique="fixed",
         n_impostors=50,
@@ -195,7 +194,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     # (2) Add syn_sim_disputed_candidate column to test_dataset
     def sim_pair(pair):
         """Compute sim_sim for the two texts in the pair column."""
-        if not pair or len(pair) != 2:
+        if pair is None or len(pair) != 2:
             return None
         return _syn_sim(pair[0], pair[1])
 
