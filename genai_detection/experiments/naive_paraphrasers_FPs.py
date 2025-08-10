@@ -217,6 +217,7 @@ def _get_rsme_per_paraphraser(
                 f"Skipping paraphraser {paraphraser} as it is not in the expected list."
             )
             continue  # Skip if the paraphrasers that are actually human authors
+        print(f"Calculating RMSE for paraphraser: {paraphraser}")
         for detector_name, detector in detector_dict.items():
             fp_for_paraphraser = dataset[dataset["paraphraser"] == paraphraser]
             assert (
@@ -271,8 +272,8 @@ def run_FNs_experiment(
     fn_dataset = dataset[dataset["same"]]
 
     rmse_df = _get_rsme_per_paraphraser(fn_dataset, detector_dict)
-    assert (
-        not rmse_df.empty
+    assert not (
+        rmse_df.empty and not fn_dataset.empty
     ), "RMSE DataFrame is empty. Check the dataset and detectors."
 
     rmse_df.to_csv(
