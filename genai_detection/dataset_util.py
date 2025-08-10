@@ -964,13 +964,15 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
 
 # === Cross-genre Dataset Loader ===
 class CrossGenreDatasetLoader(BaseDatasetLoader):
-    def __init__(self, path: str = "", name: str = CONFIG.CROSS_GENRE):
+    def __init__(self, path: str = "", name: str = CONFIG.PATH2CROSS_GENRE):
         """
         Loader for the Cross-genre dataset, i.e. from Blog, Gutenberg, and Student Essays.
         """
         super().__init__(name=name)
 
-    def load(self, n_samples: int = 1, train_split_portion: float = 0.7) -> DatasetDict:
+    def load(
+        self, n_samples: int = 10, train_split_portion: float = 0.7
+    ) -> DatasetDict:
         """
         Loader for the Cross-genre dataset.
         The dataset is expected to be a directory with text files, where each file is named in the format "author_genre.txt".
@@ -1010,6 +1012,9 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
             positive_sample = all_positive_samples.sample(
                 n=min(n_samples, len(all_positive_samples)), random_state=seed
             )
+            print(
+                f"Obtained {len(positive_sample)} positive samples for {data_category}."
+            )
             all_negative_samples = complete_df[~complete_df["same"]]
             negative_sample = all_negative_samples.sample(
                 n=min(n_samples, len(all_negative_samples)), random_state=seed
@@ -1018,28 +1023,32 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
             del complete_df
             gc.collect()
 
-            for df in [positive_sample, negative_sample]:
-                pair = df["pair"].values[0]
-                authors = df["authors"].values[0]
-                dataset = pd.concat(
-                    [
-                        dataset,
-                        pd.DataFrame(
-                            [
-                                {
-                                    "category": data_category,
-                                    "disputed_text": pair[0],
-                                    "authors": authors,
-                                    "candidate_text": pair[1],
-                                    "same": df["same"].values[0],
-                                    "pair": df["pair"].values[0],
-                                    "artificial_generation": False,
-                                }
-                            ]
-                        ),
-                    ]
+            rows_to_add = []
+            combined = pd.concat([positive_sample, negative_sample], ignore_index=True)
+            if not combined.empty:
+                pair_list = combined["pair"].values.tolist()
+                disputed = [p[0] for p in pair_list]
+                candidate = [p[1] for p in pair_list]
+
+                new_rows = pd.DataFrame(
+                    {
+                        "category": [data_category] * len(pair_list),
+                        "disputed_text": disputed,
+                        "authors": combined["authors"].tolist(),
+                        "candidate_text": candidate,
+                        "same": combined["same"].tolist(),
+                        "pair": pair_list,
+                        "artificial_generation": [False] * len(pair_list),
+                    }
                 )
-        dataset.reset_index(drop=True, inplace=True)
+
+                dataset = pd.concat([dataset, new_rows], ignore_index=True)
+
+        dataset = pd.concat([dataset, pd.DataFrame(rows_to_add)], ignore_index=True)
+        print(
+            "Number of true pairs before artificial paraphrases:",
+            len(dataset[dataset["same"]]),
+        )
 
         all_paraphrasers_dict = get_paraphraser_dict()
         paraphrasers = {
@@ -1060,7 +1069,7 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
         # only as many artificial samples as normal ones (multiplied by number of paraphrasers)
         unique_rows = dataset.drop_duplicates(subset=["disputed_text"])
         unique_rows = unique_rows.sample(
-            n=min(len(unique_rows), n_samples), random_state=seed
+            n=max(1, min(len(unique_rows), n_samples // 2)), random_state=seed
         )
         for i in tqdm(
             unique_rows.index, desc="Processing unique disputed texts for paraphrasing"
@@ -1072,6 +1081,8 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
                 "n_responses": 1,
                 "temperature": CONFIG.TEMPERATURE,
             }
+            assert text is not None, f"Text at index {i} is None."
+            rows_to_add = []
             for paraphraser_name, paraphraser in paraphrasers.items():
                 try:
                     if isinstance(paraphraser, NaiveParaphraser):
@@ -1092,26 +1103,20 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
                 except Exception as e:
                     print(f"[ERROR] Failed to paraphrase with {paraphraser_name}: {e}")
                     continue
-                dataset = pd.concat(
-                    [
-                        dataset,
-                        pd.DataFrame(
-                            [
-                                {
-                                    "category": unique_rows.loc[i, "category"],
-                                    "disputed_text": text,
-                                    "candidate_text": paraphrase,
-                                    "same": False,
-                                    "pair": [text, paraphrase],
-                                    "artificial_generation": True,
-                                    "authors": [author, paraphraser_name],
-                                }
-                            ]
-                        ),
-                    ]
+                rows_to_add.append(
+                    {
+                        "category": unique_rows.loc[i, "category"],
+                        "disputed_text": text,
+                        "candidate_text": paraphrase,
+                        "same": False,
+                        "pair": [text, paraphrase],
+                        "artificial_generation": True,
+                        "authors": [author, paraphraser_name],
+                    }
                 )
 
-        dataset.reset_index(drop=True, inplace=True)
+        dataset = pd.concat([dataset, pd.DataFrame(rows_to_add)], ignore_index=True)
+        print("Number of true pairs:", len(dataset[dataset["same"]]))
         features = Features(
             {
                 "pair": [Value("string")],
@@ -1251,7 +1256,9 @@ def run_gutenberg_corpus():
 def run_cross_genre():
     loader = CrossGenreDatasetLoader()
     dataset = loader.load(n_samples=10)
-    dataset.save_to_disk(Path(__file__).resolve().parent.parent / CONFIG.CROSS_GENRE)
+    dataset.save_to_disk(
+        Path(__file__).resolve().parent.parent / CONFIG.PATH2CROSS_GENRE
+    )
 
 
 if __name__ == "__main__":
