@@ -78,6 +78,10 @@ class DetectorBase:
         _text = [_text] if return_single else _text
         try:
             scores = self._get_score_impl(_text)
+            scores = [
+                score[0] if isinstance(score, (list, tuple)) else score
+                for score in scores
+            ]
             if normalize and scores is not NotImplemented:
                 scores = self._normalize_scores(scores)
             scores = (
