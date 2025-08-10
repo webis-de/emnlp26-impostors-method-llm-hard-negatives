@@ -117,6 +117,19 @@ def _avg_sim_ref_paraphrases(impostor_entry):
     return sum(scores) / len(scores) if scores else None
 
 
+def _helper_impostor(path2imp, pair):
+    print(f"Processing pair: {pair} of path: {path2imp}")
+    impostor_detector = ImpostorDetector(
+        impostor_technique="fixed",
+        n_impostors=50,
+        rounds=100,  # cf. pg. 181, Koppel et al. (2014)
+        top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
+        path2imp=path2imp,
+        upsample=False,
+    )
+    return impostor_detector._get_score_impl(pair)
+
+
 def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     """
     Run the experiment based on the specified task.
@@ -128,24 +141,19 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         if dataset_name == CONFIG.BLOG
         else Path(os.getcwd()).resolve() / CONFIG.PATH2STUDENT_ESSAYS
     )
-    impostor_detector = ImpostorDetector(
-        impostor_technique="fixed",
-        n_impostors=50,
-        rounds=100,  # cf. pg. 181, Koppel et al. (2014)
-        top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
-        path2imp=path2imp,
-        upsample=False,
-    )
+
     print(f"Running experiment for {dataset_name} dataset.")
 
-    # with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
-    #     results = list(
-    #         executor.map(impostor_detector._get_score_impl, train_dataset["pair"])
-    #     )
+    with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
+        results = list(
+            executor.map(
+                _helper_impostor, [path2imp] * len(train_dataset), train_dataset["pair"]
+            )
+        )
 
-    results = []
-    for pair in train_dataset["pair"]:
-        results.append(impostor_detector._get_score_impl(pair))
+    # results = []
+    # for pair in train_dataset["pair"]:
+    #     results.append(impostor_detector._get_score_impl(pair))
 
     # print(f"Computed impostor scores for {len(results)} pairs:", results)
     # results is a list of tuples: (impostor_score, impostor_dict)
