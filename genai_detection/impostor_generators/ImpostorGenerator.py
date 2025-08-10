@@ -512,35 +512,46 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
     ):
         self.n_impostors = n_impostors
         if paraphrasers is None:
-            self.t5_chatgpt_paraphraser = T5ChatGPTParaphraser()
+            # self.t5_chatgpt_paraphraser = T5ChatGPTParaphraser()
             # self.t5_google_paws_paraphraser = T5GooglePAWSParaphraser()
             # self.ollama_paraphraser = OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION)
-            self.saia_paraphraser = SAIAParaphraser()
+            self.saiai_paraphraser_llama = SAIAParaphraser(
+                model_id="meta-llama-3.1-8b-instruct"
+            )
+            self.saiai_paraphraser_mistral = SAIAParaphraser(
+                model_id="mistral-large-instruct"
+            )
+            self.saiai_paraphraser_gpt = SAIAParaphraser(model_id="openai-gpt-oss-120b")
+            self.saiai_paraphraser_qwen = SAIAParaphraser(model_id="qwen3-32b")
+
             self.topic_paraphraser = TopicParaphraser(
-                text_extractor=self.saia_paraphraser,
-                text_generator=self.saia_paraphraser,
+                text_extractor=self.saiai_paraphraser_gpt,
+                text_generator=self.saiai_paraphraser_gpt,
             )
             self.task_paraphraser = TaskParaphraser(
-                text_extractor=self.saia_paraphraser,
-                text_generator=self.saia_paraphraser,
+                text_extractor=self.saiai_paraphraser_gpt,
+                text_generator=self.saiai_paraphraser_gpt,
             )
             self.title_paraphraser = TitleParaphraser(
-                text_extractor=self.saia_paraphraser,
-                text_generator=self.saia_paraphraser,
+                text_extractor=self.saiai_paraphraser_gpt,
+                text_generator=self.saiai_paraphraser_gpt,
             )
             self.bullet_point_paraphraser = BulletPointParaphraser(
-                text_extractor=self.saia_paraphraser,
-                text_generator=self.saia_paraphraser,
+                text_extractor=self.saiai_paraphraser_gpt,
+                text_generator=self.saiai_paraphraser_gpt,
             )
             self.translation_paraphraser = TranslationParaphraser(
-                text_extractor=self.saia_paraphraser,
-                text_generator=self.saia_paraphraser,
+                text_extractor=self.saiai_paraphraser_gpt,
+                text_generator=self.saiai_paraphraser_gpt,
             )
             self.paraphrasers = [
-                self.t5_chatgpt_paraphraser,
+                # self.t5_chatgpt_paraphraser,
                 # self.t5_google_paws_paraphraser,
                 # self.ollama_paraphraser,
-                self.saia_paraphraser,
+                self.saiai_paraphraser_llama,
+                self.saiai_paraphraser_mistral,
+                self.saiai_paraphraser_gpt,
+                self.saiai_paraphraser_qwen,
                 self.topic_paraphraser,
                 self.task_paraphraser,
                 self.title_paraphraser,
@@ -637,18 +648,24 @@ class NaiveLLMImpostorGenerator(LLMImpostorGenerator):
         Naive LLM-based impostor generator that uses only naive paraphrasers.
         :param n_impostors: number of impostors to generate
         """
-        t5_chatgpt_paraphraser = T5ChatGPTParaphraser()
+        # t5_chatgpt_paraphraser = T5ChatGPTParaphraser()
         # t5_google_paws_paraphraser = T5GooglePAWSParaphraser()
         # ollama_paraphraser = OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION)
-        saiai_paraphraser = SAIAParaphraser()
+        saiai_paraphraser_llama = SAIAParaphraser(model_id="meta-llama-3.1-8b-instruct")
+        saiai_paraphraser_mistral = SAIAParaphraser(model_id="mistral-large-instruct")
+        saiai_paraphraser_gpt = SAIAParaphraser(model_id="openai-gpt-oss-120b")
+        saiai_paraphraser_qwen = SAIAParaphraser(model_id="qwen3-32b")
 
         super().__init__(
             n_impostors=n_impostors,
             paraphrasers=[
-                t5_chatgpt_paraphraser,
+                # t5_chatgpt_paraphraser,
                 # t5_google_paws_paraphraser,
                 # ollama_paraphraser,
-                saiai_paraphraser,
+                saiai_paraphraser_llama,
+                saiai_paraphraser_mistral,
+                saiai_paraphraser_gpt,
+                saiai_paraphraser_qwen,
             ],
         )
 
