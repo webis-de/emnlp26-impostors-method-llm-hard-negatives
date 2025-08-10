@@ -474,7 +474,14 @@ class ImpostorDetector(ImpostorBase):
         return tfidf_matrix.toarray()
 
     def _update_vectorizer_if_necessary(self, path2imp, input_tokens):  # top_token_list
-        if not hasattr(self, "_vectorizer") or self._vectorizer_vocab is None:
+        if (
+            not hasattr(self, "_vectorizer")
+            or not (
+                hasattr(self._vectorizer, "vocabulary_")
+                and self._vectorizer.vocabulary_ is not None
+            )
+            or self._vectorizer_vocab is None
+        ):
             train_data = None
             if path2imp and path2imp.exists():
                 split = "train" if self._training_mode else "test"
