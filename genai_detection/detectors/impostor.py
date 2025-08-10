@@ -22,7 +22,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 import torch
 
 from genai_detection.detectors.impostor_base import ImpostorBase
-from genai_detection.impostor_generators import ImpostorGenerator
+from genai_detection.impostor_generators import ImpostorGenerator, MirrorMinds_generator
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from genai_detection.config import CONFIG
@@ -67,6 +67,7 @@ class ImpostorDetector(ImpostorBase):
             "content",
             "naive_llm",
             "non_naive_llm",
+            "mirror_minds",
         ] = "llm",
         path2imp: str = CONFIG.PATH2BLOG,  # PATH2GENERIC_ON_FLY_IMP,  # path to impostor file, where fixed impostors are saved or where to save generated impostors
         real_time_generation: bool = False,  # whether to generate impostors in real-time or use pre-generated ones
@@ -141,6 +142,10 @@ class ImpostorDetector(ImpostorBase):
             )
         elif impostor_technique == "content":
             self.impostor_generator = ImpostorGenerator.ContentImpostorGenerator(
+                n_impostors=self.n_impostors
+            )
+        elif impostor_technique == "mirror_minds":
+            self.impostor_generator = MirrorMinds_generator.MirrorMindsGenerator(
                 n_impostors=self.n_impostors
             )
         else:
