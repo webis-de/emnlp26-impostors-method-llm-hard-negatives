@@ -231,7 +231,7 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
         bin_ranges = score_sim_df.groupby("diff_bin")[col].agg(["min", "max"])
         accuracy_by_bin = (
             score_sim_df.groupby("diff_bin")
-            .apply(lambda g: (g["impostor_prediction"] == g["true_label"]).mean())
+            .apply(lambda g: (g["impostor_prediction"] == g["same"]).mean())
             .reset_index(name="accuracy")
         )
 
