@@ -138,10 +138,14 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     )
     print(f"Running experiment for {dataset_name} dataset.")
 
-    with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
-        results = list(
-            executor.map(impostor_detector._get_score_impl, train_dataset["pair"])
-        )
+    # with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
+    #     results = list(
+    #         executor.map(impostor_detector._get_score_impl, train_dataset["pair"])
+    #     )
+
+    results = []
+    for pair in train_dataset["pair"]:
+        results.append(impostor_detector._get_score_impl(pair))
 
     # print(f"Computed impostor scores for {len(results)} pairs:", results)
     # results is a list of tuples: (impostor_score, impostor_dict)
