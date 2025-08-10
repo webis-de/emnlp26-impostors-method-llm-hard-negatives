@@ -1041,9 +1041,13 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
         paraphrasers = {
             k: all_paraphrasers_dict[k]
             for k in [
-                "T5_ChatGPT",
-                "T5_Google_PAWS",
-                "Ollama",
+                # "T5_ChatGPT",
+                # "T5_Google_PAWS",
+                # "Ollama",
+                "qwen3-32b",
+                "mistral-large-instruct",
+                "openai-gpt-oss-120b",
+                "meta-llama-3.1-8b-instruct",
                 "BulletPoint",
                 "Translation",
             ]
