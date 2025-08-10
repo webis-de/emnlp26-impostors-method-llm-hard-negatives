@@ -157,7 +157,10 @@ def get_detector_scores(
             if output_file.exists():
                 print(f"Loading existing file: {output_file}")
                 dataset_scored = pd.read_csv(output_file)
-                print("Read Non-naive scores:", dataset_scored["non_naive_score"])
+                print(
+                    f"Read {detector_name} scores:",
+                    dataset_scored[f"{detector_name}_score"].head(),
+                )
 
             else:
                 score_col = f"{detector_name}_score"
@@ -177,7 +180,10 @@ def get_detector_scores(
                     ):
                         idx, score = future.result()
                         dataset_scored.at[idx, score_col] = score
-                print("Created Non-naive scores:", dataset_scored["non_naive_score"])
+                print(
+                    f"Created {detector_name} scores:",
+                    dataset_scored[f"{detector_name}_score"].head(),
+                )
 
                 # FIXME: try sequential processing for simplicity
                 # for row in rows:
