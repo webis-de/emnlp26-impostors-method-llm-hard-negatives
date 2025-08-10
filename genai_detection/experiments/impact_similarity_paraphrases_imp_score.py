@@ -117,7 +117,7 @@ def _avg_sim_ref_paraphrases(impostor_entry):
     return sum(scores) / len(scores) if scores else None
 
 
-def _helper_impostor(path2imp, pair):
+def _helper_impostor(path2imp, pair, training_mode=True):
     print(f"Processing pair: {pair} of path: {path2imp}")
     impostor_detector = ImpostorDetector(
         impostor_technique="fixed",
@@ -127,6 +127,7 @@ def _helper_impostor(path2imp, pair):
         path2imp=path2imp,
         upsample=False,
     )
+    impostor_detector.set_training_mode(training_mode)
     return impostor_detector._get_score_impl(pair)
 
 
@@ -170,12 +171,18 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     opt_thres = _get_opt_imp_threshold(fpr, tpr, roc_thresholds)
 
     test_dataset = get_dataset(path2dataset, split="test")
-    impostor_detector.set_treshold(opt_thres)
     test_dataset["thres"] = opt_thres
     print(f"Set threshold to optimal threshold for {dataset_name} dataset: {opt_thres}")
     with ThreadPoolExecutor() as executor:
-        result = list(executor.map(impostor_detector.get_score, test_dataset["pair"]))
-        # results is a list of tuples: (impostor_score, impostor_dict)
+        results = list(
+            executor.map(
+                _helper_impostor,
+                [path2imp] * len(test_dataset),
+                test_dataset["pair"],
+                [False] * len(test_dataset),
+            )
+        )
+    # results is a list of tuples: (impostor_score, impostor_dict)
     test_dataset["impostor_score"] = [score for score, _ in results]
     test_dataset["impostor_dict"] = [impostor_dict for _, impostor_dict in results]
     test_dataset["impostor_prediction"] = test_dataset["impostor_score"] >= opt_thres
