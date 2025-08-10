@@ -459,7 +459,13 @@ class ImpostorDetector(ImpostorBase):
         :param top_token_list: list of top tokens to include in the matrix
         :return: Numpy array of term tfidf values, `shape = (len(tokens), len(top_token_list))`
         """
-
+        if not hasattr(self, "_vectorizer") or not hasattr(
+            self._vectorizer, "vocabulary_"
+        ):
+            self._update_vectorizer_if_necessary(
+                path2imp=path2imp,
+                input_tokens=tokens,
+            )
         try:
             tfidf_matrix = self._vectorizer.transform([" ".join(tokens)])
         except Exception as e:
@@ -477,18 +483,15 @@ class ImpostorDetector(ImpostorBase):
         return tfidf_matrix.toarray()
 
     def _update_vectorizer_if_necessary(self, path2imp, input_tokens):  # top_token_list
-        if (
-            not hasattr(self, "_vectorizer")
-            or not (
-                hasattr(self._vectorizer, "vocabulary_")
-                and self._vectorizer.vocabulary_ is not None
-            )
-            or self._vectorizer_vocab is None
-        ):
-            train_data = None
-            if path2imp and path2imp.exists():
-                split = "train" if self._training_mode else "test"
-                train_data = load_from_disk(path2imp)[split].to_pandas()
+        train_data = None
+        candidate_texts = [" ".join(input_tokens)]
+        if path2imp and path2imp.exists():
+            split = "train" if self._training_mode else "test"
+            train_data = load_from_disk(path2imp)[split].to_pandas()
+            assert isinstance(
+                train_data, pd.DataFrame
+            ), f"Expected train_data to be a pandas DataFrame, but got {type(train_data)}."
+            if not train_data is None and not train_data.empty:
                 candidate_texts = []
                 for _, row in train_data.iterrows():
                     entry = row.to_dict()
@@ -497,32 +500,32 @@ class ImpostorDetector(ImpostorBase):
                     ), f"Each entry in the dataset must be a dictionary (tokens_to_matrix). But is {type(entry)}/entry:{entry}/row:{row}."
                     pair = entry.get("pair", [])
                     candidate_texts.extend(pair)
-                tokens = [
-                    token
-                    for t in candidate_texts
-                    for token in self.tokenizer(self.preprocess_text(t))
-                ]
-                freqs = Counter(tokens)
-                freqs = Counter({k: v for k, v in freqs.items() if v > 1})
-                self._vectorizer_vocab = heapq.nlargest(
-                    self.top_n, list(freqs.keys()), key=lambda x: freqs[x]
-                )
-            self._vectorizer = TfidfVectorizer(
-                vocabulary=self._vectorizer_vocab,
-                input="content",
-                dtype=np.float32,
-                lowercase=False,  # do not lowercase all, treat tokens as case-sensitive
-            )
-            # self._vectorizer_vocab = self.top_tokens
+        tokens = [
+            token
+            for t in candidate_texts
+            for token in self.tokenizer(self.preprocess_text(t))
+        ]
+        freqs = Counter(tokens)
+        freqs = Counter({k: v for k, v in freqs.items() if v > 1})
+        self._vectorizer_vocab = heapq.nlargest(
+            self.top_n, list(freqs.keys()), key=lambda x: freqs[x]
+        )
+        self._vectorizer = TfidfVectorizer(
+            vocabulary=self._vectorizer_vocab,
+            input="content",
+            dtype=np.float32,
+            lowercase=False,  # do not lowercase all, treat tokens as case-sensitive
+        )
 
-            if train_data is None or train_data.empty:
-                candidate_texts = [" ".join(input_tokens)]
-            self._vectorizer = self._vectorizer.fit(candidate_texts)
-            print("Fitted TFIDF vectorizer on candidate texts.")
-        else:
-            print(
-                "TFIDF vectorizer already fitted, no need to update it. Using existing vocabulary."
-            )
+        self._vectorizer = self._vectorizer.fit(candidate_texts)
+        if (
+            not hasattr(self._vectorizer, "vocabulary_")
+            or self._vectorizer.vocabulary_ is None
+        ):
+            raise RuntimeError("Vectorizer fitting failed: vocabulary is empty.")
+
+        print("Fitted TFIDF vectorizer on candidate texts.")
+        return self._vectorizer
 
     @staticmethod
     def tokenize_whitespace(text: str, normalize_ws: bool = True):
