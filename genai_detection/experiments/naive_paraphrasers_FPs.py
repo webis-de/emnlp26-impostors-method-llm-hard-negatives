@@ -179,10 +179,6 @@ def get_detector_scores(
 
                 # FIXME: try sequential processing for simplicity
                 for row in rows:
-                    assert "candidate_paraphraser" in row._asdict(), (
-                        "Row does not contain 'candidate_paraphraser' key. Ensure the dataset has been processed correctly.",
-                        row._asdict(),
-                    )
                     idx, score = _compute_score(detector, row._asdict())
                     try:
                         dataset.at[idx, score_col] = score
@@ -215,26 +211,18 @@ def _get_rsme_per_paraphraser(
     # calculate rmse per paraphraser and AV model
     rmse_per_paraphraser = DefaultDict(dict)
     paraphraser_names = NAIVE_PARAPHRASER_NAMES + NON_NAIVE_PARAPHRASER_NAMES
-    assert (
-        "candidate_paraphraser" in dataset.columns
-    ), "Dataset must contain 'candidate_paraphraser' column to calculate RMSE per paraphraser. Has only columns: {}".format(
-        dataset.columns.tolist()
-    )
-
     for paraphraser in dataset["paraphraser"].unique():
         if paraphraser not in paraphraser_names:
             continue  # Skip if the paraphrasers that are actually human authors
         for detector_name, detector in detector_dict.items():
-            fp_for_paraphraser = dataset[
-                dataset["candidate_paraphraser"] == paraphraser
-            ]
+            fp_for_paraphraser = dataset[dataset["paraphraser"] == paraphraser]
             scores = fp_for_paraphraser[f"{detector_name}_score"]
             rmse = np.sqrt(np.mean((scores - fp_for_paraphraser["same"]) ** 2))
             rmse_per_paraphraser[paraphraser][detector_name] = rmse
     # to dataframe
     rmse_df = pd.DataFrame(rmse_per_paraphraser).T
     rmse_df.reset_index(inplace=True)
-    rmse_df.rename(columns={"index": "candidate_paraphraser"}, inplace=True)
+    rmse_df.rename(columns={"index": "paraphraser"}, inplace=True)
     return rmse_df
 
 
@@ -255,7 +243,7 @@ def run_FPs_experiment(
         SAVE_PATH / f"exp_naive_paraphrasers_rmse_per_paraphraser_FPs_{TIMESTAMP}.csv",
         index=False,
     )
-    print("RMSE per candidate_paraphraser among FPs:")
+    print("RMSE per candidate paraphraser among FPs:")
     return rmse_df
 
 
@@ -276,7 +264,7 @@ def run_FNs_experiment(
         SAVE_PATH / f"exp_naive_paraphrasers_rmse_per_paraphraser_FNs_{TIMESTAMP}.csv",
         index=False,
     )
-    print("RMSE per candidate_paraphraser among FNs:")
+    print("RMSE per candidate paraphraser among FNs:")
     return rmse_df
 
 
