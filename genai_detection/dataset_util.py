@@ -13,7 +13,15 @@ import unicodedata
 import typing as t
 import chardet
 
-from datasets import Dataset, DatasetDict, ClassLabel, Features, Value, load_from_disk
+from datasets import (
+    Dataset,
+    DatasetDict,
+    ClassLabel,
+    Features,
+    Value,
+    load_from_disk,
+    Sequence,
+)
 import numpy as np
 import pandas as pd
 import pyreadstat
@@ -1113,8 +1121,8 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
         dataset = pd.concat([dataset, pd.DataFrame(rows_to_add)], ignore_index=True)
         features = Features(
             {
-                "pair": [Value("string")],
-                "authors": [Value("string")],
+                "pair": Sequence(Value("string")),
+                "authors": Sequence(Value("string")),
                 "same": Value("bool"),
                 "category": Value("string"),
                 "disputed_text": Value("string"),
