@@ -459,19 +459,20 @@ class ImpostorDetector(ImpostorBase):
         :param top_token_list: list of top tokens to include in the matrix
         :return: Numpy array of term tfidf values, `shape = (len(tokens), len(top_token_list))`
         """
-        # if len(top_token_list) == 0:
-        #     return np.zeros(
-        #         (1, self.top_n), dtype=np.float32
-        #     )  # return empty matrix if no top tokens
 
-        # avoid fitting a new vectorizer every time (costly)
-        self._update_vectorizer_if_necessary(
-            # top_token_list=top_token_list,
-            path2imp=path2imp,
-            input_tokens=tokens,
-        )
-
-        tfidf_matrix = self._vectorizer.transform([" ".join(tokens)])
+        try:
+            tfidf_matrix = self._vectorizer.transform([" ".join(tokens)])
+        except Exception as e:
+            print(f"Error transforming tokens to matrix: {e}.")
+            # avoid fitting a new vectorizer every time (costly)
+            self._update_vectorizer_if_necessary(
+                path2imp=path2imp,
+                input_tokens=tokens,
+            )
+        try:
+            tfidf_matrix = self._vectorizer.transform([" ".join(tokens)])
+        except Exception as e:
+            raise "SECOND Error transforming tokens to matrix: {}".format(e)
 
         return tfidf_matrix.toarray()
 
@@ -518,6 +519,10 @@ class ImpostorDetector(ImpostorBase):
                 candidate_texts = [" ".join(input_tokens)]
             self._vectorizer = self._vectorizer.fit(candidate_texts)
             print("Fitted TFIDF vectorizer on candidate texts.")
+        else:
+            print(
+                "TFIDF vectorizer already fitted, no need to update it. Using existing vocabulary."
+            )
 
     @staticmethod
     def tokenize_whitespace(text: str, normalize_ws: bool = True):
