@@ -768,18 +768,17 @@ class VisDetectors:
         assert (
             args.get("n_impostors", n_imp) == n_imp
         ), f"n_impostors={args['n_impostors']} in args must match n_imp={n_imp} in function call"
-        impostor_detector = ImpostorDetector(
-            impostor_technique="fixed",
-            n_impostors=n_imp,
-            rounds=100,  # cf. pg. 181, Koppel et al. (2014)
-            top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
-            path2imp=path2imp,
-            upsample=False,
-        )
-        print("Initialized impostor detector with fixed impostors:", n_imp)
+
         with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
             train_dataset["impostor_score"] = list(
-                executor.map(impostor_detector.get_score, train_dataset["pair"])
+                executor.map(
+                    self._helper_impostor,
+                    [path2imp] * len(train_dataset),
+                    train_dataset["pair"],
+                    ["fixed"] * len(train_dataset),
+                    [True] * len(train_dataset),  # training mode
+                    [n_imp] * len(train_dataset),  # n_imp
+                )
             )
         print("Calculated impostor scores on training data.")
 
@@ -799,12 +798,16 @@ class VisDetectors:
         )
 
         # work with test dataset
-        impostor_detector.set_training_mode(
-            False
-        )  # set to False for validation: Use training set for impostor generation for fixed impostor technique‚
         with ThreadPoolExecutor() as executor:
             test_dataset["impostor_score"] = list(
-                executor.map(impostor_detector.get_score, test_dataset["pair"])
+                executor.map(
+                    self._helper_impostor,
+                    [path2imp] * len(test_dataset),
+                    test_dataset["pair"],
+                    ["fixed"] * len(test_dataset),
+                    [False] * len(test_dataset),  # testing mode
+                    [n_imp] * len(test_dataset),  # n_imp
+                )
             )
 
         precision, recall, pr_thresholds = precision_recall_curve(
@@ -852,10 +855,12 @@ class VisDetectors:
 
     #################################################################################
 
-    def _helper_impostor(self, path2imp, pair, imp_gen: str, training_mode=True):
+    def _helper_impostor(
+        self, path2imp, pair, imp_gen: str, training_mode=True, n_imp: int = 50
+    ):
         impostor_detector = ImpostorDetector(
             impostor_technique=imp_gen,
-            n_impostors=50,
+            n_impostors=n_imp,
             rounds=100,  # cf. pg. 181, Koppel et al. (2014)
             top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
             path2imp=path2imp,
