@@ -1153,16 +1153,13 @@ class TranslationParaphraser(NonNaiveParaphraser):
         )
         paraphrased_texts = []
         try:
-            # TODO: uncomment
-            # translation = self.deepl_client.translate_text(text, target_lang="FR")
-            # if translation.detected_source_lang == "EN":  # deprecated
-            #     language = "EN-US"
-            # res = self.deepl_client.translate_text(
-            #     translation.text, target_lang=language
-            # )
-            # paraphrased_texts.append(res.text)
-            # TODO: comment
-            paraphrased_texts.append("")
+            translation = self.deepl_client.translate_text(text, target_lang="FR")
+            if translation.detected_source_lang == "EN":  # deprecated
+                language = "EN-US"
+            res = self.deepl_client.translate_text(
+                translation.text, target_lang=language
+            )
+            paraphrased_texts.append(res.text)
         except Exception as e:
             print(f"[ERROR] Failed to translate text using DeepL: {e}")
 
@@ -1172,7 +1169,6 @@ class TranslationParaphraser(NonNaiveParaphraser):
             n_responses -= 1
 
         if n_responses >= 1:
-            print(f"[DEBUG] Generating more paraphrases")
             translation = self.text_extractor.paraphrase(
                 text=text,
                 prompt=self.extractor_prompt,
@@ -1193,8 +1189,6 @@ class TranslationParaphraser(NonNaiveParaphraser):
                     temperature=temperature,
                     response_schema=response_schema,
                 )
-
-            print(f"[DEBUG] Translation: {translation}")
             paraphrased_texts.extend(
                 self.text_generator.paraphrase(
                     text=translation,
