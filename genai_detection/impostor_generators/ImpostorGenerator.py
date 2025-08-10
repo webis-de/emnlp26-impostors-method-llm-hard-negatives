@@ -608,7 +608,7 @@ class NonNaiveLLMImpostorGenerator(LLMImpostorGenerator):
         Naive LLM-based impostor generator that uses no naive paraphrasers (i.e. only two-step paraphrasers).
         :param n_impostors: number of impostors to generate
         """
-        saia_paraphraser = SAIAParaphraser()
+        saia_paraphraser = SAIAParaphraser(model_id="openai-gpt-oss-120b")
         topic_paraphraser = TopicParaphraser(
             text_extractor=saia_paraphraser,
             text_generator=saia_paraphraser,
