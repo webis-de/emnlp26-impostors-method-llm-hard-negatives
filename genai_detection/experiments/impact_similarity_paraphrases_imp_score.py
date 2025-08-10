@@ -53,7 +53,7 @@ def _syn_sim(text1: str, text2: str):
     return np.mean([bleu_val, rouge_val["rouge1"], rouge_val["rougeL"]])
 
 
-def _get_opt_imp_threshold(self, fpr, tpr, thresholds):
+def _get_opt_imp_threshold(fpr, tpr, thresholds):
     """
     Computes the optimal threshold using Youden's J statistic.
     Youden's J statistic is used to select the optimal predicted probability cut off.
