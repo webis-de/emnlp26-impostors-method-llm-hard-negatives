@@ -112,8 +112,11 @@
   - ~~cannot download `SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")` or `gensim.downloader.load("glove-twitter-25")`~~
 - [ ] run `genai_detection/vis_detectors.py`via `scripts/vis_detectors.sh` on cluster again, bc annotation changed
   - [o] Fig 2
-  - [o] Fig 4 (TODO: on on-the-fly generated impostors)
-    - find error for on-the fly generated impostors
+    - [o] running on 15 element subset of each dataset
+    - [o] running on complete dataset (maybe old code)
+  - [o] Fig 4 
+    - [o] run all but on-the-fly on complete dataset
+    - [ ] run on-the-fly on subset bc free API calls limited to 250 queries per month
 - [o] Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
   - estimated 36h of runtime
 - [ ] lowercasing texts for unmasking or other AV/AA: 
