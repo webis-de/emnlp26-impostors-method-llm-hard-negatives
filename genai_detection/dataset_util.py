@@ -21,7 +21,11 @@ from tqdm import tqdm
 
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from genai_detection.config import CONFIG
-from genai_detection.paraphrasing.paraphraser import get_paraphraser_dict
+from genai_detection.paraphrasing.paraphraser import (
+    NaiveParaphraser,
+    NonNaiveParaphraser,
+    get_paraphraser_dict,
+)
 from genai_detection.util import preprocess_text as _preprocess_text
 
 random.seed(42)
@@ -1066,11 +1070,20 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
             paraphrase_config = {
                 "text": text,
                 "n_responses": 1,
-                "prompt": "",
                 "temperature": CONFIG.TEMPERATURE,
             }
             for paraphraser_name, paraphraser in paraphrasers.items():
                 try:
+                    if isinstance(paraphraser, NaiveParaphraser):
+                        paraphrase_config["prompt"] = (
+                            "Paraphrase the text above. Do not use direct quotes or new lines. Respond ONLY with the paraphrase."
+                        )
+                    elif isinstance(paraphraser, NonNaiveParaphraser):
+                        paraphrase_config["prompt"] = None
+                    else:
+                        raise ValueError(
+                            f"Unknown paraphraser type: {type(paraphraser)}"
+                        )
                     paraphrase = _preprocess_text(
                         paraphraser.paraphrase(**paraphrase_config)[0]
                     )
