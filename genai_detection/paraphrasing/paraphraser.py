@@ -491,7 +491,7 @@ class OllamaParaphraser(NaiveParaphraser):
     def paraphrase(
         self,
         text: str,
-        prompt: str = 'Paraphrase the following text. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","paraphrase":"<paraphrased version of the text>"}. Text to paraphrase:',
+        prompt: str = 'Paraphrase the text above. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","paraphrase":"<paraphrased version of the text>"}.',
         max_length: int = CONFIG.MAX_LENGTH,
         temperature: float = CONFIG.TEMPERATURE,
         n_responses: int = 1,
@@ -565,7 +565,7 @@ class SAIAParaphraser(NaiveParaphraser):
     def paraphrase(
         self,
         text: str,
-        prompt: str = 'Paraphrase the following text. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","paraphrase":"<paraphrased version of the text>"}. Text to paraphrase:',
+        prompt: str = 'Paraphrase the text above. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","paraphrase":"<paraphrased version of the text>"}',
         max_length: int = CONFIG.MAX_LENGTH,
         temperature: float = CONFIG.TEMPERATURE,
         n_responses: int = 1,
