@@ -1045,11 +1045,6 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
                 dataset = pd.concat([dataset, new_rows], ignore_index=True)
 
         dataset = pd.concat([dataset, pd.DataFrame(rows_to_add)], ignore_index=True)
-        print(
-            "Number of true pairs before artificial paraphrases:",
-            len(dataset[dataset["same"]]),
-        )
-
         all_paraphrasers_dict = get_paraphraser_dict()
         paraphrasers = {
             k: all_paraphrasers_dict[k]
@@ -1116,7 +1111,6 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
                 )
 
         dataset = pd.concat([dataset, pd.DataFrame(rows_to_add)], ignore_index=True)
-        print("Number of true pairs:", len(dataset[dataset["same"]]))
         features = Features(
             {
                 "pair": [Value("string")],
