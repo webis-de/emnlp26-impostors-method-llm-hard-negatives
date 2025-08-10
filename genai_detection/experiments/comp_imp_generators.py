@@ -137,16 +137,22 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     print(f"Running experiment for {dataset_name} dataset.")
 
     for imp_gen in IMP_GEN_OPTIONS:
-        with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
-            results = list(
-                executor.map(
-                    _helper_impostor,
-                    [path2imp] * len(train_dataset),
-                    train_dataset["pair"],
-                    [True] * len(train_dataset),  # training mode
-                    [imp_gen] * len(train_dataset),
-                )
-            )
+        # SAIA API rate limits exceeded
+        # with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
+        #     results = list(
+        #         executor.map(
+        #             _helper_impostor,
+        #             [path2imp] * len(train_dataset),
+        #             train_dataset["pair"],
+        #             [True] * len(train_dataset),  # training mode
+        #             [imp_gen] * len(train_dataset),
+        #         )
+        #     )
+        # TODO: maybe add sleep
+        for pair in train_dataset["pair"]:
+            _helper_impostor(
+                path2imp, pair, training_mode=True, imp_gen=imp_gen
+            )  # ensure that the training mode is set to True
 
         train_dataset[f"impostor_score_{imp_gen}"] = [score for score, _ in results]
         train_dataset[f"impostor_dict_{imp_gen}"] = [
