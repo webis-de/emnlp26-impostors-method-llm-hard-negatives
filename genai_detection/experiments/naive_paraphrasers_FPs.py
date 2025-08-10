@@ -327,7 +327,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--path2dataset",
         type=str,
-        default=Path(__file__).resolve().parents[2] / CONFIG.CROSS_GENRE,
+        default=Path(__file__).resolve().parents[2] / CONFIG.PATH2CROSS_GENRE,
         help="Path to cross-genre dataset (default: %(default)s).",
     )
     args = parser.parse_args()

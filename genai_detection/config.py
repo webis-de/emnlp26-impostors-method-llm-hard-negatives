@@ -27,7 +27,7 @@ class BaseConfig:
         f"{DATA_BASE_PATH}/student_essays/Intro2006/student-essays-dataset-converted"
     )
     PATH2GENERIC_ON_FLY_IMP = f"{DATA_BASE_PATH}/google-on-the-fly-impostors"
-    CROSS_GENRE = f"{DATA_BASE_PATH}/cross_genre/cross-genre-dataset"
+    PATH2CROSS_GENRE = f"{DATA_BASE_PATH}/cross_genre/cross-genre-dataset"
     SAVE_PATH = "results/"
     PAN23 = "pan23"
     PAN25 = "pan25"

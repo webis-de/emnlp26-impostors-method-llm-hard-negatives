@@ -132,9 +132,9 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
 if __name__ == "__main__":
     # Example usage
     detector = SupervisedImpostorBaseline()
-    dataset = load_from_disk(Path(__file__).resolve().parents[2] / CONFIG.CROSS_GENRE)[
-        "test"
-    ].to_pandas()[["disputed_text", "candidate_text", "same"]]
+    dataset = load_from_disk(
+        Path(__file__).resolve().parents[2] / CONFIG.PATH2CROSS_GENRE
+    )["test"].to_pandas()[["disputed_text", "candidate_text", "same"]]
     print("TWCHCVH", dataset.iloc[0])
     sample_texts = [
         [dataset.iloc[i]["disputed_text"], dataset.iloc[i]["candidate_text"]]
@@ -149,7 +149,7 @@ if __name__ == "__main__":
     print("Ground Truth: ", dataset["same"])
 
     # debug
-    dataset = load_from_disk(Path(__file__).resolve().parents[2] / CONFIG.CROSS_GENRE)[
-        "train"
-    ].to_pandas()[["disputed_text", "candidate_text", "same"]]
+    dataset = load_from_disk(
+        Path(__file__).resolve().parents[2] / CONFIG.PATH2CROSS_GENRE
+    )["train"].to_pandas()[["disputed_text", "candidate_text", "same"]]
     print(dataset["same"].value_counts())
