@@ -112,6 +112,7 @@
   - ~~cannot download `SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")` or `gensim.downloader.load("glove-twitter-25")`~~
 - [ ] run `genai_detection/vis_detectors.py`via `scripts/vis_detectors.sh` on cluster again, bc annotation changed
   - [o] Fig 2
+    - parallelize does not work, bc tfidf vectorizer isn't correctly initialized in ImpostorDetector
     - [o] running on 15 element subset of each dataset
     - [o] running on complete dataset (maybe old code)
   - [o] Fig 4 
