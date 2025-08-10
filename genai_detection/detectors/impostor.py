@@ -444,7 +444,9 @@ class ImpostorDetector(ImpostorBase):
         scores = self.get_score(text)
         return [score > self.threshold for score in scores]
 
-    def tokens_to_matrix(self, tokens, top_token_list, path2imp: Optional[str] = None):
+    def tokens_to_matrix(
+        self, tokens, path2imp: Optional[str] = None
+    ):  # top_token_list
         """
         Transform list of tokens into matrix of term tfidf values of the top tokens.
         Koppel et al. (2014) use space-free character 4-grams tfidf values to represent each document as a numerical vector.
@@ -457,10 +459,10 @@ class ImpostorDetector(ImpostorBase):
         :param top_token_list: list of top tokens to include in the matrix
         :return: Numpy array of term tfidf values, `shape = (len(tokens), len(top_token_list))`
         """
-        if len(top_token_list) == 0:
-            return np.zeros(
-                (1, self.top_n), dtype=np.float32
-            )  # return empty matrix if no top tokens
+        # if len(top_token_list) == 0:
+        #     return np.zeros(
+        #         (1, self.top_n), dtype=np.float32
+        #     )  # return empty matrix if no top tokens
 
         # avoid fitting a new vectorizer every time (costly)
         self._update_vectorizer_if_necessary(
