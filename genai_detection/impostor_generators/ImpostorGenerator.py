@@ -439,6 +439,10 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
                     path2imp
                     / "impostor_A_Lovers_Complaint_William_Shakespeare_results_20250608_202134.csv"
                 )
+            if not Path(path2imp).exists():
+                return {
+                    "imposter": f"No real time generation and Path {path2imp} does not exist."
+                }
             result_df = pd.read_csv(path2imp)
 
         # aggregate results' texts, preferably using full_text, if empty use snippet and return a list of texts
