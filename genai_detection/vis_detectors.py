@@ -836,7 +836,6 @@ class VisDetectors:
     #################################################################################
 
     def _helper_impostor(self, path2imp, pair, imp_gen: str, training_mode=True):
-        print(f"Processing pair: {pair} of path: {path2imp}")
         impostor_detector = ImpostorDetector(
             impostor_technique=imp_gen,
             n_impostors=50,
@@ -848,7 +847,7 @@ class VisDetectors:
         )
         impostor_detector.set_training_mode(training_mode)
         res = impostor_detector._get_score_impl(pair)
-        return [r[0] if isinstance(r, (tuple, list)) else r for r in res]
+        return [r[0] for r in res] if isinstance(res, list) else res[0]
 
     def _run_fig_4_worker(self, imp_gen, train_dataset, test_dataset, path2imp):
         try:
