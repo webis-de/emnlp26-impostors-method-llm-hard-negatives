@@ -131,10 +131,6 @@ def _helper_impostor(path2imp, pair, training_mode=True):
 
 
 def create_df(path2dataset: str, dataset_name: str, save_path: Path):
-    """
-    Run the experiment based on the specified task.
-    The task can be 'evaluate' to evaluate paraphrases or 'create' to create new paraphrases.
-    """
     train_dataset = get_dataset(path2dataset)
     path2imp = (
         Path(os.getcwd()).resolve() / CONFIG.PATH2BLOG
