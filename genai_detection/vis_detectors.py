@@ -630,6 +630,22 @@ class VisDetectors:
             CONFIG.STUDENT_ESSAYS,
         ], "This method is only implemented for BLOG and Student Essays datasets."
         train_dataset, test_dataset = self._load_datasets(balanced=True)
+        # TODO: Test on small data subsets
+        train_dataset = pd.concat(
+            [
+                train_dataset.loc[train_dataset["same"]].head(15),
+                train_dataset.loc[~train_dataset["same"]].head(15),
+            ],
+            ignore_index=False,
+        )
+
+        test_dataset = pd.concat(
+            [
+                test_dataset.loc[test_dataset["same"]].head(15),
+                test_dataset.loc[~test_dataset["same"]].head(15),
+            ],
+            ignore_index=False,
+        )
         print("Loaded datasets for Figure 2:", self.dataset_name)
         # could be initially different, bc args are from argparse which are irrespective from calling thsi function with defined dataset_name
         args["dataset_name"] = self.dataset_name
@@ -640,45 +656,45 @@ class VisDetectors:
             if self.dataset_name == CONFIG.BLOG
             else Path(os.getcwd()).resolve() / CONFIG.PATH2STUDENT_ESSAYS
         )
-        # print("Start parallel computation for different n_impostors.")
-        # with ProcessPoolExecutor() as executor:
-        #     futures = {
-        #         executor.submit(
-        #             self._run_fig_2_worker,
-        #             n_imp,
-        #             train_dataset,
-        #             test_dataset,
-        #             path2imp,
-        #             args,
-        #         ): n_imp
-        #         for n_imp in n_imp_options
-        #     }
+        print("Start parallel computation for different n_impostors.")
+        with ProcessPoolExecutor() as executor:
+            futures = {
+                executor.submit(
+                    self._run_fig_2_worker,
+                    n_imp,
+                    train_dataset,
+                    test_dataset,
+                    path2imp,
+                    args,
+                ): n_imp
+                for n_imp in n_imp_options
+            }
 
-        #     for future in as_completed(futures):
-        #         result = future.result()
-        #         if result:
-        #             precisions[result["n_imp"]] = result["precision"]
-        #             recalls[result["n_imp"]] = result["recall"]
-        #         else:
-        #             print(
-        #                 f"[ERROR] Failed to compute precision and recall for n_imp = {futures[future]}"
-        #             )
+            for future in as_completed(futures):
+                result = future.result()
+                if result:
+                    precisions[result["n_imp"]] = result["precision"]
+                    recalls[result["n_imp"]] = result["recall"]
+                else:
+                    print(
+                        f"[ERROR] Failed to compute precision and recall for n_imp = {futures[future]}"
+                    )
 
-        print("Start sequential computation for different n_impostors.")
-        for n_imp in n_imp_options:
-            result = self._run_fig_2_worker(
-                n_imp, train_dataset, test_dataset, path2imp, args
-            )
-            if result:
-                print(
-                    f"Computed precision and recall for n_imp = {n_imp}: prec: {result['precision']}, recall: {result['recall']}"
-                )
-                precisions[result["n_imp"]] = result["precision"]
-                recalls[result["n_imp"]] = result["recall"]
-            else:
-                print(
-                    f"[ERROR] Failed to compute precision and recall for n_imp = {n_imp}"
-                )
+        # print("Start sequential computation for different n_impostors.")
+        # for n_imp in n_imp_options:
+        #     result = self._run_fig_2_worker(
+        #         n_imp, train_dataset, test_dataset, path2imp, args
+        #     )
+        #     if result:
+        #         print(
+        #             f"Computed precision and recall for n_imp = {n_imp}: prec: {result['precision']}, recall: {result['recall']}"
+        #         )
+        #         precisions[result["n_imp"]] = result["precision"]
+        #         recalls[result["n_imp"]] = result["recall"]
+        #     else:
+        #         print(
+        #             f"[ERROR] Failed to compute precision and recall for n_imp = {n_imp}"
+        #         )
 
         fig = plt.figure()
         assert (
@@ -994,13 +1010,13 @@ class VisDetectors:
         #     ignore_index=False,
         # )
 
-        test_dataset = pd.concat(
-            [
-                test_dataset.loc[test_dataset["same"]].head(5),
-                test_dataset.loc[~test_dataset["same"]].head(5),
-            ],
-            ignore_index=False,
-        )
+        # test_dataset = pd.concat(
+        #     [
+        #         test_dataset.loc[test_dataset["same"]].head(5),
+        #         test_dataset.loc[~test_dataset["same"]].head(5),
+        #     ],
+        #     ignore_index=False,
+        # )
 
         # could be initially different, bc args are from argparse which are irrespective from calling thsi function with defined dataset_name
         args["dataset_name"] = self.dataset_name
