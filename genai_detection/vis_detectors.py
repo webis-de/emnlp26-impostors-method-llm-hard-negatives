@@ -825,6 +825,22 @@ class VisDetectors:
         return precision, recall
 
     #################################################################################
+
+    def _helper_impostor(self, path2imp, pair, imp_gen: str, training_mode=True):
+        print(f"Processing pair: {pair} of path: {path2imp}")
+        impostor_detector = ImpostorDetector(
+            impostor_technique=imp_gen,
+            n_impostors=50,
+            rounds=100,  # cf. pg. 181, Koppel et al. (2014)
+            top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
+            path2imp=path2imp,
+            upsample=False,
+            real_time_generation=False,  # TODO: turn True, otherwise on-the-fly generation is not possible (currently too much data for too few free api calls)
+        )
+        impostor_detector.set_training_mode(training_mode)
+        res = impostor_detector._get_score_impl(pair)
+        return [score for score, _ in res]
+
     def _run_fig_4_worker(self, imp_gen, train_dataset, test_dataset, path2imp):
         try:
             print(
@@ -847,7 +863,12 @@ class VisDetectors:
             # element not pickable -> do not use ProcessPoolExecutor, but ThreadPoolExecutor
             with ThreadPoolExecutor() as executor:
                 train_dataset["impostor_score"] = list(
-                    executor.map(impostor_detector.get_score, train_dataset["pair"])
+                    executor.map(
+                        self._helper_impostor,
+                        [path2imp] * len(train_dataset),
+                        train_dataset["pair"],
+                        [imp_gen] * len(train_dataset),
+                    )
                 )
             print(
                 "Calculated impostor scores on training data for imposter generation:",
@@ -883,7 +904,14 @@ class VisDetectors:
             )  # set to False for validation: Use training set for impostor generation for fixed impostor technique
             with ProcessPoolExecutor() as executor:
                 test_dataset["impostor_score"] = list(
-                    executor.map(impostor_detector.get_score, test_dataset["pair"])
+                    executor.map(
+                        self._helper_impostor,
+                        [path2imp] * len(train_dataset),
+                        test_dataset["pair"],
+                        [imp_gen] * len(train_dataset),
+                        [False]
+                        * len(train_dataset),  # training_mode=False for test set
+                    )
                 )
 
             # same author pairs
