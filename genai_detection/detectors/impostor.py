@@ -472,7 +472,7 @@ class ImpostorDetector(ImpostorBase):
         try:
             tfidf_matrix = self._vectorizer.transform([" ".join(tokens)])
         except Exception as e:
-            raise "SECOND Error transforming tokens to matrix: {}".format(e)
+            raise Exception("SECOND Error transforming tokens to matrix: {}".format(e))
 
         return tfidf_matrix.toarray()
 
