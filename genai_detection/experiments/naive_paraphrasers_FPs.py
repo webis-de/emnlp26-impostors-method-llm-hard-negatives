@@ -6,6 +6,7 @@ We therefore created (Non-)Naive LLM-based impostor generators in the `LLMImpost
 """
 
 import argparse
+from asyncio import sleep
 import collections
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 import os
@@ -122,7 +123,6 @@ def load_detectors(detector_name: str = "all") -> dict[str, ImpostorDetector]:
     return detector_dict
 
 
-# for parallelization
 def _compute_score(detector_name, row: collections.OrderedDict) -> tuple[int, float]:
     original_text = row["disputed_text"]
     paraphrased_text = row["candidate_text"]
@@ -134,7 +134,9 @@ def _compute_score(detector_name, row: collections.OrderedDict) -> tuple[int, fl
         print(f"Error getting index from row: {e}")
         print(f"Row keys: {row.keys()}")
     try:
-        return id, np.round(score, 2)  # return index + score
+        return id, (
+            np.round(score, 2) if not (score is None) else None
+        )  # return index + score
     except TypeError as e:
         raise TypeError(
             f"Error rounding score: {score}. Ensure the score is a number. Row: {row}. Error: {str(e)}"
@@ -196,7 +198,17 @@ def get_detector_scores(
 
                 # sequential processing to avoid SAIA API rate limits
                 for row in rows:
+                    i = 0
                     idx, score = _compute_score(detector_name, row._asdict())
+                    while score is None:
+                        print(
+                            "Exceeded API rate limit and hence score is None. Sleeping for 5 seconds."
+                        )
+                        i += 5
+                        sleep(i)
+                        idx, score = _compute_score(detector_name, row._asdict())
+                        if i > 60:
+                            break
                     try:
                         dataset_scored.at[idx, score_col] = score
                     except Exception as e:
