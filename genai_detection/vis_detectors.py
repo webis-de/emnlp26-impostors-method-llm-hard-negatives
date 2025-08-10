@@ -656,45 +656,46 @@ class VisDetectors:
             if self.dataset_name == CONFIG.BLOG
             else Path(os.getcwd()).resolve() / CONFIG.PATH2STUDENT_ESSAYS
         )
-        print("Start parallel computation for different n_impostors.")
-        with ProcessPoolExecutor() as executor:
-            futures = {
-                executor.submit(
-                    self._run_fig_2_worker,
-                    n_imp,
-                    train_dataset,
-                    test_dataset,
-                    path2imp,
-                    args,
-                ): n_imp
-                for n_imp in n_imp_options
-            }
+        # Does not work, bc tfidf vectorizer isnt correctly initialized in ImpostorDetector
+        # print("Start parallel computation for different n_impostors.")
+        # with ProcessPoolExecutor() as executor:
+        #     futures = {
+        #         executor.submit(
+        #             self._run_fig_2_worker,
+        #             n_imp,
+        #             train_dataset,
+        #             test_dataset,
+        #             path2imp,
+        #             args,
+        #         ): n_imp
+        #         for n_imp in n_imp_options
+        #     }
 
-            for future in as_completed(futures):
-                result = future.result()
-                if result:
-                    precisions[result["n_imp"]] = result["precision"]
-                    recalls[result["n_imp"]] = result["recall"]
-                else:
-                    print(
-                        f"[ERROR] Failed to compute precision and recall for n_imp = {futures[future]}"
-                    )
+        #     for future in as_completed(futures):
+        #         result = future.result()
+        #         if result:
+        #             precisions[result["n_imp"]] = result["precision"]
+        #             recalls[result["n_imp"]] = result["recall"]
+        #         else:
+        #             print(
+        #                 f"[ERROR] Failed to compute precision and recall for n_imp = {futures[future]}"
+        #             )
 
-        # print("Start sequential computation for different n_impostors.")
-        # for n_imp in n_imp_options:
-        #     result = self._run_fig_2_worker(
-        #         n_imp, train_dataset, test_dataset, path2imp, args
-        #     )
-        #     if result:
-        #         print(
-        #             f"Computed precision and recall for n_imp = {n_imp}: prec: {result['precision']}, recall: {result['recall']}"
-        #         )
-        #         precisions[result["n_imp"]] = result["precision"]
-        #         recalls[result["n_imp"]] = result["recall"]
-        #     else:
-        #         print(
-        #             f"[ERROR] Failed to compute precision and recall for n_imp = {n_imp}"
-        #         )
+        print("Start sequential computation for different n_impostors.")
+        for n_imp in n_imp_options:
+            result = self._run_fig_2_worker(
+                n_imp, train_dataset, test_dataset, path2imp, args
+            )
+            if result:
+                print(
+                    f"Computed precision and recall for n_imp = {n_imp}: prec: {result['precision']}, recall: {result['recall']}"
+                )
+                precisions[result["n_imp"]] = result["precision"]
+                recalls[result["n_imp"]] = result["recall"]
+            else:
+                print(
+                    f"[ERROR] Failed to compute precision and recall for n_imp = {n_imp}"
+                )
 
         fig = plt.figure()
         assert (
