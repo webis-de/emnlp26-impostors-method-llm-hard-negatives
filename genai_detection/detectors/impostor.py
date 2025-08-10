@@ -316,21 +316,21 @@ class ImpostorDetector(ImpostorBase):
             freqs_left = Counter({k: v for k, v in freqs_left.items() if v > 1})
             freqs_right = Counter({k: v for k, v in freqs_right.items() if v > 1})
 
-            if self.shared_vocab_only:  # TODO: over all corpus documents
-                shared_tokens = freqs_left.keys() & freqs_right.keys()
-            else:
-                shared_tokens = freqs_left.keys() | freqs_right.keys()
+            # if self.shared_vocab_only:  # TODO: over all corpus documents
+            #     shared_tokens = freqs_left.keys() & freqs_right.keys()
+            # else:
+            #     shared_tokens = freqs_left.keys() | freqs_right.keys()
 
-            top_tokens = heapq.nlargest(
-                self.top_n, shared_tokens, key=lambda x: freqs_left[x] + freqs_right[x]
-            )
+            # top_tokens = heapq.nlargest(
+            #     self.top_n, shared_tokens, key=lambda x: freqs_left[x] + freqs_right[x]
+            # )
 
             # TFIDF vectorizer fit on training corpus
             x_left = self.tokens_to_matrix(
-                tokens_left, top_tokens, path2imp=self.path2imp
+                tokens_left, path2imp=self.path2imp  # top_tokens,
             )
             x_right = self.tokens_to_matrix(
-                tokens_right, top_tokens, path2imp=self.path2imp
+                tokens_right, path2imp=self.path2imp  # top_tokens,
             )
 
             store = {
@@ -372,7 +372,7 @@ class ImpostorDetector(ImpostorBase):
                     impostor_name: {
                         "tfidf": self.tokens_to_matrix(
                             self.tokenizer(impostor_text),
-                            top_tokens,
+                            # top_tokens,
                             path2imp=self.path2imp,
                         ),
                         "text": impostor_text,
@@ -383,12 +383,18 @@ class ImpostorDetector(ImpostorBase):
                 tmp_store[candidate] = store[candidate]  # add actual candidate
 
                 # for different rounds, randomly delete a portion of features (reset in each round)
+                assert (
+                    self._vectorizer_vocab is not None
+                ), "TFIDF Vectorizer vocabulary is not set. Please ensure that the vectorizer is fitted before calling _get_score_impl."
                 for _ in range(self.rounds):
                     # feature selection: randomly delete a portion of features
                     rand_feat_to_keep_ids = sample(
-                        range(len(top_tokens)),
-                        int(len(top_tokens) * (1 - self.portion_delete)),
+                        range(len(self._vectorizer_vocab)),
+                        int(len(self._vectorizer_vocab) * (1 - self.portion_delete)),
                     )
+                    assert not any(
+                        [tmp_store[c]["tfidf"] is None for c in tmp_store.keys()]
+                    ), "Temporary store must not coontain empty TFIDF representations (imposter _get_score_impl)."
                     scores = {
                         c: self.minmax_similarity(
                             store[disputed]["tfidf"][
@@ -458,15 +464,17 @@ class ImpostorDetector(ImpostorBase):
 
         # avoid fitting a new vectorizer every time (costly)
         self._update_vectorizer_if_necessary(
-            top_token_list=top_token_list, path2imp=path2imp, input_tokens=tokens
+            # top_token_list=top_token_list,
+            path2imp=path2imp,
+            input_tokens=tokens,
         )
 
         tfidf_matrix = self._vectorizer.transform([" ".join(tokens)])
 
         return tfidf_matrix.toarray()
 
-    def _update_vectorizer_if_necessary(self, top_token_list, path2imp, input_tokens):
-        if not hasattr(self, "_vectorizer") or self._vectorizer_vocab != top_token_list:
+    def _update_vectorizer_if_necessary(self, path2imp, input_tokens):  # top_token_list
+        if not hasattr(self, "_vectorizer") or self._vectorizer_vocab is None:
             train_data = None
             if path2imp and path2imp.exists():
                 split = "train" if self._training_mode else "test"
@@ -486,16 +494,16 @@ class ImpostorDetector(ImpostorBase):
                 ]
                 freqs = Counter(tokens)
                 freqs = Counter({k: v for k, v in freqs.items() if v > 1})
-                top_token_list = heapq.nlargest(
+                self._vectorizer_vocab = heapq.nlargest(
                     self.top_n, list(freqs.keys()), key=lambda x: freqs[x]
                 )
             self._vectorizer = TfidfVectorizer(
-                vocabulary=top_token_list,
+                vocabulary=self._vectorizer_vocab,
                 input="content",
                 dtype=np.float32,
                 lowercase=False,  # do not lowercase all, treat tokens as case-sensitive
             )
-            self._vectorizer_vocab = top_token_list
+            # self._vectorizer_vocab = self.top_tokens
 
             if train_data is None or train_data.empty:
                 candidate_texts = [" ".join(input_tokens)]
