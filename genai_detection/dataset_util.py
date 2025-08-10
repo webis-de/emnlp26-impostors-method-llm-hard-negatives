@@ -1064,7 +1064,7 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
         # only as many artificial samples as normal ones (multiplied by number of paraphrasers)
         unique_rows = dataset.drop_duplicates(subset=["disputed_text"])
         unique_rows = unique_rows.sample(
-            n=max(1, min(len(unique_rows), n_samples // 2)), random_state=seed
+            n=max(1, min(len(unique_rows), n_samples)), random_state=seed
         )
         for i in tqdm(
             unique_rows.index, desc="Processing unique disputed texts for paraphrasing"
