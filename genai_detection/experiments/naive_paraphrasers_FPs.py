@@ -164,30 +164,30 @@ def get_detector_scores(
                 dataset_scored[score_col] = np.nan
                 rows = list(dataset_scored.itertuples())  # Faster + safer for indexing
                 # FIXME: Paraphrasers multiple times given (borrowed): Maybe multiple inits?
-                # with ThreadPoolExecutor() as executor:
-                #     futures = [
-                #         executor.submit(_compute_score, detector, row._asdict())
-                #         for row in rows
-                #     ]
-                #     for future in tqdm(
-                #         as_completed(futures),
-                #         total=len(futures),
-                #         desc=f"Scoring {detector_name} on {dataset_name}",
-                #     ):
-                #         idx, score = future.result()
-                #         dataset.at[idx, score_col] = score
+                with ThreadPoolExecutor() as executor:
+                    futures = [
+                        executor.submit(_compute_score, detector, row._asdict())
+                        for row in rows
+                    ]
+                    for future in tqdm(
+                        as_completed(futures),
+                        total=len(futures),
+                        desc=f"Scoring {detector_name} on {dataset_name}",
+                    ):
+                        idx, score = future.result()
+                        dataset.at[idx, score_col] = score
 
                 # FIXME: try sequential processing for simplicity
-                for row in rows:
-                    idx, score = _compute_score(detector, row._asdict())
-                    try:
-                        dataset.at[idx, score_col] = score
-                    except Exception as e:
-                        print(
-                            f"Error setting score for index {idx} in {detector_name} on {dataset_name}: {e}"
-                        )
-                        print(f"Row: {row._asdict()}")
-                        continue
+                # for row in rows:
+                #     idx, score = _compute_score(detector, row._asdict())
+                #     try:
+                #         dataset.at[idx, score_col] = score
+                #     except Exception as e:
+                #         print(
+                #             f"Error setting score for index {idx} in {detector_name} on {dataset_name}: {e}"
+                #         )
+                #         print(f"Row: {row._asdict()}")
+                #         continue
 
                 dataset_scored.to_csv(output_file, index=False)
         all_dfs.append(dataset_scored)
@@ -243,7 +243,11 @@ def run_FPs_experiment(
         SAVE_PATH / f"exp_naive_paraphrasers_rmse_per_paraphraser_FPs_{TIMESTAMP}.csv",
         index=False,
     )
-    print("RMSE per candidate paraphraser among FPs:")
+    print(
+        "Saved FPs RMSE to CSV: ",
+        SAVE_PATH / f"exp_naive_paraphrasers_rmse_per_paraphraser_FPs_{TIMESTAMP}.csv",
+    )
+    print("RMSE per candidate paraphraser among FPs:", rmse_df)
     return rmse_df
 
 
@@ -264,7 +268,11 @@ def run_FNs_experiment(
         SAVE_PATH / f"exp_naive_paraphrasers_rmse_per_paraphraser_FNs_{TIMESTAMP}.csv",
         index=False,
     )
-    print("RMSE per candidate paraphraser among FNs:")
+    print(
+        "Saved FNs RMSE to CSV: ",
+        SAVE_PATH / f"exp_naive_paraphrasers_rmse_per_paraphraser_FNs_{TIMESTAMP}.csv",
+    )
+    print("RMSE per candidate paraphraser among FNs:", rmse_df)
     return rmse_df
 
 
@@ -308,4 +316,6 @@ if __name__ == "__main__":
             print(f"{label} experiment completed successfully.")
 
     fp_results = results["FP"]
+    print("FP results:", fp_results)
     fn_results = results["FN"]
+    print("FN results:", fn_results)
