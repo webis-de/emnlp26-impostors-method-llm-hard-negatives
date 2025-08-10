@@ -209,8 +209,15 @@ def _get_rsme_per_paraphraser(
     detector_dict: dict[str, ImpostorDetector],
 ) -> pd.DataFrame:
     # calculate rmse per paraphraser and AV model
+    print(
+        "Calculating RMSE per paraphraser and detector...",
+        dataset.columns,
+        detector_dict.keys(),
+    )
     rmse_per_paraphraser = DefaultDict(dict)
     paraphraser_names = NAIVE_PARAPHRASER_NAMES + NON_NAIVE_PARAPHRASER_NAMES
+    if not any(dataset["paraphraser"].isin(paraphraser_names)):
+        return None
     for paraphraser in dataset["paraphraser"].unique():
         if paraphraser not in paraphraser_names:
             print(
@@ -220,6 +227,7 @@ def _get_rsme_per_paraphraser(
         print(f"Calculating RMSE for paraphraser: {paraphraser}")
         for detector_name, detector in detector_dict.items():
             fp_for_paraphraser = dataset[dataset["paraphraser"] == paraphraser]
+            print(fp_for_paraphraser)
             assert (
                 not fp_for_paraphraser.empty
             ), f"No data found for paraphraser {paraphraser} with detector {detector_name}."
@@ -247,6 +255,9 @@ def run_FPs_experiment(
     fp_dataset = dataset[~dataset["same"]]
 
     rmse_df = _get_rsme_per_paraphraser(fp_dataset, detector_dict)
+    if rmse_df is None or rmse_df.empty:
+        print("No RMSE data found for FPs. Check the dataset and detectors.")
+        return pd.DataFrame()
 
     rmse_df.to_csv(
         SAVE_PATH / f"exp_naive_paraphrasers_rmse_per_paraphraser_FPs_{TIMESTAMP}.csv",
@@ -272,9 +283,9 @@ def run_FNs_experiment(
     fn_dataset = dataset[dataset["same"]]
 
     rmse_df = _get_rsme_per_paraphraser(fn_dataset, detector_dict)
-    assert not (
-        rmse_df.empty and not fn_dataset.empty
-    ), "RMSE DataFrame is empty. Check the dataset and detectors."
+    if rmse_df is None or rmse_df.empty:
+        print("No RMSE data found for FPs. Check the dataset and detectors.")
+        return pd.DataFrame()
 
     rmse_df.to_csv(
         SAVE_PATH / f"exp_naive_paraphrasers_rmse_per_paraphraser_FNs_{TIMESTAMP}.csv",
