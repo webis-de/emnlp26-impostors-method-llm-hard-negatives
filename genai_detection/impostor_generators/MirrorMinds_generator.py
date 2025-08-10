@@ -20,8 +20,10 @@ class MirrorMindsGenerator(BaseImpostorGenerator):
     It uses the MirrorMinds model to generate paraphrases that maintain the original meaning while altering the wording.
     """
 
-    def __init__(self, model_id: str = "MirrorMinds/mirror_minds"):
-        super().__init__(n_impostors=1)
+    def __init__(
+        self, model_id: str = "MirrorMinds/mirror_minds", n_impostors: int = 1
+    ):
+        super().__init__(n_impostors=n_impostors)
         torch.cuda.empty_cache()
         self.model_path = snapshot_download(repo_id="google/flan-t5-small")
 
@@ -39,7 +41,7 @@ class MirrorMindsGenerator(BaseImpostorGenerator):
         tmp_path = Path(os.getcwd()) / "tmp-MirrorMinds"
         os.makedirs(tmp_path, exist_ok=True)
         text_df.to_pickle(tmp_path / "sample_essays.pkl")
-        impostor_texts = []
+        impostor_texts = {}
         for i in range(self.n_impostors):
             question_config = QuestionGeneratorConfig(
                 model_path=self.model_path,
@@ -70,7 +72,7 @@ class MirrorMindsGenerator(BaseImpostorGenerator):
                 response_config.input_path, response_config.output_path
             )
             if not df.empty:
-                impostor_texts.append(df["generated_text"].iloc[0])
+                impostor_texts[f"impostor_{i}"] = df["generated_text"].iloc[0]
 
         # print(f"Total script runtime: {time.time() - start_time:.2f} seconds")
         # print("Generated questions and responses saved successfully.")
