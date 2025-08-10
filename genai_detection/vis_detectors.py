@@ -922,6 +922,11 @@ class VisDetectors:
                     )
                 )
 
+            # each entry in scores is a one-element list
+            test_dataset["impostor_score"] = np.concatenate(
+                test_dataset["impostor_score"].values
+            )
+
             # same author pairs
             same_author_precisions, same_author_recalls, same_pr_thresholds = (
                 precision_recall_curve(
