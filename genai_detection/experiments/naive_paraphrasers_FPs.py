@@ -215,6 +215,12 @@ def _get_rsme_per_paraphraser(
     # calculate rmse per paraphraser and AV model
     rmse_per_paraphraser = DefaultDict(dict)
     paraphraser_names = NAIVE_PARAPHRASER_NAMES + NON_NAIVE_PARAPHRASER_NAMES
+    assert (
+        "candidate_paraphraser" in dataset.columns
+    ), "Dataset must contain 'candidate_paraphraser' column to calculate RMSE per paraphraser. Has only columns: {}".format(
+        dataset.columns.tolist()
+    )
+
     for paraphraser in dataset["paraphraser"].unique():
         if paraphraser not in paraphraser_names:
             continue  # Skip if the paraphrasers that are actually human authors
