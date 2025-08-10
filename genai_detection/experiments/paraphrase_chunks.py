@@ -162,9 +162,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
     """
     assert os.path.exists(path2dataset), f"Dataset path {path2dataset} does not exist."
     assert save_path.exists(), f"Save path {save_path} does not exist."
-    # TODO: only to run second job, delete after
-    n = 0
-    dataset = get_dataset(path2dataset).iloc[n:]
+    dataset = get_dataset(path2dataset)
     # keep only the first 5 examples per category
     dataset = dataset.groupby("category").head(5)
 
@@ -175,13 +173,12 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
 
     # work on each text individually
     for i, (original_text, category) in enumerate(
-        zip(dataset["disputed_text"], dataset["category"]), start=n
+        zip(dataset["disputed_text"], dataset["category"])
     ):
-        # TODO: First only process Student Essays
-        filter_cat = "Gutenberg"
-        if category != filter_cat:
-            print(f"Skipping text {i+1}/{len(dataset)}: {category} (not {filter_cat})")
-            continue
+        # filter_cat = "Gutenberg"
+        # if category != filter_cat:
+        #     print(f"Skipping text {i+1}/{len(dataset)}: {category} (not {filter_cat})")
+        #     continue
         print(f"Processing text {i+1}/{len(dataset)}: {category}")
         rows = []
         if (save_path / f"text_{i}_paraphrases.csv").exists():
