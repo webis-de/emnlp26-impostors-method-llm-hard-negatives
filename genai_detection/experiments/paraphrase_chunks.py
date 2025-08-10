@@ -165,6 +165,9 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
     # TODO: only to run second job, delete after
     n = 0
     dataset = get_dataset(path2dataset).iloc[n:]
+    # keep only the first 5 examples per category
+    dataset = dataset.groupby("category").head(5)
+
     n_responses = 1
 
     # Initialize paraphrasers and prompts
@@ -197,6 +200,8 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
                 continue
             print(f"Number of chunks: {num_chunks}")
             for paraphraser_name, paraphraser in paraphrasers.items():
+                if paraphraser_name in ["T5_ChatGPT", "T5_Google_PAWS", "Ollama"]:
+                    continue  # skip these paraphrasers, they are not used in this experiment
                 if isinstance(paraphraser, NonNaiveParaphraser):
                     prompt_options = [None]
                     temperature_options = [0, 0.5, 1.0]
