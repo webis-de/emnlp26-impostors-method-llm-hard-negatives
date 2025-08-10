@@ -384,6 +384,9 @@ class VisDetectors:
         :return: fpr, tpr, roc_thresholds, best threshold for F1 score.
         """
         assert isinstance(title_kwargs, dict), "title_kwargs must be a dictionary"
+        assert len(scores) == len(
+            labels
+        ), f"scores and labels must have the same length, but len(scores)={len(scores)} != len(labels)={len(labels)}\nscores: {scores}\nlabels: {labels}"
         sys.path.append(os.path.abspath(".."))
         dataset_name = title_kwargs.get("dataset_name", self.dataset_name)
         n_impostors = title_kwargs.get("n_impostors", None)
@@ -398,6 +401,12 @@ class VisDetectors:
             scores = np.concatenate(
                 scores.values
             )  # each entry in scores is a one-element list
+            if len(scores) != len(labels):
+                print(
+                    f"Warning: Length of scores ({len(scores)}) does not match length of labels ({len(labels)})."
+                )
+                print("scores:", scores)
+                print("labels:", labels)
         except Exception as e:
             raise ValueError(f"Failed to concatenate (vis_detectors) scores: {e}.")
 
