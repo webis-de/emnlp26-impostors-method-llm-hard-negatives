@@ -1,4 +1,5 @@
 import argparse
+from asyncio import sleep
 from concurrent.futures import ThreadPoolExecutor
 import os
 from pathlib import Path
@@ -149,10 +150,22 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         #         )
         #     )
         # TODO: maybe add sleep
+        results = []
+        res = None
         for pair in train_dataset["pair"]:
-            _helper_impostor(
-                path2imp, pair, training_mode=True, imp_gen=imp_gen
-            )  # ensure that the training mode is set to True
+            i = 0
+            while res is None:
+                i += 5
+                sleep(i)
+                res = _helper_impostor(
+                    path2imp, pair, training_mode=True, imp_gen=imp_gen
+                )
+                print(
+                    f"SAIA API Rate limit exceeded: {res is None}, sleeping for {i} seconds if True."
+                )
+                if i > 60:
+                    break
+            results.append(res)
 
         train_dataset[f"impostor_score_{imp_gen}"] = [score for score, _ in results]
         train_dataset[f"impostor_dict_{imp_gen}"] = [
