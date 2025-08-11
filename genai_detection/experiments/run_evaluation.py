@@ -24,7 +24,6 @@ from genai_detection.paraphrasing.paraphraser import (
 )
 from genai_detection.paraphrasing.paraphraser_evaluation import ParaphrasingEvaluator
 
-OLLAMA_VERSION = "zephyr:7b"  # "mistral:7b"  # "default:latest"
 N_RESPONSES = 1
 MAX_LENGTH = 512
 TEMPERATURE = 0.7
