@@ -6,6 +6,7 @@ The scores will be averaged to get a score for the whole text, which will be com
 """
 
 import argparse
+from asyncio import sleep
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from functools import partial
 from pathlib import Path
@@ -193,27 +194,32 @@ def paraphrase_with_config(
                     and temperature is not None
                 ):
                     p_config["temperature"] = temperature
-                try:
-                    paraphrased_chunk = paraphraser.paraphrase(**p_config)
-                    rows.append(
-                        {
-                            "original_text": original_text,
-                            "num_chunks": num_chunks,
-                            "paraphraser": paraphraser_name,
-                            "prompt": prompt,
-                            "chunk_id": chunk_id,
-                            "chunk": chunk,
-                            "temperature": temperature,
-                            "paraphrased_chunk": (
-                                paraphrased_chunk[0] if paraphrased_chunk else ""
-                            ),
-                            "category": category,
-                        }
-                    )
-                except Exception as e:
-                    print(
-                        f"Error paraphrasing chunk {chunk_id+1}/{len(chunks)} with {paraphraser_name}: {e}"
-                    )
+                i = 10
+                while i < 100:
+                    try:
+                        paraphrased_chunk = paraphraser.paraphrase(**p_config)
+                        rows.append(
+                            {
+                                "original_text": original_text,
+                                "num_chunks": num_chunks,
+                                "paraphraser": paraphraser_name,
+                                "prompt": prompt,
+                                "chunk_id": chunk_id,
+                                "chunk": chunk,
+                                "temperature": temperature,
+                                "paraphrased_chunk": (
+                                    paraphrased_chunk[0] if paraphrased_chunk else ""
+                                ),
+                                "category": category,
+                            }
+                        )
+                        break
+                    except Exception as e:
+                        print(
+                            f"Error paraphrasing chunk {chunk_id+1}/{len(chunks)} with {paraphraser_name}: {e}\nRetrying in {i} seconds..."
+                        )
+                        sleep(i)
+                        i += 10
     return rows
 
 
