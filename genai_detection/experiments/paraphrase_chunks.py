@@ -298,7 +298,7 @@ async def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
                     "T5_Google_PAWS",
                     "Ollama",
                 ]:
-                    res = paraphrase_with_config(
+                    res = await paraphrase_with_config(
                         paraphraser_name,
                         chunks,
                         original_text,
