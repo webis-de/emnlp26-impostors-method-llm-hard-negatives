@@ -294,6 +294,7 @@ class T5ChatGPTParaphraser(NaiveParaphraser):
             }
 
         """
+        self.model_id = "humarin/chatgpt_paraphraser_on_T5_base"
         if torch.backends.mps.is_available():
             self.device = torch.device("mps")  # Apple Silicon GPU
         elif torch.cuda.is_available() and torch.version.cuda is not None:
@@ -301,12 +302,10 @@ class T5ChatGPTParaphraser(NaiveParaphraser):
         else:
             self.device = torch.device("cpu")
         print("Using T5ChatGPTParaphraser")
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            "humarin/chatgpt_paraphraser_on_T5_base"
-        )
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
         print("Loaded T5ChatGPTParaphraser tokenizer")
         self.model = AutoModelForSeq2SeqLM.from_pretrained(
-            "humarin/chatgpt_paraphraser_on_T5_base", device_map=None  # force CPU load
+            self.model_id, device_map=None  # force CPU load
         ).to(self.device)
         print("Loaded T5ChatGPTParaphraser model")
 
@@ -372,6 +371,7 @@ class T5GooglePAWSParaphraser(NaiveParaphraser):
         - T5 Model: https://huggingface.co/Vamsi/T5_Paraphrase_Paws (12.06.2025)
         - Google PAWS dataset: https://github.com/google-research-datasets/paws (12.06.2025)
         """
+        self.model_id = "Vamsi/T5_Paraphrase_Paws"
         if torch.backends.mps.is_available():
             self.device = torch.device("mps")  # Apple Silicon GPU
         elif torch.cuda.is_available() and torch.version.cuda is not None:
@@ -379,12 +379,12 @@ class T5GooglePAWSParaphraser(NaiveParaphraser):
         else:
             self.device = torch.device("cpu")
         print("Using T5GooglePAWSParaphraser")
-        self.tokenizer = AutoTokenizer.from_pretrained("Vamsi/T5_Paraphrase_Paws")
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
         print("Loaded T5GooglePAWSParaphraser tokenizer")
         try:
-            self.model = AutoModelForSeq2SeqLM.from_pretrained(
-                "Vamsi/T5_Paraphrase_Paws"
-            ).to(self.device)
+            self.model = AutoModelForSeq2SeqLM.from_pretrained(self.model_id).to(
+                self.device
+            )
         except Exception as e:
             print(f"[ERROR] Failed to load T5GooglePAWSParaphraser model: {e}")
             self.model = None
@@ -437,27 +437,6 @@ class T5GooglePAWSParaphraser(NaiveParaphraser):
 
         outputs = results
 
-        # TODO: no duplication penalty, and thus, there are duplicates in the output
-        # print(f"[DEBUG] Using T5GooglePAWSParaphraser with prompt: {prompt}")
-        # encoding = self.tokenizer.encode_plus(
-        #     f"{text}\n{prompt.strip()}</s>", padding="max_length", return_tensors="pt"
-        # )
-
-        # input_ids, attention_masks = encoding["input_ids"].to(self.device), encoding[
-        #     "attention_mask"
-        # ].to(self.device)
-
-        # outputs = self.model.generate(
-        #     input_ids=input_ids,
-        #     attention_mask=attention_masks,
-        #     max_length=max_length,
-        #     do_sample=True,
-        #     top_k=120,
-        #     top_p=0.95,
-        #     num_return_sequences=n_responses,
-        #     trust_remote_code=True,
-        # )
-
         res = []
         for output in outputs:
             line = self.tokenizer.decode(
@@ -465,86 +444,6 @@ class T5GooglePAWSParaphraser(NaiveParaphraser):
             )
             res.append(line)
         return res
-
-
-class OllamaParaphraser(NaiveParaphraser):
-    """
-    Ollama paraphrasing model hosted by Webis.
-    """
-
-    def __init__(self, model_id: str = CONFIG.OLLAMA_MODEL):
-        self.client = OpenAI(
-            base_url="https://llm.web.webis.de/api",
-            api_key=CONFIG.OPENAI_KEY,
-        )
-        # custom (non-OpenAI) endpoint: Use requests library
-        response = requests.get(
-            "https://llm.web.webis.de/ollama/api/tags",
-            headers={"Authorization": f"Bearer {CONFIG.OPENAI_KEY}"},
-        )
-        models = response.json()["models"]
-        assert model_id in [
-            model["name"] for model in models
-        ], f"Model {model_id} is not available. Please choose from the available models: {[model['name'] for model in models]}"
-        self.model_id = model_id
-
-    def paraphrase(
-        self,
-        text: str,
-        prompt: str = 'Paraphrase the text above. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","paraphrase":"<paraphrased version of the text>"}.',
-        max_length: int = CONFIG.MAX_LENGTH,
-        temperature: float = CONFIG.TEMPERATURE,
-        n_responses: int = 1,
-        response_schema: Optional[
-            dict[str, Any]
-        ] = None,  # optional pydantic schema to validate the response
-    ) -> List[str]:
-        """
-        Generate paraphrased versions of the input text.
-
-        :param text: The input text to be paraphrased.
-        :param prompt: The prompt to be used for paraphrasing. This model allows for JSON structured ouput, hence, specify here the prompt to be used for paraphrasing.
-        The prompt is inserted after the text to enforce its importance in the LLM's context when working on long texts.
-        :param max_length: The maximum number of tokens to generate in the paraphrase.
-        :param temperature: Controls the randomness of the output. Lower values make the output more deterministic
-        :param n_responses: The number of paraphrases to generate.
-        :return: A list of paraphrased versions of the input text.
-        """
-        print("Ollama model")
-        responses = []
-        for i in range(
-            n_responses
-        ):  # directly using parameter n does not return n responses, but only one response
-            body = {
-                "model": self.model_id,
-                "messages": [{"role": "user", "content": f"{text}\n{prompt.strip()}"}],
-                "n": 1,
-                "max_tokens": max_length,
-                "temperature": temperature,
-            }
-            # if response_schema:
-            #      # text={"format": {"type": "json_object"}},  # FIXME: keyword unknwon even though: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#json-mode
-            #     body['response_format'] = {"type": "json_schema", "json_schema": response_schema}  # use pydantic schema to validate the response, https://ollama.com/blog/structured-outputs
-            try:
-                response = self.client.chat.completions.create(**body)
-            except openai.InternalServerError as e:
-                print(
-                    f"[ERROR] Failed to generate paraphrase with Ollama: {e}. Skipping..."
-                )
-                continue
-            # print(f"[DEBUG] Response from Ollama paraphraser: {response.choices[0].message.content}")
-            # print(f"[DEBUG] Response format: {format.model_json_schema()}/{type(format)}")
-            resp = response.choices[0].message.content
-            resp = re.sub("'", " ", resp)  # replace single quotes with double quotes
-            resp = re.sub(r"\s+", " ", resp)  # remove excessive whitespaces
-
-            try:
-                data = json.loads(resp)
-                responses.append(data)
-            except json.JSONDecodeError:
-                responses.append(response.choices[0].message.content)
-
-        return responses
 
 
 class SAIAParaphraser(NaiveParaphraser):
@@ -582,30 +481,27 @@ class SAIAParaphraser(NaiveParaphraser):
         :param n_responses: The number of paraphrases to generate.
         :return: A list of paraphrased versions of the input text.
         """
-        print("SAIA model")
         responses = []
         for i in range(n_responses):
             # max token differs across models but usually at least 40k tokens, so we crop at less to be safe
             body = {
                 "model": self.model_id,
                 "messages": [
-                    {"role": "user", "content": f"{text[:30000]}\n{prompt.strip()}"}
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that paraphrases text while keeping the meaning unchanged.",
+                    },
+                    {"role": "user", "content": f"{text[:30000]}\n{prompt.strip()}"},
                 ],
                 "temperature": temperature,
             }
-            # if response_schema:
-            #      # text={"format": {"type": "json_object"}},  # FIXME: keyword unknwon even though: https://platform.openai.com/docs/guides/structured-outputs?api-mode=responses#json-mode
-            #     body['response_format'] = {"type": "json_schema", "json_schema": response_schema}  # use pydantic schema to validate the response, https://ollama.com/blog/structured-outputs
             try:
                 response = self.client.chat.completions.create(**body)
             except openai.InternalServerError as e:
                 print(
-                    f"[ERROR] Failed to generate paraphrase with SAIA: {e}. Skipping..."
+                    f"[ERROR] Failed to generate paraphrase with {self.model_id}: {e}. Skipping..."
                 )
                 continue
-            # print(
-            #     f"[DEBUG] Response from SAIA paraphraser: {response.choices[0].message.content}"
-            # )
 
             resp = response.choices[0].message.content
             resp = re.sub("'", " ", resp)  # replace single quotes with double quotes
@@ -618,6 +514,19 @@ class SAIAParaphraser(NaiveParaphraser):
                 responses.append(response.choices[0].message.content)
 
         return responses
+
+
+class OllamaParaphraser(SAIAParaphraser):
+    """
+    Ollama paraphrasing model hosted by Webis.
+    """
+
+    def __init__(self, model_id: str = CONFIG.OLLAMA_MODEL):
+        super().__init__(model_id=model_id)
+        self.client = OpenAI(
+            base_url=CONFIG.OLLAMA_URL,
+            api_key=CONFIG.OPENAI_KEY,
+        )
 
 
 class IONOSParaphraser(SAIAParaphraser):
@@ -656,8 +565,8 @@ class BlabladorParaphraser(NaiveParaphraser):
     Blablador paraphrasing model hosted by Jülich/ Helmholtz AI.
     """
 
-    def __init__(self, model_id: ModelName = "1 - Ministral 8b - the fast model"):
-        self.base_url = "https://api.helmholtz-blablador.fz-juelich.de/v1"
+    def __init__(self, model_id: ModelName = CONFIG.BLABLADOR_MODEL):
+        self.base_url = CONFIG.BLABLADOR_URL
         self.headers = {
             "Authorization": f"Bearer {CONFIG.BLABLADOR_KEY}",
             "Accept": "application/json",
@@ -751,6 +660,7 @@ class BulletPointParaphraser(NonNaiveParaphraser):
         :param text_generator: A model or function to generate text based on the extracted bullet points, tone and genre.
         """
         super().__init__(text_extractor=text_extractor, text_generator=text_generator)
+        self.model_id = "bullet_point"
         self.extractor_prompt = 'Summarize the text above in five to six short bullet points. Respond ONLY with a JSON object in the following format: {"bullet_points":"<list of bullet points>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"target_audience":"<target_audience>","genre":"<genre>"}. Do not use direct quotes.'
 
     def add_tailoring_quotes(self, value):
@@ -808,10 +718,6 @@ class BulletPointParaphraser(NonNaiveParaphraser):
         logger.info(f"\n[DEBUG] Response from text extractor: {res}\n")
 
         if isinstance(res, str):
-            # res = re.sub(
-            #     r"^```(?:json)?\s*|\s*```$", "", text.strip(), flags=re.IGNORECASE
-            # )
-
             res = unicodedata.normalize("NFKC", res)  # normalize unicode characters
             match = re.search(
                 r"\{.*?\}", res, flags=re.DOTALL
@@ -834,9 +740,6 @@ class BulletPointParaphraser(NonNaiveParaphraser):
                     res
                 )  # fallback to dirtyjson.loads if ast.literal_eval fails
             except Exception as e:
-                # resp = {key: [res]}
-                # TODO: try again, until valid JSON is returned
-                print("Again, result: ", res)
                 return self._extract_bullet_points(
                     text=text,
                     prompt=prompt,
@@ -878,13 +781,8 @@ class BulletPointParaphraser(NonNaiveParaphraser):
         """
         assert self.text_extractor is not None, "Text extractor must be provided."
         if prompt is None:
-            # PAN24: (fallback)
-            text = (
-                bullet_points[0] * 5
-            )  # TODO: only bc currently no access to text in this function
-            prompt = (
-                f"Write a text of about {len(text)} words which covers the following items:"
-                + "\n".join(f"- {bp}" for bp in bullet_points)
+            prompt = f"Write a text which covers the following items:" + "\n".join(
+                f"- {bp}" for bp in bullet_points
             )
         return self.text_generator.paraphrase(
             text="",
@@ -916,7 +814,6 @@ class BulletPointParaphraser(NonNaiveParaphraser):
         :param ground_truth: Optional ground truth to use instead of the LLM extracted text.
         :return: A paraphrased version of the input text.
         """
-        print("BulletPoint model")
         if prompt == "":
             prompt = None
         bullet_points, tone, genre, time_period, register, target_audience = (
@@ -960,6 +857,7 @@ class TaskParaphraser(BulletPointParaphraser):
         :param text_generator: A model or function to generate text based on the extracted task, tone and genre.
         """
         super().__init__(text_extractor=text_extractor, text_generator=text_generator)
+        self.model_id = "task"
         self.extractor_prompt = 'Act as the author of the text above. From that perspective, infer your role or identity, the topic being addressed, and the purpose or instruction behind writing the text. Combine these elements into a concise task prompt that you would give to an LLM to reproduce the text. Respond ONLY with a JSON object in the following format: {"task":"<task>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"target_audience":"<target_audience>","genre":"<genre>"}.'
 
     def paraphrase(
@@ -974,7 +872,6 @@ class TaskParaphraser(BulletPointParaphraser):
             dict
         ] = None,  # if any ground truth is available, use it rather than the LLM extracted text
     ) -> List[str]:
-        print("Task model")
         task, tone, genre, time_period, register, target_audience = (
             self._extract_bullet_points(
                 text=text,
@@ -1022,6 +919,7 @@ class TopicParaphraser(BulletPointParaphraser):
         :param text_generator: A model or function to generate text based on the extracted topic, tone and genre.
         """
         super().__init__(text_extractor=text_extractor, text_generator=text_generator)
+        self.model_id = "topic"
         self.extractor_prompt = 'Extract the topic, tone, time period, register, target audience, and genre from the text above. Respond ONLY with a JSON object in the following format: {"topic":"<topic>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"target_audience":"<target_audience>","genre":"<genre>"}.'
 
     def paraphrase(
@@ -1091,6 +989,7 @@ class TitleParaphraser(BulletPointParaphraser):
         :param text_generator: A model or function to generate text based on the extracted title, tone and genre.
         """
         super().__init__(text_extractor=text_extractor, text_generator=text_generator)
+        self.model_id = "title"
         self.extractor_prompt = 'Find a concise title for the text, extract the tone, time period, register, target audience and genre from the text above. Respond ONLY with a JSON object in the following format: {"title":"<title>","tone":"<tone>","time_period":<time_period>,"language_register":<register>,"target_audience":"<target_audience>","genre":"<genre>"}.'
 
     def paraphrase(
@@ -1163,6 +1062,7 @@ class TranslationParaphraser(NonNaiveParaphraser):
         :param text_extractor: A model or function to translate to foreign languages.
         :param text_generator: A model or function to translate from foreign languages.
         """
+        self.model_id = "translation"
         assert isinstance(text_extractor, NaiveParaphraser) and isinstance(
             text_generator, NaiveParaphraser
         ), "Both text_extractor and text_generator must be instances of NaiveParaphraser or its subclasses."
@@ -1248,6 +1148,12 @@ def get_paraphraser_dict() -> Dict[str, Paraphraser]:
         "mistral-large-instruct": SAIAParaphraser("mistral-large-instruct"),
         "openai-gpt-oss-120b": SAIAParaphraser("openai-gpt-oss-120b"),
         "meta-llama-3.1-8b-instruct": SAIAParaphraser("meta-llama-3.1-8b-instruct"),
+        "meta-llama/Llama-3.3-70B-Instruct": IONOSParaphraser(
+            model_id="meta-llama/Llama-3.3-70B-Instruct"
+        ),
+        "mistralai/Mixtral-8x7B-Instruct-v0.1": IONOSParaphraser(
+            model_id="mistralai/Mixtral-8x7B-Instruct-v0.1"
+        ),
     }
     bullet_point_paraphraser = BulletPointParaphraser(
         text_extractor=paraphrasers["openai-gpt-oss-120b"],
@@ -1287,7 +1193,7 @@ if __name__ == "__main__":
         # 'T5_ChatGPT': T5ChatGPTParaphraser(),
         # 'T5_Google_PAWS': T5GooglePAWSParaphraser(),
         # 'Blablador': BlabladorParaphraser(model_id="1 - Llama3 405 the best general model and big context size"),
-        # "Ollama": OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL),
+        "Ollama": OllamaParaphraser(),
         "SAIA": SAIAParaphraser(),
         "IONOS": IONOSParaphraser(),
         # "TopicParaphraser": TopicParaphraser(
@@ -1329,7 +1235,8 @@ if __name__ == "__main__":
     text = "Dear Santa, I wish for a big red nosed reindeer that can fly and a sleigh full of toys for all the children in the world. I promise to be good and help others. Love, Timmy."
     # p = paraphrasers["TranslationParaphraser"]
     # p = paraphrasers["SAIA"]
-    p = paraphrasers["IONOS"]
+    # p = paraphrasers["IONOS"]
+    p = paraphrasers["Ollama"]
     print(f"[DEBUG] Paraphrasing text with {p.__class__.__name__}")
     paraphrased_texts = p.paraphrase(text=text, n_responses=2)
     print(f"[DEBUG] Paraphrased texts: {paraphrased_texts}")
