@@ -28,7 +28,9 @@ class MirrorMindsGenerator(BaseImpostorGenerator):
         # FIXME: AttributeError: 'tqdm' object has no attribute '_lock'
         self.model_path = snapshot_download(repo_id="google/flan-t5-small")
 
-    def generate_impostors(self, text: str) -> List[str]:
+    def generate_impostors(
+        self, text: str, real_time_generation: bool = True, path2imp: str = None
+    ) -> List[str]:
         """
         Generate an impostor text by mirroring the structure of the input text.
 
