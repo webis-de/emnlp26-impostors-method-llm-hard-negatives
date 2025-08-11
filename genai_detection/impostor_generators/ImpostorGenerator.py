@@ -21,6 +21,7 @@ import serpapi
 from dotenv import load_dotenv
 import torch
 from genai_detection.paraphrasing.paraphraser import (
+    IONOSParaphraser,
     SAIAParaphraser,
     T5ChatGPTParaphraser,
     T5GooglePAWSParaphraser,
@@ -153,7 +154,7 @@ class ContentImpostorGenerator(BaseImpostorGenerator):
         top_indices = similarities.topk(self.n_impostors).indices.tolist()
         selected_texts = [candidate_texts[i] for i in top_indices]
 
-        return {f"impostor_{i}": imp for i, imp in enumerate(selected_texts)}
+        return {f"impostor_{i}_content": imp for i, imp in enumerate(selected_texts)}
 
 
 class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
@@ -507,7 +508,7 @@ class TextLenImpostorGenerator(BaseImpostorGenerator):
             filtered_candidates, size=num_to_sample, replace=False, p=probs
         )
 
-        return {f"impostor_{i}": imp for i, imp in enumerate(selected)}
+        return {f"impostor_{i}_text_len": imp for i, imp in enumerate(selected)}
 
 
 class LLMImpostorGenerator(BaseImpostorGenerator):
@@ -527,6 +528,12 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
             )
             self.saiai_paraphraser_gpt = SAIAParaphraser(model_id="openai-gpt-oss-120b")
             self.saiai_paraphraser_qwen = SAIAParaphraser(model_id="qwen3-32b")
+            self.ionos_paraphraser_llama = IONOSParaphraser(
+                model_id="meta-llama/Llama-3.3-70B-Instruct"
+            )
+            self.ionos_paraphraser_mistral = IONOSParaphraser(
+                model_id="mistralai/Mixtral-8x7B-Instruct-v0.1"
+            )
 
             self.topic_paraphraser = TopicParaphraser(
                 text_extractor=self.saiai_paraphraser_gpt,
@@ -556,6 +563,8 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
                 self.saiai_paraphraser_mistral,
                 self.saiai_paraphraser_gpt,
                 self.saiai_paraphraser_qwen,
+                self.ionos_paraphraser_llama,
+                self.ionos_paraphraser_mistral,
                 self.topic_paraphraser,
                 self.task_paraphraser,
                 self.title_paraphraser,
@@ -601,7 +610,9 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
                     continue
 
         impostors = {
-            f"impostor_{i}": imp for i, imp in enumerate(paraphrases) if len(imp) > 0
+            f"impostor_{i}_{paraphraser.model_id}": imp
+            for i, imp in enumerate(paraphrases)
+            if len(imp) > 0
         }
         return impostors
 
@@ -659,6 +670,12 @@ class NaiveLLMImpostorGenerator(LLMImpostorGenerator):
         saiai_paraphraser_mistral = SAIAParaphraser(model_id="mistral-large-instruct")
         saiai_paraphraser_gpt = SAIAParaphraser(model_id="openai-gpt-oss-120b")
         saiai_paraphraser_qwen = SAIAParaphraser(model_id="qwen3-32b")
+        ionos_paraphraser_llama = IONOSParaphraser(
+            model_id="meta-llama/Llama-3.3-70B-Instruct"
+        )
+        ionos_paraphraser_mistral = IONOSParaphraser(
+            model_id="mistralai/Mixtral-8x7B-Instruct-v0.1"
+        )
 
         super().__init__(
             n_impostors=n_impostors,
@@ -670,6 +687,8 @@ class NaiveLLMImpostorGenerator(LLMImpostorGenerator):
                 saiai_paraphraser_mistral,
                 saiai_paraphraser_gpt,
                 saiai_paraphraser_qwen,
+                ionos_paraphraser_llama,
+                ionos_paraphraser_mistral,
             ],
         )
 
@@ -709,7 +728,7 @@ class FixedImpostorGenerator(BaseImpostorGenerator):
             ), "Each entry in the dataset must be a dictionary."
             if "pair" not in entry:
                 continue
-            key = entry.get("id", f"impostor_{i}")
+            key = entry.get("id", f"impostor_{i}_fixed")
             impostors[f"{key}_left"] = entry["pair"][0]
             impostors[f"{key}_right"] = entry["pair"][1]
 
