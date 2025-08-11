@@ -371,7 +371,6 @@ class ImpostorDetector(ImpostorBase):
                     "other_text": store[disputed]["text"],
                     "paraphrases": impostor_candidates,
                 }
-                print("Generated impostors for candidate.")
 
                 tmp_store = {
                     impostor_name: {
@@ -529,7 +528,6 @@ class ImpostorDetector(ImpostorBase):
         ):
             raise RuntimeError("Vectorizer fitting failed: vocabulary is empty.")
 
-        print("Fitted TFIDF vectorizer on candidate texts.")
         return self._vectorizer
 
     @staticmethod
