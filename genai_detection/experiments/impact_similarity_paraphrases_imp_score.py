@@ -257,7 +257,7 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
             label="Accuracy",
         )
         ax1.set_ylabel("Accuracy")
-        ax1.set_ylim(0, 1)
+        ax1.set_ylim(0, 1.1)
         ax1.tick_params(axis="y")
 
         # Bin range annotations above bars
@@ -270,19 +270,34 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
                 fontsize=9,
                 color="black",
             )
-        type = (
-            "Syn Sim Diff"
+        quantile_type = (
+            "Syntactic Similarity Difference"
             if col == "syn_sim_diff"
             else (
-                "Syn Sim Ref Paraphrases"
+                "Syntactic Similarity of Reference & Paraphrases"
                 if col == "syn_sim_ref_paraphrases"
-                else "Syn Sim Disputed Candidate"
+                else "Syntactic Similarity of Disputed & Candidate"
             )
         )
-        plt.title(f"Accuracy by {type} Quantile (Bin Ranges Annotated)")
+        title = (
+            f"Accuracy by {quantile_type} Quantile\nOn {dataset_name.capitalize()} Dataset (Bin Ranges Annotated)"
+            if col != "syn_sim_diff"
+            else rf"Accuracy by {quantile_type}$^1$ Quantile\nOn {dataset_name.capitalize()} Dataset (Bin Ranges Annotated)"
+        )
+        plt.title(title)
+        if col == "syn_sim_diff":
+            plt.annotate(
+                "1: Difference between syntactic similarity of reference + paraphrases and disputed candidate pair",
+                xy=(1.0, -0.2),
+                xycoords="axes fraction",
+                ha="right",
+                va="center",
+                fontsize=10,
+            )
         plt.tight_layout()
         plt.savefig(
-            save_path / f"{dataset_name}_syn_sim_{type.replace(' ', '_')}_accuracy.svg"
+            save_path
+            / f"{dataset_name}_syn_sim_{quantile_type.replace(' ', '_')}_accuracy.svg"
         )
 
 
