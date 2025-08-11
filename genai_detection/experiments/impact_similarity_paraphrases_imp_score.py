@@ -310,11 +310,18 @@ if __name__ == "__main__":
 
     # Student Essays
     print("Running experiment for Student Essays dataset.")
-    student_test_df = create_df(
-        path2dataset=CONFIG.PATH2STUDENT_ESSAYS,
-        dataset_name=CONFIG.STUDENT_ESSAYS,
-        save_path=SAVE_PATH,
-    )
+    path2student_df = SAVE_PATH / f"{CONFIG.STUDENT_ESSAYS}_impostor_scores_syn_sim.csv"
+    if not path2student_df.exists():
+        raise ValueError(
+            f"Student Essays dataset not found at {CONFIG.PATH2STUDENT_ESSAYS}. Please ensure the dataset is available."
+        )
+        student_test_df = create_df(
+            path2dataset=CONFIG.PATH2STUDENT_ESSAYS,
+            dataset_name=CONFIG.STUDENT_ESSAYS,
+            save_path=SAVE_PATH,
+        )
+    else:
+        student_test_df = pd.read_csv(path2student_df)
     print("Visualizing accuracy per syntactic similarity for Student Essays dataset.")
     vis_acc_per_syn_sim(
         score_sim_df=student_test_df,
@@ -324,11 +331,18 @@ if __name__ == "__main__":
 
     # Blog
     print("Running experiment for Blog dataset.")
-    blog_test_df = create_df(
-        path2dataset=CONFIG.PATH2BLOG,
-        dataset_name=CONFIG.BLOG,
-        save_path=SAVE_PATH,
-    )
+    path2blog_df = SAVE_PATH / f"{CONFIG.BLOG}_impostor_scores_syn_sim.csv"
+    if not path2blog_df.exists():
+        raise ValueError(
+            f"Blog dataset not found at {CONFIG.PATH2BLOG}. Please ensure the dataset is available."
+        )
+        blog_test_df = create_df(
+            path2dataset=CONFIG.PATH2BLOG,
+            dataset_name=CONFIG.BLOG,
+            save_path=SAVE_PATH,
+        )
+    else:
+        blog_test_df = pd.read_csv(path2blog_df)
     print("Visualizing accuracy per syntactic similarity for Blog dataset.")
     vis_acc_per_syn_sim(
         score_sim_df=blog_test_df,
