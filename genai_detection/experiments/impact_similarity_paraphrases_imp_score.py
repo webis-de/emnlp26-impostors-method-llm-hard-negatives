@@ -12,6 +12,7 @@ from genai_detection.config import CONFIG
 from genai_detection.detectors.impostor import ImpostorDetector
 from nltk.translate import bleu_score
 import matplotlib.pyplot as plt
+from sklearn.metrics import precision_score, recall_score, f1_score
 
 SAVE_PATH = (
     Path(__file__).resolve().parents[2]
@@ -216,6 +217,27 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     return test_dataset
 
 
+def get_metric_by_bin(score_sim_df: pd.DataFrame, metric: str) -> pd.DataFrame:
+    def compute_metric(g):
+        y_true = g["same"]
+        y_pred = g["impostor_prediction"]
+
+        if metric == "Accuracy":
+            return (y_pred == y_true).mean()
+        elif metric == "Precision":
+            return precision_score(y_true, y_pred, zero_division=0)
+        elif metric == "Recall":
+            return recall_score(y_true, y_pred, zero_division=0)
+        elif metric == "F1":
+            return f1_score(y_true, y_pred, zero_division=0)
+        else:
+            raise ValueError(f"Unknown metric: {metric}")
+
+    return (
+        score_sim_df.groupby("diff_bin").apply(compute_metric).reset_index(name=metric)
+    )
+
+
 def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_name: str):
     """
     Visualize the accuracy per syntactic similarity.
@@ -226,79 +248,74 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
         - score_sim_df["syn_sim_disputed_candidate"]
     )
 
-    for col in [
-        "syn_sim_diff",
-        "syn_sim_ref_paraphrases",
-        "syn_sim_disputed_candidate",
-    ]:
-        # Choose number of bins (e.g., quartiles = 4 bins)
-        n_bins = 4
+    for metric in ["Accuracy", "Precision", "Recall", "F1"]:
+        for col in [
+            "syn_sim_diff",
+            "syn_sim_ref_paraphrases",
+            "syn_sim_disputed_candidate",
+        ]:
+            # Choose number of bins (e.g., quartiles = 4 bins)
+            n_bins = 4
 
-        score_sim_df["diff_bin"] = pd.qcut(
-            score_sim_df[col],
-            q=n_bins,
-            labels=[f"Bin {i+1}" for i in range(n_bins)],
-        )
-        bin_ranges = score_sim_df.groupby("diff_bin")[col].agg(["min", "max"])
-        accuracy_by_bin = (
-            score_sim_df.groupby("diff_bin")
-            .apply(lambda g: (g["impostor_prediction"] == g["same"]).mean())
-            .reset_index(name="accuracy")
-        )
-
-        bin_stats = accuracy_by_bin.merge(bin_ranges, on="diff_bin")
-        fig, ax1 = plt.subplots(figsize=(8, 5))
-
-        # Accuracy bars
-        ax1.bar(
-            bin_stats["diff_bin"],
-            bin_stats["accuracy"],
-            color="skyblue",
-            label="Accuracy",
-        )
-        ax1.set_ylabel("Accuracy")
-        ax1.set_ylim(0, 1.1)
-        ax1.tick_params(axis="y")
-
-        # Bin range annotations above bars
-        for i, row in bin_stats.iterrows():
-            ax1.text(
-                i,
-                row["accuracy"] + 0.02,
-                f"[{row['min']:.2f}, {row['max']:.2f}]",
-                ha="center",
-                fontsize=9,
-                color="black",
+            score_sim_df["diff_bin"] = pd.qcut(
+                score_sim_df[col],
+                q=n_bins,
+                labels=[f"Bin {i+1}" for i in range(n_bins)],
             )
-        quantile_type = (
-            "Syntactic Similarity Difference"
-            if col == "syn_sim_diff"
-            else (
-                "Syntactic Similarity of Reference & Paraphrases"
-                if col == "syn_sim_ref_paraphrases"
-                else "Syntactic Similarity of Disputed & Candidate"
+            bin_ranges = score_sim_df.groupby("diff_bin")[col].agg(["min", "max"])
+            metric_by_bin = get_metric_by_bin(score_sim_df, metric=metric)
+            bin_stats = metric_by_bin.merge(bin_ranges, on="diff_bin")
+            fig, ax1 = plt.subplots(figsize=(8, 5))
+
+            ax1.bar(
+                bin_stats["diff_bin"],
+                bin_stats[metric],
+                color="skyblue",
+                label=metric,
             )
-        )
-        title = (
-            f"Accuracy by {quantile_type} Quantile\nOn {dataset_name.capitalize()} Dataset (Bin Ranges Annotated)"
-            if col != "syn_sim_diff"
-            else rf"Accuracy by {quantile_type}$^1$ Quantile\nOn {dataset_name.capitalize()} Dataset (Bin Ranges Annotated)"
-        )
-        plt.title(title)
-        if col == "syn_sim_diff":
-            plt.annotate(
-                "1: Difference between syntactic similarity of reference + paraphrases and disputed candidate pair",
-                xy=(1.0, -0.2),
-                xycoords="axes fraction",
-                ha="right",
-                va="center",
-                fontsize=10,
+            ax1.set_ylabel(metric)
+            ax1.set_ylim(0, 1.1)
+            ax1.tick_params(axis="y")
+
+            # Bin range annotations above bars
+            for i, row in bin_stats.iterrows():
+                ax1.text(
+                    i,
+                    row[metric] + 0.02,
+                    f"[{row['min']:.2f}, {row['max']:.2f}]",
+                    ha="center",
+                    fontsize=9,
+                    color="black",
+                )
+            quantile_type = (
+                "Syntactic Similarity Difference"
+                if col == "syn_sim_diff"
+                else (
+                    "Syntactic Similarity of Reference & Paraphrases"
+                    if col == "syn_sim_ref_paraphrases"
+                    else "Syntactic Similarity of Disputed & Candidate"
+                )
             )
-        plt.tight_layout()
-        plt.savefig(
-            save_path
-            / f"{dataset_name}_syn_sim_{quantile_type.replace(' ', '_')}_accuracy.svg"
-        )
+            title = (
+                f"{metric} by {quantile_type} Quantile\nOn {dataset_name.capitalize()} Dataset (Bin Ranges Annotated)"
+                if col != "syn_sim_diff"
+                else rf"{metric} by {quantile_type}$^1$ Quantile\nOn {dataset_name.capitalize()} Dataset (Bin Ranges Annotated)"
+            )
+            plt.title(title)
+            if col == "syn_sim_diff":
+                plt.annotate(
+                    "1: Difference between syntactic similarity of reference + paraphrases and disputed candidate pair",
+                    xy=(1.0, -0.2),
+                    xycoords="axes fraction",
+                    ha="right",
+                    va="center",
+                    fontsize=10,
+                )
+            plt.tight_layout()
+            plt.savefig(
+                save_path
+                / f"{dataset_name}_syn_sim_{quantile_type.replace(' ', '_')}_{metric.lower()}.svg"
+            )
 
 
 if __name__ == "__main__":
