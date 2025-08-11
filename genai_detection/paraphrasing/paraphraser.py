@@ -472,7 +472,7 @@ class OllamaParaphraser(NaiveParaphraser):
     Ollama paraphrasing model hosted by Webis.
     """
 
-    def __init__(self, model_id: str = CONFIG.OLLAMA_VERSION):
+    def __init__(self, model_id: str = CONFIG.OLLAMA_MODEL):
         self.client = OpenAI(
             base_url="https://llm.web.webis.de/api",
             api_key=CONFIG.OPENAI_KEY,
@@ -555,9 +555,9 @@ class SAIAParaphraser(NaiveParaphraser):
     For more information, see https://docs.hpc.gwdg.de/services/saia/index.html#api-request (09.08.2025).
     """
 
-    def __init__(self, model_id: str = CONFIG.SAIAI_VERSION):
+    def __init__(self, model_id: str = CONFIG.SAIA_MODEL):
         self.client = OpenAI(
-            base_url="https://chat-ai.academiccloud.de/v1",
+            base_url=CONFIG.SAIA_URL,
             api_key=CONFIG.SAIA_KEY,
         )
         self.model_id = model_id
@@ -618,6 +618,37 @@ class SAIAParaphraser(NaiveParaphraser):
                 responses.append(response.choices[0].message.content)
 
         return responses
+
+
+class IONOSParaphraser(SAIAParaphraser):
+    """
+    IONOS paraphrasing model hosted by IONOS.
+
+    for more information, see https://docs.ionos.com/cloud/ai/ai-model-hub/tutorials/text-generation (11.08.2025).
+
+    Get all models via curl: curl https://openai.inference.de-txl.ionos.com/v1/models -H "Authorization: Bearer KEY | jq
+    Models as of 11.08.2025 (those in brackets are not suitable for paraphrasing/ text generation):
+    - ("black-forest-labs/FLUX.1-schnell",)
+    - "meta-llama/Llama-3.3-70B-Instruct",
+    - "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8",
+    - ("BAAI/bge-m3",)
+    - "mistralai/Mixtral-8x7B-Instruct-v0.1",
+    - "openGPT-X/Teuken-7B-instruct-commercial",
+    - "mistralai/Mistral-Small-24B-Instruct",
+    - "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    - ("meta-llama/CodeLlama-13b-Instruct-hf",)
+    - ("sentence-transformers/paraphrase-multilingual-mpnet-base-v2",)
+    - "mistralai/Mistral-Nemo-Instruct-2407",
+    - ("BAAI/bge-large-en-v1.5",)
+    - ("stabilityai/stable-diffusion-xl-base-1.0",)
+    """
+
+    def __init__(self, model_id: str = CONFIG.IONOS_MODEL):
+        super().__init__(model_id=model_id)
+        self.client = OpenAI(
+            base_url=CONFIG.IONOS_URL,
+            api_key=CONFIG.IONOS_KEY,
+        )
 
 
 class BlabladorParaphraser(NaiveParaphraser):
@@ -1212,7 +1243,7 @@ def get_paraphraser_dict() -> Dict[str, Paraphraser]:
         # often fail with NotImplementedError: Cannot copy out of meta tensor; no data! ...
         #     "T5_ChatGPT": T5ChatGPTParaphraser(),
         #     "T5_Google_PAWS": T5GooglePAWSParaphraser(),
-        "Ollama": OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
+        "Ollama": OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL),
         "qwen3-32b": SAIAParaphraser("qwen3-32b"),
         "mistral-large-instruct": SAIAParaphraser("mistral-large-instruct"),
         "openai-gpt-oss-120b": SAIAParaphraser("openai-gpt-oss-120b"),
@@ -1256,27 +1287,28 @@ if __name__ == "__main__":
         # 'T5_ChatGPT': T5ChatGPTParaphraser(),
         # 'T5_Google_PAWS': T5GooglePAWSParaphraser(),
         # 'Blablador': BlabladorParaphraser(model_id="1 - Llama3 405 the best general model and big context size"),
-        # "Ollama": OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
-        "SAIA": SAIAParaphraser(model_id=CONFIG.SAIAI_VERSION),
+        # "Ollama": OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL),
+        "SAIA": SAIAParaphraser(),
+        "IONOS": IONOSParaphraser(),
         # "TopicParaphraser": TopicParaphraser(
-        #     text_extractor=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
-        #     text_generator=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
+        #     text_extractor=OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL),
+        #     text_generator=OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL),
         # ),
         # "TaskParaphraser": TaskParaphraser(
-        #     text_extractor=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
-        #     text_generator=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
+        #     text_extractor=OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL),
+        #     text_generator=OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL),
         # ),
         # "TitleParaphraser": TitleParaphraser(
-        #     text_extractor=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
-        #     text_generator=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
+        #     text_extractor=OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL),
+        #     text_generator=OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL),
         # ),
         # "BulletPointParaphraser": BulletPointParaphraser(
-        #     text_extractor=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
-        #     text_generator=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
+        #     text_extractor=OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL),
+        #     text_generator=OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL),
         # ),
         # "TranslationParaphraser": TranslationParaphraser(
-        #     text_extractor=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
-        #     text_generator=OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION),
+        #     text_extractor=OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL),
+        #     text_generator=OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL),
         #     language="French",
         # ),
     }
@@ -1296,7 +1328,8 @@ if __name__ == "__main__":
     # original_text = open(path2datasets / f"{file_name}.txt").read()
     text = "Dear Santa, I wish for a big red nosed reindeer that can fly and a sleigh full of toys for all the children in the world. I promise to be good and help others. Love, Timmy."
     # p = paraphrasers["TranslationParaphraser"]
-    p = paraphrasers["SAIA"]
+    # p = paraphrasers["SAIA"]
+    p = paraphrasers["IONOS"]
     print(f"[DEBUG] Paraphrasing text with {p.__class__.__name__}")
     paraphrased_texts = p.paraphrase(text=text, n_responses=2)
     print(f"[DEBUG] Paraphrased texts: {paraphrased_texts}")
