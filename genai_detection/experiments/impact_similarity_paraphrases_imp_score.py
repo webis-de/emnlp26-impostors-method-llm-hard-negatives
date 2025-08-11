@@ -302,7 +302,7 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
                 if col != "syn_sim_diff"
                 else f"{metric} Across "
                 + r"Syntactic Similarity Difference$^1$"
-                + f"Quantiles\n({dataset_name.capitalize()} Dataset, Bin Ranges Annotated)"
+                + f" Quantiles\n({dataset_name.capitalize()} Dataset, Bin Ranges Annotated)"
             )
             plt.title(title)
             if col == "syn_sim_diff":
