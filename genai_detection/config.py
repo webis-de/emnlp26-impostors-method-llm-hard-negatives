@@ -12,6 +12,7 @@ class BaseConfig:
     OPENAI_KEY = os.getenv("OPENAI_KEY")
     SAIA_KEY = os.getenv("SAIA_KEY")
     DEEPL_API_KEY = os.getenv("DEEPL_KEY")
+    IONOS_KEY = os.getenv("IONOS_KEY")
     DATA_BASE_PATH = "data/datasets"
     PATH2PAN25 = f"{DATA_BASE_PATH}/pan25-genai-identification/pan25-dataset-converted"
     PATH2PAN23 = (
@@ -40,8 +41,11 @@ class BaseConfig:
     UNMASKING = "unmasking"
     TEMPERATURE = 0.7
     MAX_LENGTH = 512  # Maximum length of the generated paraphrase
-    OLLAMA_VERSION = "zephyr:7b"  # "mistral:7b"  # "default:latest"
-    SAIAI_VERSION = "openai-gpt-oss-120b"
+    OLLAMA_MODEL = "zephyr:7b"  # "mistral:7b"  # "default:latest"
+    SAIA_URL = "https://chat-ai.academiccloud.de/v1"
+    SAIA_MODEL = "openai-gpt-oss-120b"
+    IONOS_URL = "https://openai.inference.de-txl.ionos.com/v1"
+    IONOS_MODEL = "meta-llama/Llama-3.3-70B-Instruct"
 
 
 class ServerConfig(BaseConfig):
