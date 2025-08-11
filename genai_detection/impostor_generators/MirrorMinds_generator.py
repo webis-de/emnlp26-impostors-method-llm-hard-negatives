@@ -25,6 +25,7 @@ class MirrorMindsGenerator(BaseImpostorGenerator):
     ):
         super().__init__(n_impostors=n_impostors)
         torch.cuda.empty_cache()
+        # FIXME: AttributeError: 'tqdm' object has no attribute '_lock'
         self.model_path = snapshot_download(repo_id="google/flan-t5-small")
 
     def generate_impostors(self, text: str) -> List[str]:
@@ -72,7 +73,9 @@ class MirrorMindsGenerator(BaseImpostorGenerator):
                 response_config.input_path, response_config.output_path
             )
             if not df.empty:
-                impostor_texts[f"impostor_{i}"] = df["generated_text"].iloc[0]
+                impostor_texts[f"impostor_{i}_mirror_minds"] = df[
+                    "generated_text"
+                ].iloc[0]
 
         # print(f"Total script runtime: {time.time() - start_time:.2f} seconds")
         # print("Generated questions and responses saved successfully.")
