@@ -398,9 +398,9 @@ class VisDetectors:
         # pd.Series to numpy arrays
         labels = labels.values
         try:
-            scores = np.concatenate(
-                scores.values
-            )  # each entry in scores is a one-element list
+            scores = np.array(
+                scores.tolist()
+            ).ravel()  # each entry in scores is a one-element list
             if len(scores) != len(labels):
                 print(
                     f"Warning: Length of scores ({len(scores)}) does not match length of labels ({len(labels)})."
@@ -819,6 +819,10 @@ class VisDetectors:
                 )
             )
 
+        test_dataset["impostor_score"] = np.array(
+            test_dataset["impostor_score"].tolist()
+        ).ravel()
+
         precision, recall, pr_thresholds = precision_recall_curve(
             test_dataset["same"], test_dataset["impostor_score"]
         )
@@ -952,9 +956,9 @@ class VisDetectors:
                 )
 
             # each entry in scores is a one-element list
-            test_dataset["impostor_score"] = np.concatenate(
-                test_dataset["impostor_score"].values
-            )
+            test_dataset["impostor_score"] = np.array(
+                test_dataset["impostor_score"].tolist()
+            ).ravel()
 
             # same author pairs
             same_author_precisions, same_author_recalls, same_pr_thresholds = (
@@ -1133,7 +1137,9 @@ class VisDetectors:
                 # )
                 preds = baseline.get_score(test_dataset["pair"])
 
-            test_dataset[f"{baseline_name.replace(' ','_')}_score"] = preds
+            test_dataset[f"{baseline_name.replace(' ','_')}_score"] = np.array(
+                preds.tolist()
+            ).ravel()
 
             # same author pairs
             precision, recall, pr_thresholds = precision_recall_curve(
