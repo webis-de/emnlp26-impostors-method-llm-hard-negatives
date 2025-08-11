@@ -1,5 +1,6 @@
 import argparse
 from asyncio import sleep
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import os
 from pathlib import Path
@@ -109,7 +110,7 @@ def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_
     return impostor_detector._get_score_impl(pair)
 
 
-def create_df(path2dataset: str, dataset_name: str, save_path: Path):
+async def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     train_dataset = get_dataset(path2dataset, split="train")
     test_dataset = get_dataset(path2dataset, split="test")
     # TODO: Test on small data subsets
@@ -156,7 +157,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             i = 0
             while res is None:
                 i += 5
-                sleep(i)
+                await sleep(i)
                 res = _helper_impostor(
                     path2imp, pair, training_mode=True, imp_gen=imp_gen
                 )
@@ -455,10 +456,12 @@ if __name__ == "__main__":
 
     # Student Essays
     print("Running experiment for Student Essays dataset.")
-    student_test_df = create_df(
-        path2dataset=CONFIG.PATH2STUDENT_ESSAYS,
-        dataset_name=CONFIG.STUDENT_ESSAYS,
-        save_path=SAVE_PATH,
+    student_test_df = asyncio.run(
+        create_df(
+            path2dataset=CONFIG.PATH2STUDENT_ESSAYS,
+            dataset_name=CONFIG.STUDENT_ESSAYS,
+            save_path=SAVE_PATH,
+        )
     )
     print("Visualizing accuracy per syntactic similarity for Student Essays dataset.")
     plot_optimal_threshold_bars(
@@ -474,10 +477,12 @@ if __name__ == "__main__":
 
     # Blog
     print("Running experiment for Blog dataset.")
-    blog_test_df = create_df(
-        path2dataset=CONFIG.PATH2BLOG,
-        dataset_name=CONFIG.BLOG,
-        save_path=SAVE_PATH,
+    blog_test_df = asyncio.run(
+        create_df(
+            path2dataset=CONFIG.PATH2BLOG,
+            dataset_name=CONFIG.BLOG,
+            save_path=SAVE_PATH,
+        )
     )
     print("Visualizing accuracy per syntactic similarity for Blog dataset.")
     plot_optimal_threshold_bars(

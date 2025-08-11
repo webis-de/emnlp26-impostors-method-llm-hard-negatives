@@ -7,6 +7,7 @@ The scores will be averaged to get a score for the whole text, which will be com
 
 import argparse
 from asyncio import sleep
+import asyncio
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from functools import partial
 from pathlib import Path
@@ -157,7 +158,7 @@ def _evaluate_chunk(
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
-def paraphrase_with_config(
+async def paraphrase_with_config(
     paraphraser_name: str,
     chunks: list,
     original_text: str,
@@ -218,12 +219,12 @@ def paraphrase_with_config(
                         print(
                             f"Error paraphrasing chunk {chunk_id+1}/{len(chunks)} with {paraphraser_name}: {e}\nRetrying in {i} seconds..."
                         )
-                        sleep(i)
+                        await sleep(i)
                         i += 10
     return rows
 
 
-def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
+async def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
     """
     Create paraphrasers and save them to the specified path.
 
@@ -672,9 +673,11 @@ if __name__ == "__main__":
     if args.task == "create":
         # only create paraphrasers and save them
         print(f"Creating and saving paraphrasers to {paraphrase_save_path}.")
-        create_and_save_paraphrasers(
-            path2dataset=args.path2dataset,
-            save_path=paraphrase_save_path,
+        asyncio.run(
+            create_and_save_paraphrasers(
+                path2dataset=args.path2dataset,
+                save_path=paraphrase_save_path,
+            )
         )
     elif args.task == "evaluate":
         print(

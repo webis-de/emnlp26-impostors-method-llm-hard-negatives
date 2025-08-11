@@ -7,6 +7,7 @@ We therefore created (Non-)Naive LLM-based impostor generators in the `LLMImpost
 
 import argparse
 from asyncio import sleep
+import asyncio
 import collections
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 import os
@@ -143,7 +144,7 @@ def _compute_score(detector_name, row: collections.OrderedDict) -> tuple[int, fl
         ) from e
 
 
-def get_detector_scores(
+async def get_detector_scores(
     detector_dict: dict[str, ImpostorDetector],
     dataset_dict: dict[str, pd.DataFrame],
 ) -> pd.DataFrame:
@@ -205,7 +206,7 @@ def get_detector_scores(
                             "Exceeded API rate limit and hence score is None. Sleeping for 5 seconds."
                         )
                         i += 10
-                        sleep(i)
+                        await sleep(i)
                         idx, score = _compute_score(detector_name, row._asdict())
                         if i > 100:
                             break
@@ -355,7 +356,9 @@ if __name__ == "__main__":
     detector_dict = load_detectors()
     print("Detectors loaded successfully.")
 
-    scores = get_detector_scores(detector_dict=detector_dict, dataset_dict=dataset_dict)
+    scores = asyncio.run(
+        get_detector_scores(detector_dict=detector_dict, dataset_dict=dataset_dict)
+    )
     print("Scores calculated successfully (parallel).")
 
     def run_fp():
