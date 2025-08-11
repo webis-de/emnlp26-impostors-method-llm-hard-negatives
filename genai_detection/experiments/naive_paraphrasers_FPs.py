@@ -204,10 +204,10 @@ def get_detector_scores(
                         print(
                             "Exceeded API rate limit and hence score is None. Sleeping for 5 seconds."
                         )
-                        i += 5
+                        i += 10
                         sleep(i)
                         idx, score = _compute_score(detector_name, row._asdict())
-                        if i > 60:
+                        if i > 100:
                             break
                     try:
                         dataset_scored.at[idx, score_col] = score
