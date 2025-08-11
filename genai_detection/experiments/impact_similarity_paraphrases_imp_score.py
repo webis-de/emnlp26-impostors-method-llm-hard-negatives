@@ -273,9 +273,6 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
                 color="skyblue",
                 label=metric,
             )
-            ax1.set_ylabel(metric)
-            ax1.set_ylim(0, 1.1)
-            ax1.tick_params(axis="y")
 
             # Bin range annotations above bars
             for i, row in bin_stats.iterrows():
@@ -287,6 +284,10 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
                     fontsize=9,
                     color="black",
                 )
+
+            ax1.set_ylabel(metric)
+            ax1.set_ylim(0, 1.1)
+            ax1.tick_params(axis="y")
             quantile_type = (
                 "Syntactic Similarity Difference"
                 if col == "syn_sim_diff"
@@ -297,9 +298,11 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
                 )
             )
             title = (
-                f"{metric} by {quantile_type} Quantile\nOn {dataset_name.capitalize()} Dataset (Bin Ranges Annotated)"
+                f"{metric} Across {quantile_type} Quantiles\n({dataset_name.capitalize()} Dataset, Bin Ranges Annotated)"
                 if col != "syn_sim_diff"
-                else rf"{metric} by {quantile_type}$^1$ Quantile\nOn {dataset_name.capitalize()} Dataset (Bin Ranges Annotated)"
+                else f"{metric} Across "
+                + r"Syntactic Similarity Difference$^1$"
+                + f"Quantiles\n({dataset_name.capitalize()} Dataset, Bin Ranges Annotated)"
             )
             plt.title(title)
             if col == "syn_sim_diff":
@@ -312,8 +315,10 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
                     fontsize=10,
                 )
             plt.tight_layout()
+            path = save_path / dataset_name / metric
+            path.mkdir(parents=True, exist_ok=True)
             plt.savefig(
-                save_path
+                path
                 / f"{dataset_name}_syn_sim_{quantile_type.replace(' ', '_')}_{metric.lower()}.svg"
             )
 
