@@ -518,7 +518,7 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
         if paraphrasers is None:
             # self.t5_chatgpt_paraphraser = T5ChatGPTParaphraser()
             # self.t5_google_paws_paraphraser = T5GooglePAWSParaphraser()
-            # self.ollama_paraphraser = OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION)
+            # self.ollama_paraphraser = OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL)
             self.saiai_paraphraser_llama = SAIAParaphraser(
                 model_id="meta-llama-3.1-8b-instruct"
             )
@@ -654,7 +654,7 @@ class NaiveLLMImpostorGenerator(LLMImpostorGenerator):
         """
         # t5_chatgpt_paraphraser = T5ChatGPTParaphraser()
         # t5_google_paws_paraphraser = T5GooglePAWSParaphraser()
-        # ollama_paraphraser = OllamaParaphraser(model_id=CONFIG.OLLAMA_VERSION)
+        # ollama_paraphraser = OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL)
         saiai_paraphraser_llama = SAIAParaphraser(model_id="meta-llama-3.1-8b-instruct")
         saiai_paraphraser_mistral = SAIAParaphraser(model_id="mistral-large-instruct")
         saiai_paraphraser_gpt = SAIAParaphraser(model_id="openai-gpt-oss-120b")
