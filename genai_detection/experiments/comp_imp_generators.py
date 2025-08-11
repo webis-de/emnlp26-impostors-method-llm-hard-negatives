@@ -156,7 +156,7 @@ async def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         for pair in train_dataset["pair"]:
             i = 0
             while res is None:
-                i += 5
+                i += 10
                 await sleep(i)
                 res = _helper_impostor(
                     path2imp, pair, training_mode=True, imp_gen=imp_gen
@@ -164,7 +164,7 @@ async def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 print(
                     f"SAIA API Rate limit exceeded: {res is None}, sleeping for {i} seconds if True."
                 )
-                if i > 60:
+                if i > 100:
                     break
             results.append(res)
 
