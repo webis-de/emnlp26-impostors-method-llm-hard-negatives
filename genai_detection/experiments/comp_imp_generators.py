@@ -15,6 +15,13 @@ from genai_detection.detectors.impostor import ImpostorDetector
 from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
 import matplotlib.pyplot as plt
 import numpy as np
+import os
+
+# https://stackoverflow.com/questions/65744442/how-to-use-threads-for-huggingface-transformers
+
+from genai_detection.impostor_generators.MirrorMinds_generator import (
+    MirrorMindsGenerator,
+)
 
 SAVE_PATH = (
     Path(__file__).resolve().parents[2]
@@ -24,14 +31,14 @@ SAVE_PATH = (
     / "impostor_generator_comparison"
 )
 IMP_GEN_OPTIONS = [
-    "llm",
-    "text_len",
-    "on-the-fly",
-    "blogs",
-    "fixed",
-    "content",
-    "naive_llm",
-    "non_naive_llm",
+    # "text_len",
+    # "on-the-fly",
+    # "blogs",
+    # "fixed",
+    # "content",
+    # "naive_llm",
+    # "non_naive_llm",
+    # "llm",
     "mirror_minds",
 ]
 
@@ -110,7 +117,8 @@ def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_
     return impostor_detector._get_score_impl(pair)
 
 
-async def create_df(path2dataset: str, dataset_name: str, save_path: Path):
+# async
+def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     train_dataset = get_dataset(path2dataset, split="train")
     test_dataset = get_dataset(path2dataset, split="test")
     # TODO: Test on small data subsets
@@ -138,35 +146,36 @@ async def create_df(path2dataset: str, dataset_name: str, save_path: Path):
 
     print(f"Running experiment for {dataset_name} dataset.")
 
+    # FIXME: rate limit + mirror minds download problem
     for imp_gen in IMP_GEN_OPTIONS:
-        # SAIA API rate limits exceeded
-        # with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
-        #     results = list(
-        #         executor.map(
-        #             _helper_impostor,
-        #             [path2imp] * len(train_dataset),
-        #             train_dataset["pair"],
-        #             [True] * len(train_dataset),  # training mode
-        #             [imp_gen] * len(train_dataset),
-        #         )
-        #     )
+        print(f"Running impostor detector for impostor generation approach: {imp_gen}")
+        with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
+            results = list(
+                executor.map(
+                    _helper_impostor,
+                    [path2imp] * len(train_dataset),
+                    train_dataset["pair"],
+                    [True] * len(train_dataset),  # training mode
+                    [imp_gen] * len(train_dataset),
+                )
+            )
         # TODO: maybe add sleep
-        results = []
-        res = None
-        for pair in train_dataset["pair"]:
-            i = 0
-            while res is None:
-                i += 10
-                await sleep(i)
-                res = _helper_impostor(
-                    path2imp, pair, training_mode=True, imp_gen=imp_gen
-                )
-                print(
-                    f"SAIA API Rate limit exceeded: {res is None}, sleeping for {i} seconds if True."
-                )
-                if i > 100:
-                    break
-            results.append(res)
+        # results = []
+        # res = None
+        # for pair in train_dataset["pair"]:
+        #     i = 0
+        #     while res is None:
+        #         i += 10
+        #         # await sleep(i)
+        #         res = _helper_impostor(
+        #             path2imp, pair, training_mode=True, imp_gen=imp_gen
+        #         )
+        #         print(
+        #             f"SAIA API Rate limit exceeded: {res is None}, sleeping for {i} seconds if True."
+        #         )
+        #         if i > 100:
+        #             break
+        #     results.append(res)
 
         train_dataset[f"impostor_score_{imp_gen}"] = [score for score, _ in results]
         train_dataset[f"impostor_dict_{imp_gen}"] = [
@@ -204,8 +213,12 @@ async def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             f"impostor_score_{imp_gen}"
         ]
 
+        # is overwritten for each imp_gen, but saver if error occurs
         test_dataset.to_csv(
-            save_path / f"{dataset_name}_impostor_scores_syn_sim.csv", index=False
+            save_path / f"{dataset_name}_test_impostor_scores_syn_sim.csv", index=False
+        )
+        train_dataset.to_csv(
+            save_path / f"{dataset_name}_train_impostor_scores_syn_sim.csv", index=False
         )
     return test_dataset
 
@@ -456,13 +469,13 @@ if __name__ == "__main__":
 
     # Student Essays
     print("Running experiment for Student Essays dataset.")
-    student_test_df = asyncio.run(
-        create_df(
-            path2dataset=CONFIG.PATH2STUDENT_ESSAYS,
-            dataset_name=CONFIG.STUDENT_ESSAYS,
-            save_path=SAVE_PATH,
-        )
+    # student_test_df = asyncio.run(
+    student_test_df = create_df(
+        path2dataset=CONFIG.PATH2STUDENT_ESSAYS,
+        dataset_name=CONFIG.STUDENT_ESSAYS,
+        save_path=SAVE_PATH,
     )
+    # )
     print("Visualizing accuracy per syntactic similarity for Student Essays dataset.")
     plot_optimal_threshold_bars(
         df=student_test_df,
@@ -477,13 +490,13 @@ if __name__ == "__main__":
 
     # Blog
     print("Running experiment for Blog dataset.")
-    blog_test_df = asyncio.run(
-        create_df(
-            path2dataset=CONFIG.PATH2BLOG,
-            dataset_name=CONFIG.BLOG,
-            save_path=SAVE_PATH,
-        )
+    # blog_test_df = asyncio.run(
+    blog_test_df = create_df(
+        path2dataset=CONFIG.PATH2BLOG,
+        dataset_name=CONFIG.BLOG,
+        save_path=SAVE_PATH,
     )
+    # )
     print("Visualizing accuracy per syntactic similarity for Blog dataset.")
     plot_optimal_threshold_bars(
         df=blog_test_df,
