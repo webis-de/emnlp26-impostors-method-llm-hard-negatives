@@ -156,17 +156,17 @@ def run_evaluation():
     print(f"Data root: {data_root}")
     results = []
 
-    # with ThreadPoolExecutor() as executor:
-    #     futures = {
-    #         executor.submit(evaluate_category, category, data_root): category
-    #         for category in CATEGORY2DIRECTORY
-    #     }
-    #     for future in as_completed(futures):
-    #         result = future.result()
-    #         print("Result:", result)
-    #         results.append(result)
+    with ThreadPoolExecutor() as executor:
+        futures = {
+            executor.submit(evaluate_category, category, data_root): category
+            for category in CATEGORY2DIRECTORY
+        }
+        for future in as_completed(futures):
+            result = future.result()
+            print("Result:", result)
+            results.append(result)
 
-    run_extraction_evaluation()
+    # run_extraction_evaluation()
 
     return results
 
