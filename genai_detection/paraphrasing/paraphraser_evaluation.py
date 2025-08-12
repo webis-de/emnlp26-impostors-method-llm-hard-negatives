@@ -373,7 +373,7 @@ class ParaphrasingEvaluator:
                 data_loaded[paraphraser_name].setdefault(self.original_text, {})
                 data_loaded[paraphraser_name][self.original_text].setdefault(None, {})
                 data_loaded[paraphraser_name][self.original_text][None][
-                    temperature
+                    self.temperature
                 ] = paraphrases
                 with open(file_existing_paraphrases, "w") as f:
                     json.dump(data_loaded, f, indent=4)
@@ -1109,12 +1109,11 @@ class ParaphrasingEvaluator:
 
         if save_path:
             save_path = Path(save_path)
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path.parent.mkdir(parents=True, exist_ok=True)
             for format in ["svg"]:
                 file_name = (
                     save_path
-                    / f"{data_category}_paraphrasing_metrics_grouped_by_{group_by}_radar_chart_{timestamp}.{format}"
+                    / f"{data_category}_paraphrasing_metrics_grouped_by_{group_by}_radar_chart.{format}"
                 )
                 plt.savefig(
                     file_name, bbox_inches="tight", transparent=True, format=format
@@ -1237,12 +1236,11 @@ class ParaphrasingEvaluator:
 
         if save_path:
             save_path = Path(save_path)
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path.parent.mkdir(parents=True, exist_ok=True)
             for format in ["svg"]:
                 full_path = (
                     save_path
-                    / f"{data_category}_sem_syn_scatter_grouped_by_{group_by}_{timestamp}.{format}"
+                    / f"{data_category}_sem_syn_scatter_grouped_by_{group_by}.{format}"
                 )
                 plt.savefig(
                     full_path, bbox_inches="tight", transparent=True, format=format
@@ -1413,12 +1411,11 @@ class ParaphrasingEvaluator:
 
         if save_path:
             save_path = Path(save_path)
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path.parent.mkdir(parents=True, exist_ok=True)
             for format in ["svg"]:
                 full_path = (
                     save_path
-                    / f"{data_category}_metric_distributions_grouped_by_{group_by}_{timestamp}.{format}"
+                    / f"{data_category}_metric_distributions_grouped_by_{group_by}.{format}"
                 )
                 plt.savefig(
                     full_path, bbox_inches="tight", transparent=True, format=format
