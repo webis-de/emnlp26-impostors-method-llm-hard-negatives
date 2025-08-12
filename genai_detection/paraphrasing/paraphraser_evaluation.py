@@ -650,7 +650,10 @@ class ParaphrasingEvaluator:
         Returns: list of paraphrases
         """
         data_loaded = dict()
-        filename = save_path / f"generated_paraphrases_subset_{self.data_category}.json"
+        filename = (
+            save_path
+            / f"generated_paraphrases_subset_{self.data_category.replace(' ', '_')}.json"
+        )
         if filename.exists():
             with open(filename, "r") as f:
                 data_loaded = json.load(f)
@@ -768,7 +771,7 @@ class ParaphrasingEvaluator:
         )
         results = []
         # load json object with existing paraphrases if available and append new ones
-        paraphrase_file_path = self.paraphrases_save_base_path / "paraphrases.json"
+        paraphrase_file_path = self.paraphrases_save_base_path
         for (paraphraser_name, paraphraser), prompt, temperature, prompt_id in tqdm(
             test_configurations,
             desc="Evaluating Paraphrasers",
