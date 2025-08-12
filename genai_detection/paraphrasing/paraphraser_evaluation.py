@@ -486,8 +486,8 @@ class ParaphrasingEvaluator:
 
         # Add labels to axes
         ax.set_xticks(angles[:-1])
-        ax.set_xticklabels(metrics, fontsize=10)
-        ax.tick_params(axis="y", labelsize=8)
+        ax.set_xticklabels(metrics)
+        ax.tick_params(axis="y")
 
         # Add legend and title
         ax.legend(
@@ -498,8 +498,8 @@ class ParaphrasingEvaluator:
         )
 
         title = "Radar plot of Metric Distributions by Dataset"
-        fig.suptitle(title, fontsize=16)
-        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        fig.suptitle(title)
+        plt.tight_layout(rect=[0, 0, 1, 0.85])
 
         if save_path:
             save_path = Path(save_path)
