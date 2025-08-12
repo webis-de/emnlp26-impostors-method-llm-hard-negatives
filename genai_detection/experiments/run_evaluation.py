@@ -33,16 +33,16 @@ PROMPTS = [
 ]
 
 CATEGORY2DIRECTORY = {
-    "News": [
-        "custom_texts",
-        "cnn_040725",
-    ],  # Dalai Lama; "cnn_230625"    # USA attacks Iran
     "Blog": ["Blog_corpus", 27],
-    "Gutenberg": ["gutenberg", "Othello_the_Moor_of_Venice_William_Shakespeare"],
     "Student Essays": [
         "student_essays/Intro2006",
         "Ass1/2006_AB4847",
     ],  # stream of consciousness essay: 18 years old girl who writes about her bipolar ex-boyfriend of 8 months and her new boyfriend who loves music like her but is not catholic; she wants to live in the present
+    # "Gutenberg": ["gutenberg", "Othello_the_Moor_of_Venice_William_Shakespeare"],
+    # "News": [
+    #     "custom_texts",
+    #     "cnn_040725",
+    # ],  # Dalai Lama; "cnn_230625"    # USA attacks Iran
 }
 
 
