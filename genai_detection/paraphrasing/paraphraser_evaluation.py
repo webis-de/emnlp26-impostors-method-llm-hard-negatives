@@ -408,7 +408,7 @@ class ParaphrasingEvaluator:
         assert metrics, "No numeric metrics found to plot."
 
         unique_labels = pd.unique(df_all[dataset_col])
-        palette = sns.color_palette("tab10", n_colors=len(unique_labels))
+        palette = sns.color_palette("tab20", n_colors=len(unique_labels))
         label_to_color = {
             lbl: palette[i % len(palette)] for i, lbl in enumerate(unique_labels)
         }
@@ -649,14 +649,9 @@ class ParaphrasingEvaluator:
         Loads paraphrases from CSV if available; otherwise generates them.
         Returns: list of paraphrases
         """
-        # if save_path.exists() and save_path.stat().st_size > 0:
-        #     logger.info(
-        #         f"Paraphrases for {paraphraser_name} already exist at {save_path}, skipping generation."
-        #     )
-        #     return pd.read_csv(save_path)["paraphrases"].tolist()
         data_loaded = dict()
-        filename = "generated_paraphrases_subsert_cross_genre.json"
-        if save_path.exists():
+        filename = save_path / f"generated_paraphrases_subset_{self.data_category}.json"
+        if filename.exists():
             with open(filename, "r") as f:
                 data_loaded = json.load(f)
 
@@ -665,15 +660,11 @@ class ParaphrasingEvaluator:
             paraphrases = data_loaded[paraphraser_name][self.original_text][prompt][
                 temperature
             ]
-            logger.info(
+            print(
                 f"Loaded paraphrases for {paraphraser_name} with prompt '{prompt}' and temperature {temperature} from JSON."
             )
             return paraphrases
         except KeyError:
-
-            # logger.debug(
-            #     f"Generating paraphrases for '{paraphraser_name}' with prompt '{prompt}' (temp={temperature})"
-            # )
             config = {
                 "text": self.original_text,
                 "n_responses": self.n_responses,
@@ -688,10 +679,6 @@ class ParaphrasingEvaluator:
             ]
             if not paraphrases:
                 raise ValueError("Generated paraphrases are empty.")
-
-            # pd.DataFrame([config | {"paraphrases": paraphrases}]).to_csv(
-            #     save_path, index=False
-            # )
             data_loaded.setdefault(paraphraser_name, {})
             data_loaded[paraphraser_name].setdefault(self.original_text, {})
             data_loaded[paraphraser_name][self.original_text].setdefault(prompt, {})
@@ -1119,7 +1106,7 @@ class ParaphrasingEvaluator:
 
         fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
         unique_labels = data[group_by].unique()
-        palette = sns.color_palette("tab10", n_colors=len(unique_labels))
+        palette = sns.color_palette("tab20", n_colors=len(unique_labels))
         label_to_color = {
             label: palette[i % len(palette)] for i, label in enumerate(unique_labels)
         }
@@ -1172,7 +1159,7 @@ class ParaphrasingEvaluator:
             x="sem_sim_avg",
             y="syn_sim_avg",
             hue=group_by,
-            palette="tab10",
+            palette="tab20",
             alpha=0.7,
             s=40,
             edgecolor="k",
@@ -1261,7 +1248,7 @@ class ParaphrasingEvaluator:
         unique_labels = data[group_by].unique()
         max_words_in_label = max(len(str(label).split()) for label in unique_labels)
         use_shared_legend = max_words_in_label > 3
-        palette = sns.color_palette("tab10", n_colors=len(unique_labels))
+        palette = sns.color_palette("tab20", n_colors=len(unique_labels))
         label_to_color = {
             label: palette[i % len(palette)] for i, label in enumerate(unique_labels)
         }
