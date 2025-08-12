@@ -513,6 +513,7 @@ class ParaphrasingEvaluator:
             print("No save path provided, plot not saved.")
         if display_plot:
             plt.show()
+        plt.close()
 
     def evaluate_extractors(
         self,
@@ -1124,6 +1125,7 @@ class ParaphrasingEvaluator:
                 print(f"Plot saved to {file_name}")
         if display_plot:
             plt.show()
+        plt.close()
 
     def plot_metric_scatter(
         self,
@@ -1252,6 +1254,7 @@ class ParaphrasingEvaluator:
 
         if display_plot:
             plt.show()
+        plt.close()
 
     def _wrap_label(self, label: str, words_per_line: int = 6) -> str:
         assert (
