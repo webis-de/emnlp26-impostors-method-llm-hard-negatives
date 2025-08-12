@@ -33,7 +33,7 @@ PROMPTS = [
 ]
 
 CATEGORY2DIRECTORY = {
-    "Blog": ["Blog_corpus", 27],
+    # "Blog": ["Blog_corpus", 27],
     "Student Essays": [
         "student_essays/Intro2006",
         "Ass1/2006_AB4847",
