@@ -450,9 +450,17 @@ class ParaphrasingEvaluator:
         label_to_color = {
             label: palette[i % len(palette)] for i, label in enumerate(unique_labels)
         }
+        line_styles = [
+            "solid",
+            "dashed",
+            "dotted",
+            "dashdot",
+            (0, (3, 1, 1, 1)),
+            (0, (5, 1)),
+        ]
 
         # groupby paraphraser model or prompt
-        for groupby_value in unique_labels:
+        for i, groupby_value in enumerate(unique_labels):
             mean_values = grouped_mean.loc[groupby_value].tolist()
             std_values = grouped_std.loc[groupby_value].tolist()
 
@@ -469,6 +477,8 @@ class ParaphrasingEvaluator:
                 label=self._wrap_label(groupby_value),
                 alpha=0.7,
                 color=label_to_color[groupby_value],
+                inewidth=2,
+                linestyle=line_styles[i % len(line_styles)],
             )
             ax.fill_between(
                 angles, lower, upper, color=label_to_color[groupby_value], alpha=0.2
@@ -495,9 +505,9 @@ class ParaphrasingEvaluator:
             save_path = Path(save_path)
             save_path.mkdir(parents=True, exist_ok=True)
             for format in ["svg"]:
-                out = save_path / f"hist_metric_dists.{format}"
+                out = save_path / f"radar_metric_dists.{format}"
                 fig.savefig(out, bbox_inches="tight", transparent=True, format=format)
-                print(f"Saved Histogram grid to {out}")
+                print(f"Saved radar plot to {out}")
 
         else:
             print("No save path provided, plot not saved.")
@@ -620,7 +630,6 @@ class ParaphrasingEvaluator:
                 )
                 print("Saved results to ", save_base_path)
 
-        # Plot KDEs for each metric per dataset
         if plot_metrics:
             dfs = {}
             print("Read results from disk for plotting from ", save_base_path)
