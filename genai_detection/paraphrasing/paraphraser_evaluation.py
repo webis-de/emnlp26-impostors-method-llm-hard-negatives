@@ -1319,7 +1319,8 @@ class ParaphrasingEvaluator:
                     zorder=5,
                 )
 
-            plt.title(f"Distribution of {metric}")
+            metric_for_tile = " ".join([t.capitalize() for t in metric.split("_")])
+            plt.title(f"Distribution of {metric_for_tile}")
             plt.xlabel(metric)
             plt.ylabel("Density")
             plt.legend(
@@ -1331,11 +1332,11 @@ class ParaphrasingEvaluator:
             # Title
             if data_category:
                 plt.title(
-                    f"Distribution of {metric}\non {data_category} Dataset, grouped by {group_by.capitalize()}"
+                    f"Distribution of {metric_for_tile}\non {data_category} Dataset, grouped by {group_by.capitalize()}"
                 )
             else:
                 plt.title(
-                    f"Distribution of {metric}\ngrouped by {group_by.capitalize()}"
+                    f"Distribution of {metric_for_tile}\ngrouped by {group_by.capitalize()}"
                 )
 
             plt.tight_layout()
@@ -1444,10 +1445,10 @@ class ParaphrasingEvaluator:
                     edgecolor="k",
                     zorder=5,
                 )
-
-            ax.set_title(f"Distribution of {metric}")
+            metric_for_tile = " ".join([t.capitalize() for t in metric.split("_")])
+            ax.set_title(f"Distribution of {metric_for_tile}")
             ax.set_xlim(0, 1)  # assuming similarity metrics in [0, 1]
-            ax.set_xlabel(metric)
+            ax.set_xlabel(metric_for_tile)
             ax.set_ylabel("Density")
 
         if use_shared_legend:
