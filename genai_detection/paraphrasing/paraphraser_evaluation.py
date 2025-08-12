@@ -1280,11 +1280,6 @@ class ParaphrasingEvaluator:
         palette = sns.color_palette("tab20", n_colors=len(unique_labels))
 
         for metric in metric_names:
-
-            counts = data.groupby(group_by)[metric].count()
-            if counts == 0:
-                continue
-
             sns.kdeplot(
                 data=data,
                 x=metric,
