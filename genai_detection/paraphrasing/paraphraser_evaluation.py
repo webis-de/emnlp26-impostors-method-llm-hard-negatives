@@ -172,7 +172,7 @@ class ParaphrasingEvaluator:
             / "paraphrasing"
             / "experiments"
             / "paraphrase_evaluation"
-            / self.data_category
+            / self.data_category.replace(" ", "_").replace("/", "_")
         )
         self.paraphrases_save_base_path.mkdir(parents=True, exist_ok=True)
 
@@ -350,17 +350,15 @@ class ParaphrasingEvaluator:
                 data_loaded = {}
 
             try:
-                potential_paraphrases = data_loaded[paraphraser_name][
-                    self.original_text
-                ][None]
+                potential_paraphrases = data_loaded[paraphraser_name][text][None]
                 paraphrases = []
                 for temperature in potential_paraphrases.keys():
                     paraphrases.extend(potential_paraphrases[temperature])
             except Exception as e:
                 print(
-                    f"Paraphraser {paraphraser_name} not found in loaded data for {self.original_text}:\n{e}.\nGenerating new paraphrase."
+                    f"Paraphraser {paraphraser_name} not found in loaded data for {text}:\n{e}.\nGenerating new paraphrase."
                 )
-                raise Exception(f"Should all be present, but not found: {e}") from e
+                # raise Exception(f"Should all be present, but not found: {e}") from e
 
                 paraphrases = paraphraser.paraphrase(
                     text=text, temperature=self.temperature
@@ -373,11 +371,9 @@ class ParaphrasingEvaluator:
                 ):
                     # save generated paraphrases to file
                     data_loaded.setdefault(paraphraser_name, {})
-                    data_loaded[paraphraser_name].setdefault(self.original_text, {})
-                    data_loaded[paraphraser_name][self.original_text].setdefault(
-                        None, {}
-                    )
-                    data_loaded[paraphraser_name][self.original_text][None][
+                    data_loaded[paraphraser_name].setdefault(text, {})
+                    data_loaded[paraphraser_name][text].setdefault(None, {})
+                    data_loaded[paraphraser_name][text][None][
                         self.temperature
                     ] = paraphrases
                     with open(file_existing_paraphrases, "w") as f:
