@@ -1234,9 +1234,9 @@ if __name__ == "__main__":
     # original_text = open(path2datasets / f"{file_name}.txt").read()
     text = "Dear Santa, I wish for a big red nosed reindeer that can fly and a sleigh full of toys for all the children in the world. I promise to be good and help others. Love, Timmy."
     # p = paraphrasers["TranslationParaphraser"]
-    # p = paraphrasers["SAIA"]
+    p = paraphrasers["SAIA"]
     # p = paraphrasers["IONOS"]
-    p = paraphrasers["Ollama"]
+    # p = paraphasers["Ollama"]
     print(f"[DEBUG] Paraphrasing text with {p.__class__.__name__}")
     paraphrased_texts = p.paraphrase(text=text, n_responses=2)
     print(f"[DEBUG] Paraphrased texts: {paraphrased_texts}")
