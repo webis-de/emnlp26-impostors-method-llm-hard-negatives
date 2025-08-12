@@ -1061,15 +1061,18 @@ class ParaphrasingEvaluator:
         # Start plot
         fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
 
-        palette = sns.color_palette("tab20", n_colors=len(grouped_mean.index))
+        unique_labels = grouped_mean.index
+        palette = sns.color_palette(
+            "tab20" if len(unique_labels) > 10 else "tab10", n_colors=len(unique_labels)
+        )
         label_to_color = {
-            label: palette[i % len(palette)]
-            for i, label in enumerate(grouped_mean.index)
+            label: palette[i % len(palette)] for i, label in enumerate(unique_labels)
         }
 
-        for paraphraser_name in grouped_mean.index:
-            mean_values = grouped_mean.loc[paraphraser_name].tolist()
-            std_values = grouped_std.loc[paraphraser_name].tolist()
+        # groupby paraphraser model or prompt
+        for groupby_value in unique_labels:
+            mean_values = grouped_mean.loc[groupby_value].tolist()
+            std_values = grouped_std.loc[groupby_value].tolist()
 
             # Close the loop
             mean_values += mean_values[:1]
@@ -1081,12 +1084,12 @@ class ParaphrasingEvaluator:
             ax.plot(
                 angles,
                 mean_values,
-                label=self._wrap_label(paraphraser_name),
+                label=self._wrap_label(groupby_value),
                 alpha=0.7,
-                color=label_to_color[paraphraser_name],
+                color=label_to_color[groupby_value],
             )
             ax.fill_between(
-                angles, lower, upper, color=label_to_color[paraphraser_name], alpha=0.2
+                angles, lower, upper, color=label_to_color[groupby_value], alpha=0.2
             )
 
         # Add labels to axes
