@@ -1303,13 +1303,14 @@ class ParaphrasingEvaluator:
 
             # Scatter for groups with a single point
             models_single = counts[counts == 1].index
-            for model in models_single:
-                single_val = data.loc[data[group_by] == model, metric].values[0]
-                plt.scatter(
-                    single_val,
-                    1,
-                    label=model,
-                    color=label_to_color[model],
+            if len(models_single) > 0:
+                sns.scatterplot(
+                    data=data[data[group_by].isin(models_single)],
+                    x=metric,
+                    y=[1] * len(models_single),  # constant y for all single points
+                    hue=group_by,
+                    palette=label_to_color,
+                    legend="full",
                     s=50,
                     edgecolor="k",
                     zorder=5,
