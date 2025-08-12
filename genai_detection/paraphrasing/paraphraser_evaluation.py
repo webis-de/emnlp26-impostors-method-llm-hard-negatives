@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from pathlib import Path
@@ -10,7 +11,7 @@ import evaluate
 import datetime
 import difflib
 from collections import defaultdict
-from itertools import chain, product
+from itertools import chain, cycle, product
 from matplotlib import pyplot as plt
 import numpy as np
 import openai
@@ -134,7 +135,7 @@ class ParaphrasingEvaluator:
         while not self.sbert_model and tries < 10:
             try:
                 self.sbert_model = SentenceTransformer(
-                    "sentence-transformers/all-MiniLM-L6-v2", device=device
+                    "sentence-transformers/all-MiniLM-L6-v2"  # , device=device    # TODO: for server?
                 )  # for cosine similarity
             except Exception as e:
                 print(
@@ -624,6 +625,103 @@ class ParaphrasingEvaluator:
         results.to_csv(save_path)
         logger.info(f"Results saved to {save_path}")
 
+    def _load_or_generate_paraphrases(
+        self,
+        paraphraser_name: str,
+        paraphraser,
+        prompt: str,
+        temperature: float,
+        save_path: Path,
+    ) -> List[str]:
+        """
+        Loads paraphrases from CSV if available; otherwise generates them.
+        Returns: list of paraphrases
+        """
+        # if save_path.exists() and save_path.stat().st_size > 0:
+        #     logger.info(
+        #         f"Paraphrases for {paraphraser_name} already exist at {save_path}, skipping generation."
+        #     )
+        #     return pd.read_csv(save_path)["paraphrases"].tolist()
+        data_loaded = dict()
+        filename = "generated_paraphrases_subsert_cross_genre.json"
+        if save_path.exists():
+            with open(filename, "r") as f:
+                data_loaded = json.load(f)
+
+        try:
+            # original text is already preprocessed
+            paraphrases = data_loaded[paraphraser_name][self.original_text][prompt][
+                temperature
+            ]
+            logger.info(
+                f"Loaded paraphrases for {paraphraser_name} with prompt '{prompt}' and temperature {temperature} from JSON."
+            )
+            return paraphrases
+        except KeyError:
+
+            # logger.debug(
+            #     f"Generating paraphrases for '{paraphraser_name}' with prompt '{prompt}' (temp={temperature})"
+            # )
+            config = {
+                "text": self.original_text,
+                "n_responses": self.n_responses,
+                "prompt": prompt,
+                "temperature": temperature,
+            }
+            if isinstance(paraphraser, NonNaiveParaphraser) and self.ground_truth:
+                config["ground_truth"] = self.ground_truth
+
+            paraphrases = [
+                _preprocess_text(p) for p in paraphraser.paraphrase(**config)
+            ]
+            if not paraphrases:
+                raise ValueError("Generated paraphrases are empty.")
+
+            # pd.DataFrame([config | {"paraphrases": paraphrases}]).to_csv(
+            #     save_path, index=False
+            # )
+            data_loaded.setdefault(paraphraser_name, {})
+            data_loaded[paraphraser_name].setdefault(self.original_text, {})
+            data_loaded[paraphraser_name][self.original_text].setdefault(prompt, {})
+            data_loaded[paraphraser_name][self.original_text][prompt][
+                temperature
+            ] = paraphrases
+            with open(filename, "w") as f:
+                json.dump(data_loaded, f, indent=4)
+            logger.info(f"Paraphrases saved to {save_path}")
+            return paraphrases
+
+    def _safe_compute_bertscore(self, paraphrases, references):
+        try:
+            return self.bertscore.compute(
+                predictions=paraphrases,
+                references=references,
+                model_type="distilbert-base-uncased",
+            )
+        except Exception as e:
+            logger.error(f"BERTScore computation failed: {e}")
+            return {
+                "precision": [0.0] * self.n_responses,
+                "recall": [0.0] * self.n_responses,
+                "f1": [0.0] * self.n_responses,
+                "hashcode": "",
+            }
+
+    def _safe_compute_rouge(self, paraphrases):
+        try:
+            return [
+                self.rouge_score.compute(
+                    predictions=[p], references=[self.original_text]
+                )
+                for p in paraphrases
+            ]
+        except Exception as e:
+            logger.error(f"ROUGE computation failed: {e}")
+            return [
+                {"rouge1": 0.0, "rouge2": 0.0, "rougeL": 0.0, "rougeLsum": 0.0}
+                for _ in paraphrases
+            ]
+
     def evaluate(
         self, save_to_disk: bool = True, save_extremest_paraphr_per_score: bool = False
     ):
@@ -639,24 +737,36 @@ class ParaphrasingEvaluator:
         paraphrases_save_base_path = (
             Path(__file__).resolve().parent.parent.parent
             / CONFIG.SAVE_PATH
-            / "paraphrases"
+            / "paraphrase_evaluation"
             / self.data_category
         )
         paraphrases_save_base_path.mkdir(parents=True, exist_ok=True)
 
-        # Naive paraphrasers take different prompts
-        test_configurations = list(product(self.paraphrasers.items(), self.prompts))
-        # Non-naive paraphrasers take the same prompt, but are called with different temperatures and seeds
-        temperatures = list(np.linspace(0, 1, max(3, len(self.prompts)), endpoint=True))
-        for i, ((name, paraphraser), prompt) in enumerate(test_configurations):
-            if not isinstance(paraphraser, NaiveParaphraser):
-                test_configurations[i] = (
-                    (name, paraphraser),
-                    None,
-                    temperatures[i % len(temperatures)],
-                )
+        # Non-naive paraphrasers take the same prompt, but are called with different temperatures to introduce variance
+        temperatures = list(np.linspace(0, 1, max(2, len(self.prompts)), endpoint=True))
+
+        # Cyclic iterator over temperatures
+        temp_cycle = cycle(temperatures)
+
+        test_configurations = []
+        for paraphraser_name, paraphraser in self.paraphrasers.items():
+            if isinstance(paraphraser, NaiveParaphraser):
+                # naive paraphrasers: fixed temperature + prompt diversity
+                for prompt_id, prompt in enumerate(self.prompts, start=1):
+                    test_configurations.append(
+                        (
+                            (paraphraser_name, paraphraser),
+                            prompt,
+                            self.temperature,
+                            prompt_id,
+                        )
+                    )
             else:
-                test_configurations[i] = ((name, paraphraser), prompt, self.temperature)
+                # Non-naive: fixed prompt diversity + temperature diversity
+                for _ in self.prompts:
+                    test_configurations.append(
+                        ((paraphraser_name, paraphraser), None, next(temp_cycle), 0)
+                    )
 
         print(
             f"[DEBUG] Total configurations to evaluate: {len(test_configurations)}, {test_configurations}"
@@ -664,102 +774,40 @@ class ParaphrasingEvaluator:
         logger.info(
             f"[DEBUG] Total configurations to evaluate: {len(test_configurations)}, {test_configurations}"
         )
-        for (name, paraphraser), prompt, temperature in tqdm(
+        results = []
+        # load json object with existing paraphrases if available and append new ones
+        paraphrase_file_path = paraphrases_save_base_path / "paraphrases.json"
+        for (paraphraser_name, paraphraser), prompt, temperature, prompt_id in tqdm(
             test_configurations,
             desc="Evaluating Paraphrasers",
             total=len(test_configurations),
         ):
-            # FIXME: experiment notebook: predictions format bad (list of words), reference format ok
+            # path2file = (
+            #     paraphrases_save_base_path
+            #     / f"{name}_paraphrases_temp{temperature}_prompt{prompt_id}_{self.original_file_name}.csv"
+            # )
             try:
-                logger.info(
-                    f"[DEBUG] Using paraphraser '{name}' with prompt '{prompt}'"
+                paraphrases = self._load_or_generate_paraphrases(
+                    paraphraser_name,
+                    paraphraser,
+                    prompt,
+                    temperature,
+                    paraphrase_file_path,
                 )
-                path2paraphrase_file = (
-                    paraphrases_save_base_path
-                    / f"{name}_paraphrases_{self.original_file_name}.csv"
-                )
-                if (
-                    path2paraphrase_file.exists()
-                    and os.stat(path2paraphrase_file).st_size > 0
-                ):
-                    logger.info(
-                        f"Paraphrases for {name} already exist at {path2paraphrase_file}, skipping."
-                    )
-                    tmp_df = pd.read_csv(path2paraphrase_file)
-                    paraphrases = tmp_df["paraphrases"].tolist()
-                else:
-                    paraphrase_config = {
-                        "text": self.original_text,
-                        "n_responses": self.n_responses,
-                        "prompt": prompt,
-                        "temperature": temperature,
-                    }
-                    if (
-                        isinstance(paraphraser, NonNaiveParaphraser)
-                        and self.ground_truth
-                    ):
-                        paraphrase_config["ground_truth"] = self.ground_truth
-                    paraphrases = [
-                        _preprocess_text(p)
-                        for p in paraphraser.paraphrase(**paraphrase_config)
-                    ]
-                    if not paraphrases:
-                        raise ValueError("Empty paraphrase list.")
-                    paraphrase_config.update({"paraphrases": paraphrases})
-                    tmp_df = pd.DataFrame([paraphrase_config])
-                    tmp_df.to_csv(
-                        path2paraphrase_file,
-                        index=False,
-                    )
-                    print(f"Paraphrases saved to {path2paraphrase_file}")
-
             except Exception as e:
                 logger.error(
-                    f"[ERROR] Paraphraser '{name}' with prompt '{prompt}' for category '{self.data_category}' failed: {e}"
+                    f"Paraphraser '{paraphraser_name}' with prompt '{prompt}' failed: {e}"
                 )
-                paraphrases = [
-                    "" for _ in range(self.n_responses)
-                ]  # Fallback to empty strings
+                paraphrases = [""] * self.n_responses
 
-            try:
-                # input is list of strings, each string is a paraphrase/ reference
-                bert_scores = self.bertscore.compute(
-                    predictions=paraphrases,
-                    references=references,
-                    model_type="distilbert-base-uncased",
-                )
-            except Exception as e:
-                print("[ERROR] BERTScore computation failed:", e)
-                bert_scores = {
-                    "precision": [0.0] * self.n_responses,
-                    "recall": [0.0] * self.n_responses,
-                    "f1": [0.0] * self.n_responses,
-                    "hashcode": "",
-                }
-            try:
-                # rouge returns one value for all paraphrases, hence: list comprehension
-                rouge_scores = [
-                    self.rouge_score.compute(
-                        predictions=[p], references=[self.original_text]
-                    )
-                    for p in paraphrases
-                ]
-            except Exception as e:
-                print("[ERROR] ROUGE computation failed:", e)
-                rouge_scores = [
-                    {
-                        "rouge1": 0.0,
-                        "rouge2": 0.0,
-                        "rougeL": 0.0,
-                        "rougeLsum": 0.0,
-                    }
-                    for _ in paraphrases
-                ]
+            bert_scores = self._safe_compute_bertscore(paraphrases, references)
+            rouge_scores = self._safe_compute_rouge(paraphrases)
+
             try:
                 for i, paraphrase in enumerate(paraphrases):
                     results.append(
                         self._build_result_row(
-                            name,
+                            paraphraser_name,
                             prompt,
                             paraphrase,
                             original_split,
@@ -771,7 +819,7 @@ class ParaphrasingEvaluator:
 
             except Exception as e:
                 print(
-                    f"[ERROR] Scoring failed for '{name}' with prompt '{prompt}' for category '{self.data_category}' and paraphrases '{paraphrases}': {e}"
+                    f"[ERROR] Scoring failed for '{paraphraser_name}' with prompt '{prompt}' for category '{self.data_category}' and paraphrases '{paraphrases}': {e}"
                 )
                 continue
 
@@ -779,16 +827,8 @@ class ParaphrasingEvaluator:
         # drop any columns that are completely empty, i.e. all NaN
         df.dropna(axis=1, how="all", inplace=True)
         if save_to_disk:
-            save_base_path = (
-                Path(__file__).resolve().parent.parent.parent / CONFIG.SAVE_PATH
-            )
-            assert (
-                save_base_path.exists()
-            ), f"Savefig base path {save_base_path} does not exist."
-            save_base_path = save_base_path / "paraphrasing"
-            os.makedirs(save_base_path, exist_ok=True)
             save_path = (
-                save_base_path
+                paraphrases_save_base_path
                 / f"paraphrasing_results_comparison_temp{self.temperature}_maxLength{self.max_length}_dataset_{self.data_category}.csv"
             )
             df.to_csv(save_path, index=False, float_format="%.4f")
@@ -818,7 +858,7 @@ class ParaphrasingEvaluator:
             )
         if save_extremest_paraphr_per_score:
             worst_save_path = (
-                save_base_path
+                paraphrases_save_base_path
                 / f"extremest_paraphrases_per_metric_temp{self.temperature}_maxLength{self.max_length}_dataset_{self.data_category}.csv"
             )
             extremest_paraphrases.to_csv(worst_save_path, index=False)
@@ -827,7 +867,7 @@ class ParaphrasingEvaluator:
 
     def _build_result_row(
         self,
-        name: str,
+        paraphraser_name: str,
         prompt: str,
         paraphrase: str,
         original_split: List[str],
@@ -837,7 +877,7 @@ class ParaphrasingEvaluator:
     ) -> dict:
         """
         Build a result row for the DataFrame.
-        :param name: Name of the paraphraser.
+        :param paraphraser_name: Name of the paraphraser.
         :param prompt: The prompt used for paraphrasing excluding the text to paraphrase and tailoring whitespaces, but including bulletpoints etc.
         :param paraphrase: One of the generated paraphrase.
         :param original_split: The original text split into tokens.
@@ -856,7 +896,7 @@ class ParaphrasingEvaluator:
         else:
             cos_sim = None
         res = {
-            "model": name,
+            "model": paraphraser_name,
             "prompt": f"{prompt} <TEXT>",
             "parameters": {
                 "n_responses": self.n_responses,
@@ -970,8 +1010,13 @@ class ParaphrasingEvaluator:
         assert (
             group_by in df.columns
         ), f"Group by column '{group_by}' not found in DataFrame."
-        grouped_mean = df.groupby(group_by)[labels].mean()
-        grouped_std = df.groupby(group_by)[labels].std()
+        if group_by == "model" and "Paraphraser" not in df.columns:
+            data = df.rename(columns={group_by: "Paraphraser"}, inplace=False)
+            group_by = "Paraphraser"
+        else:
+            data = df.copy()
+        grouped_mean = data.groupby(group_by)[labels].mean()
+        grouped_std = data.groupby(group_by)[labels].std()
 
         # Compute angle of each axis
         angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
@@ -1008,9 +1053,9 @@ class ParaphrasingEvaluator:
         # Add legend and title
         ax.legend(loc="lower left", bbox_to_anchor=(1.1, 0.7), fontsize=9)
         title = (
-            f"Radar Chart: Paraphrasing Metric\non {data_category} text, grouped by {group_by}"
+            f"Radar Chart: Paraphrasing Metric\non {data_category.capitalize()} Dataset, grouped by {group_by.capitalize()}"
             if data_category
-            else f"Radar Chart: Paraphrasing Metrics\ngrouped by {group_by}"
+            else f"Radar Chart: Paraphrasing Metrics\ngrouped by {group_by.capitalize()}"
         )
         plt.title(title, fontsize=12)
         plt.tight_layout()
@@ -1019,7 +1064,7 @@ class ParaphrasingEvaluator:
             save_path = Path(save_path)
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            for format in ["png", "svg"]:
+            for format in ["svg"]:
                 file_name = (
                     save_path
                     / f"{data_category}_paraphrasing_metrics_grouped_by_{group_by}_radar_chart_{timestamp}.{format}"
@@ -1092,9 +1137,9 @@ class ParaphrasingEvaluator:
         ax.set_xlabel("Semantic Similarity (sem_sim_avg)")
         ax.set_ylabel("Syntactic Similarity (syn_sim_avg)")
         title = (
-            f"Semantic vs Syntactic Similarity\non {data_category} Texts, grouped by {group_by}"
+            f"Semantic vs Syntactic Similarity\non {data_category.capitalize()} Dataset, grouped by {group_by.capitalize()}"
             if data_category
-            else f"Semantic vs Syntactic Similarity\ngrouped by {group_by}"
+            else f"Semantic vs Syntactic Similarity\ngrouped by {group_by.capitalize()}"
         )
         ax.set_title(title)
 
@@ -1149,7 +1194,7 @@ class ParaphrasingEvaluator:
             save_path = Path(save_path)
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            for format in ["png", "svg"]:
+            for format in ["svg"]:
                 full_path = (
                     save_path
                     / f"{data_category}_sem_syn_scatter_grouped_by_{group_by}_{timestamp}.{format}"
@@ -1313,9 +1358,9 @@ class ParaphrasingEvaluator:
         for j in range(i + 1, len(axes)):
             fig.delaxes(axes[j])
         title = (
-            f"Metric Distributions\non {data_category} data, grouped by {group_by}"
+            f"Metric Distributions\non {data_category.capitalize()} Dataset, grouped by {group_by.capitalize()}"
             if data_category
-            else f"Metric Distributions\ngrouped by {group_by}"
+            else f"Metric Distributions\ngrouped by {group_by.capitalize()}"
         )
         fig.suptitle(title, fontsize=16)
         plt.tight_layout(rect=[0, 0, 0.85, 0.95])
@@ -1324,7 +1369,7 @@ class ParaphrasingEvaluator:
             save_path = Path(save_path)
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            for format in ["png", "svg"]:
+            for format in ["svg"]:
                 full_path = (
                     save_path
                     / f"{data_category}_metric_distributions_grouped_by_{group_by}_{timestamp}.{format}"
