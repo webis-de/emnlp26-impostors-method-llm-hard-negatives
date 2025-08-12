@@ -1513,6 +1513,7 @@ class ParaphrasingEvaluator:
 
         if display_plot:
             plt.show()
+        plt.close()
         self._plot_one_plot_per_metric_distribution(
             data=data,
             metric_names=metric_names,
