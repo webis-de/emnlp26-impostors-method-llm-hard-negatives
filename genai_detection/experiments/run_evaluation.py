@@ -69,61 +69,61 @@ def load_metadata(path, file_name):
         return {}
 
 
-def evaluate_category(data_category, data_root, save_path):
-    print(f"Evaluating category: {data_category}")
+def evaluate_category(data_category, data_root):
+    use_ground_truth = not (data_category in ["Blog", "Student Essays"])
+    print(
+        f"Evaluating category: {data_category} using ground truth: {use_ground_truth}"
+    )
+    dir_name, file_name = CATEGORY2DIRECTORY[data_category]
+    path2datasets = data_root / dir_name
+    if not path2datasets.exists():
+        raise FileNotFoundError(f"Missing dataset path: {path2datasets}")
+
+    metadata = load_metadata(path2datasets, file_name) if use_ground_truth else {}
+    text = load_text(data_category, path2datasets, file_name)
+    paraphrasers = get_paraphraser_dict()
+    print(f"Loaded paraphrasers for {data_category}")
+
+    evaluator = ParaphrasingEvaluator(
+        paraphrasers=paraphrasers,
+        prompts=PROMPTS,
+        original_text=text,
+        n_responses=N_RESPONSES,
+        max_length=MAX_LENGTH,
+        temperature=TEMPERATURE,
+        ground_truth=metadata,
+        data_category=data_category,
+        original_file_name=file_name,
+    )
+    print(f"Initialialized evaluator for {data_category}")
+
     try:
-        dir_name, file_name = CATEGORY2DIRECTORY[data_category]
-        path2datasets = data_root / dir_name
-        if not path2datasets.exists():
-            raise FileNotFoundError(f"Missing dataset path: {path2datasets}")
-
-        use_ground_truth = not (data_category in ["Blog", "Student Essays"])
-        metadata = load_metadata(path2datasets, file_name) if use_ground_truth else {}
-        text = load_text(data_category, path2datasets, file_name)
-        paraphrasers = get_paraphraser_dict()
-        print(f"Loaded paraphrasers for {data_category}")
-
-        evaluator = ParaphrasingEvaluator(
-            paraphrasers=paraphrasers,
-            prompts=PROMPTS,
-            original_text=text,
-            n_responses=N_RESPONSES,
-            max_length=MAX_LENGTH,
-            temperature=TEMPERATURE,
-            ground_truth=metadata,
-            data_category=data_category,
-            original_file_name=file_name,
-        )
-        print(f"Starting evaluation for {data_category}")
-
         df, extremest = evaluator.evaluate(
             save_extremest_paraphr_per_score=True, save_to_disk=True
         )
-        print(f"Evaluation complete for {data_category} with {len(df)} paraphrases")
-
-        print("Starting plotting for", data_category)
-        for group in ["model", "prompt"]:
-            evaluator.plot_models_metrics(
-                df, data_category, group_by=group, display_plot=False
-            )
-            print(f"Plot metrics for {data_category} by {group}: metrics plotted")
-            evaluator.plot_metric_scatter(
-                df, data_category, group_by=group, display_plot=False
-            )
-            print(
-                f"Plot metric scatter for {data_category} by {group}: scatter plotted"
-            )
-            evaluator.plot_metric_distributions(
-                df, data_category, group_by=group, display_plot=False
-            )
-            print(
-                f"Plot metric distributions for {data_category} by {group}: distributions plotted"
-            )
-
-        return {data_category: df}
-
     except Exception as e:
         return {data_category: pd.DataFrame()}
+
+    print(f"Evaluation complete for {data_category} with {len(df)} paraphrases")
+
+    print("Starting plotting for", data_category)
+    for group in ["model", "prompt"]:
+        evaluator.plot_models_metrics(
+            df, data_category, group_by=group, display_plot=False
+        )
+        print(f"Plot metrics for {data_category} by {group}: metrics plotted")
+        evaluator.plot_metric_scatter(
+            df, data_category, group_by=group, display_plot=False
+        )
+        print(f"Plot metric scatter for {data_category} by {group}: scatter plotted")
+        evaluator.plot_metric_distributions(
+            df, data_category, group_by=group, display_plot=False
+        )
+        print(
+            f"Plot metric distributions for {data_category} by {group}: distributions plotted"
+        )
+
+    return {data_category: df}
 
 
 def run_extraction_evaluation(save_path):
@@ -158,12 +158,12 @@ def run_evaluation():
 
     with ThreadPoolExecutor() as executor:
         futures = {
-            executor.submit(evaluate_category, category, data_root, save_path): category
+            executor.submit(evaluate_category, category, data_root): category
             for category in CATEGORY2DIRECTORY
         }
         for future in as_completed(futures):
             result = future.result()
-            print(result)
+            print("Result:", result)
             results.append(result)
 
     # run_extraction_evaluation(save_path)
