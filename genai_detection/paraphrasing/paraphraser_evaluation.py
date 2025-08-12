@@ -1302,6 +1302,7 @@ class ParaphrasingEvaluator:
                     common_norm=False,
                     alpha=0.4,
                     palette=label_to_color,
+                    legend="full",
                 )
 
             # Scatter for groups with a single point
@@ -1327,6 +1328,8 @@ class ParaphrasingEvaluator:
                 loc="upper left",
                 bbox_to_anchor=(1.01, 1),  # outside the plot on right
                 title=group_by.capitalize(),
+                fontsize=10,
+                title_fontsize=12,
             )
 
             # Title
@@ -1466,30 +1469,6 @@ class ParaphrasingEvaluator:
             fontsize=10,
             title_fontsize=12,
         )
-        # else:
-        # present_models = counts[counts > 0].index  # all that appear for this metric
-        # handles = []
-        # labels = []
-        # for model in present_models:
-        #     color = label_to_color[model]
-        #     if model in models_multi:
-        #         # Proxy patch representing KDE fill
-        #         h = mpatches.Patch(facecolor=color, alpha=0.4, edgecolor="none")
-        #     else:
-        #         # Proxy marker representing singleton scatter
-        #         h = mlines.Line2D(
-        #             [],
-        #             [],
-        #             marker="o",
-        #             linestyle="none",
-        #             markerfacecolor=color,
-        #             markeredgecolor="k",
-        #             markersize=6,
-        #         )
-        #     handles.append(h)
-        #     labels.append(model)
-        # for ax in axes:
-        #     ax.legend(handles, labels, title=group_by.capitalize(), loc="best")
 
         # Remove unused axes
         for j in range(i + 1, len(axes)):
@@ -1499,8 +1478,8 @@ class ParaphrasingEvaluator:
             if data_category
             else f"Metric Distributions\ngrouped by {group_by.capitalize()}"
         )
-        fig.suptitle(title)
-        plt.tight_layout(rect=[0, 0, 0.85, 0.93])
+        fig.suptitle(title, fontsize=18, y=0.95)
+        plt.tight_layout(rect=[0, 0, 0.85, 0.90])
 
         if save_path:
             save_path = Path(save_path)
