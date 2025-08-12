@@ -75,7 +75,6 @@ class ParaphrasingEvaluator:
         n_responses: int = 3,
         max_length: int = CONFIG.MAX_LENGTH,
         temperature: float = CONFIG.TEMPERATURE,
-        config: Optional[dict[str, Any]] = None,
         ground_truth: Optional[dict[str, Any]] = None,
         data_category: Optional[str] = None,
         original_file_name: Optional[str] = None,
@@ -88,7 +87,6 @@ class ParaphrasingEvaluator:
         :param n_responses: The number of paraphrases to generate for each paraphraser.
         :param max_length: The maximum length of the generated paraphrase.
         :param temperature: Controls the randomness of the output. Lower values make the output more deterministic.
-        :param config: configuration object or dict, expects at least save_path attribute
         :param ground_truth: Optional ground truth data to compare against the generated paraphrases.
         :param data_category: Optional category of the data being evaluated, used for logging and saving results.
         :param original_file_name: Optional name of the original file, used for logging and saving results.
@@ -156,7 +154,6 @@ class ParaphrasingEvaluator:
                 print("Failed to load gensim glove-twitter-25. Retrying...")
                 tries += 1
         self.wmd_model = model.WordEmbedding(model=self.pretr_word_model)
-        self.config = config
         self.base_dirs = {
             "blog": Path(__file__).resolve().parents[2] / "data/datasets/Blog_corpus/",
             "gutenberg": Path(__file__).resolve().parents[2]
@@ -184,7 +181,7 @@ class ParaphrasingEvaluator:
         """Calculate similarity ratio between two strings (case-insensitive)."""
         return difflib.SequenceMatcher(None, str(a).lower(), str(b).lower()).ratio()
 
-    def _similar(self, a, b, sim_thres: float = 0.7) -> bool:
+    def _similar(self, a, b, sim_thres: float = 0.65) -> bool:
         """Check if two inputs are sufficiently similar."""
         return self._degree_of_similarity(str(a), str(b)) > sim_thres
 
@@ -283,13 +280,19 @@ class ParaphrasingEvaluator:
 
         return df
 
-    def _evaluate_model_on_data(self, model_name: str, paraphraser, df: pd.DataFrame):
+    def _evaluate_model_on_data(
+        self, paraphraser_name: str, paraphraser, df: pd.DataFrame
+    ):
         """
         Evaluate a single paraphraser on the given dataset.
         Returns metrics dictionary and length difference list.
         """
         results_per_text = []
         lengths = {"original": [], "paraphrase": []}
+        file_existing_paraphrases = (
+            self.paraphrases_save_base_path
+            / f"generated_paraphrases_subset_{self.data_category.replace(' ', '_')}.json"
+        )
         if "century" not in df.columns and "date" in df.columns:
             # Blog dataset has 'date' column (eg. 12,May,2004), convert to 'century'
             df["century"] = df["date"].apply(
@@ -301,7 +304,7 @@ class ParaphrasingEvaluator:
             )
 
         for row in tqdm(
-            df.itertuples(), total=len(df), desc=f"Evaluating {model_name}"
+            df.itertuples(), total=len(df), desc=f"Evaluating {paraphraser_name}"
         ):
             text = str(getattr(row, "text", ""))
             filename = getattr(row, "filename", "unknown")
@@ -310,7 +313,6 @@ class ParaphrasingEvaluator:
                 extra, _, genre, century, _, _ = paraphraser._extract_bullet_points(
                     text=text,
                     prompt=paraphraser.extractor_prompt,
-                    response_schema=TopicSchema.model_json_schema(),
                 )
             except Exception as e:
                 logger.warning(f"Extraction failed for file '{filename}': {e}")
@@ -322,32 +324,60 @@ class ParaphrasingEvaluator:
                 or "now" in str(century).lower()
             ):
                 century = 21
-            gt_genre = getattr(row, "genre", "") or ""
+            gt_genre = getattr(row, "genre", "").lower() or ""
             gt_century = getattr(row, "century", 0) or 0
             gt_topic = getattr(row, "topic", "") or ""
 
             genre_match = any(
-                self._similar(extr_g.strip().lower(), gt_genre.lower())
+                self._similar(extr_g.strip().lower(), gt_genre)
                 for extr_g in re.split(r"[ /,]+", str(genre).lower())
             )
             time_match = self._similar(century, gt_century)
-            topic_match = self._degree_of_similarity(str(gt_topic).lower(), extra)
+            topic_match = np.max(
+                [
+                    self._degree_of_similarity(gt_sub_topic.strip(), extra)
+                    for gt_sub_topic in str(gt_topic).lower().split(",")
+                ]
+            )
+
+            # read existing paraphrase if available
+            if file_existing_paraphrases.exists():
+                with open(file_existing_paraphrases, "r") as f:
+                    data_loaded = json.load(f)
+            else:
+                data_loaded = {}
 
             try:
-                paraphrase = paraphraser.paraphrase(
+                potential_paraphrases = data_loaded[paraphraser_name][
+                    self.original_text
+                ][None]
+                paraphrases = []
+                for temperature in potential_paraphrases.keys():
+                    paraphrases.extend(potential_paraphrases[temperature])
+            except Exception as e:
+                print(
+                    f"Paraphraser {paraphraser_name} not found in loaded data for {self.original_text}:\n{e}.\nGenerating new paraphrase."
+                )
+
+                paraphrases = paraphraser.paraphrase(
                     text=text, temperature=self.temperature
                 )
-            except (
-                openai.BadRequestError
-            ) as e:  # e.g. Internal Server Error for https://zephyr-7b-llm.srv.webis.de/api/chat
-                paraphrase = None
 
             if (
-                paraphrase
-                and isinstance(paraphrase, (list, tuple))
-                and len(paraphrase) > 0
+                paraphrases
+                and isinstance(paraphrases, (list, tuple))
+                and len(paraphrases) > 0
             ):
-                paraphrase_len = len(paraphrase[0].split())
+                # save generated paraphrases to file
+                data_loaded.setdefault(paraphraser_name, {})
+                data_loaded[paraphraser_name].setdefault(self.original_text, {})
+                data_loaded[paraphraser_name][self.original_text].setdefault(None, {})
+                data_loaded[paraphraser_name][self.original_text][None][
+                    temperature
+                ] = paraphrases
+                with open(file_existing_paraphrases, "w") as f:
+                    json.dump(data_loaded, f, indent=4)
+                paraphrase_len = np.average([len(p.split()) for p in paraphrases])
             else:
                 paraphrase_len = 0
 
@@ -358,8 +388,8 @@ class ParaphrasingEvaluator:
             results_per_text.append(
                 {
                     "filename": filename,
-                    "genre_match": genre_match,  # int(genre_match),
-                    "time_match": time_match,  # int(time_match),
+                    "genre_match": genre_match,
+                    "time_match": time_match,
                     "topic_match": topic_match,
                     "original_length": orig_len,
                     "paraphrase_length": paraphrase_len,
@@ -375,7 +405,7 @@ class ParaphrasingEvaluator:
         # Convert to DataFrame
         results_df = pd.DataFrame(results_per_text)
         print(
-            f"[DEBUG] Results DataFrame for {model_name} of len {len(results_df)}:\n{results_df.head()}"
+            f"[DEBUG] Results DataFrame for {paraphraser_name} of len {len(results_df)}:\n{results_df.head()}"
         )
 
         # Optionally compute total scores
@@ -509,16 +539,16 @@ class ParaphrasingEvaluator:
             if not isinstance(v, NaiveParaphraser)
         }
 
-        for dataset_type, base_dir in self.base_dirs.items():
+        for dataset_category, base_dir in self.base_dirs.items():
             try:
-                df = self._load_dataset(base_dir, dataset_type)
+                df = self._load_dataset(base_dir, dataset_category)
             except Exception as e:
                 logger.error(
-                    f"Failed to load dataset {dataset_type} from {base_dir}: {e}"
+                    f"Failed to load dataset {dataset_category} from {base_dir}: {e}"
                 )
                 continue
 
-            df = df.head(min(30, len(df)))  # For debugging, remove in production
+            df = df.head(min(1, len(df)))  # For debugging, remove in production
             if "id" in df.columns:
                 df.rename(columns={"id": "filename"}, inplace=True)
             logger.info(f"Dataset snapshot:\n{df.head()}")
@@ -534,15 +564,15 @@ class ParaphrasingEvaluator:
             )
             length_differences = {}
 
-            for model_name, paraphraser in models.items():
+            for paraphraser_name, paraphraser in models.items():
                 logger.info(
-                    f"Evaluating model '{model_name}' on {dataset_type} dataset..."
+                    f"Evaluating model '{paraphraser_name}' on {dataset_category} dataset..."
                 )
                 detailed_result_df, summary_df, lengths = self._evaluate_model_on_data(
-                    model_name, paraphraser, df
+                    paraphraser_name, paraphraser, df
                 )
                 print(
-                    f"[DEBUG] Detailed results for {model_name}:\n{detailed_result_df.head()}"
+                    f"[DEBUG] Detailed results for {paraphraser_name}:\n{detailed_result_df.head()}"
                 )
 
                 # Calculate length differences as percentages
@@ -550,52 +580,58 @@ class ParaphrasingEvaluator:
                     ((p - o) / o) * 100 if o > 0 else 0
                     for o, p in zip(lengths["original"], lengths["paraphrase"])
                 ]
-                length_differences[model_name] = percent_diffs
+                length_differences[paraphraser_name] = percent_diffs
 
                 for key in ["genre_match", "time_match", "topic_match", "total"]:
-                    aggregate_results[model_name][key] += summary_df.get(key, 0)
+                    aggregate_results[paraphraser_name][key] += summary_df.get(key, 0)
 
             # Reporting results
-            logger.info(f"\n[RESULTS for {dataset_type} dataset]")
-            for model_name, metrics in aggregate_results.items():
+            logger.info(f"\n[RESULTS for {dataset_category} dataset]")
+            for paraphraser_name, metrics in aggregate_results.items():
                 total = metrics["total"]
                 if total == 0:
                     logger.warning(
-                        f"No evaluation data for model '{model_name}' on dataset '{dataset_type}'."
+                        f"No evaluation data for model '{paraphraser_name}' on dataset '{dataset_category}'."
                     )
                     continue
                 for key in ["genre_match", "time_match", "topic_match"]:
-                    aggregate_results[model_name][key] = round(metrics[key] / total, 2)
-                aggregate_results[model_name]["length_diff"] = round(
-                    np.mean(length_differences[model_name]), 2
+                    aggregate_results[paraphraser_name][key] = round(
+                        metrics[key] / total, 2
+                    )
+                aggregate_results[paraphraser_name]["length_diff"] = round(
+                    np.mean(length_differences[paraphraser_name]), 2
                 )
 
-                logger.info(f"Model: {model_name}")
+                logger.info(f"Model: {paraphraser_name}")
                 logger.info(
-                    f"  Genre Accuracy: {aggregate_results[model_name]['genre_match']}"
+                    f"  Genre Accuracy: {aggregate_results[paraphraser_name]['genre_match']}"
                 )
                 logger.info(
-                    f"  Time Accuracy (approx): {aggregate_results[model_name]['time_match']}"
+                    f"  Time Accuracy (approx): {aggregate_results[paraphraser_name]['time_match']}"
                 )
                 logger.info(
-                    f"  Topic Accuracy (approx): {aggregate_results[model_name]['topic_match']}"
+                    f"  Topic Accuracy (approx): {aggregate_results[paraphraser_name]['topic_match']}"
                 )
                 logger.info(
-                    f"  Length Difference (mean): {aggregate_results[model_name]['length_diff']}%"
+                    f"  Length Difference (mean): {aggregate_results[paraphraser_name]['length_diff']}%"
                 )
 
             # Save results if requested
             if save_to_disk:
-                save_base_path = (
-                    Path(__file__).resolve().parents[1]
-                    / self.config["save_path"]  # eventually 2 instead of 1
+                save_base_path = self.paraphrases_save_base_path
+                detailed_detail_degree = "detailed"
+                self._save_results(
+                    detailed_result_df,
+                    dataset_category,
+                    save_base_path,
+                    detail_degree=detailed_detail_degree,
                 )
-                if not "paraphrasing" in str(save_base_path):
-                    save_base_path = save_base_path / "paraphrasing"
-                if detailed:
-                    self._save_results(detailed_result_df, dataset_type, save_base_path)
-                else:
-                    self._save_results(aggregate_results, dataset_type, save_base_path)
+                self._save_results(
+                    aggregate_results,
+                    dataset_category,
+                    save_base_path,
+                    detail_degree="aggregated",
+                )
                 print("Saved results to ", save_base_path)
 
         # Plot KDEs for each metric per dataset
@@ -604,7 +640,8 @@ class ParaphrasingEvaluator:
             print("Read results from disk for plotting from ", save_base_path)
             for dataset in self.base_dirs.keys():
                 df = pd.read_csv(
-                    save_base_path / f"extractor_eval_results_{dataset}.csv"
+                    save_base_path
+                    / f"extractor_eval_results_{dataset}_detailDeg_{detailed_detail_degree}.csv"
                 )
                 df["length_diff"] = [
                     ((p - o) / o) if o > 0 else 0
@@ -623,12 +660,20 @@ class ParaphrasingEvaluator:
                 save_path=save_base_path,
             )
 
-    def _save_results(self, results: dict, dataset_type: str, save_base_path: Path):
+    def _save_results(
+        self,
+        results: dict,
+        dataset_type: str,
+        save_base_path: Path,
+        detail_degree: str = "detailed",
+    ):
         if not save_base_path.exists():
             raise FileNotFoundError(f"Save path {save_base_path} does not exist.")
-        save_base_path.mkdir(parents=True, exist_ok=True)
 
-        save_path = save_base_path / f"extractor_eval_results_{dataset_type}.csv"
+        save_path = (
+            save_base_path
+            / f"extractor_eval_results_{dataset_type}_detailDeg_{detail_degree}.csv"
+        )
         if not isinstance(results, pd.DataFrame):
             results = pd.DataFrame.from_dict(results, orient="index")
         results.to_csv(save_path)
@@ -1022,9 +1067,9 @@ class ParaphrasingEvaluator:
             for i, label in enumerate(grouped_mean.index)
         }
 
-        for model_name in grouped_mean.index:
-            mean_values = grouped_mean.loc[model_name].tolist()
-            std_values = grouped_std.loc[model_name].tolist()
+        for paraphraser_name in grouped_mean.index:
+            mean_values = grouped_mean.loc[paraphraser_name].tolist()
+            std_values = grouped_std.loc[paraphraser_name].tolist()
 
             # Close the loop
             mean_values += mean_values[:1]
@@ -1036,12 +1081,12 @@ class ParaphrasingEvaluator:
             ax.plot(
                 angles,
                 mean_values,
-                label=self._wrap_label(model_name),
+                label=self._wrap_label(paraphraser_name),
                 alpha=0.7,
-                color=label_to_color[model_name],
+                color=label_to_color[paraphraser_name],
             )
             ax.fill_between(
-                angles, lower, upper, color=label_to_color[model_name], alpha=0.2
+                angles, lower, upper, color=label_to_color[paraphraser_name], alpha=0.2
             )
 
         # Add labels to axes
@@ -1427,10 +1472,6 @@ if __name__ == "__main__":
         n_responses=n_responses,
         max_length=max_length,
         temperature=temperature,
-        config={
-            "save_path": Path(__file__).resolve().parent.parent.parent
-            / CONFIG.SAVE_PATH
-        },
     )
     print("Starting evaluation of paraphrasers...")
     evaluator.evaluate_extractors(save_to_disk=True)
