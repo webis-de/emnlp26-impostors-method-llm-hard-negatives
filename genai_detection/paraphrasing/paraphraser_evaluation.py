@@ -138,6 +138,9 @@ class ParaphrasingEvaluator:
                     "sentence-transformers/all-MiniLM-L6-v2"  # , device=device    # TODO: for server?
                 )  # for cosine similarity
             except Exception as e:
+                raise RuntimeError(
+                    "Failed to load SentenceTransformer model: {e}"
+                ) from e
                 print(
                     "Failed to load SentenceTransformer model. Setting it to None. with error:",
                     e,
