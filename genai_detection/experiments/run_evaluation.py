@@ -28,10 +28,7 @@ N_RESPONSES = 1
 MAX_LENGTH = 512
 TEMPERATURE = 0.7
 PROMPTS = [
-    "Paraphrase the text above and output only the paraphrased version.",
-    "For the text above: First, extract bullet points capturing the main ideas, then create a text based on these bullet points. Only output the final text (i.e. do not output the bullet points or any additional chain of thoughts).",
     "For the text above: Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
-    "For the text above: Paraphrase the sentence using the same tone as the original with approximately the same number of words.",
     "For the text above: Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence.",
 ]
 
@@ -102,6 +99,7 @@ def evaluate_category(data_category, data_root, save_path):
         df, extremest = evaluator.evaluate(
             save_extremest_paraphr_per_score=True, save_to_disk=True
         )
+        print(f"Evaluation complete for {data_category} with {len(df)} paraphrases")
 
         print("Starting plotting for", data_category)
         for group in ["model", "prompt"]:
@@ -122,10 +120,10 @@ def evaluate_category(data_category, data_root, save_path):
                 f"Plot metric distributions for {data_category} by {group}: distributions plotted"
             )
 
-        return f"Completed: {data_category}"
+        return {data_category: df}
 
     except Exception as e:
-        return f"Failed: {data_category} due to {e}"
+        return {data_category: pd.DataFrame()}
 
 
 def run_extraction_evaluation(save_path):
@@ -168,7 +166,7 @@ def run_evaluation():
             print(result)
             results.append(result)
 
-    run_extraction_evaluation(save_path)
+    # run_extraction_evaluation(save_path)
 
     return results
 
