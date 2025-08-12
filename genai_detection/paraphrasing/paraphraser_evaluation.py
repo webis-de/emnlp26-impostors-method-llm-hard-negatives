@@ -1250,7 +1250,7 @@ class ParaphrasingEvaluator:
 
         unique_labels = data[group_by].unique()
         max_words_in_label = max(len(str(label).split()) for label in unique_labels)
-        use_shared_legend = max_words_in_label > 3
+        use_shared_legend = max_words_in_label > 3 or len(unique_labels) > 5
         palette = sns.color_palette("tab20", n_colors=len(unique_labels))
         label_to_color = {
             label: palette[i % len(palette)] for i, label in enumerate(unique_labels)
