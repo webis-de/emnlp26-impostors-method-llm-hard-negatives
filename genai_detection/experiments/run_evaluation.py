@@ -144,6 +144,7 @@ def run_extraction_evaluation():
         n_responses=3,
         max_length=MAX_LENGTH,
         temperature=TEMPERATURE,
+        data_category="cross genre",
     )
     print("Starting extraction evaluation")
     evaluator.evaluate_extractors(save_to_disk=True, display_plot=False)
