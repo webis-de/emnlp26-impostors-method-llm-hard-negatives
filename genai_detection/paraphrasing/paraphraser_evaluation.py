@@ -1046,7 +1046,7 @@ class ParaphrasingEvaluator:
         # Add legend and title
         ax.legend(loc="lower left", bbox_to_anchor=(1.1, 0.7), fontsize=9)
         title = (
-            f"Radar Chart: Paraphrasing Metric\non {data_category.capitalize()} Dataset, grouped by {group_by.capitalize()}"
+            f"Radar Chart: Paraphrasing Metric\non {' '.join(word.capitalize() for word in data_category.split())} Dataset, grouped by {group_by.capitalize()}"
             if data_category
             else f"Radar Chart: Paraphrasing Metrics\ngrouped by {group_by.capitalize()}"
         )
@@ -1128,7 +1128,7 @@ class ParaphrasingEvaluator:
         ax.set_xlabel("Semantic Similarity (sem_sim_avg)")
         ax.set_ylabel("Syntactic Similarity (syn_sim_avg)")
         title = (
-            f"Semantic vs Syntactic Similarity\non {data_category.capitalize()} Dataset, grouped by {group_by.capitalize()}"
+            f"Semantic vs Syntactic Similarity\non {' '.join(word.capitalize() for word in data_category.split())} Dataset, grouped by {group_by.capitalize()}"
             if data_category
             else f"Semantic vs Syntactic Similarity\ngrouped by {group_by.capitalize()}"
         )
@@ -1350,7 +1350,7 @@ class ParaphrasingEvaluator:
         for j in range(i + 1, len(axes)):
             fig.delaxes(axes[j])
         title = (
-            f"Metric Distributions\non {data_category.capitalize()} Dataset, grouped by {group_by.capitalize()}"
+            f"Metric Distributions\non {' '.join(word.capitalize() for word in data_category.split())} Dataset, grouped by {group_by.capitalize()}"
             if data_category
             else f"Metric Distributions\ngrouped by {group_by.capitalize()}"
         )
