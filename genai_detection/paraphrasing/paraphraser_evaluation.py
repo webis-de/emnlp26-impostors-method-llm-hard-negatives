@@ -505,7 +505,7 @@ class ParaphrasingEvaluator:
             save_path = Path(save_path)
             save_path.mkdir(parents=True, exist_ok=True)
             for format in ["svg"]:
-                out = save_path / f"radar_metric_dists.{format}"
+                out = save_path / f"radar_extraction_quality_per_dataset.{format}"
                 fig.savefig(out, bbox_inches="tight", transparent=True, format=format)
                 print(f"Saved radar plot to {out}")
 
