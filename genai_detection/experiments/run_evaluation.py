@@ -108,13 +108,13 @@ def evaluate_category(data_category, data_root):
 
     print("Starting plotting for", data_category)
     for group in ["model", "prompt"]:
-        evaluator.plot_models_metrics(
-            df, data_category, group_by=group, display_plot=False
-        )
-        print(f"Plot metrics for {data_category} by {group}: metrics plotted")
-        evaluator.plot_metric_scatter(
-            df, data_category, group_by=group, display_plot=False
-        )
+        # evaluator.plot_models_metrics(
+        #     df, data_category, group_by=group, display_plot=False
+        # )
+        # print(f"Plot metrics for {data_category} by {group}: metrics plotted")
+        # evaluator.plot_metric_scatter(
+        #     df, data_category, group_by=group, display_plot=False
+        # )
         print(f"Plot metric scatter for {data_category} by {group}: scatter plotted")
         evaluator.plot_metric_distributions(
             df, data_category, group_by=group, display_plot=False
