@@ -740,6 +740,8 @@ class ParaphrasingEvaluator:
         paraphrases_save_base_path = (
             Path(__file__).resolve().parent.parent.parent
             / CONFIG.SAVE_PATH
+            / "paraphrasing"
+            / "experiments"
             / "paraphrase_evaluation"
             / self.data_category
         )
