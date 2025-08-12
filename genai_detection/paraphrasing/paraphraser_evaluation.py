@@ -366,23 +366,24 @@ class ParaphrasingEvaluator:
                     text=text, temperature=self.temperature
                 )
 
-            if (
-                paraphrases
-                and isinstance(paraphrases, (list, tuple))
-                and len(paraphrases) > 0
-            ):
-                # save generated paraphrases to file
-                data_loaded.setdefault(paraphraser_name, {})
-                data_loaded[paraphraser_name].setdefault(self.original_text, {})
-                data_loaded[paraphraser_name][self.original_text].setdefault(None, {})
-                data_loaded[paraphraser_name][self.original_text][None][
-                    self.temperature
-                ] = paraphrases
-                with open(file_existing_paraphrases, "w") as f:
-                    json.dump(data_loaded, f, indent=4)
-                paraphrase_len = np.average([len(p.split()) for p in paraphrases])
-            else:
-                paraphrase_len = 0
+                if (
+                    paraphrases
+                    and isinstance(paraphrases, (list, tuple))
+                    and len(paraphrases) > 0
+                ):
+                    # save generated paraphrases to file
+                    data_loaded.setdefault(paraphraser_name, {})
+                    data_loaded[paraphraser_name].setdefault(self.original_text, {})
+                    data_loaded[paraphraser_name][self.original_text].setdefault(
+                        None, {}
+                    )
+                    data_loaded[paraphraser_name][self.original_text][None][
+                        self.temperature
+                    ] = paraphrases
+                    with open(file_existing_paraphrases, "w") as f:
+                        json.dump(data_loaded, f, indent=4)
+
+            paraphrase_len = np.average([len(p.split()) for p in paraphrases])
 
             orig_len = len(text.split())
             lengths["original"].append(orig_len)
@@ -537,7 +538,7 @@ class ParaphrasingEvaluator:
                 )
                 continue
 
-            df = df.head(min(1, len(df)))  # For debugging, remove in production
+            df = df.head(min(1, len(df)))  # TODO: For debugging, remove in production
             if "id" in df.columns:
                 df.rename(columns={"id": "filename"}, inplace=True)
             logger.info(f"Dataset snapshot:\n{df.head()}")
