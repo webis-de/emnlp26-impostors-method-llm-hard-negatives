@@ -1291,34 +1291,16 @@ class ParaphrasingEvaluator:
                 f"No data points found for metric '{metric}' in group '{group_by}'."
             )
 
-            # KDE for groups with multiple points
-            models_multi = counts[counts > 1].index
-            if len(models_multi) > 0:
-                sns.kdeplot(
-                    data=data[data[group_by].isin(models_multi)],
-                    x=metric,
-                    hue=group_by,
-                    fill=True,
-                    common_norm=False,
-                    alpha=0.4,
-                    palette=label_to_color,
-                    legend="full",
-                )
-
-            # Scatter for groups with a single point
-            models_single = counts[counts == 1].index
-            if len(models_single) > 0:
-                sns.scatterplot(
-                    data=data[data[group_by].isin(models_single)],
-                    x=metric,
-                    y=[1] * len(models_single),  # constant y for all single points
-                    hue=group_by,
-                    palette=label_to_color,
-                    legend="full",
-                    s=50,
-                    edgecolor="k",
-                    zorder=5,
-                )
+            sns.kdeplot(
+                data=data,
+                x=metric,
+                hue=group_by,
+                fill=True,
+                common_norm=False,
+                alpha=0.4,
+                palette=label_to_color,
+                legend="full",
+            )
 
             metric_for_tile = " ".join([t.capitalize() for t in metric.split("_")])
             plt.title(f"Distribution of {metric_for_tile}")
@@ -1350,7 +1332,13 @@ class ParaphrasingEvaluator:
                 str(data_category).replace(" ", "_") if data_category else "dataset"
             )
             file_name = f"{safe_category}_{safe_metric}_grouped_by_{group_by}.svg"
-            full_path = self.paraphrases_save_base_path / file_name
+            path2dir = (
+                self.paraphrases_save_base_path
+                / "metric_distributions"
+                / "distribution_per_metric"
+            )
+            path2dir.mkdir(parents=True, exist_ok=True)
+            full_path = path2dir / file_name
             plt.savefig(full_path, bbox_inches="tight", transparent=True, format="svg")
             print(f"Plot saved to {full_path}")
 
