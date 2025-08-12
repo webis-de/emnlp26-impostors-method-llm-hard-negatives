@@ -126,7 +126,7 @@ def evaluate_category(data_category, data_root):
     return {data_category: df}
 
 
-def run_extraction_evaluation(save_path):
+def run_extraction_evaluation():
     model = SAIAParaphraser()
     paraphrasers = {
         "TopicParaphraser": TopicParaphraser(model, model),
@@ -144,7 +144,6 @@ def run_extraction_evaluation(save_path):
         n_responses=3,
         max_length=MAX_LENGTH,
         temperature=TEMPERATURE,
-        config={"save_path": save_path},
     )
     print("Starting extraction evaluation")
     evaluator.evaluate_extractors(save_to_disk=True, display_plot=False)
@@ -153,7 +152,7 @@ def run_extraction_evaluation(save_path):
 
 def run_evaluation():
     data_root, save_path = get_base_paths()
-    print(f"Data root: {data_root}, Save path: {save_path}")
+    print(f"Data root: {data_root}")
     results = []
 
     with ThreadPoolExecutor() as executor:
@@ -166,7 +165,7 @@ def run_evaluation():
             print("Result:", result)
             results.append(result)
 
-    # run_extraction_evaluation(save_path)
+    run_extraction_evaluation()
 
     return results
 
