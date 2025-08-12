@@ -1451,45 +1451,45 @@ class ParaphrasingEvaluator:
             ax.set_xlabel(metric_for_tile)
             ax.set_ylabel("Density")
 
-        if use_shared_legend:
-            legend_patches = [
-                mpatches.Patch(color=color, label=self._wrap_label(label))
-                for label, color in label_to_color.items()
-            ]
-            fig.legend(
-                handles=legend_patches,
-                loc="upper left",
-                bbox_to_anchor=(1.01, 1),  # outside the plot on right
-                title=group_by.capitalize(),
-                frameon=True,
-                borderaxespad=0,
-                fontsize=10,
-                title_fontsize=12,
-            )
-        else:
-            present_models = counts[counts > 0].index  # all that appear for this metric
-            handles = []
-            labels = []
-            for model in present_models:
-                color = label_to_color[model]
-                if model in models_multi:
-                    # Proxy patch representing KDE fill
-                    h = mpatches.Patch(facecolor=color, alpha=0.4, edgecolor="none")
-                else:
-                    # Proxy marker representing singleton scatter
-                    h = mlines.Line2D(
-                        [],
-                        [],
-                        marker="o",
-                        linestyle="none",
-                        markerfacecolor=color,
-                        markeredgecolor="k",
-                        markersize=6,
-                    )
-                handles.append(h)
-                labels.append(model)
-            for ax in axes:
-                ax.legend(handles, labels, title=group_by.capitalize(), loc="best")
+        # if use_shared_legend:
+        legend_patches = [
+            mpatches.Patch(color=color, label=self._wrap_label(label))
+            for label, color in label_to_color.items()
+        ]
+        fig.legend(
+            handles=legend_patches,
+            loc="upper left",
+            bbox_to_anchor=(1.01, 1),  # outside the plot on right
+            title=group_by.capitalize(),
+            frameon=True,
+            borderaxespad=0,
+            fontsize=10,
+            title_fontsize=12,
+        )
+        # else:
+        # present_models = counts[counts > 0].index  # all that appear for this metric
+        # handles = []
+        # labels = []
+        # for model in present_models:
+        #     color = label_to_color[model]
+        #     if model in models_multi:
+        #         # Proxy patch representing KDE fill
+        #         h = mpatches.Patch(facecolor=color, alpha=0.4, edgecolor="none")
+        #     else:
+        #         # Proxy marker representing singleton scatter
+        #         h = mlines.Line2D(
+        #             [],
+        #             [],
+        #             marker="o",
+        #             linestyle="none",
+        #             markerfacecolor=color,
+        #             markeredgecolor="k",
+        #             markersize=6,
+        #         )
+        #     handles.append(h)
+        #     labels.append(model)
+        # for ax in axes:
+        #     ax.legend(handles, labels, title=group_by.capitalize(), loc="best")
 
         # Remove unused axes
         for j in range(i + 1, len(axes)):
