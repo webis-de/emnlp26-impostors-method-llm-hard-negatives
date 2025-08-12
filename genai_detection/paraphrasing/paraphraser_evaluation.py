@@ -172,6 +172,15 @@ class ParaphrasingEvaluator:
         }
         self.ground_truth = ground_truth or {}
         self.data_category = data_category or "unknown"
+        self.paraphrases_save_base_path = (
+            Path(__file__).resolve().parent.parent.parent
+            / CONFIG.SAVE_PATH
+            / "paraphrasing"
+            / "experiments"
+            / "paraphrase_evaluation"
+            / self.data_category
+        )
+        self.paraphrases_save_base_path.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
     def _degree_of_similarity(a: str, b: str) -> float:
@@ -737,15 +746,6 @@ class ParaphrasingEvaluator:
         results = []
         references = [self.original_text] * self.n_responses
         original_split = self.original_text.split()
-        paraphrases_save_base_path = (
-            Path(__file__).resolve().parent.parent.parent
-            / CONFIG.SAVE_PATH
-            / "paraphrasing"
-            / "experiments"
-            / "paraphrase_evaluation"
-            / self.data_category
-        )
-        paraphrases_save_base_path.mkdir(parents=True, exist_ok=True)
 
         # Non-naive paraphrasers take the same prompt, but are called with different temperatures to introduce variance
         temperatures = list(np.linspace(0, 1, max(2, len(self.prompts)), endpoint=True))
@@ -781,14 +781,14 @@ class ParaphrasingEvaluator:
         )
         results = []
         # load json object with existing paraphrases if available and append new ones
-        paraphrase_file_path = paraphrases_save_base_path / "paraphrases.json"
+        paraphrase_file_path = self.paraphrases_save_base_path / "paraphrases.json"
         for (paraphraser_name, paraphraser), prompt, temperature, prompt_id in tqdm(
             test_configurations,
             desc="Evaluating Paraphrasers",
             total=len(test_configurations),
         ):
             # path2file = (
-            #     paraphrases_save_base_path
+            #     self.paraphrases_save_base_path
             #     / f"{name}_paraphrases_temp{temperature}_prompt{prompt_id}_{self.original_file_name}.csv"
             # )
             try:
@@ -833,7 +833,7 @@ class ParaphrasingEvaluator:
         df.dropna(axis=1, how="all", inplace=True)
         if save_to_disk:
             save_path = (
-                paraphrases_save_base_path
+                self.paraphrases_save_base_path
                 / f"paraphrasing_results_comparison_temp{self.temperature}_maxLength{self.max_length}_dataset_{self.data_category}.csv"
             )
             df.to_csv(save_path, index=False, float_format="%.4f")
@@ -863,7 +863,7 @@ class ParaphrasingEvaluator:
             )
         if save_extremest_paraphr_per_score:
             worst_save_path = (
-                paraphrases_save_base_path
+                self.paraphrases_save_base_path
                 / f"extremest_paraphrases_per_metric_temp{self.temperature}_maxLength{self.max_length}_dataset_{self.data_category}.csv"
             )
             extremest_paraphrases.to_csv(worst_save_path, index=False)
@@ -991,7 +991,6 @@ class ParaphrasingEvaluator:
     def plot_models_metrics(
         self,
         df: pd.DataFrame,
-        save_path: Optional[Path] = None,
         data_category: Optional[str] = None,
         group_by: Optional[str] = "model",
         display_plot: bool = True,
@@ -1001,13 +1000,12 @@ class ParaphrasingEvaluator:
 
         :param df: DataFrame containing the evaluation results.
         :param metric_name: The name of the metric to plot.
-        :param save_path: Optional path to save the plot (without filename). If None, the plot will not be saved.
         :param data_category: Optional category of the data, used for the plot title.
         :param group_by: The column to group the data by (default is 'model'). Alternatives could be 'prompt'.
         :param display_plot: Whether to display the plot (default is True).
         :return: A list of matplotlib figures.
         """
-        save_path = save_path / "radar_charts"
+        save_path = self.paraphrases_save_base_path / "radar_charts"
         save_path.mkdir(parents=True, exist_ok=True)
         # Enforce fixed metric order
         all_labels = self.get_metric_names()
@@ -1084,7 +1082,6 @@ class ParaphrasingEvaluator:
     def plot_metric_scatter(
         self,
         df: pd.DataFrame,
-        save_path: Optional[Path] = None,
         data_category: Optional[str] = None,
         group_by: Optional[str] = "model",
         display_plot: bool = True,
@@ -1093,13 +1090,12 @@ class ParaphrasingEvaluator:
         Scatter plot of semantic similarity vs syntactic similarity per model.
 
         :param df: DataFrame with at least 'sem_sim_avg', 'syn_sim_avg', and 'model' columns.
-        :param save_path: Optional path to save the plot. If None, the plot is not saved.
         :param data_category: Optional category of the data, used for the plot title.
         :param group_by: The column to group the data by (default is 'model'). Alternatives could be 'prompt'.
         :param display_plot: Whether to display the plot (default is True).
         :return: matplotlib Figure object.
         """
-        save_path = save_path / "metric_scatter"
+        save_path = self.paraphrases_save_base_path / "metric_scatter"
         save_path.mkdir(parents=True, exist_ok=True)
         if group_by == "model" and "Paraphraser" not in df.columns:
             data = df.rename(columns={group_by: "Paraphraser"}, inplace=False)
@@ -1227,7 +1223,6 @@ class ParaphrasingEvaluator:
     def plot_metric_distributions(
         self,
         df: pd.DataFrame,
-        save_path: Optional[Path] = None,
         data_category: Optional[str] = None,
         group_by: Optional[str] = "model",
         display_plot: bool = True,
@@ -1236,13 +1231,12 @@ class ParaphrasingEvaluator:
         Plot distribution of each metric per model in subplots.
 
         :param df: DataFrame containing metric scores and a 'model' column.
-        :param save_path: Optional path to save the plot. If None, the plot is not saved.
         :param data_category: Optional string for plot title context.
         :param group_by: The column to group the data by (default is 'model'). Alternatives could be 'prompt'.
         :param display_plot: Whether to display the plot (default is True).
         :return: None
         """
-        save_path = save_path / "metric_distributions"
+        save_path = self.paraphrases_save_base_path / "metric_distributions"
         save_path.mkdir(parents=True, exist_ok=True)
         metric_names = [
             metric for metric in self.get_metric_names() if metric in df.columns
