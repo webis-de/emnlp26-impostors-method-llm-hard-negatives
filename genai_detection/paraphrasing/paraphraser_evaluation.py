@@ -545,7 +545,7 @@ class ParaphrasingEvaluator:
                 )
                 continue
 
-            df = df.head(min(1, len(df)))  # TODO: For debugging, remove in production
+            df = df.head(min(2, len(df)))  # TODO: For debugging, remove in production
             if "id" in df.columns:
                 df.rename(columns={"id": "filename"}, inplace=True)
             logger.info(f"Dataset snapshot:\n{df.head()}")
