@@ -324,6 +324,8 @@ class ParaphrasingEvaluator:
                 or "now" in str(century).lower()
             ):
                 century = 21
+            else:
+                century = self._get_century(century)
             gt_genre = getattr(row, "genre", "").lower() or ""
             gt_century = getattr(row, "century", 0) or 0
             gt_topic = getattr(row, "topic", "") or ""
@@ -358,6 +360,7 @@ class ParaphrasingEvaluator:
                 print(
                     f"Paraphraser {paraphraser_name} not found in loaded data for {self.original_text}:\n{e}.\nGenerating new paraphrase."
                 )
+                raise Exception(f"Should all be present, but not found: {e}") from e
 
                 paraphrases = paraphraser.paraphrase(
                     text=text, temperature=self.temperature
@@ -418,7 +421,7 @@ class ParaphrasingEvaluator:
 
         return results_df, summary, lengths
 
-    def plot_metric_hists_per_dataset(
+    def plot_metric_radar_per_dataset(
         self,
         df_all: pd.DataFrame,
         metrics: list[str],
@@ -426,89 +429,76 @@ class ParaphrasingEvaluator:
         dataset_col: str = "dataset",
         display_plot: bool = True,
     ):
-        # Filter valid metrics
         metrics = [
             m
             for m in metrics
             if m in df_all.columns and pd.api.types.is_numeric_dtype(df_all[m])
         ]
         assert metrics, "No numeric metrics found to plot."
+        grouped_mean = df_all.groupby(dataset_col)[metrics].mean()
+        grouped_std = df_all.groupby(dataset_col)[metrics].std()
 
-        unique_labels = pd.unique(df_all[dataset_col])
-        palette = sns.color_palette("tab20", n_colors=len(unique_labels))
+        # Compute angle of each axis
+        angles = np.linspace(0, 2 * np.pi, len(metrics), endpoint=False).tolist()
+        # Complete the loop
+        angles += angles[:1]
+
+        # Start plot
+        fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
+
+        unique_labels = grouped_mean.index
+        palette = sns.color_palette(
+            "tab20" if len(unique_labels) > 10 else "tab10", n_colors=len(unique_labels)
+        )
         label_to_color = {
-            lbl: palette[i % len(palette)] for i, lbl in enumerate(unique_labels)
+            label: palette[i % len(palette)] for i, label in enumerate(unique_labels)
         }
 
-        n = len(metrics)
-        n_cols = 2
-        n_rows = int(np.ceil(n / n_cols))
+        # groupby paraphraser model or prompt
+        for groupby_value in unique_labels:
+            mean_values = grouped_mean.loc[groupby_value].tolist()
+            std_values = grouped_std.loc[groupby_value].tolist()
 
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=(6 * n_cols, 4 * n_rows))
-        axes = axes.flatten()
+            # Close the loop
+            mean_values += mean_values[:1]
+            std_values += std_values[:1]
 
-        for i, metric in enumerate(metrics):
-            ax = axes[i]
-            sub_df = df_all[[dataset_col, metric]].dropna()
+            lower = np.maximum(0, np.array(mean_values) - np.array(std_values))
+            upper = np.minimum(1, np.array(mean_values) + np.array(std_values))
 
-            # KDE per dataset
-            # sns.kdeplot(
-            #     data=sub_df,
-            #     x=metric,
-            #     hue=dataset_col,
-            #     fill=True,
-            #     common_norm=False,
-            #     alpha=0.4,
-            #     palette=label_to_color,
-            #     ax=ax,
-            #     legend=False,
-            # )
-            sns.histplot(
-                data=sub_df,
-                x=metric,
-                hue=dataset_col,
-                multiple="dodge",  # side-by-side bars
-                palette=label_to_color,
+            ax.plot(
+                angles,
+                mean_values,
+                label=self._wrap_label(groupby_value),
                 alpha=0.7,
-                ax=ax,
-                legend=False,
+                color=label_to_color[groupby_value],
             )
-            if metric != "length_diff":
-                ax.set_xlim(0, 1)
-            else:
-                ax.set_xlim(sub_df[metric].min(), sub_df[metric].max())
+            ax.fill_between(
+                angles, lower, upper, color=label_to_color[groupby_value], alpha=0.2
+            )
 
-            ax.set_title(metric)
-            ax.set_xlabel(metric)
-            ax.set_ylabel("Count")
+        # Add labels to axes
+        ax.set_xticks(angles[:-1])
+        ax.set_xticklabels(metrics, fontsize=10)
+        ax.tick_params(axis="y", labelsize=8)
 
-        legend_patches = [
-            mpatches.Patch(color=color, label=self._wrap_label(label))
-            for label, color in label_to_color.items()
-        ]
-        fig.legend(
-            handles=legend_patches,
-            loc="upper left",
-            bbox_to_anchor=(1.02, 1),  # outside the plot on right
-            title="Dataset",
-            frameon=True,
-            borderaxespad=0,
+        # Add legend and title
+        ax.legend(
+            loc="lower left",
+            bbox_to_anchor=(1.1, 0.7),
             fontsize=10,
-            title_fontsize=12,
+            title=dataset_col.capitalize(),
         )
-        for j in range(i + 1, len(axes)):
-            fig.delaxes(axes[j])
 
-        title = "Histogram of Metric Distributions by Dataset"
+        title = "Radar plot of Metric Distributions by Dataset"
         fig.suptitle(title, fontsize=16)
         plt.tight_layout(rect=[0, 0, 1, 0.95])
 
         if save_path:
             save_path = Path(save_path)
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path.mkdir(parents=True, exist_ok=True)
-            for format in ["png", "svg"]:
-                out = save_path / f"hist_metric_dists_{timestamp}.{format}"
+            for format in ["svg"]:
+                out = save_path / f"hist_metric_dists.{format}"
                 fig.savefig(out, bbox_inches="tight", transparent=True, format=format)
                 print(f"Saved Histogram grid to {out}")
 
@@ -520,8 +510,7 @@ class ParaphrasingEvaluator:
     def evaluate_extractors(
         self,
         save_to_disk: bool = True,
-        detailed: bool = True,
-        plot_kdes: bool = True,
+        plot_metrics: bool = True,
         display_plot: bool = True,
     ):
         """
@@ -635,7 +624,7 @@ class ParaphrasingEvaluator:
                 print("Saved results to ", save_base_path)
 
         # Plot KDEs for each metric per dataset
-        if plot_kdes:
+        if plot_metrics:
             dfs = {}
             print("Read results from disk for plotting from ", save_base_path)
             for dataset in self.base_dirs.keys():
@@ -653,7 +642,7 @@ class ParaphrasingEvaluator:
 
             # Long / tidy combined DataFrame
             df_all = pd.concat(dfs.values(), ignore_index=True)
-            self.plot_metric_hists_per_dataset(
+            self.plot_metric_radar_per_dataset(
                 df_all=df_all,
                 metrics=["genre_match", "time_match", "topic_match", "length_diff"],
                 display_plot=display_plot,
