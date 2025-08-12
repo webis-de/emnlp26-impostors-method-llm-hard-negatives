@@ -1258,11 +1258,14 @@ class ParaphrasingEvaluator:
 
         for i, metric in enumerate(metric_names):
             ax = axes[i]
-            if metric not in data.columns:
-                continue
 
             # Find models with only one data point for this metric
             counts = data.groupby(group_by)[metric].count()
+            assert (
+                counts != 0
+            ).any(), (
+                f"No data points found for metric '{metric}' in group '{group_by}'."
+            )
 
             # Models with multiple entries (for KDE)
             models_multi = counts[counts > 1].index
