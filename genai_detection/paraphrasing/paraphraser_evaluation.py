@@ -127,9 +127,6 @@ class ParaphrasingEvaluator:
             if torch.cuda.is_available()
             else ("mps" if torch.backends.mps.is_available() else "cpu")
         )
-        print(f"Using device: {device}")
-        # FIXME: NotImplementedError: Cannot copy out of meta tensor; no data! Please use torch.nn.Module.to_empty() instead of torch.nn.Module.to() when moving module from meta to a different device.
-
         tries = 0
         self.sbert_model = None
         while not self.sbert_model and tries < 10:
@@ -1019,6 +1016,12 @@ class ParaphrasingEvaluator:
         # Start plot
         fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
 
+        palette = sns.color_palette("tab20", n_colors=len(grouped_mean.index))
+        label_to_color = {
+            label: palette[i % len(palette)]
+            for i, label in enumerate(grouped_mean.index)
+        }
+
         for model_name in grouped_mean.index:
             mean_values = grouped_mean.loc[model_name].tolist()
             std_values = grouped_std.loc[model_name].tolist()
@@ -1030,9 +1033,15 @@ class ParaphrasingEvaluator:
             lower = np.maximum(0, np.array(mean_values) - np.array(std_values))
             upper = np.minimum(1, np.array(mean_values) + np.array(std_values))
 
-            ax.plot(angles, mean_values, label=self._wrap_label(model_name))
+            ax.plot(
+                angles,
+                mean_values,
+                label=self._wrap_label(model_name),
+                alpha=0.7,
+                color=label_to_color[model_name],
+            )
             ax.fill_between(
-                angles, lower, upper, color=ax.get_lines()[-1].get_color(), alpha=0.2
+                angles, lower, upper, color=label_to_color[model_name], alpha=0.2
             )
 
         # Add labels to axes
@@ -1046,9 +1055,9 @@ class ParaphrasingEvaluator:
         # Add legend and title
         ax.legend(loc="lower left", bbox_to_anchor=(1.1, 0.7), fontsize=9)
         title = (
-            f"Radar Chart: Paraphrasing Metric\non {' '.join(word.capitalize() for word in data_category.split())} Dataset, grouped by {group_by.capitalize()}"
+            f"Radar Chart of Paraphrasing Metrics\non {' '.join(word.capitalize() for word in data_category.split())} Dataset, grouped by {group_by.capitalize()}"
             if data_category
-            else f"Radar Chart: Paraphrasing Metrics\ngrouped by {group_by.capitalize()}"
+            else f"Radar Chart of Paraphrasing Metrics\ngrouped by {group_by.capitalize()}"
         )
         plt.title(title, fontsize=12)
         plt.tight_layout()
