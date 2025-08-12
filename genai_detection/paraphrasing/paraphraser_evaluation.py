@@ -1116,7 +1116,7 @@ class ParaphrasingEvaluator:
             for format in ["svg"]:
                 file_name = (
                     save_path
-                    / f"{data_category}_paraphrasing_metrics_grouped_by_{group_by}_radar_chart.{format}"
+                    / f"{data_category.replace(' ','_')}_paraphrasing_metrics_grouped_by_{group_by}_radar_chart.{format}"
                 )
                 plt.savefig(
                     file_name, bbox_inches="tight", transparent=True, format=format
@@ -1243,7 +1243,7 @@ class ParaphrasingEvaluator:
             for format in ["svg"]:
                 full_path = (
                     save_path
-                    / f"{data_category}_sem_syn_scatter_grouped_by_{group_by}.{format}"
+                    / f"{data_category.replace(' ','_')}_sem_syn_scatter_grouped_by_{group_by}.{format}"
                 )
                 plt.savefig(
                     full_path, bbox_inches="tight", transparent=True, format=format
@@ -1503,7 +1503,7 @@ class ParaphrasingEvaluator:
             for format in ["svg"]:
                 full_path = (
                     save_path
-                    / f"{data_category}_metric_distributions_grouped_by_{group_by}.{format}"
+                    / f"{data_category.replace(' ','_')}_metric_distributions_grouped_by_{group_by}.{format}"
                 )
                 plt.savefig(
                     full_path, bbox_inches="tight", transparent=True, format=format
