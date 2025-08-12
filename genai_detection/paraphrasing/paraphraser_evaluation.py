@@ -1282,11 +1282,8 @@ class ParaphrasingEvaluator:
         for metric in metric_names:
 
             counts = data.groupby(group_by)[metric].count()
-            assert (
-                counts != 0
-            ).any(), (
-                f"No data points found for metric '{metric}' in group '{group_by}'."
-            )
+            if counts == 0:
+                continue
 
             sns.kdeplot(
                 data=data,
@@ -1308,15 +1305,11 @@ class ParaphrasingEvaluator:
                 plt.title(
                     f"Distribution of {metric_for_tile}\ngrouped by {group_by.capitalize()}"
                 )
-            plt.title(f"Distribution of {metric_for_tile}")
             plt.xlabel(metric)
             plt.ylabel("Density")
             plt.legend(
-                title=group_by.capitalize(),
                 loc="upper left",
                 bbox_to_anchor=(1.01, 1),
-                fontsize=10,
-                title_fontsize=12,
             )
 
             plt.tight_layout()
