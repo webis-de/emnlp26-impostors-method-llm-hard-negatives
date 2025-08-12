@@ -1101,7 +1101,12 @@ class ParaphrasingEvaluator:
         ax.set_ylim(0, 1)
 
         # Add legend and title
-        ax.legend(loc="lower left", bbox_to_anchor=(1.1, 0.7), fontsize=9)
+        ax.legend(
+            loc="lower left",
+            bbox_to_anchor=(1.1, 0.7),
+            fontsize=9,
+            title=group_by.capitalize(),
+        )
         title = (
             f"Radar Chart of Paraphrasing Metrics\non {' '.join(word.capitalize() for word in data_category.split())} Dataset, grouped by {group_by.capitalize()}"
             if data_category
@@ -1201,7 +1206,7 @@ class ParaphrasingEvaluator:
         ]
         ax.legend(
             handles=legend_patches,
-            title=group_by,
+            title=group_by.capitalize(),
             loc="upper left",
             bbox_to_anchor=(1.03, 1),
             borderaxespad=0.0,
