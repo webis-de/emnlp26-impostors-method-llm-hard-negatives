@@ -1265,6 +1265,91 @@ class ParaphrasingEvaluator:
             ]
         )
 
+    def _plot_one_plot_per_metric_distribution(
+        self,
+        data: pd.DataFrame,
+        metric_names: list,
+        group_by: str,
+        data_category: str,
+        display_plot: bool = False,
+    ):
+        unique_labels = data[group_by].unique()
+        palette = sns.color_palette("tab20", n_colors=len(unique_labels))
+        label_to_color = {
+            label: palette[i % len(palette)] for i, label in enumerate(unique_labels)
+        }
+
+        for metric in metric_names:
+
+            counts = data.groupby(group_by)[metric].count()
+            assert (
+                counts != 0
+            ).any(), (
+                f"No data points found for metric '{metric}' in group '{group_by}'."
+            )
+
+            # KDE for groups with multiple points
+            models_multi = counts[counts > 1].index
+            if len(models_multi) > 0:
+                sns.kdeplot(
+                    data=data[data[group_by].isin(models_multi)],
+                    x=metric,
+                    hue=group_by,
+                    fill=True,
+                    common_norm=False,
+                    alpha=0.4,
+                    palette=label_to_color,
+                )
+
+            # Scatter for groups with a single point
+            models_single = counts[counts == 1].index
+            for model in models_single:
+                single_val = data.loc[data[group_by] == model, metric].values[0]
+                plt.scatter(
+                    single_val,
+                    1,
+                    label=model,
+                    color=label_to_color[model],
+                    s=50,
+                    edgecolor="k",
+                    zorder=5,
+                )
+
+            plt.title(f"Distribution of {metric}")
+            plt.xlabel(metric)
+            plt.ylabel("Density")
+            plt.legend(
+                loc="upper left",
+                bbox_to_anchor=(1.01, 1),  # outside the plot on right
+                title=group_by.capitalize(),
+            )
+
+            # Title
+            if data_category:
+                plt.title(
+                    f"Distribution of {metric}\non {data_category} Dataset, grouped by {group_by.capitalize()}"
+                )
+            else:
+                plt.title(
+                    f"Distribution of {metric}\ngrouped by {group_by.capitalize()}"
+                )
+
+            plt.tight_layout()
+
+            # Save with unique name
+            safe_metric = str(metric).replace(" ", "_").replace("/", "_")
+            safe_category = (
+                str(data_category).replace(" ", "_") if data_category else "dataset"
+            )
+            file_name = f"{safe_category}_{safe_metric}_grouped_by_{group_by}.svg"
+            full_path = self.paraphrases_save_base_path / file_name
+            plt.savefig(full_path, bbox_inches="tight", transparent=True, format="svg")
+            print(f"Plot saved to {full_path}")
+
+            if display_plot:
+                plt.show()
+            plt.close()
+
     def plot_metric_distributions(
         self,
         df: pd.DataFrame,
@@ -1427,6 +1512,13 @@ class ParaphrasingEvaluator:
 
         if display_plot:
             plt.show()
+        self._plot_one_plot_per_metric_distribution(
+            data=data,
+            metric_names=metric_names,
+            group_by=group_by,
+            data_category=data_category,
+            display_plot=False,
+        )
 
 
 if __name__ == "__main__":
