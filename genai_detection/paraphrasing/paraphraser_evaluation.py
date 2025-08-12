@@ -1278,9 +1278,6 @@ class ParaphrasingEvaluator:
     ):
         unique_labels = data[group_by].unique()
         palette = sns.color_palette("tab20", n_colors=len(unique_labels))
-        label_to_color = {
-            label: palette[i % len(palette)] for i, label in enumerate(unique_labels)
-        }
 
         for metric in metric_names:
 
@@ -1298,23 +1295,11 @@ class ParaphrasingEvaluator:
                 fill=True,
                 common_norm=False,
                 alpha=0.4,
-                palette=label_to_color,
-                legend="full",
+                palette=palette,
+                legend=True,
             )
 
             metric_for_tile = " ".join([t.capitalize() for t in metric.split("_")])
-            plt.title(f"Distribution of {metric_for_tile}")
-            plt.xlabel(metric)
-            plt.ylabel("Density")
-            plt.legend(
-                loc="upper left",
-                bbox_to_anchor=(1.01, 1),  # outside the plot on right
-                title=group_by.capitalize(),
-                fontsize=10,
-                title_fontsize=12,
-            )
-
-            # Title
             if data_category:
                 plt.title(
                     f"Distribution of {metric_for_tile}\non {data_category} Dataset, grouped by {group_by.capitalize()}"
@@ -1323,6 +1308,16 @@ class ParaphrasingEvaluator:
                 plt.title(
                     f"Distribution of {metric_for_tile}\ngrouped by {group_by.capitalize()}"
                 )
+            plt.title(f"Distribution of {metric_for_tile}")
+            plt.xlabel(metric)
+            plt.ylabel("Density")
+            plt.legend(
+                title=group_by.capitalize(),
+                loc="upper left",
+                bbox_to_anchor=(1.01, 1),
+                fontsize=10,
+                title_fontsize=12,
+            )
 
             plt.tight_layout()
 
