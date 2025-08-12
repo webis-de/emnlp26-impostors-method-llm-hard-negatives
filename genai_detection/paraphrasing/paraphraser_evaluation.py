@@ -866,7 +866,7 @@ class ParaphrasingEvaluator:
         if save_to_disk:
             save_path = (
                 self.paraphrases_save_base_path
-                / f"paraphrasing_results_comparison_temp{self.temperature}_maxLength{self.max_length}_dataset_{self.data_category}.csv"
+                / f"paraphrasing_results_comparison_temp{self.temperature}_maxLength{self.max_length}_dataset_{self.data_category.replace(' ','_')}.csv"
             )
             df.to_csv(save_path, index=False, float_format="%.4f")
             print(f"Results saved to {save_path}")
@@ -896,7 +896,7 @@ class ParaphrasingEvaluator:
         if save_extremest_paraphr_per_score:
             worst_save_path = (
                 self.paraphrases_save_base_path
-                / f"extremest_paraphrases_per_metric_temp{self.temperature}_maxLength{self.max_length}_dataset_{self.data_category}.csv"
+                / f"extremest_paraphrases_per_metric_temp{self.temperature}_maxLength{self.max_length}_dataset_{self.data_category.replace(' ','_')}.csv"
             )
             extremest_paraphrases.to_csv(worst_save_path, index=False)
 
