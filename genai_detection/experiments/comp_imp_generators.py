@@ -208,6 +208,18 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 imp_dict for _, imp_dict in results
             ]
             assert results is not None, "Results should not be None"
+            print(
+                "DEBUG: Predictions in train dataset before:",
+                train_dataset[col_score].values,
+            )
+            print(
+                "New scores (training dataset):",
+                train_dataset.loc[missing_mask, col_score],
+            )
+            print(
+                "DEBUG: Predictions in train dataset after:",
+                train_dataset[col_score].values,
+            )
 
             train_dataset.to_csv(
                 save_path / train_scores_file_name,
@@ -215,6 +227,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             )
 
         labels = train_dataset["same"].values
+        print("DEBUG: Predictions in train dataset:", train_dataset[col_score].values)
         scores = np.concatenate(
             train_dataset[col_score].values
         )  # each entry in scores is a one-element list
