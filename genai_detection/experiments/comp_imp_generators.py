@@ -117,7 +117,18 @@ def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_
     return impostor_detector._get_score_impl(pair)
 
 
-# async
+def _split_unhashable(df: pd.DataFrame) -> pd.DataFrame:
+    for col in ["pair", "authors"]:
+        if col in df.columns:
+            df[f"{col}_left"] = df[col].apply(
+                lambda x: x[0] if isinstance(x, (list, tuple, np.ndarray)) else x
+            )
+            df[f"{col}_right"] = df[col].apply(
+                lambda x: x[1] if isinstance(x, (list, tuple, np.ndarray)) else x
+            )
+    return df
+
+
 def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     train_dataset = get_dataset(path2dataset, split="train")
     test_dataset = get_dataset(path2dataset, split="test")
@@ -154,41 +165,41 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         train_scores_file_name = (
             f"{dataset_name}_{imp_gen}_train_impostor_scores_syn_sim.csv"
         )
-        if (save_path / test_scores_file_name).exists():
+        if (save_path / train_scores_file_name).exists():
             print(
-                f"Reading {imp_gen} for {dataset_name} dataset from existing file {save_path / test_scores_file_name}"
+                f"Reading {imp_gen} for {dataset_name} dataset from existing file {save_path / train_scores_file_name}"
             )
             with open(save_path / train_scores_file_name, "r") as f:
                 df_from_csv = pd.read_csv(f)
 
-            for col in ["pair", "authors", "same"]:
-                train_dataset[col] = train_dataset[col].apply(
-                    lambda x: tuple(x) if isinstance(x, (list, np.ndarray)) else x
-                )
-                df_from_csv[col] = df_from_csv[col].apply(
-                    lambda x: tuple(x) if isinstance(x, (list, np.ndarray)) else x
-                )
+            train_dataset = _split_unhashable(train_dataset)
+            df_from_csv = _split_unhashable(df_from_csv)
 
-                train_dataset = pd.merge(
-                    train_dataset,
-                    df_from_csv,
-                    on=["pair", "authors", "same"],
-                    how="left",
-                )
-                print(f"Train dataset shape after merging: {train_dataset}")
-                assert (
-                    not train_dataset.empty
-                ), f"Train dataset is empty after merging with {train_scores_file_name}"
+            train_dataset = pd.merge(
+                train_dataset,
+                df_from_csv,
+                on=["pair_left", "pair_right", "authors_left", "authors_right", "same"],
+                how="left",
+            )
+            print(f"Train dataset shape after merging: {train_dataset}")
+            assert (
+                not train_dataset.empty
+            ), f"Train dataset is empty after merging with {train_scores_file_name}"
+
+        if (save_path / test_scores_file_name).exists():
             with open(save_path / test_scores_file_name, "r") as f:
-                test_dataset = pd.merge(
-                    test_dataset,
-                    pd.read_csv(f),
-                    on=["pair", "authors", "same"],
-                    how="left",
-                )
-                assert (
-                    not test_dataset.empty
-                ), f"Test dataset is empty after merging with {test_scores_file_name}"
+                df_from_csv = pd.read_csv(f)
+            test_dataset = _split_unhashable(test_dataset)
+            df_from_csv = _split_unhashable(df_from_csv)
+            test_dataset = pd.merge(
+                test_dataset,
+                df_from_csv,
+                on=["pair_left", "pair_right", "authors_left", "authors_right", "same"],
+                how="left",
+            )
+            assert (
+                not test_dataset.empty
+            ), f"Test dataset is empty after merging with {test_scores_file_name}"
         # fill nan values of new rows with predicted values
         print(f"Running impostor detector for impostor generation approach: {imp_gen}")
         col_score = f"impostor_score_{imp_gen}"
