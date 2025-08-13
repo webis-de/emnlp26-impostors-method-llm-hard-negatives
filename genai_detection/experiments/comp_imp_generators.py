@@ -175,7 +175,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             )
             with open(save_path / train_scores_file_name, "r") as f:
                 df_from_csv = pd.read_csv(f)
-                df_from_csv.reset_index(inplace=True)
+                # df_from_csv.reset_index(inplace=True)
                 assert (
                     "pair" in df_from_csv.columns
                 ), f"Expected 'pair' column in {train_scores_file_name}, but not found: {df_from_csv.columns}"
@@ -211,7 +211,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         if (save_path / test_scores_file_name).exists():
             with open(save_path / test_scores_file_name, "r") as f:
                 df_from_csv = pd.read_csv(f)
-                df_from_csv.reset_index(inplace=True)
+                # df_from_csv.reset_index(inplace=True)
             test_dataset = _split_unhashable(test_dataset)
             if col_score not in test_dataset:
                 test_dataset[col_score] = np.nan
@@ -275,7 +275,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 "DEBUG: Predictions in train dataset after:",
                 train_dataset[col_score].values,
             )
-
+            train_dataset.reset_index(inplace=True)
             train_dataset.to_csv(
                 save_path / train_scores_file_name,
                 index=False,
@@ -316,6 +316,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 test_dataset[col_score] > opt_thres
             )
 
+            test_dataset.reset_index(inplace=True)
             test_dataset.to_csv(
                 save_path / test_scores_file_name,
                 index=False,
