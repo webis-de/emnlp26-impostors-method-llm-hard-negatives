@@ -1325,6 +1325,7 @@ class ParaphrasingEvaluator:
                 )
             plt.xlabel(metric)
             plt.ylabel("Density")
+            plt.ylim(0, 1)
             handles = [
                 mpatches.Patch(color=palette[i], label=self._wrap_label(str(label)))
                 for i, label in enumerate(unique_labels)
@@ -1360,7 +1361,7 @@ class ParaphrasingEvaluator:
                 plt.show()
             plt.close()
 
-    def plot_metricƒ_distributions(
+    def plot_metric_distributions(
         self,
         df: pd.DataFrame,
         data_category: Optional[str] = None,
@@ -1464,7 +1465,7 @@ class ParaphrasingEvaluator:
         fig.legend(
             handles=legend_patches,
             loc="upper left",
-            bbox_to_anchor=(1.01, 1),  # outside the plot on right
+            bbox_to_anchor=(0.95, 0.9),  # outside the plot on right
             title=group_by.capitalize(),
             frameon=True,
             borderaxespad=0,
@@ -1481,7 +1482,7 @@ class ParaphrasingEvaluator:
             else f"Metric Distributions\ngrouped by {group_by.capitalize()}"
         )
         fig.suptitle(title, fontsize=18)
-        plt.tight_layout(rect=[0, 0, 0.90, 0.95])
+        plt.tight_layout(rect=[0, 0, 0.95, 0.95])
 
         if save_path:
             save_path = Path(save_path)

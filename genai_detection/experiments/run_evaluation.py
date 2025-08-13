@@ -156,12 +156,12 @@ def run_evaluation():
     print(f"Data root: {data_root}")
     results = []
 
-    # for category in CATEGORY2DIRECTORY:
-    #     print(f"Evaluating category: {category}")
-    #     results.append(evaluate_category(category, data_root))
-    #     print("_" * 50)
+    for category in CATEGORY2DIRECTORY:
+        print(f"Evaluating category: {category}")
+        results.append(evaluate_category(category, data_root))
+        print("_" * 50)
 
-    run_extraction_evaluation()
+    # run_extraction_evaluation()
 
     return results
 
