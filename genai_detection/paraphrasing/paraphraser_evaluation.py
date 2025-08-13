@@ -379,7 +379,7 @@ class ParaphrasingEvaluator:
                     paraphrases.extend(potential_paraphrases[temperature])
             except Exception as e:
                 print(
-                    f"Paraphraser {paraphraser_name} not found in loaded data for {text[:15]}:\n{e}.\nGenerating new paraphrase."
+                    f"Paraphraser {paraphraser_name} not found in loaded data for '{text[:15]}...':\nError: {e}.\nGenerating new paraphrase."
                 )
                 # raise Exception(f"Should all be present, but not found: {e}") from e
 
