@@ -293,6 +293,10 @@ class ParaphrasingEvaluator:
             self.paraphrases_save_base_path
             / f"generated_paraphrases_subset_{self.data_category.replace(' ', '_')}.json"
         )
+        file_existing_extractions = (
+            self.paraphrases_save_base_path
+            / f"extracted_subset_{self.data_category.replace(' ', '_')}.json"
+        )
         if "century" not in df.columns and "date" in df.columns:
             # Blog dataset has 'date' column (eg. 12,May,2004), convert to 'century'
             df["century"] = df["date"].apply(
@@ -308,15 +312,34 @@ class ParaphrasingEvaluator:
         ):
             text = str(getattr(row, "text", ""))
             filename = getattr(row, "filename", "unknown")
+            if file_existing_extractions.exists():
+                with open(file_existing_extractions, "r") as f:
+                    data_loaded = json.load(f)
+            else:
+                data_loaded = {}
 
-            try:
-                extra, _, genre, century, _, _ = paraphraser._extract_bullet_points(
-                    text=text,
-                    prompt=paraphraser.extractor_prompt,
+            if filename in data_loaded.keys():
+                extra, genre, century = (
+                    data_loaded[filename]["extra"],
+                    data_loaded[filename]["genre"],
+                    data_loaded[filename]["century"],
                 )
-            except Exception as e:
-                logger.warning(f"Extraction failed for file '{filename}': {e}")
-                continue
+            else:
+                try:
+                    extra, _, genre, century, _, _ = paraphraser._extract_bullet_points(
+                        text=text,
+                        prompt=paraphraser.extractor_prompt,
+                    )
+                    data_loaded[filename] = {
+                        "extra": extra,
+                        "genre": genre,
+                        "century": century,
+                    }
+                    with open(file_existing_extractions, "w") as f:
+                        json.dump(data_loaded, f, indent=4)
+                except Exception as e:
+                    logger.warning(f"Extraction failed for file '{filename}': {e}")
+                    continue
 
             if (
                 "current" in str(century).lower()
@@ -441,7 +464,7 @@ class ParaphrasingEvaluator:
         angles += angles[:1]
 
         # Start plot
-        fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(polar=True))
+        fig, ax = plt.subplots(figsize=(7, 7), subplot_kw=dict(polar=True))
 
         unique_labels = grouped_mean.index
         palette = sns.color_palette(
@@ -533,104 +556,104 @@ class ParaphrasingEvaluator:
         save_base_path = self.paraphrases_save_base_path
         detailed_detail_degree = "detailed"
         # TODO: To debug plotting, remove in production
-        # models = {
-        #     k: v
-        #     for k, v in self.paraphrasers.items()
-        #     if not isinstance(v, NaiveParaphraser)
-        # }
+        models = {
+            k: v
+            for k, v in self.paraphrasers.items()
+            if not isinstance(v, NaiveParaphraser)
+        }
 
-        # for dataset_category, base_dir in self.base_dirs.items():
-        #     try:
-        #         df = self._load_dataset(base_dir, dataset_category)
-        #     except Exception as e:
-        #         logger.error(
-        #             f"Failed to load dataset {dataset_category} from {base_dir}: {e}"
-        #         )
-        #         continue
+        for dataset_category, base_dir in self.base_dirs.items():
+            try:
+                df = self._load_dataset(base_dir, dataset_category)
+            except Exception as e:
+                logger.error(
+                    f"Failed to load dataset {dataset_category} from {base_dir}: {e}"
+                )
+                continue
 
-        #     df = df.head(min(2, len(df)))  # TODO: For debugging, remove in production
-        #     if "id" in df.columns:
-        #         df.rename(columns={"id": "filename"}, inplace=True)
-        #     logger.info(f"Dataset snapshot:\n{df.head()}")
-        #     print(f"Dataset snapshot:\n{df.head()}")
+            df = df.head(min(2, len(df)))  # TODO: For debugging, remove in production
+            if "id" in df.columns:
+                df.rename(columns={"id": "filename"}, inplace=True)
+            logger.info(f"Dataset snapshot:\n{df.head()}")
+            print(f"Dataset snapshot:\n{df.head()}")
 
-        #     aggregate_results = defaultdict(
-        #         lambda: {
-        #             "genre_match": 0,
-        #             "time_match": 0,
-        #             "topic_match": 0,
-        #             "total": 0,
-        #         }
-        #     )
-        #     length_differences = {}
+            aggregate_results = defaultdict(
+                lambda: {
+                    "genre_match": 0,
+                    "time_match": 0,
+                    "topic_match": 0,
+                    "total": 0,
+                }
+            )
+            length_differences = {}
 
-        #     for paraphraser_name, paraphraser in models.items():
-        #         logger.info(
-        #             f"Evaluating model '{paraphraser_name}' on {dataset_category} dataset..."
-        #         )
-        #         detailed_result_df, summary_df, lengths = self._evaluate_model_on_data(
-        #             paraphraser_name, paraphraser, df
-        #         )
-        #         print(
-        #             f"[DEBUG] Detailed results for {paraphraser_name}:\n{detailed_result_df.head()}"
-        #         )
+            for paraphraser_name, paraphraser in models.items():
+                logger.info(
+                    f"Evaluating model '{paraphraser_name}' on {dataset_category} dataset..."
+                )
+                detailed_result_df, summary_df, lengths = self._evaluate_model_on_data(
+                    paraphraser_name, paraphraser, df
+                )
+                print(
+                    f"[DEBUG] Detailed results for {paraphraser_name}:\n{detailed_result_df.head()}"
+                )
 
-        #         # Calculate length differences as percentages
-        #         percent_diffs = [
-        #             ((p - o) / o) * 100 if o > 0 else 0
-        #             for o, p in zip(lengths["original"], lengths["paraphrase"])
-        #         ]
-        #         length_differences[paraphraser_name] = percent_diffs
+                # Calculate length differences as percentages
+                percent_diffs = [
+                    ((p - o) / o) * 100 if o > 0 else 0
+                    for o, p in zip(lengths["original"], lengths["paraphrase"])
+                ]
+                length_differences[paraphraser_name] = percent_diffs
 
-        #         for key in ["genre_match", "time_match", "topic_match", "total"]:
-        #             aggregate_results[paraphraser_name][key] += summary_df.get(key, 0)
+                for key in ["genre_match", "time_match", "topic_match", "total"]:
+                    aggregate_results[paraphraser_name][key] += summary_df.get(key, 0)
 
-        #     # Reporting results
-        #     logger.info(f"\n[RESULTS for {dataset_category} dataset]")
-        #     for paraphraser_name, metrics in aggregate_results.items():
-        #         total = metrics["total"]
-        #         if total == 0:
-        #             logger.warning(
-        #                 f"No evaluation data for model '{paraphraser_name}' on dataset '{dataset_category}'."
-        #             )
-        #             continue
-        #         for key in ["genre_match", "time_match", "topic_match"]:
-        #             aggregate_results[paraphraser_name][key] = round(
-        #                 metrics[key] / total, 2
-        #             )
-        #         aggregate_results[paraphraser_name]["length_diff"] = round(
-        #             np.mean(length_differences[paraphraser_name]), 2
-        #         )
+            # Reporting results
+            logger.info(f"\n[RESULTS for {dataset_category} dataset]")
+            for paraphraser_name, metrics in aggregate_results.items():
+                total = metrics["total"]
+                if total == 0:
+                    logger.warning(
+                        f"No evaluation data for model '{paraphraser_name}' on dataset '{dataset_category}'."
+                    )
+                    continue
+                for key in ["genre_match", "time_match", "topic_match"]:
+                    aggregate_results[paraphraser_name][key] = round(
+                        metrics[key] / total, 2
+                    )
+                aggregate_results[paraphraser_name]["length_diff"] = round(
+                    np.mean(length_differences[paraphraser_name]), 2
+                )
 
-        #         logger.info(f"Model: {paraphraser_name}")
-        #         logger.info(
-        #             f"  Genre Accuracy: {aggregate_results[paraphraser_name]['genre_match']}"
-        #         )
-        #         logger.info(
-        #             f"  Time Accuracy (approx): {aggregate_results[paraphraser_name]['time_match']}"
-        #         )
-        #         logger.info(
-        #             f"  Topic Accuracy (approx): {aggregate_results[paraphraser_name]['topic_match']}"
-        #         )
-        #         logger.info(
-        #             f"  Length Difference (mean): {aggregate_results[paraphraser_name]['length_diff']}%"
-        #         )
+                logger.info(f"Model: {paraphraser_name}")
+                logger.info(
+                    f"  Genre Accuracy: {aggregate_results[paraphraser_name]['genre_match']}"
+                )
+                logger.info(
+                    f"  Time Accuracy (approx): {aggregate_results[paraphraser_name]['time_match']}"
+                )
+                logger.info(
+                    f"  Topic Accuracy (approx): {aggregate_results[paraphraser_name]['topic_match']}"
+                )
+                logger.info(
+                    f"  Length Difference (mean): {aggregate_results[paraphraser_name]['length_diff']}%"
+                )
 
-        #     # Save results if requested
-        #     if save_to_disk:
-        #         self._save_results(
-        #             detailed_result_df,
-        #             dataset_category,
-        #             save_base_path,
-        #             detail_degree=detailed_detail_degree,
-        #         )
-        #         self._save_results(
-        #             aggregate_results,
-        #             dataset_category,
-        #             save_base_path,
-        #             detail_degree="aggregated",
-        #         )
-        #         print("Saved results to ", save_base_path)
+            # Save results if requested
+            if save_to_disk:
+                self._save_results(
+                    detailed_result_df,
+                    dataset_category,
+                    save_base_path,
+                    detail_degree=detailed_detail_degree,
+                )
+                self._save_results(
+                    aggregate_results,
+                    dataset_category,
+                    save_base_path,
+                    detail_degree="aggregated",
+                )
+                print("Saved results to ", save_base_path)
 
         if plot_metrics:
             dfs = {}
@@ -1338,7 +1361,7 @@ class ParaphrasingEvaluator:
                 plt.show()
             plt.close()
 
-    def plot_metric_distributions(
+    def plot_metricƒ_distributions(
         self,
         df: pd.DataFrame,
         data_category: Optional[str] = None,
