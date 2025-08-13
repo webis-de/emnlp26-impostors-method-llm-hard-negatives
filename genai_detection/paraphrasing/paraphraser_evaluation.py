@@ -441,7 +441,7 @@ class ParaphrasingEvaluator:
         angles += angles[:1]
 
         # Start plot
-        fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
+        fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(polar=True))
 
         unique_labels = grouped_mean.index
         palette = sns.color_palette(
@@ -499,7 +499,7 @@ class ParaphrasingEvaluator:
 
         title = "Radar plot of Metric Distributions by Dataset"
         fig.suptitle(title)
-        plt.tight_layout(rect=[0, 0, 1, 0.85])
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
 
         if save_path:
             save_path = Path(save_path)
