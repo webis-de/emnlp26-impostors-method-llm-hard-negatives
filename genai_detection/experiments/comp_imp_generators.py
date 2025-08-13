@@ -105,6 +105,7 @@ def _get_opt_imp_threshold(fpr, tpr, thresholds):
 
 def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_minds"):
     print(f"Generating impostor with {imp_gen} generator")
+    assert pair is not None, "Pair must not be None"
     impostor_detector = ImpostorDetector(
         impostor_technique=imp_gen,
         n_impostors=50,
@@ -247,6 +248,9 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         )
         if missing_mask.sum() > 0:
             new_rows = train_dataset[missing_mask].copy()
+            assert not new_rows[
+                "pair"
+            ].empty, "No new row pairs to process for training dataset"
             with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
                 results = list(
                     executor.map(
@@ -285,6 +289,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         print("DEBUG: Predictions in train dataset:", train_dataset[col_score].values)
         scores = train_dataset[col_score].values
         fpr, tpr, roc_thresholds = roc_curve(y_true=labels, y_score=scores)
+        # FIXME: no valid vals
         opt_thres = _get_opt_imp_threshold(fpr, tpr, roc_thresholds)
         missing_mask = (
             pd.Series([t != opt_thres for t in test_dataset["thres"]])
