@@ -1303,7 +1303,7 @@ class ParaphrasingEvaluator:
             plt.xlabel(metric)
             plt.ylabel("Density")
             handles = [
-                mpatches.Patch(color=palette[i], label=str(label))
+                mpatches.Patch(color=palette[i], label=self._wrap_label(str(label)))
                 for i, label in enumerate(unique_labels)
             ]
             plt.legend(
