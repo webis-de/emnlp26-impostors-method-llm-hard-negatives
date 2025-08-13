@@ -181,6 +181,9 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             if col_score in train_dataset.columns
             else pd.Series(True, index=train_dataset.index)
         )
+        print(
+            f"Number of missing impostor scores in train dataset: {missing_mask.sum()}"
+        )
         if missing_mask.sum() > 0:
             new_rows = train_dataset[missing_mask].copy()
             with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
@@ -198,6 +201,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             train_dataset.loc[missing_mask, col_dict] = [
                 imp_dict for _, imp_dict in results
             ]
+            assert results is not None, "Results should not be None"
 
             train_dataset.to_csv(
                 save_path / train_scores_file_name,
@@ -206,7 +210,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
 
         labels = train_dataset["same"].values
         scores = np.concatenate(
-            train_dataset[f"impostor_score_{imp_gen}"].values
+            train_dataset[col_score].values
         )  # each entry in scores is a one-element list
 
         fpr, tpr, roc_thresholds = roc_curve(y_true=labels, y_score=scores)
@@ -227,13 +231,9 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                     )
                 )
             # results is a list of tuples: (impostor_score, impostor_dict)
-            test_dataset[f"impostor_score_{imp_gen}"] = [score for score, _ in results]
-            test_dataset[f"impostor_dict_{imp_gen}"] = [
-                impostor_dict for _, impostor_dict in results
-            ]
-            test_dataset[f"impostor_prediction_{imp_gen}"] = test_dataset[
-                f"impostor_score_{imp_gen}"
-            ]
+            test_dataset[col_score] = [score for score, _ in results]
+            test_dataset[col_dict] = [impostor_dict for _, impostor_dict in results]
+            test_dataset[f"impostor_prediction_{imp_gen}"] = test_dataset[col_score]
 
             test_dataset.to_csv(
                 save_path / test_scores_file_name,
