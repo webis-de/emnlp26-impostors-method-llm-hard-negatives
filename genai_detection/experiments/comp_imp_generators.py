@@ -31,15 +31,14 @@ SAVE_PATH = (
     / "impostor_generator_comparison"
 )
 IMP_GEN_OPTIONS = [
-    # "text_len",
+    "fixed",
+    "naive_llm",
+    "non_naive_llm",
+    "llm",
+    "text_len",
+    "content",
     # "on-the-fly",
-    # "blogs",
-    # "fixed",
-    # "content",
-    # "naive_llm",
-    # "non_naive_llm",
-    # "llm",
-    "mirror_minds",
+    # "mirror_minds",
 ]
 
 
@@ -105,6 +104,7 @@ def _get_opt_imp_threshold(fpr, tpr, thresholds):
 
 
 def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_minds"):
+    print(f"Generating impostor with {imp_gen} generator")
     impostor_detector = ImpostorDetector(
         impostor_technique=imp_gen,
         n_impostors=50,
@@ -124,16 +124,16 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     # TODO: Test on small data subsets
     train_dataset = pd.concat(
         [
-            train_dataset.loc[train_dataset["same"]].head(5),
-            train_dataset.loc[~train_dataset["same"]].head(5),
+            train_dataset.loc[train_dataset["same"]].head(1),
+            train_dataset.loc[~train_dataset["same"]].head(1),
         ],
         ignore_index=False,
     )
 
     test_dataset = pd.concat(
         [
-            test_dataset.loc[test_dataset["same"]].head(5),
-            test_dataset.loc[~test_dataset["same"]].head(5),
+            test_dataset.loc[test_dataset["same"]].head(1),
+            test_dataset.loc[~test_dataset["same"]].head(1),
         ],
         ignore_index=False,
     )
@@ -148,78 +148,98 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
 
     # FIXME: rate limit + mirror minds download problem
     for imp_gen in IMP_GEN_OPTIONS:
-        print(f"Running impostor detector for impostor generation approach: {imp_gen}")
-        with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
-            results = list(
-                executor.map(
-                    _helper_impostor,
-                    [path2imp] * len(train_dataset),
-                    train_dataset["pair"],
-                    [True] * len(train_dataset),  # training mode
-                    [imp_gen] * len(train_dataset),
-                )
+        test_scores_file_name = (
+            f"{dataset_name}_{imp_gen}_test_impostor_scores_syn_sim.csv"
+        )
+        train_scores_file_name = (
+            f"{dataset_name}_{imp_gen}_train_impostor_scores_syn_sim.csv"
+        )
+        if (save_path / test_scores_file_name).exists():
+            print(
+                f"Reading {imp_gen} for {dataset_name} dataset from existing file {save_path / test_scores_file_name}"
             )
-        # TODO: maybe add sleep
-        # results = []
-        # res = None
-        # for pair in train_dataset["pair"]:
-        #     i = 0
-        #     while res is None:
-        #         i += 10
-        #         # await sleep(i)
-        #         res = _helper_impostor(
-        #             path2imp, pair, training_mode=True, imp_gen=imp_gen
-        #         )
-        #         print(
-        #             f"SAIA API Rate limit exceeded: {res is None}, sleeping for {i} seconds if True."
-        #         )
-        #         if i > 100:
-        #             break
-        #     results.append(res)
+            with open(save_path / train_scores_file_name, "r") as f:
+                train_dataset = pd.merge(
+                    train_dataset,
+                    pd.read_csv(f),
+                    on=["pair", "authors", "same"],
+                    how="left",
+                )
+            with open(save_path / test_scores_file_name, "r") as f:
+                test_dataset = pd.merge(
+                    test_dataset,
+                    pd.read_csv(f),
+                    on=["pair", "authors", "same"],
+                    how="left",
+                )
+        # fill nan values of new rows with predicted values
+        print(f"Running impostor detector for impostor generation approach: {imp_gen}")
+        col_score = f"impostor_score_{imp_gen}"
+        col_dict = f"impostor_dict_{imp_gen}"
+        missing_mask = (
+            train_dataset[col_score].isna()
+            if col_score in train_dataset.columns
+            else pd.Series([True] * len(train_dataset))
+        )
+        if missing_mask.sum() > 0:
+            new_rows = train_dataset[missing_mask].copy()
+            with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
+                results = list(
+                    executor.map(
+                        _helper_impostor,
+                        [path2imp] * len(new_rows),
+                        new_rows["pair"],
+                        [True] * len(new_rows),  # training mode
+                        [imp_gen] * len(new_rows),
+                    )
+                )
 
-        train_dataset[f"impostor_score_{imp_gen}"] = [score for score, _ in results]
-        train_dataset[f"impostor_dict_{imp_gen}"] = [
-            impostor_dict for _, impostor_dict in results
-        ]
+            train_dataset.loc[missing_mask, col_score] = [score for score, _ in results]
+            train_dataset.loc[missing_mask, col_dict] = [
+                imp_dict for _, imp_dict in results
+            ]
 
-        labels = train_dataset["same"]
-        labels = labels.values
+            train_dataset.to_csv(
+                save_path / train_scores_file_name,
+                index=False,
+            )
+
+        labels = train_dataset["same"].values
         scores = np.concatenate(
             train_dataset[f"impostor_score_{imp_gen}"].values
         )  # each entry in scores is a one-element list
 
         fpr, tpr, roc_thresholds = roc_curve(y_true=labels, y_score=scores)
         opt_thres = _get_opt_imp_threshold(fpr, tpr, roc_thresholds)
-
-        test_dataset["thres"] = opt_thres
-        print(
-            f"Set threshold to optimal threshold for {dataset_name} dataset: {opt_thres}"
-        )
-        with ThreadPoolExecutor() as executor:
-            results = list(
-                executor.map(
-                    _helper_impostor,
-                    [path2imp] * len(test_dataset),
-                    test_dataset["pair"],
-                    [False] * len(test_dataset),
-                )
+        if "thres" not in test_dataset.columns or test_dataset["thres"] != opt_thres:
+            test_dataset["thres"] = opt_thres
+            print(
+                f"Set threshold to optimal threshold for {dataset_name} dataset: {opt_thres}"
             )
-        # results is a list of tuples: (impostor_score, impostor_dict)
-        test_dataset[f"impostor_score_{imp_gen}"] = [score for score, _ in results]
-        test_dataset[f"impostor_dict_{imp_gen}"] = [
-            impostor_dict for _, impostor_dict in results
-        ]
-        test_dataset[f"impostor_prediction_{imp_gen}"] = test_dataset[
-            f"impostor_score_{imp_gen}"
-        ]
+            with ThreadPoolExecutor() as executor:
+                results = list(
+                    executor.map(
+                        _helper_impostor,
+                        [path2imp] * len(test_dataset),
+                        test_dataset["pair"],
+                        [False] * len(test_dataset),
+                        [imp_gen] * len(test_dataset),
+                    )
+                )
+            # results is a list of tuples: (impostor_score, impostor_dict)
+            test_dataset[f"impostor_score_{imp_gen}"] = [score for score, _ in results]
+            test_dataset[f"impostor_dict_{imp_gen}"] = [
+                impostor_dict for _, impostor_dict in results
+            ]
+            test_dataset[f"impostor_prediction_{imp_gen}"] = test_dataset[
+                f"impostor_score_{imp_gen}"
+            ]
 
-        # is overwritten for each imp_gen, but saver if error occurs
-        test_dataset.to_csv(
-            save_path / f"{dataset_name}_test_impostor_scores_syn_sim.csv", index=False
-        )
-        train_dataset.to_csv(
-            save_path / f"{dataset_name}_train_impostor_scores_syn_sim.csv", index=False
-        )
+            test_dataset.to_csv(
+                save_path / test_scores_file_name,
+                index=False,
+            )
+
     return test_dataset
 
 
@@ -489,24 +509,24 @@ if __name__ == "__main__":
     )
 
     # Blog
-    print("Running experiment for Blog dataset.")
-    # blog_test_df = asyncio.run(
-    blog_test_df = create_df(
-        path2dataset=CONFIG.PATH2BLOG,
-        dataset_name=CONFIG.BLOG,
-        save_path=SAVE_PATH,
-    )
+    # print("Running experiment for Blog dataset.")
+    # # blog_test_df = asyncio.run(
+    # blog_test_df = create_df(
+    #     path2dataset=CONFIG.PATH2BLOG,
+    #     dataset_name=CONFIG.BLOG,
+    #     save_path=SAVE_PATH,
     # )
-    print("Visualizing accuracy per syntactic similarity for Blog dataset.")
-    plot_optimal_threshold_bars(
-        df=blog_test_df,
-        save_path=SAVE_PATH,
-        dataset_name=CONFIG.BLOG,
-    )
-    plot_threshold_curves_all(
-        df=blog_test_df,
-        save_path=SAVE_PATH,
-        dataset_name=CONFIG.BLOG,
-    )
+    # # )
+    # print("Visualizing accuracy per syntactic similarity for Blog dataset.")
+    # plot_optimal_threshold_bars(
+    #     df=blog_test_df,
+    #     save_path=SAVE_PATH,
+    #     dataset_name=CONFIG.BLOG,
+    # )
+    # plot_threshold_curves_all(
+    #     df=blog_test_df,
+    #     save_path=SAVE_PATH,
+    #     dataset_name=CONFIG.BLOG,
+    # )
 
-    print("Experiment completed. Results saved to:", SAVE_PATH)
+    # print("Experiment completed. Results saved to:", SAVE_PATH)
