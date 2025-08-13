@@ -179,7 +179,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         missing_mask = (
             train_dataset[col_score].isna()
             if col_score in train_dataset.columns
-            else pd.Series([True] * len(train_dataset))
+            else pd.Series(True, index=train_dataset.index)
         )
         if missing_mask.sum() > 0:
             new_rows = train_dataset[missing_mask].copy()
