@@ -159,9 +159,19 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 f"Reading {imp_gen} for {dataset_name} dataset from existing file {save_path / test_scores_file_name}"
             )
             with open(save_path / train_scores_file_name, "r") as f:
+                df_from_csv = pd.read_csv(f)
+
+            for col in ["pair", "authors", "same"]:
+                train_dataset[col] = train_dataset[col].apply(
+                    lambda x: tuple(x) if isinstance(x, (list, np.ndarray)) else x
+                )
+                df_from_csv[col] = df_from_csv[col].apply(
+                    lambda x: tuple(x) if isinstance(x, (list, np.ndarray)) else x
+                )
+
                 train_dataset = pd.merge(
                     train_dataset,
-                    pd.read_csv(f),
+                    df_from_csv,
                     on=["pair", "authors", "same"],
                     how="left",
                 )
