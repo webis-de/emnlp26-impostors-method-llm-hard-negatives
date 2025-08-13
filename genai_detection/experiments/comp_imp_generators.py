@@ -165,6 +165,9 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                     on=["pair", "authors", "same"],
                     how="left",
                 )
+                assert (
+                    not train_dataset.empty
+                ), f"Train dataset is empty after merging with {train_scores_file_name}"
             with open(save_path / test_scores_file_name, "r") as f:
                 test_dataset = pd.merge(
                     test_dataset,
@@ -172,6 +175,9 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                     on=["pair", "authors", "same"],
                     how="left",
                 )
+                assert (
+                    not test_dataset.empty
+                ), f"Test dataset is empty after merging with {test_scores_file_name}"
         # fill nan values of new rows with predicted values
         print(f"Running impostor detector for impostor generation approach: {imp_gen}")
         col_score = f"impostor_score_{imp_gen}"
