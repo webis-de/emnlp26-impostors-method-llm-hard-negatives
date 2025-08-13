@@ -232,7 +232,13 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         scores = train_dataset[col_score].values
         fpr, tpr, roc_thresholds = roc_curve(y_true=labels, y_score=scores)
         opt_thres = _get_opt_imp_threshold(fpr, tpr, roc_thresholds)
-        if "thres" not in test_dataset.columns or test_dataset["thres"] != opt_thres:
+        missing_mask = (
+            [t != opt_thres for t in test_dataset["thres"]]
+            if "thres" in test_dataset.columns
+            else pd.Series(True, index=train_dataset.index)
+        )
+        if missing_mask.sum() > 0:
+            new_rows = test_dataset[missing_mask].copy()
             test_dataset["thres"] = opt_thres
             print(
                 f"Set threshold to optimal threshold for {dataset_name} dataset: {opt_thres}"
@@ -241,16 +247,20 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 results = list(
                     executor.map(
                         _helper_impostor,
-                        [path2imp] * len(test_dataset),
-                        test_dataset["pair"],
-                        [False] * len(test_dataset),
-                        [imp_gen] * len(test_dataset),
+                        [path2imp] * len(new_rows),
+                        new_rows["pair"],
+                        [False] * len(new_rows),
+                        [imp_gen] * len(new_rows),
                     )
                 )
             # results is a list of tuples: (impostor_score, impostor_dict)
-            test_dataset[col_score] = [score for score, _ in results]
-            test_dataset[col_dict] = [impostor_dict for _, impostor_dict in results]
-            test_dataset[f"impostor_prediction_{imp_gen}"] = test_dataset[col_score]
+            test_dataset.loc[missing_mask, col_score] = [score for score, _ in results]
+            test_dataset.loc[missing_mask, col_dict] = [
+                imp_dict for _, imp_dict in results
+            ]
+            test_dataset[f"impostor_prediction_{imp_gen}"] = (
+                test_dataset[col_score] > opt_thres
+            )
 
             test_dataset.to_csv(
                 save_path / test_scores_file_name,
