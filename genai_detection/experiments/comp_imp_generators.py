@@ -175,6 +175,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             )
             with open(save_path / train_scores_file_name, "r") as f:
                 df_from_csv = pd.read_csv(f)
+                df_from_csv.reset_index(inplace=True)
                 assert (
                     "pair" in df_from_csv.columns
                 ), f"Expected 'pair' column in {train_scores_file_name}, but not found: {df_from_csv.columns}"
@@ -189,6 +190,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             train_dataset.set_index(
                 ["pair_left", "pair_right", "authors_left", "authors_right", "same"],
                 inplace=True,
+                # drop=False,
             )
             print(f"Train dataset columns before merging: {train_dataset.columns}")
 
@@ -197,6 +199,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             df_from_csv.set_index(
                 ["pair_left", "pair_right", "authors_left", "authors_right", "same"],
                 inplace=True,
+                # drop=False,
             )
 
             train_dataset = train_dataset.combine_first(df_from_csv)
@@ -208,12 +211,14 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         if (save_path / test_scores_file_name).exists():
             with open(save_path / test_scores_file_name, "r") as f:
                 df_from_csv = pd.read_csv(f)
+                df_from_csv.reset_index(inplace=True)
             test_dataset = _split_unhashable(test_dataset)
             if col_score not in test_dataset:
                 test_dataset[col_score] = np.nan
             test_dataset.set_index(
                 ["pair_left", "pair_right", "authors_left", "authors_right", "same"],
                 inplace=True,
+                # drop=False,
             )
 
             df_from_csv = _split_unhashable(df_from_csv)
@@ -221,6 +226,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             df_from_csv.set_index(
                 ["pair_left", "pair_right", "authors_left", "authors_right", "same"],
                 inplace=True,
+                # drop=False,
             )
 
             test_dataset = test_dataset.combine_first(df_from_csv)
