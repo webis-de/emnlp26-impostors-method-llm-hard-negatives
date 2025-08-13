@@ -489,7 +489,7 @@ class SAIAParaphraser(NaiveParaphraser):
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are a helpful assistant that paraphrases text while keeping the meaning unchanged.",
+                        "content": "You are a paraphrasing assistant. Output only the final paraphrased text.",
                     },
                     {"role": "user", "content": f"{text[:30000]}\n{prompt.strip()}"},
                 ],
