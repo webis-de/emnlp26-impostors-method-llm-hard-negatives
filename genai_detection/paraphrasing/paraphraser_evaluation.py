@@ -570,7 +570,7 @@ class ParaphrasingEvaluator:
                 )
                 continue
 
-            # df = df.head(min(5, len(df)))  # TODO: For debugging, remove in production
+            df = df.head(min(30, len(df)))  # subset: keep for evaluation
             if "id" in df.columns:
                 df.rename(columns={"id": "filename"}, inplace=True)
             logger.info(f"Dataset snapshot:\n{df.head()}")
