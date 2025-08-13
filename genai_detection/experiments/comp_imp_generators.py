@@ -266,7 +266,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         fpr, tpr, roc_thresholds = roc_curve(y_true=labels, y_score=scores)
         opt_thres = _get_opt_imp_threshold(fpr, tpr, roc_thresholds)
         missing_mask = (
-            [t != opt_thres for t in test_dataset["thres"]]
+            pd.Series([t != opt_thres for t in test_dataset["thres"]])
             if "thres" in test_dataset.columns
             else pd.Series(True, index=train_dataset.index)
         )
