@@ -464,7 +464,7 @@ class ParaphrasingEvaluator:
         angles += angles[:1]
 
         # Start plot
-        fig, ax = plt.subplots(figsize=(7, 7), subplot_kw=dict(polar=True))
+        fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
 
         unique_labels = grouped_mean.index
         palette = sns.color_palette(
@@ -515,7 +515,7 @@ class ParaphrasingEvaluator:
         # Add legend and title
         ax.legend(
             loc="lower left",
-            bbox_to_anchor=(1.1, 0.7),
+            bbox_to_anchor=(1.1, 0.8),
             fontsize=10,
             title=dataset_col.capitalize(),
         )
@@ -570,7 +570,7 @@ class ParaphrasingEvaluator:
                 )
                 continue
 
-            df = df.head(min(5, len(df)))  # TODO: For debugging, remove in production
+            # df = df.head(min(5, len(df)))  # TODO: For debugging, remove in production
             if "id" in df.columns:
                 df.rename(columns={"id": "filename"}, inplace=True)
             logger.info(f"Dataset snapshot:\n{df.head()}")
