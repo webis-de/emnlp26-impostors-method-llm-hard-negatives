@@ -32,9 +32,9 @@ SAVE_PATH = (
 )
 IMP_GEN_OPTIONS = [
     "fixed",
-    "naive_llm",
-    "non_naive_llm",
-    "llm",
+    # "naive_llm",
+    # "non_naive_llm",
+    # "llm",
     "text_len",
     "content",
     # "on-the-fly",
@@ -159,12 +159,16 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
 
     # FIXME: rate limit + mirror minds download problem
     for imp_gen in IMP_GEN_OPTIONS:
+        col_score = f"impostor_score_{imp_gen}"
+        col_dict = f"impostor_dict_{imp_gen}"
+
         test_scores_file_name = (
             f"{dataset_name}_{imp_gen}_test_impostor_scores_syn_sim.csv"
         )
         train_scores_file_name = (
             f"{dataset_name}_{imp_gen}_train_impostor_scores_syn_sim.csv"
         )
+
         if (save_path / train_scores_file_name).exists():
             print(
                 f"Reading {imp_gen} for {dataset_name} dataset from existing file {save_path / train_scores_file_name}"
@@ -179,17 +183,22 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             assert (
                 "pair" in train_dataset.columns
             ), f"Expected 'pair' column in training dataset, but not found: {train_dataset.columns}"
+            if col_score not in train_dataset:
+                train_dataset[col_score] = np.nan
+            train_dataset.set_index(
+                ["pair_left", "pair_right", "authors_left", "authors_right", "same"],
+                inplace=True,
+            )
+
             df_from_csv = _split_unhashable(df_from_csv)
             df_from_csv.drop(["pair", "authors"], axis=1, inplace=True)
-            train_dataset = pd.merge(
-                train_dataset,
-                df_from_csv,
-                on=["pair_left", "pair_right", "authors_left", "authors_right", "same"],
-                how="left",
+            df_from_csv.set_index(
+                ["pair_left", "pair_right", "authors_left", "authors_right", "same"],
+                inplace=True,
             )
-            # if "pair_x" in train_dataset.columns:
-            #     train_dataset.rename(columns={"pair_x": "pair"}, inplace=True)
-            print(f"Train dataset shape after merging: {train_dataset}")
+
+            train_dataset = train_dataset.combine_first(df_from_csv)
+            print(f"Train dataset columns after merging: {train_dataset.columns}")
             assert (
                 not train_dataset.empty
             ), f"Train dataset is empty after merging with {train_scores_file_name}"
@@ -198,24 +207,28 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             with open(save_path / test_scores_file_name, "r") as f:
                 df_from_csv = pd.read_csv(f)
             test_dataset = _split_unhashable(test_dataset)
+            if col_score not in test_dataset:
+                test_dataset[col_score] = np.nan
+            test_dataset.set_index(
+                ["pair_left", "pair_right", "authors_left", "authors_right", "same"],
+                inplace=True,
+            )
+
             df_from_csv = _split_unhashable(df_from_csv)
             df_from_csv.drop(["pair", "authors"], axis=1, inplace=True)
-            # if "pair_x" in test_dataset.columns:
-            #     test_dataset.rename(columns={"pair_x": "pair"}, inplace=True)
-            test_dataset = pd.merge(
-                test_dataset,
-                df_from_csv,
-                on=["pair_left", "pair_right", "authors_left", "authors_right", "same"],
-                how="left",
+            df_from_csv.set_index(
+                ["pair_left", "pair_right", "authors_left", "authors_right", "same"],
+                inplace=True,
             )
+
+            test_dataset = test_dataset.combine_first(df_from_csv)
             print(f"Test dataset cols after merging: {test_dataset.columns}")
             assert (
                 not test_dataset.empty
             ), f"Test dataset is empty after merging with {test_scores_file_name}"
         # fill nan values of new rows with predicted values
         print(f"Running impostor detector for impostor generation approach: {imp_gen}")
-        col_score = f"impostor_score_{imp_gen}"
-        col_dict = f"impostor_dict_{imp_gen}"
+
         missing_mask = (
             train_dataset[col_score].isna()
             if col_score in train_dataset.columns
