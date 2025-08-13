@@ -1325,7 +1325,7 @@ class ParaphrasingEvaluator:
                 )
             plt.xlabel(metric)
             plt.ylabel("Density")
-            plt.ylim(0, 1)
+            plt.xlim(0, 1)
             handles = [
                 mpatches.Patch(color=palette[i], label=self._wrap_label(str(label)))
                 for i, label in enumerate(unique_labels)
@@ -1465,7 +1465,10 @@ class ParaphrasingEvaluator:
         fig.legend(
             handles=legend_patches,
             loc="upper left",
-            bbox_to_anchor=(0.95, 0.9),  # outside the plot on right
+            bbox_to_anchor=(
+                0.95,
+                0.95,
+            ),  # outside the plot on right (x pos, y pos)
             title=group_by.capitalize(),
             frameon=True,
             borderaxespad=0,
