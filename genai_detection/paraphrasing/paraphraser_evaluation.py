@@ -356,7 +356,7 @@ class ParaphrasingEvaluator:
                     paraphrases.extend(potential_paraphrases[temperature])
             except Exception as e:
                 print(
-                    f"Paraphraser {paraphraser_name} not found in loaded data for {text}:\n{e}.\nGenerating new paraphrase."
+                    f"Paraphraser {paraphraser_name} not found in loaded data for {text[:15]}:\n{e}.\nGenerating new paraphrase."
                 )
                 # raise Exception(f"Should all be present, but not found: {e}") from e
 
@@ -477,7 +477,7 @@ class ParaphrasingEvaluator:
                 label=self._wrap_label(groupby_value),
                 alpha=0.7,
                 color=label_to_color[groupby_value],
-                inewidth=2,
+                linewidth=2,
                 linestyle=line_styles[i % len(line_styles)],
             )
             ax.fill_between(
