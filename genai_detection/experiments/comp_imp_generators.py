@@ -289,7 +289,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         missing_mask = (
             pd.Series([t != opt_thres for t in test_dataset["thres"]])
             if "thres" in test_dataset.columns
-            else pd.Series(True, index=train_dataset.index)
+            else pd.Series(True, index=test_dataset.index)
         )
         if missing_mask.sum() > 0:
             new_rows = test_dataset[missing_mask].copy()
