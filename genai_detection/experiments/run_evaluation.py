@@ -156,10 +156,10 @@ def run_evaluation():
     print(f"Data root: {data_root}")
     results = []
 
-    for category in CATEGORY2DIRECTORY:
-        print(f"Evaluating category: {category}")
-        results.append(evaluate_category(category, data_root))
-        print("_" * 50)
+    # for category in CATEGORY2DIRECTORY:
+    #     print(f"Evaluating category: {category}")
+    #     results.append(evaluate_category(category, data_root))
+    #     print("_" * 50)
 
     # results are stored under wrong filenames, maybe bc of the multiprocessing?
     # with ThreadPoolExecutor() as executor:
@@ -172,7 +172,7 @@ def run_evaluation():
     #         print("Result:", result)
     #         results.append(result)
 
-    # run_extraction_evaluation()
+    run_extraction_evaluation()
 
     return results
 
