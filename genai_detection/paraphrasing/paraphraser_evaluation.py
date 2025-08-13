@@ -499,7 +499,7 @@ class ParaphrasingEvaluator:
 
         title = "Radar plot of Metric Distributions by Dataset"
         fig.suptitle(title)
-        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        plt.tight_layout()
 
         if save_path:
             save_path = Path(save_path)
