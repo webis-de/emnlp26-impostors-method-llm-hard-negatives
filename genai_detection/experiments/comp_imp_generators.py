@@ -185,10 +185,12 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             ), f"Expected 'pair' column in training dataset, but not found: {train_dataset.columns}"
             if col_score not in train_dataset:
                 train_dataset[col_score] = np.nan
+            print(f"Train dataset columns before merging: {train_dataset.columns}")
             train_dataset.set_index(
                 ["pair_left", "pair_right", "authors_left", "authors_right", "same"],
                 inplace=True,
             )
+            print(f"Train dataset columns before merging: {train_dataset.columns}")
 
             df_from_csv = _split_unhashable(df_from_csv)
             df_from_csv.drop(["pair", "authors"], axis=1, inplace=True)
