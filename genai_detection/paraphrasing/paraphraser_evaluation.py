@@ -1458,8 +1458,8 @@ class ParaphrasingEvaluator:
             if data_category
             else f"Metric Distributions\ngrouped by {group_by.capitalize()}"
         )
-        fig.suptitle(title, fontsize=18, y=0.95)
-        plt.tight_layout(rect=[0, 0, 0.85, 0.90])
+        fig.suptitle(title, fontsize=18)
+        plt.tight_layout(rect=[0, 0, 0.90, 0.95])
 
         if save_path:
             save_path = Path(save_path)
