@@ -38,11 +38,11 @@ CATEGORY2DIRECTORY = {
         "student_essays/Intro2006",
         "Ass1/2006_AB4847",
     ],  # stream of consciousness essay: 18 years old girl who writes about her bipolar ex-boyfriend of 8 months and her new boyfriend who loves music like her but is not catholic; she wants to live in the present
-    # "Gutenberg": ["gutenberg", "Othello_the_Moor_of_Venice_William_Shakespeare"],
-    # "News": [
-    #     "custom_texts",
-    #     "cnn_040725",
-    # ],  # Dalai Lama; "cnn_230625"    # USA attacks Iran
+    "Gutenberg": ["gutenberg", "Othello_the_Moor_of_Venice_William_Shakespeare"],
+    "News": [
+        "custom_texts",
+        "cnn_040725",
+    ],  # Dalai Lama; "cnn_230625"    # USA attacks Iran
 }
 
 
@@ -156,23 +156,12 @@ def run_evaluation():
     print(f"Data root: {data_root}")
     results = []
 
-    # for category in CATEGORY2DIRECTORY:
-    #     print(f"Evaluating category: {category}")
-    #     results.append(evaluate_category(category, data_root))
-    #     print("_" * 50)
+    for category in CATEGORY2DIRECTORY:
+        print(f"Evaluating category: {category}")
+        results.append(evaluate_category(category, data_root))
+        print("_" * 50)
 
-    # results are stored under wrong filenames, maybe bc of the multiprocessing?
-    # with ThreadPoolExecutor() as executor:
-    #     futures = {
-    #         executor.submit(evaluate_category, category, data_root): category
-    #         for category in CATEGORY2DIRECTORY
-    #     }
-    #     for future in as_completed(futures):
-    #         result = future.result()
-    #         print("Result:", result)
-    #         results.append(result)
-
-    run_extraction_evaluation()
+    # run_extraction_evaluation()
 
     return results
 
