@@ -171,9 +171,18 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             )
             with open(save_path / train_scores_file_name, "r") as f:
                 df_from_csv = pd.read_csv(f)
+                assert (
+                    "pair" in df_from_csv.columns
+                ), f"Expected 'pair' column in {train_scores_file_name}, but not found: {df_from_csv.columns}"
 
             train_dataset = _split_unhashable(train_dataset)
+            assert (
+                "pair" in train_dataset.columns
+            ), f"Expected 'pair' column in training dataset, but not found: {train_dataset.columns}"
             df_from_csv = _split_unhashable(df_from_csv)
+            assert (
+                "pair" in df_from_csv.columns
+            ), f"Expected 'pair' column in {train_scores_file_name}, but not found: {df_from_csv.columns}"
 
             train_dataset = pd.merge(
                 train_dataset,
@@ -197,6 +206,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 on=["pair_left", "pair_right", "authors_left", "authors_right", "same"],
                 how="left",
             )
+            print(f"Test dataset cols after merging: {test_dataset.columns}")
             assert (
                 not test_dataset.empty
             ), f"Test dataset is empty after merging with {test_scores_file_name}"
