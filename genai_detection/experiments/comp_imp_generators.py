@@ -180,6 +180,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 "pair" in train_dataset.columns
             ), f"Expected 'pair' column in training dataset, but not found: {train_dataset.columns}"
             df_from_csv = _split_unhashable(df_from_csv)
+            df_from_csv.drop(["pair", "authors"], axis=1, inplace=True)
             assert (
                 "pair" in df_from_csv.columns
             ), f"Expected 'pair' column in {train_scores_file_name}, but not found: {df_from_csv.columns}"
@@ -190,6 +191,8 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 on=["pair_left", "pair_right", "authors_left", "authors_right", "same"],
                 how="left",
             )
+            # if "pair_x" in train_dataset.columns:
+            #     train_dataset.rename(columns={"pair_x": "pair"}, inplace=True)
             print(f"Train dataset shape after merging: {train_dataset}")
             assert (
                 not train_dataset.empty
@@ -200,6 +203,9 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 df_from_csv = pd.read_csv(f)
             test_dataset = _split_unhashable(test_dataset)
             df_from_csv = _split_unhashable(df_from_csv)
+            df_from_csv.drop(["pair", "authors"], axis=1, inplace=True)
+            # if "pair_x" in test_dataset.columns:
+            #     test_dataset.rename(columns={"pair_x": "pair"}, inplace=True)
             test_dataset = pd.merge(
                 test_dataset,
                 df_from_csv,
