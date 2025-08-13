@@ -165,6 +165,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                     on=["pair", "authors", "same"],
                     how="left",
                 )
+                print(f"Train dataset shape after merging: {train_dataset}")
                 assert (
                     not train_dataset.empty
                 ), f"Train dataset is empty after merging with {train_scores_file_name}"
@@ -228,10 +229,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
 
         labels = train_dataset["same"].values
         print("DEBUG: Predictions in train dataset:", train_dataset[col_score].values)
-        scores = np.concatenate(
-            train_dataset[col_score].values
-        )  # each entry in scores is a one-element list
-
+        scores = train_dataset[col_score].values
         fpr, tpr, roc_thresholds = roc_curve(y_true=labels, y_score=scores)
         opt_thres = _get_opt_imp_threshold(fpr, tpr, roc_thresholds)
         if "thres" not in test_dataset.columns or test_dataset["thres"] != opt_thres:
