@@ -181,10 +181,6 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             ), f"Expected 'pair' column in training dataset, but not found: {train_dataset.columns}"
             df_from_csv = _split_unhashable(df_from_csv)
             df_from_csv.drop(["pair", "authors"], axis=1, inplace=True)
-            assert (
-                "pair" in df_from_csv.columns
-            ), f"Expected 'pair' column in {train_scores_file_name}, but not found: {df_from_csv.columns}"
-
             train_dataset = pd.merge(
                 train_dataset,
                 df_from_csv,
