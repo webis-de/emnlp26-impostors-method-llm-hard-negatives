@@ -113,7 +113,7 @@ class ContentImpostorGenerator(BaseImpostorGenerator):
             else ("mps" if torch.backends.mps.is_available() else "cpu")
         )
         print(f"Using device: {device}")
-        self.model = SentenceTransformer(model_name, device=device)
+        self.model = SentenceTransformer(model_name)  # , device=device)
 
     def generate_impostors(
         self, text: str, path2imp: str = None, real_time_generation: bool = False
