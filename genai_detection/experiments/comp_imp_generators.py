@@ -506,7 +506,7 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
     for imp_gen, vals in scores_per_imp_gen_per_thres_dict.items():
         axes[1, 0].plot(
             vals["thresholds"],
-            vals["precisions"][:-1],
+            vals["precisions"],
             label=imp_gen,
             color=colors[imp_gen],
         )
@@ -520,7 +520,7 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
     for imp_gen, vals in scores_per_imp_gen_per_thres_dict.items():
         axes[1, 1].plot(
             vals["thresholds"],
-            vals["recalls"][:-1],
+            vals["recalls"],
             label=imp_gen,
             color=colors[imp_gen],
         )
