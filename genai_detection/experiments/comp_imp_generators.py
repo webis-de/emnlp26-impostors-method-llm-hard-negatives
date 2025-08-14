@@ -334,6 +334,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         if any(missing_mask):
 
             print("Missing mask for test dataset:", missing_mask.index, missing_mask)
+            print("test data before:", test_dataset.index, type(test_dataset["pair"]))
             new_rows = test_dataset.loc[missing_mask].copy()
             print("cols", new_rows.columns)
             for row in new_rows.itertuples():
