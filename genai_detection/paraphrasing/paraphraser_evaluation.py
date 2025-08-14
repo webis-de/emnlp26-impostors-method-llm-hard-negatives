@@ -420,9 +420,14 @@ class ParaphrasingEvaluator:
                 for extr_g in re.split(r"[ /,]+", str(genre).lower())
             )
             time_match = self._similar(century, gt_century)
+            extracted_topic = (
+                extra.get("topic", extra) if isinstance(extra, dict) else extra
+            )
             topic_match = np.max(
                 [
-                    self._degree_of_similarity(gt_sub_topic.strip(), extra)
+                    self._degree_of_similarity(
+                        gt_sub_topic.strip(), extracted_topic.strip()
+                    )
                     for gt_sub_topic in str(gt_topic).lower().split(",")
                 ]
             )
