@@ -225,13 +225,21 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             if col_score not in test_dataset:
                 test_dataset[col_score] = np.nan
 
-            df_from_csv = _split_unhashable(df_from_csv)
             df_from_csv = df_from_csv.set_index(matching_cols)
+            df_from_csv = df_from_csv[~df_from_csv.index.duplicated(keep="last")]
             test_dataset = test_dataset.set_index(matching_cols)
 
             # Fill only missing col_score values
+            print(
+                "Number of nan in score column before filling:",
+                test_dataset[col_score].isna().sum(),
+            )
             test_dataset[col_score] = test_dataset[col_score].fillna(
                 df_from_csv[col_score]
+            )
+            print(
+                "Number of nan in score column after filling:",
+                test_dataset[col_score].isna().sum(),
             )
             test_dataset.index.names = matching_cols
             test_dataset.reset_index(inplace=True)
