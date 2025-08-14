@@ -324,8 +324,10 @@ class ParaphrasingEvaluator:
                     data_loaded[filename]["genre"],
                     data_loaded[filename]["century"],
                 )
+                print("SUCCESS: Loaded existing extraction for file:", filename)
             else:
                 try:
+                    raise Exception(f"Should not be here, but not found: {filename}")
                     extra, _, genre, century, _, _ = paraphraser._extract_bullet_points(
                         text=text,
                         prompt=paraphraser.extractor_prompt,
@@ -381,8 +383,7 @@ class ParaphrasingEvaluator:
                 print(
                     f"Paraphraser {paraphraser_name} not found in loaded data for '{text[:15]}...':\nError: {e}.\nGenerating new paraphrase."
                 )
-                # raise Exception(f"Should all be present, but not found: {e}") from e
-
+                raise Exception(f"Should all be present, but not found: {e}") from e
                 paraphrases = paraphraser.paraphrase(
                     text=text, temperature=self.temperature
                 )
