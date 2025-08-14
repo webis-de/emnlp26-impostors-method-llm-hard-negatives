@@ -401,6 +401,7 @@ class ParaphrasingEvaluator:
                 paraphrases = []
                 for temperature in potential_paraphrases.keys():
                     paraphrases.extend(potential_paraphrases[temperature])
+                print("11 Successfully loaded existing paraphrases for file:", filename)
             except Exception as e:
                 print(
                     f"Paraphraser {paraphraser_name} not found in loaded data for '{text[:15]}...':\nError: {e}.\nGenerating new paraphrase."
