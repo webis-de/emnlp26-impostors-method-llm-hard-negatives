@@ -311,7 +311,7 @@ class ParaphrasingEvaluator:
             df.itertuples(), total=len(df), desc=f"Evaluating {paraphraser_name}"
         ):
             text = str(getattr(row, "text", ""))
-            filename = getattr(row, "filename", "unknown")
+            filename = str(getattr(row, "filename", "unknown"))
             assert (
                 file_existing_extractions.exists()
             ), f"File {file_existing_extractions} does not exist."
