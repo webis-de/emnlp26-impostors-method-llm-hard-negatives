@@ -312,9 +312,18 @@ class ParaphrasingEvaluator:
         ):
             text = str(getattr(row, "text", ""))
             filename = getattr(row, "filename", "unknown")
+            assert (
+                file_existing_extractions.exists()
+            ), f"File {file_existing_extractions} does not exist."
             if file_existing_extractions.exists():
                 with open(file_existing_extractions, "r") as f:
                     data_loaded = json.load(f)
+                print(
+                    "Keys in loaded data:",
+                    data_loaded.keys(),
+                    type(data_loaded[data_loaded.keys()[0]]),
+                )
+                print("filename key we are looking for:", filename, type(filename))
             else:
                 data_loaded = {}
 
