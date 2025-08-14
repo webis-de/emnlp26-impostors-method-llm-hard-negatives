@@ -130,10 +130,12 @@ def run_extraction_evaluation():
     model = SAIAParaphraser()
     # since extractor is the same model for all paraphrasers, evaluate only one paraphraser is sufficient
     paraphrasers = {
-        # "TopicParaphraser": TopicParaphraser(model, model),
+        "TopicParaphraser": TopicParaphraser(
+            model, model
+        ),  # we extract topic, hence, best choice
         # "TaskParaphraser": TaskParaphraser(model, model),
         # "TitleParaphraser": TitleParaphraser(model, model),
-        "BulletPointParaphraser": BulletPointParaphraser(model, model),
+        # "BulletPointParaphraser": BulletPointParaphraser(model, model),
     }
 
     evaluator = ParaphrasingEvaluator(
