@@ -273,61 +273,15 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             )
             if col_score not in test_dataset:
                 test_dataset[col_score] = np.nan
-            # test_dataset.set_index(
-            #     ["pair_left", "pair_right", "authors_left", "authors_right", "same"],
-            #     inplace=True,
-            #     # drop=False,
-            # )
 
             df_from_csv = _split_unhashable(df_from_csv)
-            # df_from_csv.drop(["pair", "authors"], axis=1, inplace=True)
-            # df_from_csv.set_index(
-            #     ["pair_left", "pair_right", "authors_left", "authors_right", "same"],
-            #     inplace=True,
-            #     # drop=False,
-            # )
-
-            # FIXME: destroys integrity of the dataset
-
-            # for df in (test_dataset, df_from_csv):
-            #     df.index = pd.MultiIndex.from_frame(
-            #         df.index.to_frame().astype(str).apply(lambda s: s.str.strip())
-            #     )
-
             df_from_csv = df_from_csv.set_index(matching_cols)
             test_dataset = test_dataset.set_index(matching_cols)
-            print("important")
-            print(test_dataset.index.equals(df_from_csv.index))
-            print(test_dataset.index.dtypes)
-            print(df_from_csv.index.dtypes)
-            # print(
-            #     "Only in test_dataset:",
-            #     len(test_dataset.index.difference(df_from_csv.index)),
-            # )
-            # print(
-            #     "Only in df_from_csv:",
-            #     len(df_from_csv.index.difference(test_dataset.index)),
-            # )
 
             # Fill only missing col_score values
             test_dataset[col_score] = test_dataset[col_score].fillna(
                 df_from_csv[col_score]
             )
-
-            # FIXME: try this
-            # for row in df_from_csv.itertuples():
-            #     for row_test in test_dataset.itertuples():
-            #         if all(
-            #             [
-            #                 getattr(row, col) == getattr(row_test, col)
-            #                 for col in matching_cols
-            #             ]
-            #         ):
-            #             test_dataset.loc[row_test.Index, col_score] = getattr(
-            #                 row, col_score
-            #             )
-            #             continue
-            # test_dataset = test_dataset.combine_first(df_from_csv)
             print(f"Test dataset cols after merging: {test_dataset.columns}")
             print(
                 "Test dataset cols after merging pair col",
@@ -338,7 +292,8 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             assert (
                 not test_dataset.empty
             ), f"Test dataset is empty after merging with {test_scores_file_name}"
-        # fill nan values of new rows with predicted values
+        train_dataset.reset_index(inplace=True)
+        test_dataset.reset_index(inplace=True)
         print(f"Running impostor detector for impostor generation approach: {imp_gen}")
         print("2 Number of elements in train dataset:", len(train_dataset))
         missing_mask = (
@@ -394,12 +349,8 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         scores = train_dataset[col_score].values
         fpr, tpr, roc_thresholds = roc_curve(y_true=labels, y_score=scores)
         opt_thres = _get_opt_imp_threshold(fpr, tpr, roc_thresholds)
-        # do not use multi index
         missing_mask = (
-            # pd.Series(
             [t != opt_thres for t in test_dataset["thres"]]
-            # , index=test_dataset.index,
-            # )
             if "thres" in test_dataset.columns
             else [True]
             * len(test_dataset)  # pd.Series(True)#, index=test_dataset.index)
@@ -407,7 +358,6 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         if any(missing_mask):
 
             print("Missing mask for test dataset:", missing_mask.index, missing_mask)
-            # print("test data before:", test_dataset.index, type(test_dataset["pair"]))
             print(
                 "test data before:",
                 [type(p) for p in test_dataset["pair"]],
