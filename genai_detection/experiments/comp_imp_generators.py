@@ -334,7 +334,17 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         if any(missing_mask):
 
             print("Missing mask for test dataset:", missing_mask.index, missing_mask)
-            print("test data before:", test_dataset.index, type(test_dataset["pair"]))
+            # print("test data before:", test_dataset.index, type(test_dataset["pair"]))
+            print(
+                "test data before:",
+                [type(p) for p in test_dataset["pair"]],
+                type(test_dataset["pair"]),
+            )
+            none_indices = test_dataset.index[
+                test_dataset["pair"].isna()
+                | (test_dataset["pair"].apply(lambda x: x is None))
+            ].tolist()
+            print("Indices with pair=None:", none_indices)
             new_rows = test_dataset.loc[missing_mask].copy()
             print("cols", new_rows.columns)
             for row in new_rows.itertuples():
