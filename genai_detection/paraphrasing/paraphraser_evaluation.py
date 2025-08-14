@@ -479,14 +479,18 @@ class ParaphrasingEvaluator:
             if m in df_all.columns and pd.api.types.is_numeric_dtype(df_all[m])
         ]
         assert metrics, "No numeric metrics found to plot."
-        grouped_mean = df_all.groupby(dataset_col)[metrics].mean()
-        grouped_std = df_all.groupby(dataset_col)[metrics].std()
+        grouped_mean = df_all.groupby(dataset_col)[metrics].mean().round(2)
+        grouped_std = df_all.groupby(dataset_col)[metrics].std().round(2)
+        grouped_median = df_all.groupby(dataset_col)[metrics].median().round(2)
 
         if save_path:
             save_path = Path(save_path)
             save_path.mkdir(parents=True, exist_ok=True)
-            mean_std_df = pd.concat({"mean": grouped_mean, "std": grouped_std}, axis=1)
-            csv_out = save_path / "extraction_metrics_mean_std_per_dataset.csv"
+            mean_std_df = pd.concat(
+                {"mean": grouped_mean, "std": grouped_std, "median": grouped_median},
+                axis=1,
+            )
+            csv_out = save_path / "extraction_metrics_mean_std_median_per_dataset.csv"
             mean_std_df.to_csv(csv_out)
             print(f"Saved mean/std values as CSV file to {csv_out}")
 
