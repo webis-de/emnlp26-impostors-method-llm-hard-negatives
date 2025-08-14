@@ -105,7 +105,12 @@ def _get_opt_imp_threshold(fpr, tpr, thresholds):
 
 def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_minds"):
     print(f"Generating impostor with {imp_gen} generator")
-    assert pair is not None and not pd.isna(pair), "Pair must not be None"
+    assert pair is not None and not (
+        pd.isna(pair).any()
+        if isinstance(pair, (list, tuple, np.ndarray))
+        else pd.isna(pair)
+    ), "Pair must not be None or NaN"
+
     impostor_detector = ImpostorDetector(
         impostor_technique=imp_gen,
         n_impostors=50,
