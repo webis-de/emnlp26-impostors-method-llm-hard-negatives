@@ -392,7 +392,12 @@ class ParaphrasingEvaluator:
                 print(
                     "Keys for paraphraser:", data_loaded[paraphraser_name][text].keys()
                 )
-                potential_paraphrases = data_loaded[paraphraser_name][text][None]
+                key = (
+                    "null"
+                    if "null" in data_loaded[paraphraser_name][text].keys()
+                    else None
+                )
+                potential_paraphrases = data_loaded[paraphraser_name][text][key]
                 paraphrases = []
                 for temperature in potential_paraphrases.keys():
                     paraphrases.extend(potential_paraphrases[temperature])
