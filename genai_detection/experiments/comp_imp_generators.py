@@ -539,12 +539,12 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
         by_label.values(),
         by_label.keys(),
         loc="center right",
-        bbox_to_anchor=(0.95, 0.8),
+        bbox_to_anchor=(1.02, 0.8),
         ncol=1,
         frameon=False,
     )
 
-    plt.tight_layout(rect=[0, 0, 0.95, 0.95])  # leave space for legend
+    plt.tight_layout(rect=[0, 0, 0.85, 1])  # leave space for legend
     plt.subplots_adjust(hspace=0.2)
     save_path.mkdir(parents=True, exist_ok=True)
     plt.savefig(
