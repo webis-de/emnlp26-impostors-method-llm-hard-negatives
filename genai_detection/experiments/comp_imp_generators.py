@@ -292,8 +292,9 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             ), f"Test dataset is empty after merging with {test_scores_file_name}"
         train_dataset.index.names = matching_cols
         train_dataset.reset_index(inplace=True)  # , drop=True)
-        test_dataset.index.names = matching_cols
-        test_dataset.reset_index(inplace=True)  # , drop=True)
+        print("Test dataset index names:", test_dataset.index.names)
+        # test_dataset.index.names = matching_cols
+        # test_dataset.reset_index(inplace=True)  # , drop=True)
         print(f"Running impostor detector for impostor generation approach: {imp_gen}")
         print("2 Number of elements in train dataset:", len(train_dataset))
         missing_mask = (
