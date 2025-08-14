@@ -31,14 +31,14 @@ SAVE_PATH = (
     / "impostor_generator_comparison"
 )
 IMP_GEN_OPTIONS = [
-    # "fixed",
+    "fixed",
     # "naive_llm",
     # "non_naive_llm",
     # "llm",
-    # "text_len",
-    "content",
-    # "on-the-fly",
-    # "mirror_minds",
+    "text_len",
+    # "content",    # device error
+    # "on-the-fly", # no more api calls
+    # "mirror_minds", # device error
 ]
 
 
@@ -573,6 +573,7 @@ if __name__ == "__main__":
         save_path=SAVE_PATH,
         dataset_name=CONFIG.STUDENT_ESSAYS,
     )
+    print("Experiment for Student Essays dataset completed. Plots saved to:", SAVE_PATH)
 
     # Blog
     # print("Running experiment for Blog dataset.")
