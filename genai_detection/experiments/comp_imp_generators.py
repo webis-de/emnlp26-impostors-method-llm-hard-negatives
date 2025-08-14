@@ -31,11 +31,11 @@ SAVE_PATH = (
     / "impostor_generator_comparison"
 )
 IMP_GEN_OPTIONS = [
-    "fixed",
+    # "fixed",
     # "naive_llm",
     # "non_naive_llm",
     # "llm",
-    "text_len",
+    # "text_len",
     "content",
     # "on-the-fly",
     # "mirror_minds",
