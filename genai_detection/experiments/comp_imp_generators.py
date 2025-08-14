@@ -160,8 +160,16 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         ignore_index=False,
     )
     assert not any(
-        [pair is None or pd.isna(pair) for pair in test_dataset["pair"]]
-    ), "Test dataset pairs must not be None"
+        [
+            pair is None
+            or (
+                pd.isna(pair).any()
+                if hasattr(pair, "__iter__") and not isinstance(pair, str)
+                else pd.isna(pair)
+            )
+            for pair in test_dataset["pair"]
+        ]
+    ), "Test dataset pairs must not be None or NaN"
 
     path2imp = (
         Path(os.getcwd()).resolve() / CONFIG.PATH2BLOG
