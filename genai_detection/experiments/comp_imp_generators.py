@@ -229,21 +229,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             ), f"Expected 'pair' column in training dataset, but not found: {train_dataset.columns}"
             if col_score not in train_dataset:
                 train_dataset[col_score] = np.nan
-            # print(f"Train dataset columns before merging: {train_dataset.columns}")
-            # train_dataset.set_index(
-            #     ["pair_left", "pair_right", "authors_left", "authors_right", "same"],
-            #     inplace=True,
-            #     # drop=False,
-            # )
-            # print(f"Train dataset columns before merging: {train_dataset.columns}")
 
-            # df_from_csv = _split_unhashable(df_from_csv)
-            # df_from_csv.drop(["pair", "authors"], axis=1, inplace=True)
-            # df_from_csv.set_index(
-            #     ["pair_left", "pair_right", "authors_left", "authors_right", "same"],
-            #     inplace=True,
-            #     # drop=False,
-            # )
             df_from_csv = df_from_csv.set_index(matching_cols)
             df_from_csv = df_from_csv[~df_from_csv.index.duplicated(keep="last")]
             train_dataset = train_dataset.set_index(matching_cols)
@@ -253,9 +239,12 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             train_dataset[col_score] = train_dataset[col_score].fillna(
                 df_from_csv[col_score]
             )
-
-            # train_dataset = train_dataset.combine_first(df_from_csv)
             print(f"Train dataset columns after merging: {train_dataset.columns}")
+            train_dataset.index.names = matching_cols
+            train_dataset.reset_index(inplace=True)  # , drop=True)
+            print(
+                f"Train dataset columns after reseting index: {train_dataset.columns}"
+            )
             assert (
                 not train_dataset.empty
             ), f"Train dataset is empty after merging with {train_scores_file_name}"
@@ -290,11 +279,13 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             assert (
                 not test_dataset.empty
             ), f"Test dataset is empty after merging with {test_scores_file_name}"
-        train_dataset.index.names = matching_cols
-        train_dataset.reset_index(inplace=True)  # , drop=True)
-        print("Test dataset index names:", test_dataset.index.names)
-        # test_dataset.index.names = matching_cols
-        # test_dataset.reset_index(inplace=True)  # , drop=True)
+
+            print("Test dataset columns after merging:", test_dataset.columns)
+            test_dataset.index.names = matching_cols
+            test_dataset.reset_index(inplace=True)  # , drop=True)
+            print(
+                "Test dataset columns names after reseting index:", test_dataset.columns
+            )
         print(f"Running impostor detector for impostor generation approach: {imp_gen}")
         print("2 Number of elements in train dataset:", len(train_dataset))
         missing_mask = (
