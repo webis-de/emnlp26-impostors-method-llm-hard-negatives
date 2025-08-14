@@ -156,9 +156,9 @@ class ParaphrasingEvaluator:
                 tries += 1
         self.wmd_model = model.WordEmbedding(model=self.pretr_word_model)
         self.base_dirs = {
-            # "blog": Path(__file__).resolve().parents[2] / "data/datasets/Blog_corpus/",
-            # "gutenberg": Path(__file__).resolve().parents[2]
-            # / "data/datasets/gutenberg/",
+            "blog": Path(__file__).resolve().parents[2] / "data/datasets/Blog_corpus/",
+            "gutenberg": Path(__file__).resolve().parents[2]
+            / "data/datasets/gutenberg/",
             # "custom": Path(__file__).resolve().parents[2]
             # / "data/datasets/custom_texts/",
             "student_essays": Path(__file__).resolve().parents[2]
