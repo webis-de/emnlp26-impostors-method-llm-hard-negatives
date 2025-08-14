@@ -234,7 +234,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 df_from_csv[col_score]
             )
             test_dataset.index.names = matching_cols
-            test_dataset.reset_index(inplace=True)  # , drop=True)
+            test_dataset.reset_index(inplace=True)
 
         missing_mask = (
             train_dataset[col_score].isna()
@@ -242,8 +242,11 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             else pd.Series(True, index=train_dataset.index)
         )
         if missing_mask.sum() > 0:
+            print(
+                f"DEBUG Missing {col_score} in {missing_mask.sum()} rows of train dataset for {imp_gen} generator."
+            )
             new_rows = train_dataset[missing_mask].copy()
-            with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
+            with ThreadPoolExecutor() as executor:
                 results = list(
                     executor.map(
                         _helper_impostor,
@@ -267,19 +270,22 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         labels = train_dataset["same"].values
         scores = train_dataset[col_score].values
 
-        print("DEBUG: Predictions in train dataset:", scores)
-        print("DEBUG: True labels in train dataset:", labels)
+        # print("DEBUG: Predictions in train dataset:", scores)
+        # print("DEBUG: True labels in train dataset:", labels)
         fpr, tpr, roc_thresholds = roc_curve(y_true=labels, y_score=scores)
         print("DEBUG: FPR:", fpr)
         print("DEBUG: TPR:", tpr)
         print("DEBUG: ROC thresholds:", roc_thresholds)
         opt_thres = _get_opt_imp_threshold(fpr, tpr, roc_thresholds)
         missing_mask = (
-            [t != opt_thres for t in test_dataset["thres"]]
-            if "thres" in test_dataset.columns
-            else [True] * len(test_dataset)
+            test_dataset[col_score].isna()
+            if col_score in test_dataset.columns
+            else pd.Series(True, index=test_dataset.index)
         )
-        if any(missing_mask):
+        if missing_mask.sum() > 0:
+            print(
+                f"DEBUG Missing {col_score} in {missing_mask.sum()} rows of test dataset for {imp_gen} generator."
+            )
             new_rows = test_dataset.loc[missing_mask].copy()
             test_dataset["thres"] = opt_thres
             with ThreadPoolExecutor() as executor:
@@ -297,8 +303,15 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             test_dataset.loc[missing_mask, col_dict] = [
                 imp_dict for _, imp_dict in results
             ]
-            test_dataset[f"impostor_prediction_{imp_gen}"] = (
-                test_dataset[col_score] > opt_thres
+
+        missing_pred_mask = (
+            [t != opt_thres for t in test_dataset["thres"]]
+            if "thres" in test_dataset.columns
+            else [True] * len(test_dataset)
+        )
+        if any(missing_pred_mask):
+            test_dataset[missing_pred_mask, f"impostor_prediction_{imp_gen}"] = (
+                test_dataset[missing_pred_mask, col_score] > opt_thres
             )
 
             test_dataset.to_csv(
@@ -461,8 +474,6 @@ def get_scores_dict_for_diff_thres(df: pd.DataFrame):
             continue
         y_true = df["same"].values
         y_scores = df[f"impostor_score_{imp_gen}"].values
-        # if y_scores.ndim > 1:
-        #     y_scores = np.concatenate(y_scores)
         scores_per_imp_gen_per_thres[imp_gen] = compute_metrics_over_thresholds(
             y_true, y_scores
         )
@@ -506,14 +517,13 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
         ax.set_title(title, fontsize=14)
         ax.grid(False)
 
-    # --- One shared legend on right side, slightly lower ---
     handles, labels = axes[0, 0].get_legend_handles_labels()
     by_label = dict(zip(labels, handles))  # keep only unique labels
     fig.legend(
         by_label.values(),
         by_label.keys(),
-        loc="center right",  # right side
-        bbox_to_anchor=(1.05, 0.5),  # slightly lower
+        loc="center right",
+        bbox_to_anchor=(1.05, 0.5),
         ncol=1,
         frameon=False,
     )
