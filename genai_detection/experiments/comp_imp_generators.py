@@ -179,6 +179,11 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             for pair in test_dataset["pair"]
         ]
     ), "Test dataset pairs must not be None or NaN"
+    print(
+        "Test dataset cols at beginning pair col",
+        [type(p) for p in test_dataset["pair"]],
+        type(test_dataset["pair"]),
+    )
 
     path2imp = (
         Path(os.getcwd()).resolve() / CONFIG.PATH2BLOG
@@ -244,6 +249,11 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 df_from_csv = pd.read_csv(f)
                 # df_from_csv.reset_index(inplace=True)
             test_dataset = _split_unhashable(test_dataset)
+            print(
+                "Test dataset cols after split unhashable pair col",
+                [type(p) for p in test_dataset["pair"]],
+                type(test_dataset["pair"]),
+            )
             if col_score not in test_dataset:
                 test_dataset[col_score] = np.nan
             test_dataset.set_index(
@@ -262,6 +272,11 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
 
             test_dataset = test_dataset.combine_first(df_from_csv)
             print(f"Test dataset cols after merging: {test_dataset.columns}")
+            print(
+                "Test dataset cols after merging pair col",
+                [type(p) for p in test_dataset["pair"]],
+                type(test_dataset["pair"]),
+            )
             assert (
                 not test_dataset.empty
             ), f"Test dataset is empty after merging with {test_scores_file_name}"
