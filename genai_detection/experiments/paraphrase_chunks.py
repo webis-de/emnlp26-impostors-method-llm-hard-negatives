@@ -313,7 +313,9 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
 
 def evaluate_paraphrases(path2dataset: str, save_path: Path) -> List[pd.DataFrame]:
     assert os.path.exists(path2dataset), f"Dataset path {path2dataset} does not exist."
-    file2existing_paraphrases = save_path / "existing_chunk_paraphrases.json"
+    file2existing_paraphrases = (
+        save_path / "paraphrases_per_text" / "existing_chunk_paraphrases.json"
+    )
     if not file2existing_paraphrases.exists():
         raise FileNotFoundError(
             f"File with existing paraphrases {file2existing_paraphrases} does not exist."
@@ -537,6 +539,7 @@ if __name__ == "__main__":
     paraphrase_save_path = SAVE_PATH / "cross_genre" / "paraphrases_per_text"
     paraphrase_save_path.mkdir(parents=True, exist_ok=True)
 
+    # works on minimal example (15.08.2025)
     if args.task == "create":
         # only create paraphrasers and save them
         print(f"Creating and saving paraphrasers to {paraphrase_save_path}.")
