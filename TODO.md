@@ -99,9 +99,9 @@
   - Precision-Recall curve can be better than F1 score, bc we can decide what is the focus (i.e. high precision)
 - [o] run `experiments/naive_paraphrasers_FPs.py` on cluster via `scripts/exp_naive_paraphrasers_FPs.sh`
   - cancelled due to time limitations
-- [o] run `experiments/run_evaluation.py`via `scripts/evaluate_paraphrasers.sh`
-  - cancelled due to time limitations
-  - trying to get parallelization working
+- [x] run `experiments/run_evaluation.py`via `scripts/evaluate_paraphrasers.sh`
+  - metrics: BLEU, ROUGE-1, ROUGE-L, BERTScore, cosine similarity of SBERT vectors, WMS, ... on paraphrases to reference
+  - (extractor) evaluation (time, genre, topic, length)
 - [o] run `experiments/paraphrase_chunks.py`via `scripts/exp_chunks_paraphrasing.sh`
   - cancelled due to time limitations
   - ~~trying to get parallelization working~~
@@ -120,6 +120,8 @@
     - [ ] run on-the-fly on subset bc free API calls limited to 250 queries per month
 - [o] Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
 - [o] Compare Impostor generators and MirrorMinds-LLMDetector paraphrase' effect on impostor detector scores (`comp_imp_generators.py`)
+- [x] IONOS paraphraser
+- [ ] Fix MirrorMinds in impostor generator `comp_imp_generators.py` does not work...!!!
 - [x] experiment: Syntactic similarity impact on impostor scores
   - Student Essay dataset: bad
   - Blog dataset: ok
@@ -541,7 +543,7 @@
       - [x] impostor  
       - [x] Unmasking  
       - [x] Add test split for Huggingface dataset
-    - [ ] Acquisition of dataset _Student essays_: James W. Pennebaker is looking for it, Moshe Koppel no longer has it
+    - [x] Acquisition of dataset _Student essays_: James W. Pennebaker is looking for it, Moshe Koppel no longer has it
       - [ ] impostor  
       - [ ] Unmasking  
   - [ ] **Paraphrasing approaches** at PAN and ELOQUENT  
