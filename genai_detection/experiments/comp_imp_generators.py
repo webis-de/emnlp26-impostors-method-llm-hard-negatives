@@ -321,21 +321,23 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         scores = train_dataset[col_score].values
         fpr, tpr, roc_thresholds = roc_curve(y_true=labels, y_score=scores)
         opt_thres = _get_opt_imp_threshold(fpr, tpr, roc_thresholds)
+        # do not use multi index
         missing_mask = (
-            pd.Series(
-                [t != opt_thres for t in test_dataset["thres"]],
-                index=test_dataset.index,
-            )
+            # pd.Series(
+            [t != opt_thres for t in test_dataset["thres"]]
+            # , index=test_dataset.index,
+            # )
             if "thres" in test_dataset.columns
-            else pd.Series(True, index=test_dataset.index)
+            else [True]
+            * len(test_dataset)  # pd.Series(True)#, index=test_dataset.index)
         )
         if missing_mask.sum() > 0:
 
             print("Missing mask for test dataset:", missing_mask.index, missing_mask)
-            new_rows = test_dataset[missing_mask].copy()
+            new_rows = test_dataset.loc[missing_mask].copy()
             print("cols", new_rows.columns)
             for row in new_rows.itertuples():
-                print("row", row.index, type(row.pair), row.pair)
+                print("row", row.index, type(row.pair))
                 # print(
                 #     f"Row {row.Index} with pair {len(row.pair)} has threshold {row.thres}, setting to optimal threshold {opt_thres}"
                 # )
