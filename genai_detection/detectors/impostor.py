@@ -248,6 +248,11 @@ class ImpostorDetector(ImpostorBase):
         :param text: input text or batch of input texts
         :return: score indicating whether the input text is machine-generated, i.e. close 1 means machine-generated, close 0 means human-written
         """
+        assert isinstance(
+            text, Iterable
+        ), "Input text must be iterable. But got: {}".format(
+            type(text), text[0:10] if isinstance(text, (str, list)) else text
+        )
         text = list(text)  # convert to tuple to list
 
         scores_per_pair = defaultdict(
