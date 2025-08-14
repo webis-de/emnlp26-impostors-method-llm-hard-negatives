@@ -239,7 +239,7 @@ class ParaphrasingEvaluator:
             if file.suffix == ".csv" and dataset_type == "blog":
                 df = pd.read_csv(file)
                 df["text"] = df["text"].apply(_preprocess_text)
-                df = df[df["text"].apply(lambda x: len(x.split()) >= 500)]
+                df = df[df["text"].apply(lambda x: len(x.split()) >= 700)]
 
                 df["year"] = (
                     pd.to_datetime(df["date"], errors="coerce", dayfirst=True)
@@ -254,7 +254,7 @@ class ParaphrasingEvaluator:
                 with open(file, "r", encoding="utf-8") as f:
                     author = " ".join(file.stem.split("_")[-2:])
                     content = _preprocess_text(f.read())
-                    if len(content.split()) >= 500:
+                    if len(content.split()) >= 700:
                         data.append(
                             {"author": author, "text": content, "filename": file.stem}
                         )
