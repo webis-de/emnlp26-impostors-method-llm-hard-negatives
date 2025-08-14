@@ -200,7 +200,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
                 data_loaded = json.load(f)
         else:
             data_loaded = {}
-            data_loaded.setdefault(text_key, {})
+        data_loaded.setdefault(text_key, {})
 
         for num_chunks in tqdm(
             range(1, 6), desc="Evaluating with different chunk sizes"
