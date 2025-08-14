@@ -492,7 +492,7 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
             vals["f1s"],
             label=imp_gen,
             color=colors[imp_gen],
-            linewidth=2.5,
+            linewidth=1.5,
         )
     axes[0, 0].set_xlabel("Threshold", fontsize=14)
     axes[0, 0].set_ylabel("F1 Score $\\frac{{2PR}}{{P+R}}$", fontsize=14)
@@ -507,7 +507,7 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
             vals["accs"],
             label=imp_gen,
             color=colors[imp_gen],
-            linewidth=2.5,
+            linewidth=1.5,
         )
     axes[0, 1].set_xlabel("Threshold", fontsize=14)
     axes[0, 1].set_ylabel("Accuracy Score $\\frac{{TP + TN}}{{N}}$", fontsize=14)
@@ -522,7 +522,7 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
             vals["precisions"],
             label=imp_gen,
             color=colors[imp_gen],
-            linewidth=2.5,
+            linewidth=1.5,
         )
     axes[1, 0].set_xlabel("Threshold", fontsize=14)
     axes[1, 0].set_ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
@@ -537,7 +537,7 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
             vals["recalls"],
             label=imp_gen,
             color=colors[imp_gen],
-            linewidth=2.5,
+            linewidth=1.5,
         )
     axes[1, 1].set_xlabel("Threshold", fontsize=14)
     axes[1, 1].set_ylabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
@@ -561,7 +561,7 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
     )
 
     plt.tight_layout(rect=[0, 0, 1, 0.95])
-    plt.subplots_adjust(hspace=0.4)
+    plt.subplots_adjust(hspace=0.2)
     save_path.mkdir(parents=True, exist_ok=True)
     plt.savefig(save_path / f"{dataset_name}_threshold_curves_all.svg")
     plt.close(fig)
