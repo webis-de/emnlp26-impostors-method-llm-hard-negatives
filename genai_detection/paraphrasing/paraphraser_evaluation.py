@@ -155,14 +155,13 @@ class ParaphrasingEvaluator:
                 tries += 1
         self.wmd_model = model.WordEmbedding(model=self.pretr_word_model)
         self.base_dirs = {
-            "blog": Path(__file__).resolve().parents[2] / "data/datasets/Blog_corpus/",
-            "gutenberg": Path(__file__).resolve().parents[2]
-            / "data/datasets/gutenberg/",
+            # "blog": Path(__file__).resolve().parents[2] / "data/datasets/Blog_corpus/",
+            # "gutenberg": Path(__file__).resolve().parents[2]
+            # / "data/datasets/gutenberg/",
             # "custom": Path(__file__).resolve().parents[2]
             # / "data/datasets/custom_texts/",
-            # TODO: Add student essays dataset
-            # "student_essays": Path(__file__).resolve().parents[2]
-            # / "data/datasets/student_essays/Intro2006/",
+            "student_essays": Path(__file__).resolve().parents[2]
+            / "data/datasets/student_essays/Intro2006/",
         }
         self.ground_truth = ground_truth or {}
         self.data_category = data_category or "unknown"
@@ -206,6 +205,47 @@ class ParaphrasingEvaluator:
             return int(century)
         return int(time_period)
 
+    def _create_student_essays_metadata(self, base_dir: Path):
+        task_description = {
+            "Ass1": "Stream of consciousness",
+            "Ass2": "childhood",
+            "Ass3": "personality",
+            "Ass4": "Thematic Apperception Test",
+            "Ass5": "different theories",  # not used in Koppel et al. (2014)
+        }
+        rows = []
+        for file in chain(
+            (base_dir / assignment).glob("*.txt")
+            for assignment in ["Ass1", "Ass2", "Ass3", "Ass4"]
+        ):
+            if not file.is_file():
+                continue
+            text = file.read_text(encoding="utf-8")
+            if len(text.split()) < 700:
+                continue
+            filename = file.stem
+            assignment = file.split("/")[-2]
+            if assignment == "Ass5" or assignment not in task_description:
+                continue
+            author = (
+                filename
+                if assignment != "Ass1" or "2006_" not in filename
+                else filename.split("_")[-1]
+            )
+            metadata = {
+                "filename": filename,
+                "author": author,
+                "topic": task_description.get(assignment, "Unknown"),
+                "text": _preprocess_text(text),
+                "year": "2006",
+                "genre": "Essay",
+                "century": 21,
+            }
+            rows.append(metadata)
+        metadata_df = pd.DataFrame(rows)
+        metadata_df.to_excel(base_dir / "file_metadata.xlsx", index=False, mode="a")
+        return metadata_df
+
     def _load_dataset(self, base_dir: Path, dataset_type: str) -> pd.DataFrame:
         """
         Load dataset texts and metadata (if available), preprocess and filter.
@@ -220,7 +260,12 @@ class ParaphrasingEvaluator:
         metadata = None
         data = []
         path2metadata = base_dir / "file_metadata.xlsx"
-        if dataset_type != "blog":
+        if dataset_type == "student_essays":
+            if not path2metadata.exists():
+                self._create_student_essays_metadata(base_dir)
+            return pd.read_excel(path2metadata)
+
+        elif dataset_type in ["gutenberg", "custom"]:
             if not path2metadata.exists():
                 raise FileNotFoundError(
                     f"Metadata file {path2metadata} does not exist. Current path: {os.getcwd()}"
