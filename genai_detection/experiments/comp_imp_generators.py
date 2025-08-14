@@ -219,7 +219,6 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             )
             with open(save_path / train_scores_file_name, "r") as f:
                 df_from_csv = pd.read_csv(f)
-                # df_from_csv.reset_index(inplace=True)
                 assert (
                     "pair" in df_from_csv.columns
                 ), f"Expected 'pair' column in {train_scores_file_name}, but not found: {df_from_csv.columns}"
@@ -264,7 +263,6 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         if (save_path / test_scores_file_name).exists():
             with open(save_path / test_scores_file_name, "r") as f:
                 df_from_csv = pd.read_csv(f)
-                # df_from_csv.reset_index(inplace=True)
             test_dataset = _split_unhashable(test_dataset)
             print(
                 "Test dataset cols after split unhashable pair col",
@@ -292,8 +290,10 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             assert (
                 not test_dataset.empty
             ), f"Test dataset is empty after merging with {test_scores_file_name}"
-        train_dataset.reset_index(inplace=True)
-        test_dataset.reset_index(inplace=True)
+        train_dataset.index.names = matching_cols
+        train_dataset.reset_index(inplace=True)  # , drop=True)
+        test_dataset.index.names = matching_cols
+        test_dataset.reset_index(inplace=True)  # , drop=True)
         print(f"Running impostor detector for impostor generation approach: {imp_gen}")
         print("2 Number of elements in train dataset:", len(train_dataset))
         missing_mask = (
