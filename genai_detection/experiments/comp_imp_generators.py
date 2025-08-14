@@ -290,14 +290,14 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             print(test_dataset.index.equals(df_from_csv.index))
             print(test_dataset.index.dtypes)
             print(df_from_csv.index.dtypes)
-            print(
-                "Only in test_dataset:",
-                len(test_dataset.index.difference(df_from_csv.index)),
-            )
-            print(
-                "Only in df_from_csv:",
-                len(df_from_csv.index.difference(test_dataset.index)),
-            )
+            # print(
+            #     "Only in test_dataset:",
+            #     len(test_dataset.index.difference(df_from_csv.index)),
+            # )
+            # print(
+            #     "Only in df_from_csv:",
+            #     len(df_from_csv.index.difference(test_dataset.index)),
+            # )
 
             # Fill only missing col_score values
             test_dataset[col_score] = test_dataset[col_score].fillna(
@@ -317,7 +317,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             #                 row, col_score
             #             )
             #             continue
-            test_dataset = test_dataset.combine_first(df_from_csv)
+            # test_dataset = test_dataset.combine_first(df_from_csv)
             print(f"Test dataset cols after merging: {test_dataset.columns}")
             print(
                 "Test dataset cols after merging pair col",
