@@ -32,7 +32,7 @@ SAVE_PATH = (
 )
 IMP_GEN_OPTIONS = [
     "fixed",
-    # "naive_llm",
+    "naive_llm",
     # "non_naive_llm",
     # "llm",
     "text_len",
