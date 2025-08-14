@@ -270,6 +270,23 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 # drop=False,
             )
 
+            # FIXME: destroys integrity of the dataset
+            print("important")
+            print(test_dataset.index.equals(df_from_csv.index))
+            print(test_dataset.index.dtypes)
+            print(df_from_csv.index.dtypes)
+            print(
+                "Only in test_dataset:",
+                test_dataset.index.difference(df_from_csv.index),
+            )
+            print(
+                "Only in df_from_csv:", df_from_csv.index.difference(test_dataset.index)
+            )
+            for df in (test_dataset, df_from_csv):
+                df.index = pd.MultiIndex.from_frame(
+                    df.index.to_frame().astype(str).apply(lambda s: s.str.strip())
+                )
+
             test_dataset = test_dataset.combine_first(df_from_csv)
             print(f"Test dataset cols after merging: {test_dataset.columns}")
             print(
@@ -277,6 +294,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 [type(p) for p in test_dataset["pair"]],
                 type(test_dataset["pair"]),
             )
+
             assert (
                 not test_dataset.empty
             ), f"Test dataset is empty after merging with {test_scores_file_name}"
