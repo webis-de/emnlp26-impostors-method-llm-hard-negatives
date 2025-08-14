@@ -219,17 +219,19 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
             n_total_chunks = f"n_chunks_{num_chunks}"
 
             text_data = data_loaded[text_key]
-            text_data.setdefault(n_total_chunks, {})
+            data_loaded[text_key].setdefault(n_total_chunks, {})
             chunk_data = text_data[n_total_chunks]
 
             for chunk_id in range(num_chunks):
                 chunk_identifier = f"chunk_{chunk_id}"
-                chunk_data.setdefault(chunk_identifier, {})
+                data_loaded[text_key][n_total_chunks].setdefault(chunk_identifier, {})
                 paraphraser_data = chunk_data[chunk_identifier]
 
                 for paraphraser_name in paraphrasers.keys():
                     if paraphraser_name not in paraphraser_data.keys():
-                        paraphraser_data.setdefault(paraphraser_name, {})
+                        data_loaded[text_key][n_total_chunks][
+                            paraphraser_name
+                        ].setdefault(paraphraser_name, {})
                         missing_configs.append(
                             [
                                 text_key,
