@@ -389,6 +389,9 @@ class ParaphrasingEvaluator:
                 data_loaded = {}
 
             try:
+                print(
+                    "Keys for paraphraser:", data_loaded[paraphraser_name][text].keys()
+                )
                 potential_paraphrases = data_loaded[paraphraser_name][text][None]
                 paraphrases = []
                 for temperature in potential_paraphrases.keys():
