@@ -496,7 +496,7 @@ class ParaphrasingEvaluator:
         angles += angles[:1]
 
         # Start plot
-        fig, ax = plt.subplots(figsize=(7, 7), subplot_kw=dict(polar=True))
+        fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(polar=True))
 
         unique_labels = grouped_mean.index
         palette = sns.color_palette(
@@ -523,7 +523,7 @@ class ParaphrasingEvaluator:
             mean_values += mean_values[:1]
             std_values += std_values[:1]
 
-            lower = np.maximum(0, np.array(mean_values) - np.array(std_values))
+            lower = np.maximum(-1, np.array(mean_values) - np.array(std_values))
             upper = np.minimum(1, np.array(mean_values) + np.array(std_values))
 
             ax.plot(
