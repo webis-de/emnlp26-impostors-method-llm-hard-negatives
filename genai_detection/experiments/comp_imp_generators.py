@@ -314,8 +314,8 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         )
         test_dataset["thres"] = opt_thres
         if any(missing_pred_mask):
-            test_dataset[missing_pred_mask, f"impostor_prediction_{imp_gen}"] = (
-                test_dataset[missing_pred_mask, col_score] > opt_thres
+            test_dataset.loc[missing_pred_mask, f"impostor_prediction_{imp_gen}"] = (
+                test_dataset.loc[missing_pred_mask, col_score] > opt_thres
             )
 
             test_dataset.to_csv(
