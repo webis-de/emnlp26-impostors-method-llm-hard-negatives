@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import sys
 from typing import Any, List, Optional
+import chardet
 import nltk
 from nltk.translate import bleu_score, meteor_score
 import evaluate
@@ -219,9 +220,7 @@ class ParaphrasingEvaluator:
         # Gather valid files for each assignment
         for assignment in list(task_description.keys()):
             files = [
-                f
-                for f in (base_dir / assignment).glob("*.txt")
-                if f.is_file() and len(f.read_text(encoding="utf-8").split()) >= 700
+                file for file in (base_dir / assignment).glob("*.txt") if file.is_file()
             ]
             files_by_ass.append(files)
 
@@ -235,7 +234,13 @@ class ParaphrasingEvaluator:
         # Now process in interleaved order
         rows = []
         for file in interleaved_files:
-            text = file.read_text(encoding="utf-8")
+            with open(file, "rb") as f:
+                raw_data = f.read()
+                detected = chardet.detect(raw_data)
+                encoding = detected["encoding"]
+            text = raw_data.decode(encoding)
+            if len(text.split()) < 700:
+                continue
             filename = file.stem
             assignment = file.parent.name
             if assignment == "Ass5" or assignment not in task_description:
