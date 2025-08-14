@@ -223,10 +223,9 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
             for chunk_id in range(num_chunks):
                 chunk_identifier = f"chunk_{chunk_id}"
                 chunk_data = chunk_data_dict.setdefault(chunk_identifier, {})
-                paraphraser_data = chunk_data[chunk_identifier]
 
                 for paraphraser_name in paraphrasers.keys():
-                    if paraphraser_name not in paraphraser_data.keys():
+                    if paraphraser_name not in chunk_data.keys():
                         chunk_data[paraphraser_name] = {}
                         missing_configs.append(
                             [
@@ -308,9 +307,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
         # text_paraphrases_df.to_csv(save_path / f"text_{i}_paraphrases.csv", index=False)
 
 
-def evaluate_paraphrases(
-    path2dataset: str, save_path: Path
-) -> Dict[str, List[pd.DataFrame]]:
+def evaluate_paraphrases(path2dataset: str, save_path: Path) -> List[pd.DataFrame]:
     assert os.path.exists(path2dataset), f"Dataset path {path2dataset} does not exist."
 
     # iterate over all csv file containing paraphrases
@@ -390,7 +387,7 @@ def evaluate_paraphrases(
     # Save the results to a CSV file
     save_path.mkdir(parents=True, exist_ok=True)
     df.to_csv(save_path / f"text_paraphrases_evaluation_results.csv", index=False)
-    return df
+    return rows
 
 
 def get_slim_dfs_for_one_text(n_paragraphs_df: list) -> list:  # of dataframes
@@ -553,8 +550,6 @@ if __name__ == "__main__":
         print(
             f"Evaluation results saved to {SAVE_PATH / 'cross_genre' / 'text_paraphrases_evaluation_results.csv'}."
         )
-        print(results.head())
-
         assert type(results) is list, "Results should be a list."
         slim_df = get_slim_dfs_for_one_text(results)
         assert type(slim_df) is list, "Slim DataFrame should be a list of DataFrames."
