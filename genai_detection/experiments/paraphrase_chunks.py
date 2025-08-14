@@ -10,6 +10,7 @@ from asyncio import sleep
 import asyncio
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from functools import partial
+import json
 from pathlib import Path
 import os
 import textwrap
@@ -74,27 +75,6 @@ def get_dataset(path2dataset: str) -> pd.DataFrame:
     return dataset
 
 
-def init_paraphrase_evaluator(
-    original_text: str,
-    n_responses: int = 1,
-    max_length: int = CONFIG.MAX_LENGTH,
-    temperature: float = CONFIG.TEMPERATURE,
-    paraphrasers: Dict[str, Paraphraser] = None,
-    prompts: List[str] = PROMPTS,
-):
-    assert paraphrasers is not None, "Paraphrasers must be provided."
-    assert prompts is not None, "Prompts must be provided."
-    paraphrase_evaluator = ParaphrasingEvaluator(
-        paraphrasers=paraphrasers,
-        prompts=prompts,
-        original_text=original_text,
-        n_responses=n_responses,
-        max_length=max_length,
-        temperature=temperature,
-    )
-    return paraphrase_evaluator
-
-
 def split_text_into_chunks(text: str, n: int = 1) -> List[str]:
     """
     Splits the input text into approximately n chunks, ensuring that each chunk has a similar number
@@ -139,12 +119,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def paraphrase_with_config(
     paraphraser_name: str,
-    chunks: list,
-    original_text: str,
-    num_chunks: int,
+    chunk: str,
     n_responses: int,
-    category: str,
-):
+    config: Dict[str, str] = {},
+) -> List[Dict[str, str]]:
     paraphraser = get_paraphraser_dict()[paraphraser_name]
     rows = []
     if isinstance(paraphraser, NonNaiveParaphraser):
@@ -158,46 +136,35 @@ def paraphrase_with_config(
 
     for prompt in prompt_options:
         for temperature in temperature_options:
-            print(
-                f"Using paraphraser: {paraphraser_name} with temperature={temperature}, prompt={prompt}"
-            )
+            # print(
+            #     f"Using paraphraser: {paraphraser_name} with temperature={temperature}, prompt={prompt}"
+            # )
+            p_config = {
+                "text": chunk,
+                "prompt": prompt,
+                "n_responses": n_responses,
+            }
+            if isinstance(paraphraser, NonNaiveParaphraser) and temperature is not None:
+                p_config["temperature"] = temperature
 
-            for chunk_id, chunk in enumerate(chunks):
-                print(f"Paraphrasing chunk {chunk_id+1}/{len(chunks)}")
-                p_config = {
-                    "text": chunk,
-                    "prompt": prompt,
-                    "n_responses": n_responses,
-                }
-                if (
-                    isinstance(paraphraser, NonNaiveParaphraser)
-                    and temperature is not None
-                ):
-                    p_config["temperature"] = temperature
-
-                try:
-                    paraphrased_chunk = paraphraser.paraphrase(**p_config)
-                    rows.append(
-                        {
-                            "original_text": original_text,
-                            "num_chunks": num_chunks,
-                            "paraphraser": paraphraser_name,
-                            "prompt": prompt,
-                            "chunk_id": chunk_id,
-                            "chunk": chunk,
-                            "temperature": temperature,
-                            "paraphrased_chunk": (
-                                paraphrased_chunk[0] if paraphrased_chunk else ""
-                            ),
-                            "category": category,
-                        }
-                    )
-                    break
-                except Exception as e:
-                    print(
-                        f"Error paraphrasing chunk {chunk_id+1}/{len(chunks)} with {paraphraser_name}: {e}\nRetrying in {i} seconds..."
-                    )
-                    raise e
+            try:
+                paraphrased_chunk = paraphraser.paraphrase(**p_config)
+                updated_config = config.copy()
+                updated_config.update(
+                    {
+                        "paraphraser": paraphraser_name,
+                        "prompt": prompt,
+                        "chunk": chunk,
+                        "temperature": temperature,
+                        "paraphrased_chunk": (
+                            paraphrased_chunk[0] if paraphrased_chunk else ""
+                        ),
+                    }
+                )
+                rows.append(updated_config)
+                break
+            except Exception as e:
+                raise e
     return rows
 
 
@@ -210,6 +177,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
     """
     assert os.path.exists(path2dataset), f"Dataset path {path2dataset} does not exist."
     assert save_path.exists(), f"Save path {save_path} does not exist."
+    file2existing_paraphrases = save_path / "existing_chunk_paraphrases.json"
     dataset = get_dataset(path2dataset)
     # keep only the first 5 examples per category
     dataset = dataset.groupby("category").head(1)  # TODO: change to 5
@@ -220,19 +188,19 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
     paraphrasers = get_paraphraser_dict()
 
     # work on each text individually
-    all_rows = []
     for i, (original_text, category) in enumerate(
         zip(dataset["disputed_text"], dataset["category"])
     ):
-        # filter_cat = "Gutenberg"
-        # if category != filter_cat:
-        #     print(f"Skipping text {i+1}/{len(dataset)}: {category} (not {filter_cat})")
-        #     continue
+
         print(f"Processing text {i+1}/{len(dataset)}: {category}")
         rows = []
-        if (save_path / f"text_{i}_paraphrases.csv").exists():
-            print(f"Paraphrases for text {i} already exist, skipping.")
-            continue
+        text_key = f"text_{i}"
+        if file2existing_paraphrases.exists():
+            with open(file2existing_paraphrases, "r") as f:
+                data_loaded = json.load(f)
+        else:
+            data_loaded = {}
+            data_loaded.setdefault(text_key, {})
 
         for num_chunks in tqdm(
             range(1, 6), desc="Evaluating with different chunk sizes"
@@ -245,49 +213,101 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
                 )
                 continue
             print(f"Number of chunks: {num_chunks}")
-            # Usage of ThreadPoolExecutor to parallelize over paraphrasers -> SAIA API Rate Limit Error
-            # with ThreadPoolExecutor(max_workers=len(paraphrasers)) as executor:
-            #     futures = []
-            #     for paraphraser_name in paraphrasers.keys():
-            #         if paraphraser_name not in [
-            #             "T5_ChatGPT",
-            #             "T5_Google_PAWS",
-            #             "Ollama",
-            #         ]:
-            #             futures.append(
-            #                 executor.submit(
-            #                     paraphrase_with_config,
-            #                     paraphraser_name,
-            #                     chunks,
-            #                     original_text,
-            #                     num_chunks,
-            #                     n_responses,
-            #                     category,
-            #                 )
-            #             )
-            #     for future in as_completed(futures):
-            #         all_rows.extend(future.result())
+
+            missing_configs = []
+
+            n_total_chunks = f"n_chunks_{num_chunks}"
+
+            text_data = data_loaded[text_key]
+            text_data.setdefault(n_total_chunks, {})
+            chunk_data = text_data[n_total_chunks]
+
+            for chunk_id in range(num_chunks):
+                chunk_identifier = f"chunk_{chunk_id}"
+                chunk_data.setdefault(chunk_identifier, {})
+                paraphraser_data = chunk_data[chunk_identifier]
+
+                for paraphraser_name in paraphrasers.keys():
+                    if paraphraser_name not in paraphraser_data.keys():
+                        paraphraser_data.setdefault(paraphraser_name, {})
+                        missing_configs.append(
+                            [
+                                text_key,
+                                n_total_chunks,
+                                chunk_identifier,
+                                paraphraser_name,
+                            ]
+                        )
+
+            if len(missing_configs) == 0:
+                print(
+                    f"All paraphrases for text {i} with {num_chunks} chunks already exist, skipping."
+                )
+                continue
+            with ThreadPoolExecutor(max_workers=len(missing_configs)) as executor:
+                futures = []
+                for config in missing_configs:
+                    paraphraser_name = config[3]
+                    num_chunks = int(config[1].split("_")[-1])
+                    chunk_id = int(config[2].split("_")[-1])
+                    static_update_dict = {
+                        "original_text": original_text,
+                        "num_chunks": num_chunks,
+                        "paraphraser": paraphraser_name,
+                        "chunk_id": chunk_id,
+                        "category": category,
+                    }
+                    if paraphraser_name not in [
+                        "T5_ChatGPT",
+                        "T5_Google_PAWS",
+                        # "Ollama",
+                    ]:
+                        futures.append(
+                            executor.submit(
+                                paraphrase_with_config,
+                                paraphraser_name,
+                                chunks[chunk_id],
+                                n_responses,
+                                static_update_dict,
+                            )
+                        )
+                for future in as_completed(futures):
+                    res = future.result()
+                    for paraphrase_dif_temp_prompt in res:
+                        assert isinstance(
+                            paraphrase_dif_temp_prompt, dict
+                        ), "Result should be a dict."
+                        chunk_id = paraphrase_dif_temp_prompt.pop("chunk_id")
+                        paraphraser_name = paraphrase_dif_temp_prompt.pop("paraphraser")
+                        data_loaded[text_key][n_total_chunks][chunk_id][
+                            paraphraser_name
+                        ] = paraphrase_dif_temp_prompt
 
             # Sequentially iterate over paraphrasers to avoid API rate limits
-            for paraphraser_name in paraphrasers.keys():
-                if paraphraser_name not in [
-                    "T5_ChatGPT",
-                    "T5_Google_PAWS",
-                    # "Ollama",
-                ]:
-                    res = paraphrase_with_config(
-                        paraphraser_name,
-                        chunks,
-                        original_text,
-                        num_chunks,
-                        n_responses,
-                        category,
-                    )
-                    if res:
-                        all_rows.extend(res)
-        text_paraphrases_df = pd.DataFrame(rows)
-        # Save the results for this text
-        text_paraphrases_df.to_csv(save_path / f"text_{i}_paraphrases.csv", index=False)
+            # for paraphraser_name in paraphrasers.keys():
+            #     if paraphraser_name not in [
+            #         "T5_ChatGPT",
+            #         "T5_Google_PAWS",
+            #         # "Ollama",
+            #     ]:
+            #         res = paraphrase_with_config(
+            #             paraphraser_name,
+            #             chunks,
+            #             original_text,
+            #             num_chunks,
+            #             n_responses,
+            #             category,
+            #         )
+            #         if res:
+            #             all_rows.extend(res)
+
+        # save results for this text to json file
+        with open(file2existing_paraphrases, "w") as f:
+            json.dump(data_loaded, f, indent=4)
+        print(f"Saved paraphrases for text {i} to {file2existing_paraphrases}")
+        # text_paraphrases_df = pd.DataFrame(rows)
+        # # Save the results for this text
+        # text_paraphrases_df.to_csv(save_path / f"text_{i}_paraphrases.csv", index=False)
 
 
 def evaluate_paraphrases(
@@ -536,6 +556,17 @@ if __name__ == "__main__":
             f"Evaluation results saved to {SAVE_PATH / 'cross_genre' / 'text_paraphrases_evaluation_results.csv'}."
         )
         print(results.head())
+
+        assert type(results) is list, "Results should be a list."
+        slim_df = get_slim_dfs_for_one_text(results)
+        assert type(slim_df) is list, "Slim DataFrame should be a list of DataFrames."
+        plot_model_metrics(
+            n_paragraphs_df=slim_df,
+            save_dir=SAVE_PATH / "cross_genre" / "plots",
+            show=False,
+            save=True,
+            data_category="Cross-Genre",
+        )
 
     # FIXME: cannot parallelize matplotlib plots
     # print("Next, plot model metrics per text (parallel).")
