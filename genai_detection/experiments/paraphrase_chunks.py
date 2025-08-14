@@ -146,9 +146,13 @@ def paraphrase_with_config(
 
             try:
                 # TODO: dummy
-                paraphrased_chunk = (
-                    "This is a dummy"  # paraphraser.paraphrase(**p_config)
-                )
+                paraphrased_chunk = [
+                    "This is a dummy"
+                ]  # paraphraser.paraphrase(**p_config)
+                assert isinstance(
+                    paraphrased_chunk, list
+                ), "Paraphrased chunk should be a list."
+
                 updated_config = config.copy()
                 updated_config.update(
                     {
