@@ -482,13 +482,21 @@ class ParaphrasingEvaluator:
         grouped_mean = df_all.groupby(dataset_col)[metrics].mean()
         grouped_std = df_all.groupby(dataset_col)[metrics].std()
 
+        if save_path:
+            save_path = Path(save_path)
+            save_path.mkdir(parents=True, exist_ok=True)
+            mean_std_df = pd.concat({"mean": grouped_mean, "std": grouped_std}, axis=1)
+            csv_out = save_path / "extraction_metrics_mean_std_per_dataset.csv"
+            mean_std_df.to_csv(csv_out)
+            print(f"Saved mean/std values as CSV file to {csv_out}")
+
         # Compute angle of each axis
         angles = np.linspace(0, 2 * np.pi, len(metrics), endpoint=False).tolist()
         # Complete the loop
         angles += angles[:1]
 
         # Start plot
-        fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+        fig, ax = plt.subplots(figsize=(7, 7), subplot_kw=dict(polar=True))
 
         unique_labels = grouped_mean.index
         palette = sns.color_palette(
@@ -549,8 +557,6 @@ class ParaphrasingEvaluator:
         plt.tight_layout()
 
         if save_path:
-            save_path = Path(save_path)
-            save_path.mkdir(parents=True, exist_ok=True)
             for format in ["svg"]:
                 out = save_path / f"radar_extraction_quality_per_dataset.{format}"
                 fig.savefig(out, bbox_inches="tight", transparent=True, format=format)
