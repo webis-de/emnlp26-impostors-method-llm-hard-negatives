@@ -124,7 +124,7 @@ def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_
                 f"Pair is a list/tuple/ndarray: {[p[:20] for p in pair]}..."
             )  # Print first 3 elements
         else:
-            raise ValueError(f"Unsupported type for pair: {type(pair)}")
+            raise ValueError(f"Unsupported type for pair: {type(pair)}/ {pair}...")
     return impostor_detector._get_score_impl(pair)
 
 
@@ -159,6 +159,9 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         ],
         ignore_index=False,
     )
+    assert not any(
+        [pair is None for pair in test_dataset["pair"]]
+    ), "Test dataset pairs must not be None"
 
     path2imp = (
         Path(os.getcwd()).resolve() / CONFIG.PATH2BLOG
