@@ -301,8 +301,9 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 "DEBUG: Predictions in train dataset before:",
                 train_dataset[col_score].values,
             )
+            # FIXME: strange output in debugging
             print(
-                "New scores (training dataset):",
+                "New scores (training dataset) 2:",
                 train_dataset.loc[missing_mask, col_score],
             )
             print(
@@ -319,7 +320,6 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         print("DEBUG: Predictions in train dataset:", train_dataset[col_score].values)
         scores = train_dataset[col_score].values
         fpr, tpr, roc_thresholds = roc_curve(y_true=labels, y_score=scores)
-        # FIXME: no valid vals
         opt_thres = _get_opt_imp_threshold(fpr, tpr, roc_thresholds)
         missing_mask = (
             pd.Series(
@@ -331,6 +331,11 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         )
         if missing_mask.sum() > 0:
             new_rows = test_dataset[missing_mask].copy()
+            for row in new_rows.itertuples():
+                print(row.index, type(row.pair))
+                # print(
+                #     f"Row {row.Index} with pair {len(row.pair)} has threshold {row.thres}, setting to optimal threshold {opt_thres}"
+                # )
             test_dataset["thres"] = opt_thres
             print(
                 f"Set threshold to optimal threshold for {dataset_name} dataset: {opt_thres}"
