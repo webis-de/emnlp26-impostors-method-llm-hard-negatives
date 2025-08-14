@@ -331,6 +331,10 @@ def df2optimal_metrics(score_dif_imp_gen_df: pd.DataFrame):
         if f"impostor_prediction_{imp_gen}" not in score_dif_imp_gen_df.columns:
             continue
         pred = score_dif_imp_gen_df[f"impostor_prediction_{imp_gen}"]
+        if all(p == 0 for p in pred):
+            print(
+                f"Warning: All predictions for {imp_gen} are 0. Prec, Recall, F1 will be 0."
+            )
         true_labels = score_dif_imp_gen_df["same"]
 
         acc = (pred == true_labels).mean()
@@ -545,6 +549,7 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
     axes[1, 1].set_title("Threshold vs Recall Score", fontsize=14)
     axes[1, 1].grid(False)
 
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
     # One shared legend
     handles, labels = axes[0, 0].get_legend_handles_labels()
     fig.legend(
@@ -560,7 +565,6 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
         ncol=len(scores_per_imp_gen_per_thres_dict),
     )
 
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
     plt.subplots_adjust(hspace=0.2)
     save_path.mkdir(parents=True, exist_ok=True)
     plt.savefig(save_path / f"{dataset_name}_threshold_curves_all.svg")
@@ -576,14 +580,14 @@ if __name__ == "__main__":
 
     # Student Essays
     print("Running experiment for Student Essays dataset.")
-    # student_test_df = asyncio.run(
     student_test_df = create_df(
         path2dataset=CONFIG.PATH2STUDENT_ESSAYS,
         dataset_name=CONFIG.STUDENT_ESSAYS,
         save_path=SAVE_PATH,
     )
-    # )
-    print("Visualizing accuracy per syntactic similarity for Student Essays dataset.")
+    print(
+        "Visualizing accuracy, prec, recall, f1 per syntactic similarity for Student Essays dataset."
+    )
     plot_optimal_threshold_bars(
         df=student_test_df,
         save_path=SAVE_PATH,
@@ -605,7 +609,7 @@ if __name__ == "__main__":
     #     save_path=SAVE_PATH,
     # )
     # # )
-    # print("Visualizing accuracy per syntactic similarity for Blog dataset.")
+    # print("Visualizing accuracy, prec, recall, f1 per syntactic similarity for Blog dataset.")
     # plot_optimal_threshold_bars(
     #     df=blog_test_df,
     #     save_path=SAVE_PATH,
