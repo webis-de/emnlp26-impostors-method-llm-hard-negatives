@@ -261,7 +261,7 @@ class ParaphrasingEvaluator:
             }
             rows.append(metadata)
         metadata_df = pd.DataFrame(rows)
-        metadata_df.to_excel(base_dir / "file_metadata.xlsx", index=False, mode="a")
+        metadata_df.to_excel(base_dir / "file_metadata.xlsx", index=False)
         return metadata_df
 
     def _load_dataset(self, base_dir: Path, dataset_type: str) -> pd.DataFrame:
