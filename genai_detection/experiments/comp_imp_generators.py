@@ -292,7 +292,10 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         # FIXME: no valid vals
         opt_thres = _get_opt_imp_threshold(fpr, tpr, roc_thresholds)
         missing_mask = (
-            pd.Series([t != opt_thres for t in test_dataset["thres"]])
+            pd.Series(
+                [t != opt_thres for t in test_dataset["thres"]],
+                index=test_dataset.index,
+            )
             if "thres" in test_dataset.columns
             else pd.Series(True, index=test_dataset.index)
         )
