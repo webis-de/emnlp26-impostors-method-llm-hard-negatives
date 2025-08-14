@@ -321,7 +321,7 @@ class ParaphrasingEvaluator:
                 print(
                     "Keys in loaded data:",
                     data_loaded.keys(),
-                    type(data_loaded[data_loaded.keys()[0]]),
+                    type(data_loaded[list(data_loaded.keys())[0]]),
                 )
                 print("filename key we are looking for:", filename, type(filename))
             else:
