@@ -246,7 +246,10 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             #     # drop=False,
             # )
             df_from_csv = df_from_csv.set_index(matching_cols)
+            df_from_csv = df_from_csv[~df_from_csv.index.duplicated(keep="last")]
             train_dataset = train_dataset.set_index(matching_cols)
+            train_dataset = train_dataset[~train_dataset.index.duplicated(keep="last")]
+
             # Fill only missing col_score values
             train_dataset[col_score] = train_dataset[col_score].fillna(
                 df_from_csv[col_score]
