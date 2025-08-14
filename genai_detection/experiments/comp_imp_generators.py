@@ -160,7 +160,6 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         ],
         ignore_index=False,
     )
-    print("1 Number of elements in train dataset:", len(train_dataset))
 
     test_dataset = pd.concat(
         [
@@ -176,22 +175,6 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         "authors_right",
         "same",
     ]
-    assert not any(
-        [
-            pair is None
-            or (
-                pd.isna(pair).any()
-                if hasattr(pair, "__iter__") and not isinstance(pair, str)
-                else pd.isna(pair)
-            )
-            for pair in test_dataset["pair"]
-        ]
-    ), "Test dataset pairs must not be None or NaN"
-    print(
-        "Test dataset cols at beginning pair col",
-        [type(p) for p in test_dataset["pair"]],
-        type(test_dataset["pair"]),
-    )
 
     path2imp = (
         Path(os.getcwd()).resolve() / CONFIG.PATH2BLOG
@@ -201,7 +184,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
 
     print(f"Running experiment for {dataset_name} dataset.")
 
-    # FIXME: rate limit + mirror minds download problem
+    # FIXME: mirror minds download problem
     for imp_gen in IMP_GEN_OPTIONS:
         col_score = f"impostor_score_{imp_gen}"
         col_dict = f"impostor_dict_{imp_gen}"
@@ -219,14 +202,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             )
             with open(save_path / train_scores_file_name, "r") as f:
                 df_from_csv = pd.read_csv(f)
-                assert (
-                    "pair" in df_from_csv.columns
-                ), f"Expected 'pair' column in {train_scores_file_name}, but not found: {df_from_csv.columns}"
-
             train_dataset = _split_unhashable(train_dataset)
-            assert (
-                "pair" in train_dataset.columns
-            ), f"Expected 'pair' column in training dataset, but not found: {train_dataset.columns}"
             if col_score not in train_dataset:
                 train_dataset[col_score] = np.nan
 
@@ -239,25 +215,13 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             train_dataset[col_score] = train_dataset[col_score].fillna(
                 df_from_csv[col_score]
             )
-            print(f"Train dataset columns after merging: {train_dataset.columns}")
             train_dataset.index.names = matching_cols
-            train_dataset.reset_index(inplace=True)  # , drop=True)
-            print(
-                f"Train dataset columns after reseting index: {train_dataset.columns}"
-            )
-            assert (
-                not train_dataset.empty
-            ), f"Train dataset is empty after merging with {train_scores_file_name}"
+            train_dataset.reset_index(inplace=True)
 
         if (save_path / test_scores_file_name).exists():
             with open(save_path / test_scores_file_name, "r") as f:
                 df_from_csv = pd.read_csv(f)
             test_dataset = _split_unhashable(test_dataset)
-            print(
-                "Test dataset cols after split unhashable pair col",
-                [type(p) for p in test_dataset["pair"]],
-                type(test_dataset["pair"]),
-            )
             if col_score not in test_dataset:
                 test_dataset[col_score] = np.nan
 
@@ -269,38 +233,16 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             test_dataset[col_score] = test_dataset[col_score].fillna(
                 df_from_csv[col_score]
             )
-            print(f"Test dataset cols after merging: {test_dataset.columns}")
-            print(
-                "Test dataset cols after merging pair col",
-                [type(p) for p in test_dataset["pair"]],
-                type(test_dataset["pair"]),
-            )
-
-            assert (
-                not test_dataset.empty
-            ), f"Test dataset is empty after merging with {test_scores_file_name}"
-
-            print("Test dataset columns after merging:", test_dataset.columns)
             test_dataset.index.names = matching_cols
             test_dataset.reset_index(inplace=True)  # , drop=True)
-            print(
-                "Test dataset columns names after reseting index:", test_dataset.columns
-            )
-        print(f"Running impostor detector for impostor generation approach: {imp_gen}")
-        print("2 Number of elements in train dataset:", len(train_dataset))
+
         missing_mask = (
             train_dataset[col_score].isna()
             if col_score in train_dataset.columns
             else pd.Series(True, index=train_dataset.index)
         )
-        print(
-            f"Number of missing impostor scores in train dataset: {missing_mask.sum()}"
-        )
         if missing_mask.sum() > 0:
             new_rows = train_dataset[missing_mask].copy()
-            assert not new_rows[
-                "pair"
-            ].empty, "No new row pairs to process for training dataset"
             with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
                 results = list(
                     executor.map(
@@ -317,19 +259,6 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 imp_dict for _, imp_dict in results
             ]
             assert results is not None, "Results should not be None"
-            print(
-                "DEBUG: Predictions in train dataset before:",
-                train_dataset[col_score].values,
-            )
-            # FIXME: strange output in debugging
-            print(
-                "New scores (training dataset) 2:",
-                train_dataset.loc[missing_mask, col_score],
-            )
-            print(
-                "DEBUG: Predictions in train dataset after:",
-                train_dataset[col_score].values,
-            )
             train_dataset.reset_index(inplace=True)
             train_dataset.to_csv(
                 save_path / train_scores_file_name,
@@ -337,40 +266,23 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             )
 
         labels = train_dataset["same"].values
-        print("DEBUG: Predictions in train dataset:", train_dataset[col_score].values)
         scores = train_dataset[col_score].values
+
+        print("DEBUG: Predictions in train dataset:", scores)
+        print("DEBUG: True labels in train dataset:", labels)
         fpr, tpr, roc_thresholds = roc_curve(y_true=labels, y_score=scores)
+        print("DEBUG: FPR:", fpr)
+        print("DEBUG: TPR:", tpr)
+        print("DEBUG: ROC thresholds:", roc_thresholds)
         opt_thres = _get_opt_imp_threshold(fpr, tpr, roc_thresholds)
         missing_mask = (
             [t != opt_thres for t in test_dataset["thres"]]
             if "thres" in test_dataset.columns
-            else [True]
-            * len(test_dataset)  # pd.Series(True)#, index=test_dataset.index)
+            else [True] * len(test_dataset)
         )
         if any(missing_mask):
-
-            print("Missing mask for test dataset:", missing_mask.index, missing_mask)
-            print(
-                "test data before:",
-                [type(p) for p in test_dataset["pair"]],
-                type(test_dataset["pair"]),
-            )
-            none_indices = test_dataset.index[
-                test_dataset["pair"].isna()
-                | (test_dataset["pair"].apply(lambda x: x is None))
-            ].tolist()
-            print("Indices with pair=None:", none_indices)
             new_rows = test_dataset.loc[missing_mask].copy()
-            print("cols", new_rows.columns)
-            for row in new_rows.itertuples():
-                print("row", row.index, type(row.pair))
-                # print(
-                #     f"Row {row.Index} with pair {len(row.pair)} has threshold {row.thres}, setting to optimal threshold {opt_thres}"
-                # )
             test_dataset["thres"] = opt_thres
-            print(
-                f"Set threshold to optimal threshold for {dataset_name} dataset: {opt_thres}"
-            )
             with ThreadPoolExecutor() as executor:
                 results = list(
                     executor.map(
