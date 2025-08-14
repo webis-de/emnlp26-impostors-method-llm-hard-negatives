@@ -392,17 +392,6 @@ def plot_optimal_threshold_bars(
     bars_prec = plot_bar(axes[1, 0], precs, "Precision at Optimal Threshold")
     bars_rec = plot_bar(axes[1, 1], recs, "Recall at Optimal Threshold")
 
-    # Create one shared legend for all subplots
-    handles = [plt.Rectangle((0, 0), 1, 1, color=colors[ig]) for ig in imp_gens]
-    fig.legend(
-        handles,
-        imp_gens,
-        loc="upper center",
-        bbox_to_anchor=(0.5, 1.05),
-        ncol=len(imp_gens),
-        fontsize=10,
-    )
-
     plt.tight_layout(rect=[0, 0, 1, 0.95])  # leave space for legend
     plt.savefig(save_path / f"{dataset_name}_optimal_threshold_bars.svg")
     plt.close(fig)
@@ -489,83 +478,122 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
         for i, ig in enumerate(scores_per_imp_gen_per_thres_dict.keys())
     }
 
-    # --- Plot 1: F1 vs Threshold ---
-    for imp_gen, vals in scores_per_imp_gen_per_thres_dict.items():
-        axes[0, 0].plot(
-            vals["thresholds"],
-            vals["f1s"],
-            label=imp_gen,
-            color=colors[imp_gen],
-            linewidth=1.5,
-        )
-    axes[0, 0].set_xlabel("Threshold", fontsize=14)
-    axes[0, 0].set_ylabel("F1 Score $\\frac{{2PR}}{{P+R}}$", fontsize=14)
-    axes[0, 0].set_ylim(0, 1)
-    axes[0, 0].set_title("Threshold vs F1 Score", fontsize=14)
-    axes[0, 0].grid(False)
+    metrics = ["f1s", "accs", "precisions", "recalls"]
+    titles = [
+        "Threshold vs F1 Score",
+        "Threshold vs Accuracy Score",
+        "Threshold vs Precision Score",
+        "Threshold vs Recall Score",
+    ]
+    ylabels = [
+        "F1 Score $\\frac{{2PR}}{{P+R}}$",
+        "Accuracy Score $\\frac{{TP + TN}}{{N}}$",
+        "Precision $\\frac{{TP}}{{TP + FP}}$",
+        "Recall $\\frac{{TP}}{{TP + FN}}$",
+    ]
+    for ax, metric, title, ylabel in zip(axes.flat, metrics, titles, ylabels):
+        for imp_gen, vals in scores_per_imp_gen_per_thres_dict.items():
+            ax.plot(
+                vals["thresholds"],
+                vals[metric],
+                label=imp_gen,
+                color=colors[imp_gen],
+                linewidth=1.5,
+            )
+        ax.set_xlabel("Threshold", fontsize=14)
+        ax.set_ylabel(ylabel, fontsize=14)
+        ax.set_ylim(0, 1)
+        ax.set_title(title, fontsize=14)
+        ax.grid(False)
 
-    # --- Plot 2: Accuracy vs Threshold ---
-    for imp_gen, vals in scores_per_imp_gen_per_thres_dict.items():
-        axes[0, 1].plot(
-            vals["thresholds"],
-            vals["accs"],
-            label=imp_gen,
-            color=colors[imp_gen],
-            linewidth=1.5,
-        )
-    axes[0, 1].set_xlabel("Threshold", fontsize=14)
-    axes[0, 1].set_ylabel("Accuracy Score $\\frac{{TP + TN}}{{N}}$", fontsize=14)
-    axes[0, 1].set_ylim(0, 1)
-    axes[0, 1].set_title("Threshold vs Accuracy Score", fontsize=14)
-    axes[0, 1].grid(False)
-
-    # --- Plot 3: Precision vs Threshold ---
-    for imp_gen, vals in scores_per_imp_gen_per_thres_dict.items():
-        axes[1, 0].plot(
-            vals["thresholds"],
-            vals["precisions"],
-            label=imp_gen,
-            color=colors[imp_gen],
-            linewidth=1.5,
-        )
-    axes[1, 0].set_xlabel("Threshold", fontsize=14)
-    axes[1, 0].set_ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
-    axes[1, 0].set_ylim(0, 1)
-    axes[1, 0].set_title("Threshold vs Precision Score", fontsize=14)
-    axes[1, 0].grid(False)
-
-    # --- Plot 4: Recall vs Threshold ---
-    for imp_gen, vals in scores_per_imp_gen_per_thres_dict.items():
-        axes[1, 1].plot(
-            vals["thresholds"],
-            vals["recalls"],
-            label=imp_gen,
-            color=colors[imp_gen],
-            linewidth=1.5,
-        )
-    axes[1, 1].set_xlabel("Threshold", fontsize=14)
-    axes[1, 1].set_ylabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
-    axes[1, 1].set_ylim(0, 1)
-    axes[1, 1].set_title("Threshold vs Recall Score", fontsize=14)
-    axes[1, 1].grid(False)
-
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
-    # One shared legend
+    # --- One shared legend on right side, slightly lower ---
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))  # keep only unique labels
     fig.legend(
-        # handles=[
-        #     plt.Line2D([0], [0], color=colors[ig])
-        #     for ig in scores_per_imp_gen_per_thres_dict.keys()
-        # ],
-        # labels=list(scores_per_imp_gen_per_thres_dict.keys()),
-        loc="upper center",
-        bbox_to_anchor=(0.5, 1.05),
-        # ncol=len(scores_per_imp_gen_per_thres_dict),
+        by_label.values(),
+        by_label.keys(),
+        loc="center right",  # right side
+        bbox_to_anchor=(1.05, 0.5),  # slightly lower
+        ncol=1,
+        frameon=False,
     )
 
+    plt.tight_layout(rect=[0, 0, 0.9, 0.95])  # leave space for legend
     plt.subplots_adjust(hspace=0.2)
     save_path.mkdir(parents=True, exist_ok=True)
     plt.savefig(save_path / f"{dataset_name}_threshold_curves_all.svg")
     plt.close(fig)
+
+    # # --- Plot 1: F1 vs Threshold ---
+    # for imp_gen, vals in scores_per_imp_gen_per_thres_dict.items():
+    #     axes[0, 0].plot(
+    #         vals["thresholds"],
+    #         vals["f1s"],
+    #         label=imp_gen,
+    #         color=colors[imp_gen],
+    #         linewidth=1.5,
+    #     )
+    # axes[0, 0].set_xlabel("Threshold", fontsize=14)
+    # axes[0, 0].set_ylabel("F1 Score $\\frac{{2PR}}{{P+R}}$", fontsize=14)
+    # axes[0, 0].set_ylim(0, 1)
+    # axes[0, 0].set_title("Threshold vs F1 Score", fontsize=14)
+    # axes[0, 0].grid(False)
+
+    # # --- Plot 2: Accuracy vs Threshold ---
+    # for imp_gen, vals in scores_per_imp_gen_per_thres_dict.items():
+    #     axes[0, 1].plot(
+    #         vals["thresholds"],
+    #         vals["accs"],
+    #         label=imp_gen,
+    #         color=colors[imp_gen],
+    #         linewidth=1.5,
+    #     )
+    # axes[0, 1].set_xlabel("Threshold", fontsize=14)
+    # axes[0, 1].set_ylabel("Accuracy Score $\\frac{{TP + TN}}{{N}}$", fontsize=14)
+    # axes[0, 1].set_ylim(0, 1)
+    # axes[0, 1].set_title("Threshold vs Accuracy Score", fontsize=14)
+    # axes[0, 1].grid(False)
+
+    # # --- Plot 3: Precision vs Threshold ---
+    # for imp_gen, vals in scores_per_imp_gen_per_thres_dict.items():
+    #     axes[1, 0].plot(
+    #         vals["thresholds"],
+    #         vals["precisions"],
+    #         label=imp_gen,
+    #         color=colors[imp_gen],
+    #         linewidth=1.5,
+    #     )
+    # axes[1, 0].set_xlabel("Threshold", fontsize=14)
+    # axes[1, 0].set_ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
+    # axes[1, 0].set_ylim(0, 1)
+    # axes[1, 0].set_title("Threshold vs Precision Score", fontsize=14)
+    # axes[1, 0].grid(False)
+
+    # # --- Plot 4: Recall vs Threshold ---
+    # for imp_gen, vals in scores_per_imp_gen_per_thres_dict.items():
+    #     axes[1, 1].plot(
+    #         vals["thresholds"],
+    #         vals["recalls"],
+    #         label=imp_gen,
+    #         color=colors[imp_gen],
+    #         linewidth=1.5,
+    #     )
+    # axes[1, 1].set_xlabel("Threshold", fontsize=14)
+    # axes[1, 1].set_ylabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
+    # axes[1, 1].set_ylim(0, 1)
+    # axes[1, 1].set_title("Threshold vs Recall Score", fontsize=14)
+    # axes[1, 1].grid(False)
+
+    # plt.tight_layout(rect=[0, 0, 1, 0.95])
+    # fig.legend(
+    #     loc="upper center",
+    #     bbox_to_anchor=(0.5, 1.05),
+    # )
+
+    # plt.subplots_adjust(hspace=0.2)
+    # save_path.mkdir(parents=True, exist_ok=True)
+    # plt.savefig(save_path / f"{dataset_name}_threshold_curves_all.svg")
+    # plt.close(fig)
 
 
 if __name__ == "__main__":
