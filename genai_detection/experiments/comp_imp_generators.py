@@ -462,7 +462,9 @@ def get_scores_dict_for_diff_thres(df: pd.DataFrame):
         if f"impostor_score_{imp_gen}" not in df.columns:
             continue
         y_true = df["same"].values
-        y_scores = np.concatenate(df[f"impostor_score_{imp_gen}"].values)
+        y_scores = df[f"impostor_score_{imp_gen}"].values
+        # if y_scores.ndim > 1:
+        #     y_scores = np.concatenate(y_scores)
         scores_per_imp_gen_per_thres[imp_gen] = compute_metrics_over_thresholds(
             y_true, y_scores
         )
