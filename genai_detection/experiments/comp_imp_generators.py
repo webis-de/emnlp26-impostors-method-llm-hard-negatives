@@ -544,7 +544,7 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
         frameon=False,
     )
 
-    plt.tight_layout(rect=[0, 0, 0.85, 1])  # leave space for legend
+    plt.tight_layout(rect=[0, 0, 0.9, 1])  # leave space for legend
     plt.subplots_adjust(hspace=0.2)
     save_path.mkdir(parents=True, exist_ok=True)
     plt.savefig(
