@@ -160,6 +160,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         ],
         ignore_index=False,
     )
+    print("1 Number of elements in train dataset:", len(train_dataset))
 
     test_dataset = pd.concat(
         [
@@ -168,6 +169,13 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         ],
         ignore_index=False,
     )
+    matching_cols = [
+        "pair_left",
+        "pair_right",
+        "authors_left",
+        "authors_right",
+        "same",
+    ]
     assert not any(
         [
             pair is None
@@ -222,23 +230,29 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             ), f"Expected 'pair' column in training dataset, but not found: {train_dataset.columns}"
             if col_score not in train_dataset:
                 train_dataset[col_score] = np.nan
-            print(f"Train dataset columns before merging: {train_dataset.columns}")
-            train_dataset.set_index(
-                ["pair_left", "pair_right", "authors_left", "authors_right", "same"],
-                inplace=True,
-                # drop=False,
-            )
-            print(f"Train dataset columns before merging: {train_dataset.columns}")
+            # print(f"Train dataset columns before merging: {train_dataset.columns}")
+            # train_dataset.set_index(
+            #     ["pair_left", "pair_right", "authors_left", "authors_right", "same"],
+            #     inplace=True,
+            #     # drop=False,
+            # )
+            # print(f"Train dataset columns before merging: {train_dataset.columns}")
 
-            df_from_csv = _split_unhashable(df_from_csv)
-            df_from_csv.drop(["pair", "authors"], axis=1, inplace=True)
-            df_from_csv.set_index(
-                ["pair_left", "pair_right", "authors_left", "authors_right", "same"],
-                inplace=True,
-                # drop=False,
+            # df_from_csv = _split_unhashable(df_from_csv)
+            # df_from_csv.drop(["pair", "authors"], axis=1, inplace=True)
+            # df_from_csv.set_index(
+            #     ["pair_left", "pair_right", "authors_left", "authors_right", "same"],
+            #     inplace=True,
+            #     # drop=False,
+            # )
+            df_from_csv = df_from_csv.set_index(matching_cols)
+            train_dataset = train_dataset.set_index(matching_cols)
+            # Fill only missing col_score values
+            train_dataset[col_score] = train_dataset[col_score].fillna(
+                df_from_csv[col_score]
             )
 
-            train_dataset = train_dataset.combine_first(df_from_csv)
+            # train_dataset = train_dataset.combine_first(df_from_csv)
             print(f"Train dataset columns after merging: {train_dataset.columns}")
             assert (
                 not train_dataset.empty
@@ -277,13 +291,6 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             #         df.index.to_frame().astype(str).apply(lambda s: s.str.strip())
             #     )
 
-            matching_cols = [
-                "pair_left",
-                "pair_right",
-                "authors_left",
-                "authors_right",
-                "same",
-            ]
             df_from_csv = df_from_csv.set_index(matching_cols)
             test_dataset = test_dataset.set_index(matching_cols)
             print("important")
@@ -330,7 +337,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             ), f"Test dataset is empty after merging with {test_scores_file_name}"
         # fill nan values of new rows with predicted values
         print(f"Running impostor detector for impostor generation approach: {imp_gen}")
-
+        print("2 Number of elements in train dataset:", len(train_dataset))
         missing_mask = (
             train_dataset[col_score].isna()
             if col_score in train_dataset.columns
