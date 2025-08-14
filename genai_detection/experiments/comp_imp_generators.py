@@ -121,7 +121,11 @@ def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_
     )
     impostor_detector.set_training_mode(training_mode)
     # FIXME: debugging
-    if pair is not None and not pd.isna(pair):
+    if pair is not None and not (
+        pd.isna(pair).any()
+        if isinstance(pair, (list, tuple, np.ndarray))
+        else pd.isna(pair)
+    ):
         if isinstance(pair, str):
             print(f"Pair is a string: {pair[:29]}...")  # Print first 30 characters
         elif isinstance(pair, (list, tuple, np.ndarray)):
