@@ -115,6 +115,16 @@ def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_
         upsample=False,
     )
     impostor_detector.set_training_mode(training_mode)
+    # FIXME: debugging
+    if pair is not None:
+        if isinstance(pair, str):
+            print(f"Pair is a string: {pair[:29]}...")  # Print first 30 characters
+        elif isinstance(pair, (list, tuple, np.ndarray)):
+            print(
+                f"Pair is a list/tuple/ndarray: {[p[:20] for p in pair]}..."
+            )  # Print first 3 elements
+        else:
+            raise ValueError(f"Unsupported type for pair: {type(pair)}")
     return impostor_detector._get_score_impl(pair)
 
 
