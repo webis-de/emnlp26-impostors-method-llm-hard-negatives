@@ -234,7 +234,6 @@ class ParaphrasingEvaluator:
                 dataset_type == "gutenberg"
                 and "Complete_Works_of_William_Shakespeare" in file.name
             ):
-                # Skip oversized text
                 continue
 
             if file.suffix == ".csv" and dataset_type == "blog":
@@ -338,10 +337,8 @@ class ParaphrasingEvaluator:
                     data_loaded[filename]["genre"],
                     data_loaded[filename]["century"],
                 )
-                # print("SUCCESS: Loaded existing extraction for file:", filename)
             else:
                 try:
-                    raise Exception(f"Should not be here, but not found: {filename}")
                     extra, _, genre, century, _, _ = paraphraser._extract_bullet_points(
                         text=text,
                         prompt=paraphraser.extractor_prompt,
@@ -389,9 +386,6 @@ class ParaphrasingEvaluator:
                 data_loaded = {}
 
             try:
-                # print(
-                #     "Keys for paraphraser:", data_loaded[paraphraser_name][text].keys()
-                # )
                 key = (
                     "null"
                     if "null" in data_loaded[paraphraser_name][text].keys()
@@ -401,12 +395,7 @@ class ParaphrasingEvaluator:
                 paraphrases = []
                 for temperature in potential_paraphrases.keys():
                     paraphrases.extend(potential_paraphrases[temperature])
-                # print("11 Successfully loaded existing paraphrases for file:", filename)
             except Exception as e:
-                # print(
-                #     f"Paraphraser {paraphraser_name} not found in loaded data for '{text[:15]}...':\nError: {e}.\nGenerating new paraphrase."
-                # )
-                raise Exception(f"Should all be present, but not found: {e}") from e
                 paraphrases = paraphraser.paraphrase(
                     text=text, temperature=self.temperature
                 )
@@ -451,10 +440,6 @@ class ParaphrasingEvaluator:
 
         # Convert to DataFrame
         results_df = pd.DataFrame(results_per_text)
-        print(
-            f"[DEBUG] Results DataFrame for {paraphraser_name} of len {len(results_df)}:\n{results_df.head()}"
-        )
-
         # Optionally compute total scores
         summary = {
             "genre_match": results_df["genre_match"].sum(),
@@ -874,10 +859,6 @@ class ParaphrasingEvaluator:
             desc="Evaluating Paraphrasers",
             total=len(test_configurations),
         ):
-            # path2file = (
-            #     self.paraphrases_save_base_path
-            #     / f"{name}_paraphrases_temp{temperature}_prompt{prompt_id}_{self.original_file_name}.csv"
-            # )
             try:
                 paraphrases = self._load_or_generate_paraphrases(
                     paraphraser_name,
@@ -949,11 +930,11 @@ class ParaphrasingEvaluator:
                 ignore_index=True,
             )
         if save_extremest_paraphr_per_score:
-            worst_save_path = (
+            extremest_save_path = (
                 self.paraphrases_save_base_path
                 / f"extremest_paraphrases_per_metric_temp{self.temperature}_maxLength{self.max_length}_dataset_{self.data_category.replace(' ','_')}.csv"
             )
-            extremest_paraphrases.to_csv(worst_save_path, index=False)
+            extremest_paraphrases.to_csv(extremest_save_path, index=False)
 
         return df, extremest_paraphrases
 
