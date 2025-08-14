@@ -331,8 +331,9 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         )
         if missing_mask.sum() > 0:
             new_rows = test_dataset[missing_mask].copy()
+            print("cols", new_rows.columns)
             for row in new_rows.itertuples():
-                print(row.index, type(row.pair))
+                print("row", row.index, type(row.pair), row.pair)
                 # print(
                 #     f"Row {row.Index} with pair {len(row.pair)} has threshold {row.thres}, setting to optimal threshold {opt_thres}"
                 # )
