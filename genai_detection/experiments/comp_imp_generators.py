@@ -155,8 +155,8 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     # TODO: Test on small data subsets
     train_dataset = pd.concat(
         [
-            train_dataset.loc[train_dataset["same"]].head(2),
-            train_dataset.loc[~train_dataset["same"]].head(2),
+            train_dataset.loc[train_dataset["same"]].head(5),
+            train_dataset.loc[~train_dataset["same"]].head(5),
         ],
         ignore_index=False,
     )
@@ -259,7 +259,6 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 imp_dict for _, imp_dict in results
             ]
             assert results is not None, "Results should not be None"
-            train_dataset.reset_index(inplace=True)
             train_dataset.to_csv(
                 save_path / train_scores_file_name,
                 index=False,
@@ -302,7 +301,6 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 test_dataset[col_score] > opt_thres
             )
 
-            test_dataset.reset_index(inplace=True)
             test_dataset.to_csv(
                 save_path / test_scores_file_name,
                 index=False,
