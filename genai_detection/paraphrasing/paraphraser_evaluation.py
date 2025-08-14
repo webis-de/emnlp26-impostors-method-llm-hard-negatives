@@ -311,9 +311,6 @@ class ParaphrasingEvaluator:
         ):
             text = str(getattr(row, "text", ""))
             filename = str(getattr(row, "filename", "unknown"))
-            assert (
-                file_existing_extractions.exists()
-            ), f"File {file_existing_extractions} does not exist."
             if file_existing_extractions.exists():
                 with open(file_existing_extractions, "r") as f:
                     data_loaded = json.load(f)
