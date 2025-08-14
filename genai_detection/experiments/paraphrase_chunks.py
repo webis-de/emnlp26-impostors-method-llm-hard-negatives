@@ -145,7 +145,10 @@ def paraphrase_with_config(
                 p_config["temperature"] = temperature
 
             try:
-                paraphrased_chunk = paraphraser.paraphrase(**p_config)
+                # TODO: dummy
+                paraphrased_chunk = (
+                    "This is a dummy"  # paraphraser.paraphrase(**p_config)
+                )
                 updated_config = config.copy()
                 updated_config.update(
                     {
