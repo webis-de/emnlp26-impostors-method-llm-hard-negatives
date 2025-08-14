@@ -262,7 +262,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             #     # drop=False,
             # )
 
-            # df_from_csv = _split_unhashable(df_from_csv)
+            df_from_csv = _split_unhashable(df_from_csv)
             # df_from_csv.drop(["pair", "authors"], axis=1, inplace=True)
             # df_from_csv.set_index(
             #     ["pair_left", "pair_right", "authors_left", "authors_right", "same"],
