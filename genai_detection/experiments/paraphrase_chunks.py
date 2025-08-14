@@ -17,6 +17,7 @@ import sys
 import re
 from typing import DefaultDict, Dict, List
 import nltk
+import numpy as np
 from tqdm import tqdm
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -39,15 +40,12 @@ from genai_detection.paraphrasing.paraphraser_evaluation import ParaphrasingEval
 
 CATEGORIES = [
     "Blog",
-    "News",
+    # "News",
     "Gutenberg",
     "Student Essay",
 ]
 PROMPTS = [
-    "Paraphrase the text above and output only the paraphrased version.",
-    "For the text above: First, extract bullet points capturing the main ideas, then create a text based on these bullet points. Only output the final text (i.e. do not output the bullet points or any additional chain of thoughts).",
     "For the text above: Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
-    "For the text above: Paraphrase the sentence using the same tone as the original with approximately the same number of words.",
     "For the text above: Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence.",
 ]
 SAVE_PATH = (
@@ -158,7 +156,7 @@ def _evaluate_chunk(
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
-async def paraphrase_with_config(
+def paraphrase_with_config(
     paraphraser_name: str,
     chunks: list,
     original_text: str,
@@ -170,7 +168,7 @@ async def paraphrase_with_config(
     rows = []
     if isinstance(paraphraser, NonNaiveParaphraser):
         prompt_options = [None]
-        temperature_options = [0, 0.5, 1.0]
+        temperature_options = np.linspace(0.0, 1.0, num=len(PROMPTS)).tolist()
     elif isinstance(paraphraser, NaiveParaphraser):
         prompt_options = PROMPTS
         temperature_options = [None]
@@ -195,36 +193,34 @@ async def paraphrase_with_config(
                     and temperature is not None
                 ):
                     p_config["temperature"] = temperature
-                i = 10
-                while i < 100:
-                    try:
-                        paraphrased_chunk = paraphraser.paraphrase(**p_config)
-                        rows.append(
-                            {
-                                "original_text": original_text,
-                                "num_chunks": num_chunks,
-                                "paraphraser": paraphraser_name,
-                                "prompt": prompt,
-                                "chunk_id": chunk_id,
-                                "chunk": chunk,
-                                "temperature": temperature,
-                                "paraphrased_chunk": (
-                                    paraphrased_chunk[0] if paraphrased_chunk else ""
-                                ),
-                                "category": category,
-                            }
-                        )
-                        break
-                    except Exception as e:
-                        print(
-                            f"Error paraphrasing chunk {chunk_id+1}/{len(chunks)} with {paraphraser_name}: {e}\nRetrying in {i} seconds..."
-                        )
-                        await sleep(i)
-                        i += 10
+
+                try:
+                    paraphrased_chunk = paraphraser.paraphrase(**p_config)
+                    rows.append(
+                        {
+                            "original_text": original_text,
+                            "num_chunks": num_chunks,
+                            "paraphraser": paraphraser_name,
+                            "prompt": prompt,
+                            "chunk_id": chunk_id,
+                            "chunk": chunk,
+                            "temperature": temperature,
+                            "paraphrased_chunk": (
+                                paraphrased_chunk[0] if paraphrased_chunk else ""
+                            ),
+                            "category": category,
+                        }
+                    )
+                    break
+                except Exception as e:
+                    print(
+                        f"Error paraphrasing chunk {chunk_id+1}/{len(chunks)} with {paraphraser_name}: {e}\nRetrying in {i} seconds..."
+                    )
+                    raise e
     return rows
 
 
-async def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
+def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
     """
     Create paraphrasers and save them to the specified path.
 
@@ -298,7 +294,7 @@ async def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
                     "T5_Google_PAWS",
                     "Ollama",
                 ]:
-                    res = await paraphrase_with_config(
+                    res = paraphrase_with_config(
                         paraphraser_name,
                         chunks,
                         original_text,
@@ -378,7 +374,7 @@ def evaluate_paraphrases(
                 print("[ERROR] ROUGE computation failed:", e)
 
             res = paraphrase_evaluator._build_result_row(
-                name=df["paraphraser"].iloc[0],
+                paraphraser_name=df["paraphraser"].iloc[0],
                 prompt=df["prompt"].iloc[0],
                 paraphrase=paraphrased_chunk,
                 original_split=original_text.split(),
@@ -673,12 +669,12 @@ if __name__ == "__main__":
     if args.task == "create":
         # only create paraphrasers and save them
         print(f"Creating and saving paraphrasers to {paraphrase_save_path}.")
-        asyncio.run(
-            create_and_save_paraphrasers(
-                path2dataset=args.path2dataset,
-                save_path=paraphrase_save_path,
-            )
+
+        create_and_save_paraphrasers(
+            path2dataset=args.path2dataset,
+            save_path=paraphrase_save_path,
         )
+
     elif args.task == "evaluate":
         print(
             f"Paraphrasers created and saved to {paraphrase_save_path}. Next, run the evaluation."
