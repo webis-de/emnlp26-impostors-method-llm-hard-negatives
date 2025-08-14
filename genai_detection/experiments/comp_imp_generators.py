@@ -266,6 +266,10 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 save_path / train_scores_file_name,
                 index=False,
             )
+            print(
+                "DEBUG: Saved train dataset with predictions to CSV, path:",
+                save_path / train_scores_file_name,
+            )
 
         labels = train_dataset["same"].values
         scores = train_dataset[col_score].values
@@ -287,7 +291,6 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 f"DEBUG Missing {col_score} in {missing_mask.sum()} rows of test dataset for {imp_gen} generator."
             )
             new_rows = test_dataset.loc[missing_mask].copy()
-            test_dataset["thres"] = opt_thres
             with ThreadPoolExecutor() as executor:
                 results = list(
                     executor.map(
@@ -309,6 +312,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             if "thres" in test_dataset.columns
             else [True] * len(test_dataset)
         )
+        test_dataset["thres"] = opt_thres
         if any(missing_pred_mask):
             test_dataset[missing_pred_mask, f"impostor_prediction_{imp_gen}"] = (
                 test_dataset[missing_pred_mask, col_score] > opt_thres
@@ -317,6 +321,10 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             test_dataset.to_csv(
                 save_path / test_scores_file_name,
                 index=False,
+            )
+            print(
+                "DEBUG: Saved test dataset with predictions to CSV, path:",
+                save_path / test_scores_file_name,
             )
 
     return test_dataset
