@@ -105,7 +105,7 @@ def _get_opt_imp_threshold(fpr, tpr, thresholds):
 
 def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_minds"):
     print(f"Generating impostor with {imp_gen} generator")
-    assert pair is not None, "Pair must not be None"
+    assert pair is not None and not pd.isna(pair), "Pair must not be None"
     impostor_detector = ImpostorDetector(
         impostor_technique=imp_gen,
         n_impostors=50,
@@ -116,7 +116,7 @@ def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_
     )
     impostor_detector.set_training_mode(training_mode)
     # FIXME: debugging
-    if pair is not None:
+    if pair is not None and not pd.isna(pair):
         if isinstance(pair, str):
             print(f"Pair is a string: {pair[:29]}...")  # Print first 30 characters
         elif isinstance(pair, (list, tuple, np.ndarray)):
@@ -160,7 +160,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         ignore_index=False,
     )
     assert not any(
-        [pair is None for pair in test_dataset["pair"]]
+        [pair is None or pd.isna(pair) for pair in test_dataset["pair"]]
     ), "Test dataset pairs must not be None"
 
     path2imp = (
