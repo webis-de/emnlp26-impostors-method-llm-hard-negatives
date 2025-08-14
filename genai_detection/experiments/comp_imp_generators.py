@@ -155,16 +155,16 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     # TODO: Test on small data subsets
     train_dataset = pd.concat(
         [
-            train_dataset.loc[train_dataset["same"]].head(1),
-            train_dataset.loc[~train_dataset["same"]].head(1),
+            train_dataset.loc[train_dataset["same"]].head(2),
+            train_dataset.loc[~train_dataset["same"]].head(2),
         ],
         ignore_index=False,
     )
 
     test_dataset = pd.concat(
         [
-            test_dataset.loc[test_dataset["same"]].head(1),
-            test_dataset.loc[~test_dataset["same"]].head(1),
+            test_dataset.loc[test_dataset["same"]].head(2),
+            test_dataset.loc[~test_dataset["same"]].head(2),
         ],
         ignore_index=False,
     )
