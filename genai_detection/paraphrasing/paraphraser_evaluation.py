@@ -158,8 +158,8 @@ class ParaphrasingEvaluator:
             "blog": Path(__file__).resolve().parents[2] / "data/datasets/Blog_corpus/",
             "gutenberg": Path(__file__).resolve().parents[2]
             / "data/datasets/gutenberg/",
-            "custom": Path(__file__).resolve().parents[2]
-            / "data/datasets/custom_texts/",
+            # "custom": Path(__file__).resolve().parents[2]
+            # / "data/datasets/custom_texts/",
             # TODO: Add student essays dataset
             # "student_essays": Path(__file__).resolve().parents[2]
             # / "data/datasets/student_essays/Intro2006/",
@@ -338,10 +338,10 @@ class ParaphrasingEvaluator:
                     data_loaded[filename]["genre"],
                     data_loaded[filename]["century"],
                 )
-                print("SUCCESS: Loaded existing extraction for file:", filename)
+                # print("SUCCESS: Loaded existing extraction for file:", filename)
             else:
                 try:
-                    raise Exception(f"Should not be here, but not found: {filename}")
+                    # raise Exception(f"Should not be here, but not found: {filename}")
                     extra, _, genre, century, _, _ = paraphraser._extract_bullet_points(
                         text=text,
                         prompt=paraphraser.extractor_prompt,
@@ -389,9 +389,9 @@ class ParaphrasingEvaluator:
                 data_loaded = {}
 
             try:
-                print(
-                    "Keys for paraphraser:", data_loaded[paraphraser_name][text].keys()
-                )
+                # print(
+                #     "Keys for paraphraser:", data_loaded[paraphraser_name][text].keys()
+                # )
                 key = (
                     "null"
                     if "null" in data_loaded[paraphraser_name][text].keys()
@@ -401,12 +401,12 @@ class ParaphrasingEvaluator:
                 paraphrases = []
                 for temperature in potential_paraphrases.keys():
                     paraphrases.extend(potential_paraphrases[temperature])
-                print("11 Successfully loaded existing paraphrases for file:", filename)
+                # print("11 Successfully loaded existing paraphrases for file:", filename)
             except Exception as e:
-                print(
-                    f"Paraphraser {paraphraser_name} not found in loaded data for '{text[:15]}...':\nError: {e}.\nGenerating new paraphrase."
-                )
-                raise Exception(f"Should all be present, but not found: {e}") from e
+                # print(
+                #     f"Paraphraser {paraphraser_name} not found in loaded data for '{text[:15]}...':\nError: {e}.\nGenerating new paraphrase."
+                # )
+                # raise Exception(f"Should all be present, but not found: {e}") from e
                 paraphrases = paraphraser.paraphrase(
                     text=text, temperature=self.temperature
                 )
