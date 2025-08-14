@@ -551,18 +551,15 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
 
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     # One shared legend
-    handles, labels = axes[0, 0].get_legend_handles_labels()
     fig.legend(
         # handles=[
         #     plt.Line2D([0], [0], color=colors[ig])
         #     for ig in scores_per_imp_gen_per_thres_dict.keys()
         # ],
         # labels=list(scores_per_imp_gen_per_thres_dict.keys()),
-        handles,
-        labels,
         loc="upper center",
         bbox_to_anchor=(0.5, 1.05),
-        ncol=len(scores_per_imp_gen_per_thres_dict),
+        # ncol=len(scores_per_imp_gen_per_thres_dict),
     )
 
     plt.subplots_adjust(hspace=0.2)
