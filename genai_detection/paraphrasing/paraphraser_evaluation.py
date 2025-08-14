@@ -323,11 +323,16 @@ class ParaphrasingEvaluator:
                     data_loaded.keys(),
                     type(data_loaded[list(data_loaded.keys())[0]]),
                 )
-                print("filename key we are looking for:", filename, type(filename))
+                print(
+                    "filename key we are looking for:",
+                    filename,
+                    type(filename),
+                    str(filename) in data_loaded.keys(),
+                )
             else:
                 data_loaded = {}
 
-            if filename in data_loaded.keys():
+            if str(filename) in data_loaded.keys():
                 extra, genre, century = (
                     data_loaded[filename]["extra"],
                     data_loaded[filename]["genre"],
@@ -580,9 +585,11 @@ class ParaphrasingEvaluator:
                 )
                 continue
 
-            df = df.head(min(5, len(df)))  # subset: keep for evaluation
             if "id" in df.columns:
                 df.rename(columns={"id": "filename"}, inplace=True)
+            df = df.drop_duplicates(subset="filename", keep="first")
+            df = df.head(min(5, len(df)))  # subset: keep for evaluation
+
             logger.info(f"Dataset snapshot:\n{df.head()}")
             print(f"Dataset snapshot:\n{df.head()}")
 
