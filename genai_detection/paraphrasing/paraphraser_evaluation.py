@@ -208,11 +208,11 @@ class ParaphrasingEvaluator:
 
     def _create_student_essays_metadata(self, base_dir: Path):
         task_description = {
-            "Ass1": "Stream of consciousness",
-            "Ass2": "childhood",
-            "Ass3": "personality",
-            "Ass4": "Thematic Apperception Test",
-            "Ass5": "different theories",  # not used in Koppel et al. (2014)
+            "Ass1": "Stream of consciousness, personal journal, diary, essay",
+            "Ass2": "childhood, personal journal, diary, essay",
+            "Ass3": "personality, essay, reflection, self-analysis",
+            "Ass4": "Thematic Apperception Test, essay",
+            "Ass5": "different theories, essay",  # not used in Koppel et al. (2014)
         }
         rows = []
         files_by_ass = []
@@ -377,17 +377,6 @@ class ParaphrasingEvaluator:
             if file_existing_extractions.exists():
                 with open(file_existing_extractions, "r") as f:
                     data_loaded = json.load(f)
-                print(
-                    "Keys in loaded data:",
-                    data_loaded.keys(),
-                    type(data_loaded[list(data_loaded.keys())[0]]),
-                )
-                print(
-                    "filename key we are looking for:",
-                    filename,
-                    type(filename),
-                    str(filename) in data_loaded.keys(),
-                )
             else:
                 data_loaded = {}
 
