@@ -134,25 +134,6 @@ def split_text_into_chunks(text: str, n: int = 1) -> List[str]:
     return chunks
 
 
-# to parallelize
-def _evaluate_chunk(
-    chunk, paraphrasers, prompts, n_responses, max_len, temperature, num_chunks
-):
-    paraphrase_evaluator = ParaphrasingEvaluator(
-        paraphrasers=paraphrasers,
-        prompts=prompts,
-        original_text=chunk,
-        n_responses=n_responses,
-        max_length=max_len,
-        temperature=temperature,
-    )
-    df, _ = paraphrase_evaluator.evaluate(
-        save_extremest_paraphr_per_score=False, save_to_disk=False
-    )
-    df["n_chunks"] = num_chunks
-    return df
-
-
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
@@ -231,7 +212,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
     assert save_path.exists(), f"Save path {save_path} does not exist."
     dataset = get_dataset(path2dataset)
     # keep only the first 5 examples per category
-    dataset = dataset.groupby("category").head(5)
+    dataset = dataset.groupby("category").head(1)  # TODO: change to 5
 
     n_responses = 1
 
@@ -292,7 +273,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
                 if paraphraser_name not in [
                     "T5_ChatGPT",
                     "T5_Google_PAWS",
-                    "Ollama",
+                    # "Ollama",
                 ]:
                     res = paraphrase_with_config(
                         paraphraser_name,
@@ -392,127 +373,6 @@ def evaluate_paraphrases(
     save_path.mkdir(parents=True, exist_ok=True)
     df.to_csv(save_path / f"text_paraphrases_evaluation_results.csv", index=False)
     return df
-
-
-def run_experiment(path2dataset: str) -> pd.DataFrame:
-    """
-    Run the paraphrasing experiment on the cross-genre dataset.
-    The results are saved in a CSV file.
-
-    :param path2dataset: Path to the cross-genre dataset.
-    :return: A dictionary with scores for each text.
-    """
-    assert os.path.exists(path2dataset), f"Dataset path {path2dataset} does not exist."
-    dataset = get_dataset(path2dataset)
-    n_responses = 1
-
-    # Initialize paraphrasers and prompts
-    paraphrasers = get_paraphraser_dict()
-
-    scores_per_text = DefaultDict(list)
-    for original_text, category in tqdm(
-        zip(dataset["disputed_text"], dataset["category"]), desc="Processing texts"
-    ):
-        n_paragraphs_df = []
-        for num_chunks in tqdm(
-            range(1, 6), desc="Evaluating with different chunk sizes"
-        ):
-            chunks = split_text_into_chunks(original_text, n=num_chunks)
-            print(f"Number of chunks: {num_chunks}")
-
-            res_for_chunks = []
-            evaluate_fn = partial(
-                _evaluate_chunk,
-                paraphrasers=paraphrasers,
-                prompts=PROMPTS,
-                n_responses=n_responses,
-                max_len=CONFIG.MAX_LENGTH,
-                temperature=CONFIG.TEMPERATURE,
-                num_chunks=num_chunks,
-            )
-
-            with ThreadPoolExecutor() as executor:  # not cpu bound but IO bound: Use ThreadPoolExecutor rather than ProcessPoolExecutor
-                futures = [executor.submit(evaluate_fn, chunk) for chunk in chunks]
-                for future in tqdm(
-                    as_completed(futures),
-                    total=len(futures),
-                    desc="Evaluating paraphrases",
-                ):
-                    df = future.result()
-                    res_for_chunks.append(df)
-
-            # Combine all dataframes
-            df_concat = pd.concat(res_for_chunks)
-
-            # Separate numeric and non-numeric columns
-            numeric_df = df_concat.select_dtypes(include="number")
-            non_numeric_df = df_concat.select_dtypes(exclude="number")
-
-            # Take only the first non-numeric row per group to merge back later
-            non_numeric_first = non_numeric_df.groupby(level=0).first()
-
-            # Compute mean of numeric data
-            numeric_mean = numeric_df.groupby(level=0).mean()
-
-            # Combine them back together
-            averaged_df = pd.concat([non_numeric_first, numeric_mean], axis=1)
-
-            # Add to results list
-            n_paragraphs_df.append(averaged_df)
-        scores_per_text[original_text] = [n_paragraphs_df, category]
-    return scores_per_text
-
-
-def _save_modelwise_chunk_scores(
-    n_paragraphs_df: list, output_dir: str | Path, data_category: str = "News"
-):
-    assert isinstance(
-        n_paragraphs_df, list
-    ), "n_paragraphs_df must be a list of DataFrames."
-    output_dir = Path(output_dir)
-    assert output_dir.exists(), f"Output directory {output_dir} does not exist."
-    output_dir.mkdir(parents=True, exist_ok=True)
-    full_df = pd.concat(n_paragraphs_df)
-    for model_name, model_df in full_df.groupby("model"):
-        # Group by prompt, sort by n_chunks
-        model_df_sorted = model_df.sort_values(by=["prompt", "n_chunks"])
-
-        # Save to CSV
-        file_name = f"{model_name}_chunk_scores_category_{data_category}.csv"
-        model_df_sorted.to_csv(output_dir / file_name, index=False)
-
-
-# to parallelize
-def _save_text_chunk_score(i, text, n_paragraphs_df, data_category, output_dir):
-    path2results = output_dir / f"text_{i}"
-    os.makedirs(path2results, exist_ok=True)
-
-    with open(path2results / "text.txt", "w") as text_file:
-        text_file.write(text)
-
-    _save_modelwise_chunk_scores(
-        n_paragraphs_df, output_dir=path2results, data_category=data_category
-    )
-
-
-def save_textwise_chunk_scores(scores_per_text: dict, output_dir: str | Path):
-    """
-    Save the chunk scores for each text in a separate CSV file.
-    """
-    assert isinstance(scores_per_text, dict), "scores_per_text must be a dictionary."
-    output_dir = Path(output_dir)
-    assert output_dir.exists(), f"Output directory {output_dir} does not exist."
-    output_dir.mkdir(parents=True, exist_ok=True)
-    items = [
-        (i, k, v[0], v[1], output_dir)
-        for i, (k, v) in enumerate(scores_per_text.items())
-    ]
-    with ProcessPoolExecutor() as executor:
-        futures = [executor.submit(_save_text_chunk_score, *item) for item in items]
-        for _ in tqdm(
-            as_completed(futures), total=len(futures), desc="Saving modelwise scores"
-        ):
-            pass
 
 
 def get_slim_dfs_for_one_text(n_paragraphs_df: list) -> list:  # of dataframes
@@ -627,18 +487,6 @@ def plot_model_metrics(
             plt.close()
 
 
-#### only for parallel processing
-def _process_df(args):
-    text, (n_paragraphs_df, data_category) = args
-    slim_n_paragraphs_dfs = get_slim_dfs_for_one_text(n_paragraphs_df)
-    plot_model_metrics(
-        slim_n_paragraphs_dfs,
-        save_dir=SAVE_PATH,
-        data_category=data_category,
-        show=False,
-    )
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Assess effect of (Non-) Naive impostor generation."
@@ -689,15 +537,7 @@ if __name__ == "__main__":
         )
         print(results.head())
 
-    # scores_per_text = run_experiment(
-    #     path2dataset=args.path2dataset,
-    # )
-
-    # print(
-    #     f"Obtained scores for {len(scores_per_text)} texts. Next, save them in parallel fashion."
-    # )
-    # save_textwise_chunk_scores(scores_per_text=scores_per_text, output_dir=SAVE_PATH)
-
+    # FIXME: cannot parallelize matplotlib plots
     # print("Next, plot model metrics per text (parallel).")
     # with ProcessPoolExecutor() as executor:
     #     futures = [
