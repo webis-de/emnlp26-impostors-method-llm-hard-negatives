@@ -276,7 +276,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
                         ), "Result should be a dict."
                         chunk_id = paraphrase_dif_temp_prompt.pop("chunk_id")
                         paraphraser_name = paraphrase_dif_temp_prompt.pop("paraphraser")
-                        data_loaded[text_key][n_total_chunks][chunk_id][
+                        data_loaded[text_key][n_total_chunks][f"chunk_{chunk_id}"][
                             paraphraser_name
                         ] = paraphrase_dif_temp_prompt
 
