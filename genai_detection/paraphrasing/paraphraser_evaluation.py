@@ -11,7 +11,7 @@ import evaluate
 import datetime
 import difflib
 from collections import defaultdict
-from itertools import chain, cycle, product
+from itertools import chain, cycle, product, zip_longest
 from matplotlib import pyplot as plt
 import numpy as np
 import openai
@@ -214,17 +214,30 @@ class ParaphrasingEvaluator:
             "Ass5": "different theories",  # not used in Koppel et al. (2014)
         }
         rows = []
-        for file in chain(
-            (base_dir / assignment).glob("*.txt")
-            for assignment in ["Ass1", "Ass2", "Ass3", "Ass4"]
-        ):
-            if not file.is_file():
-                continue
+        files_by_ass = []
+
+        # Gather valid files for each assignment
+        for assignment in list(task_description.keys()):
+            files = [
+                f
+                for f in (base_dir / assignment).glob("*.txt")
+                if f.is_file() and len(f.read_text(encoding="utf-8").split()) >= 700
+            ]
+            files_by_ass.append(files)
+
+        # Interleave: take one from each assignment in turn
+        interleaved_files = []
+        for group in zip_longest(*files_by_ass):
+            for f in group:
+                if f is not None:
+                    interleaved_files.append(f)
+
+        # Now process in interleaved order
+        rows = []
+        for file in interleaved_files:
             text = file.read_text(encoding="utf-8")
-            if len(text.split()) < 700:
-                continue
             filename = file.stem
-            assignment = file.split("/")[-2]
+            assignment = file.parent.name
             if assignment == "Ass5" or assignment not in task_description:
                 continue
             author = (
@@ -261,7 +274,7 @@ class ParaphrasingEvaluator:
         data = []
         path2metadata = base_dir / "file_metadata.xlsx"
         if dataset_type == "student_essays":
-            if not path2metadata.exists():
+            if True:  #  TODO: not path2metadata.exists():
                 self._create_student_essays_metadata(base_dir)
             return pd.read_excel(path2metadata)
 
