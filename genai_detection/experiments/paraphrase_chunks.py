@@ -136,9 +136,6 @@ def paraphrase_with_config(
 
     for prompt in prompt_options:
         for temperature in temperature_options:
-            # print(
-            #     f"Using paraphraser: {paraphraser_name} with temperature={temperature}, prompt={prompt}"
-            # )
             p_config = {
                 "text": chunk,
                 "prompt": prompt,
@@ -309,80 +306,84 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
 
 def evaluate_paraphrases(path2dataset: str, save_path: Path) -> List[pd.DataFrame]:
     assert os.path.exists(path2dataset), f"Dataset path {path2dataset} does not exist."
+    file2existing_paraphrases = save_path / "existing_chunk_paraphrases.json"
+    if not file2existing_paraphrases.exists():
+        raise FileNotFoundError(
+            f"File with existing paraphrases {file2existing_paraphrases} does not exist."
+        )
+    loaded_paraphrases = json.load(open(file2existing_paraphrases, "r"))
 
     # iterate over all csv file containing paraphrases
     rows = []  # of dicts
-    for paraphrases_file in tqdm(
-        path2dataset.glob("*.csv"), desc="Evaluating paraphrases"
+    for text_id, text_data in tqdm(
+        loaded_paraphrases.items(),
+        desc="Evaluating paraphrases",
+        total=len(loaded_paraphrases),
     ):
-        # paraphases of one text
-        df = pd.read_csv(paraphrases_file)
-        text_id = paraphrases_file.stem.split("_")[1]  # e.g. text_0_paraphrases.csv
-        original_text = _preprocess_text(df["original_text"].iloc[0])
-        paraphrase_evaluator = ParaphrasingEvaluator(
-            paraphrasers=get_paraphraser_dict(),
-            prompts=PROMPTS,
-            original_text=original_text,
-            n_responses=1,
-        )
-        for i in range(len(df)):
-            original_row = df.iloc[i].to_dict()
-            paraphrased_chunk = _preprocess_text(original_row["paraphrased_chunk"])
-            if not paraphrased_chunk or pd.isna(paraphrased_chunk):
-                print(
-                    f"[WARNING] Paraphrased chunk is empty for text ID {text_id}, skipping evaluation."
-                )
-                continue
-
-            try:
-                # input is list of strings, each string is a paraphrase/ reference
-                bert_scores = paraphrase_evaluator.bertscore.compute(
-                    predictions=[paraphrased_chunk],
-                    references=[original_text],
-                    model_type="distilbert-base-uncased",
-                )
-            except Exception as e:
-                print("[ERROR] BERTScore computation failed:", e)
-                bert_scores = {
-                    "precision": [0.0],
-                    "recall": [0.0],
-                    "f1": [0.0],
-                    "hashcode": "",
-                }
-            # placeholder/ fallback
-            rouge_scores = {
-                "rouge1": 0.0,
-                "rouge2": 0.0,
-                "rougeL": 0.0,
-                "rougeLsum": 0.0,
-            }
-            try:
-                # TODO: shouldnt be nan... obsolete?
-                if paraphrased_chunk and original_text:
-                    rouge_scores = paraphrase_evaluator.rouge_score.compute(
-                        predictions=[paraphrased_chunk], references=[original_text]
+        # [n_total_chunks][f"chunk_{chunk_id}"][
+        #                     paraphraser_name
+        #                 ]
+        for n_total_chunks, chunk_data_dict in text_data.items():
+            for chunk_id, chunk_data in chunk_data_dict.items():
+                for paraphraser_name, paraphrase_data in chunk_data.items():
+                    original_text = _preprocess_text(paraphrase_data["original_text"])
+                    paraphrase_evaluator = ParaphrasingEvaluator(
+                        paraphrasers=get_paraphraser_dict(),
+                        prompts=PROMPTS,
+                        original_text=original_text,
+                        n_responses=1,
                     )
-                else:
-                    print(
-                        f"[WARNING] Paraphrased chunk or original text is empty for text ID {text_id}, skipping ROUGE evaluation."
+                    paraphrased_chunk = _preprocess_text(
+                        paraphrase_data["paraphrased_chunk"]
                     )
-            except Exception as e:
-                print("[ERROR] ROUGE computation failed:", e)
+                    if not paraphrased_chunk or pd.isna(paraphrased_chunk):
+                        print(
+                            f"[WARNING] Paraphrased chunk is empty for text ID {text_id}, skipping evaluation."
+                        )
+                        continue
 
-            res = paraphrase_evaluator._build_result_row(
-                paraphraser_name=df["paraphraser"].iloc[0],
-                prompt=df["prompt"].iloc[0],
-                paraphrase=paraphrased_chunk,
-                original_split=original_text.split(),
-                bert_scores=bert_scores,
-                rouge_scores=rouge_scores,
-                idx=0,
-            )
-            assert res is not None, "Result row should not be None."
-            assert isinstance(original_row, dict), "Original row should be a dict."
-            original_row.update(res)
-            original_row["text_id"] = text_id
-            rows.append(original_row)
+                    try:
+                        # input is list of strings, each string is a paraphrase/ reference
+                        bert_scores = paraphrase_evaluator.bertscore.compute(
+                            predictions=[paraphrased_chunk],
+                            references=[original_text],
+                            model_type="distilbert-base-uncased",
+                        )
+                    except Exception as e:
+                        print("[ERROR] BERTScore computation failed:", e)
+                        bert_scores = {
+                            "precision": [0.0],
+                            "recall": [0.0],
+                            "f1": [0.0],
+                            "hashcode": "",
+                        }
+                    # placeholder/ fallback
+                    rouge_scores = {
+                        "rouge1": 0.0,
+                        "rouge2": 0.0,
+                        "rougeL": 0.0,
+                        "rougeLsum": 0.0,
+                    }
+                    try:
+                        rouge_scores = paraphrase_evaluator.rouge_score.compute(
+                            predictions=[paraphrased_chunk], references=[original_text]
+                        )
+
+                    except Exception as e:
+                        print("[ERROR] ROUGE computation failed:", e)
+
+                    res = paraphrase_evaluator._build_result_row(
+                        paraphraser_name=paraphraser_name,
+                        prompt=paraphrase_data["prompt"],
+                        paraphrase=paraphrased_chunk,
+                        original_split=original_text.split(),
+                        bert_scores=bert_scores,
+                        rouge_scores=rouge_scores,
+                        idx=0,
+                    )
+                    assert res is not None, "Result row should not be None."
+                    paraphrase_data.update(res)
+                    rows.append(paraphrase_data)
     df = pd.DataFrame(rows)
     # Save the results to a CSV file
     save_path.mkdir(parents=True, exist_ok=True)
