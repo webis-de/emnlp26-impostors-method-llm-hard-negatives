@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=chunks
+#SBATCH --job-name=eval_chunks
 #SBATCH --mem=128g
 #SBATCH --cpus-per-task=16
 #SBATCH --output=logs/%j-chunks.log
