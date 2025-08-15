@@ -557,6 +557,9 @@ if __name__ == "__main__":
             path2dataset=args.path2dataset,
             save_path=paraphrase_save_path,
         )
+        print(
+            f"Paraphrasers created and saved to {paraphrase_save_path}. Next, run the evaluation."
+        )
 
     # works on minimal example (15.08.2025)
     elif args.task == "evaluate":
@@ -581,3 +584,4 @@ if __name__ == "__main__":
             save=True,
             data_category="Cross-Genre",
         )
+        print("Plots saved to plots directory:", SAVE_PATH / "cross_genre" / "plots")
