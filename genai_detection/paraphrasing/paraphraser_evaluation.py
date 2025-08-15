@@ -1430,8 +1430,8 @@ class ParaphrasingEvaluator:
                 )
             plt.xlabel(metric)
             plt.ylabel("Density")
-            # do not set value range -> results barely visible
-            # plt.xlim(0, 1)
+            min_val = data[metric].min()
+            plt.xlim(left=max(0, min_val), right=None)
             handles = [
                 mpatches.Patch(color=palette[i], label=self._wrap_label(str(label)))
                 for i, label in enumerate(unique_labels)
@@ -1560,7 +1560,8 @@ class ParaphrasingEvaluator:
             metric_for_tile = " ".join([t.capitalize() for t in metric.split("_")])
             ax.set_title(f"Distribution of {metric_for_tile}")
             # do not set value range -> results barely visible
-            # ax.set_xlim(0, 1)  # assuming similarity metrics in [0, 1]
+            min_val = data[metric].min()
+            ax.set_xlim(left=max(0, min_val), right=None)
             ax.set_xlabel(metric_for_tile)
             ax.set_ylabel("Density")
 
