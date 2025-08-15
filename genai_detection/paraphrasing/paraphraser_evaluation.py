@@ -1566,7 +1566,7 @@ class ParaphrasingEvaluator:
                     )
                 if scale == "symlog":
                     ax.grid(which="both", linestyle="--", color="gray", alpha=0.5)
-                ax.set_xscale(scale, linthresh=1e-3)
+                ax.set_xscale(scale)
                 metric_for_tile = " ".join([t.capitalize() for t in metric.split("_")])
                 ax.set_title(f"Distribution of {metric_for_tile}")
                 # do not set value range -> results barely visible
