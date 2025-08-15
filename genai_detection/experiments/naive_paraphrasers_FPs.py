@@ -188,7 +188,18 @@ def read_scores_from_csv(path2csv: Path) -> pd.DataFrame:
         if not filename.endswith(".csv"):
             continue
         path2csvfile = path2csv / filename
-        imp_gen = filename.split("_")[1]
+        label_map = {
+            "naive": "naive_llm",
+            "non_naive": "non_naive_llm",
+            "text": "text_len",
+            "fixed": "fixed",
+            "content": "content",
+        }
+
+        imp_gen = next(
+            (label for key, label in label_map.items() if key in filename), "llm"
+        )
+
         csv_df = pd.read_csv(
             path2csvfile, usecols=["same", f"impostor_prediction_{imp_gen}"]
         )  # ,"pair","authors",f"impostor_score_{imp_gen}"])
