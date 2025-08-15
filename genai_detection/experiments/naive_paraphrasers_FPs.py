@@ -211,7 +211,9 @@ def read_scores_from_csv(path2csv: Path) -> pd.DataFrame:
             csv_df = pd.read_csv(
                 path2csvfile, usecols=["same", f"impostor_score_{imp_gen}"]
             )  # ,"pair","authors",f"impostor_score_{imp_gen}"])
-            fpr, tpr, roc_thresholds = roc_curve(y_true=csv_df["same"], y_score=scores)
+            fpr, tpr, roc_thresholds = roc_curve(
+                y_true=csv_df["same"], y_score=csv_df[f"impostor_score_{imp_gen}"]
+            )
             opt_thres = _get_opt_imp_threshold(fpr, tpr, roc_thresholds)
             csv_df[f"impostor_prediction_{imp_gen}"] = (
                 csv_df[f"impostor_score_{imp_gen}"] >= opt_thres
