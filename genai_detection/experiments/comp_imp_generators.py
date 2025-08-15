@@ -353,7 +353,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             test_dataset.loc[missing_pred_mask, f"impostor_prediction_{imp_gen}"] = (
                 test_dataset.loc[missing_pred_mask, col_score] > opt_thres
             )
-
+        if any(missing_pred_mask) or missing_mask.sum() > 0:
             test_dataset.to_csv(
                 save_path / test_scores_file_name,
                 index=False,
