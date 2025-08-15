@@ -32,13 +32,13 @@ SAVE_PATH = (
 )
 IMP_GEN_OPTIONS = [
     # "naive_llm",
-    # "non_naive_llm",
+    "non_naive_llm",
     # "llm",
     # "fixed",
     # "text_len",
     # "content",    # no device error when running sequentially and with 256GB RAM, 4 CPU cores
     # "on-the-fly", # no more api calls
-    "mirror_minds",  # device error
+    # "mirror_minds",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores
 ]
 
 
@@ -185,8 +185,6 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     )
 
     print(f"Running experiment for {dataset_name} dataset.")
-
-    # FIXME: mirror minds download problem
     for imp_gen in IMP_GEN_OPTIONS:
         col_score = f"impostor_score_{imp_gen}"
         col_dict = f"impostor_dict_{imp_gen}"
