@@ -268,11 +268,14 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 ]
                 else 14 // _get_num_impostors(imp_gen)
             )  # 14 API calls per minute (2 API calls per second) to avoid SAIA rate limiting
-            if imp_gen in ["content", "mirror_minds"]:
+            if imp_gen in ["content", "mirror_minds", "non_naive_llm"]:
                 results = []
-                for pair in new_rows["pair"]:
+                for p, pair in enumerate(new_rows["pair"]):
                     res = _helper_impostor(
                         path2imp, pair, training_mode=True, imp_gen=imp_gen
+                    )
+                    print(
+                        f"DEBUG: {p+1}/{len(new_rows)}: successfully generated impostor."
                     )
                     results.append(res)
             else:
