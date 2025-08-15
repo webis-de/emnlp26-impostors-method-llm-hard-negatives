@@ -525,6 +525,7 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
         ig: cmap(i % 10)
         for i, ig in enumerate(scores_per_imp_gen_per_thres_dict.keys())
     }
+    line_styles = ["-", "--", "-.", ":"]
 
     metrics = ["f1s", "accs", "precisions", "recalls"]
     titles = [
@@ -540,13 +541,14 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
         "Recall $\\frac{{TP}}{{TP + FN}}$",
     ]
     for ax, metric, title, ylabel in zip(axes.flat, metrics, titles, ylabels):
-        for imp_gen, vals in scores_per_imp_gen_per_thres_dict.items():
+        for i, (imp_gen, vals) in enumerate(scores_per_imp_gen_per_thres_dict.items()):
             ax.plot(
                 vals["thresholds"],
                 vals[metric],
                 label=imp_gen,
                 color=colors[imp_gen],
                 linewidth=1.5,
+                linestyle=line_styles[i % len(line_styles)],
             )
         ax.set_xlabel("Threshold", fontsize=14)
         ax.set_ylabel(ylabel, fontsize=14)
