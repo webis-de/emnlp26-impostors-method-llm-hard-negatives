@@ -791,7 +791,7 @@ class VisDetectors:
             dataset, loaded_data, imp_gen, n_imp
         )
 
-        return dataset.iloc[missing_scores_indices], missing_scores_indices
+        return dataset.loc[missing_scores_indices], missing_scores_indices
 
     def _update_loaded_data(
         self,
