@@ -307,6 +307,9 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
             bin_stats = metric_by_bin.merge(bin_ranges, on="diff_bin")
             fig, ax1 = plt.subplots(figsize=(8, 5))
 
+            print("cols:", bin_stats.columns)
+            print("metric:", metric)  # Should be 'Accuracy'
+
             ax1.bar(
                 bin_stats["diff_bin"],
                 bin_stats[metric],
