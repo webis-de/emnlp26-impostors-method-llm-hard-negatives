@@ -1419,7 +1419,7 @@ class ParaphrasingEvaluator:
                     palette=palette,
                     legend=True,
                 )
-                plt.xscale(scale)
+                plt.yscale(scale)
                 if scale == "symlog":
                     plt.grid(which="both", linestyle="--", linewidth=0.5)
 
@@ -1566,7 +1566,7 @@ class ParaphrasingEvaluator:
                     )
                 if scale == "symlog":
                     ax.grid(which="both", linestyle="--", color="gray", alpha=0.5)
-                ax.set_xscale(scale)
+                ax.set_yscale(scale)
                 metric_for_tile = " ".join([t.capitalize() for t in metric.split("_")])
                 ax.set_title(f"Distribution of {metric_for_tile}")
                 # do not set value range -> results barely visible
@@ -1606,11 +1606,11 @@ class ParaphrasingEvaluator:
             plt.tight_layout(rect=[0, 0, 0.95, 0.95])
 
             if save_path:
-                save_path = Path(save_path) / f"{scale}_scale"
-                save_path.mkdir(parents=True, exist_ok=True)
+                scale_save_path = Path(save_path) / f"{scale}_scale"
+                scale_save_path.mkdir(parents=True, exist_ok=True)
                 for format in ["svg"]:
                     filenaname = f"{data_category.replace(' ','_')}_metric_distributions_grouped_by_{group_by}_{scale}_scale.{format}"
-                    full_path = save_path / filenaname
+                    full_path = scale_save_path / filenaname
                     plt.savefig(
                         full_path, bbox_inches="tight", transparent=True, format=format
                     )
