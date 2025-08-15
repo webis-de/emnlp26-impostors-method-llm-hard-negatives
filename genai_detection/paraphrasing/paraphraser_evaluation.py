@@ -401,6 +401,10 @@ class ParaphrasingEvaluator:
                 with open(file_existing_extractions, "r") as f:
                     data_loaded = json.load(f)
             else:
+                raise FileNotFoundError(
+                    "Existing extraction file not found: "
+                    + str(file_existing_extractions)
+                )
                 data_loaded = {}
 
             if str(filename) in data_loaded.keys():
@@ -475,6 +479,9 @@ class ParaphrasingEvaluator:
                 for temperature in potential_paraphrases.keys():
                     paraphrases.extend(potential_paraphrases[temperature])
             except Exception as e:
+                raise RuntimeError(
+                    f"Failed to load paraphrases for {paraphraser_name} on text '{text[:30]}': {e}"
+                ) from e
                 paraphrases = paraphraser.paraphrase(
                     text=text, temperature=self.temperature
                 )
