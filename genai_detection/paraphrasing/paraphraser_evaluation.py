@@ -188,6 +188,26 @@ class ParaphrasingEvaluator:
             dim=0,
         ).item()
 
+    def _similarity_numbers(self, a, b):
+        """
+        Calculate the percentual similarity of two integers,
+        using the first value as the baseline (100%).
+        Converts strings to integers if needed.
+
+        Example:
+        similarity_percent(100, 90) -> 0.9
+        """
+        # Convert to int if strings
+        a = int(a)
+        b = int(b)
+
+        if a == 0:
+            return 0
+
+        # Calculate percentage similarity
+        similarity = b / a
+        return similarity
+
     @staticmethod
     def _get_century(time_period) -> int:
         """Convert a time period or year string/int to century."""
@@ -422,7 +442,9 @@ class ParaphrasingEvaluator:
                 self._semantic_similarity(extr_g.strip().lower(), gt_genre)
                 for extr_g in re.split(r"[ /,]+", str(genre).lower())
             )
-            time_match = self._similar(century, gt_century)
+            time_match = self._similarity_numbers(
+                century, gt_century
+            )  # self._similar(century, gt_century)
             extracted_topic = (
                 extra.get("topic", extra) if isinstance(extra, dict) else extra
             )
