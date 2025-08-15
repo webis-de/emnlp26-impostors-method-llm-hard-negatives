@@ -578,42 +578,41 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
             assert len(paraphrasers) > 0, "At least one paraphraser must be provided."
             self.paraphrasers = paraphrasers
         self.prompts = [
-            "Paraphrase the text above and output only the paraphrased version.",
-            "For the text above: First, extract bullet points capturing the main ideas, then create a text based on these bullet points. Only output the final text (i.e. do not output the bullet points or any additional chain of thoughts).",
             "For the text above: Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
-            "For the text above: Paraphrase the sentence using the same tone as the original with approximately the same number of words.",
             "For the text above: Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence.",
         ]
 
     def generate_impostors(
         self, text: str, path2imp: str = None, real_time_generation: bool = False
     ) -> Dict[str, str]:
+        # returns a dictionary of impostor texts: min(n_impostors, len(paraphrasers) * len(prompts))
         impostors = {}
-        paraphrases = []
-        for i, paraphraser in enumerate(self.paraphrasers):
-            if isinstance(paraphraser, NaiveParaphraser):
-                for prompt in self.prompts:
-                    try:
-                        impostor_texts = paraphraser.paraphrase(text, prompt=prompt)
-                        paraphrases.extend(impostor_texts)
-                    except Exception as e:
-                        print(f"Error generating impostor with {paraphraser}: {e}")
-                        continue
-            else:  # Non-naive paraphrasers
+        random.shuffle(self.paraphrasers)
+        count = 0
+        for paraphraser in self.paraphrasers:
+            if count >= self.n_impostors:
+                break
+            for p_id, prompt in enumerate(self.prompts):
+                if count >= self.n_impostors:
+                    break
+                if p_id > 0 and isinstance(paraphraser, NonNaiveParaphraser):
+                    # skip non-naive paraphrasers: They use their own prompts
+                    continue
                 try:
                     impostor_texts = paraphraser.paraphrase(
-                        text, prompt=self.prompts[i], n_responses=1
-                    )[0]
-                    paraphrases.extend(impostor_texts)
+                        text, prompt=prompt, n_responses=1
+                    )
+                    for imp in impostor_texts:
+                        if imp:  # only non-empty
+                            impostors[
+                                f"impostor_{count}_prompt{p_id}_{paraphraser.model_id}"
+                            ] = imp
+                            count += 1
+                            if count >= self.n_impostors:
+                                break
                 except Exception as e:
                     print(f"Error generating impostor with {paraphraser}: {e}")
-                    continue
 
-        impostors = {
-            f"impostor_{i}_{paraphraser.model_id}": imp
-            for i, imp in enumerate(paraphrases)
-            if len(imp) > 0
-        }
         return impostors
 
 
