@@ -52,47 +52,6 @@ SAVE_PATH = (
 TIMESTAMP = pd.Timestamp.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 
-# def get_dataset(path2dataset: str) -> pd.DataFrame:
-#     """
-#     Load the cross-genre dataset from the specified path.
-#     The dataset is expected to be in a format compatible with the `load_from_disk` function.
-
-#     The construction of this cross-genre dataset is in file `genai_detection/dataset_util.py`.
-#     """
-#     assert os.path.exists(path2dataset), f"Dataset path {path2dataset} does not exist."
-#     dataset = load_from_disk(path2dataset)["train"].to_pandas()
-#     print(f"Loaded Cross-genre dataset with {len(dataset)} examples.")
-#     dataset["paraphraser"] = dataset["authors"].apply(lambda x: x[1])
-#     return dataset
-
-
-# def split_dataset_by_paraphraser_naivety(
-#     dataset: pd.DataFrame,
-# ) -> dict[str, pd.DataFrame]:
-#     """
-#     Split the dataset into two subsets based on the paraphraser type.
-#     Naive paraphrasers are those that are created in one step and non-naive paraphrasers are those that are created in a two-step approach.
-#     """
-#     # versions without naive/ non-naive paraphrasers in authors
-#     naive_p_dataset = dataset[
-#         ~dataset["paraphraser"].isin(NON_NAIVE_PARAPHRASER_NAMES)
-#     ]  # contains only naive paraphrasers
-#     non_naive_p_dataset = dataset[
-#         ~dataset["paraphraser"].isin(NAIVE_PARAPHRASER_NAMES)
-#     ]  # contains only non-naive paraphrasers
-#     print(
-#         f"len(non_naive_p_dataset) examples with non-naive paraphrasers: {len(non_naive_p_dataset)}"
-#     )
-#     print(
-#         f"len(naive_p_dataset) examples with naive paraphrasers: {len(naive_p_dataset)}"
-#     )
-#     dataset_dict = {
-#         "naive": naive_p_dataset,
-#         "non_naive": non_naive_p_dataset,
-#     }
-#     return dataset_dict
-
-
 def load_detectors(detector_name: str = "all") -> dict[str, ImpostorDetector]:
     """
     Load the detectors for the experiment.
@@ -123,116 +82,6 @@ def load_detectors(detector_name: str = "all") -> dict[str, ImpostorDetector]:
         ), f"Detector {detector_name} not found in {list(detector_dict.keys())}."
         return {detector_name: detector_dict[detector_name]}
     return detector_dict
-
-
-# def _compute_score(detector_name, row: collections.OrderedDict) -> tuple[int, float]:
-#     original_text = row["disputed_text"]
-#     paraphrased_text = row["candidate_text"]
-#     detector = load_detectors(detector_name)[detector_name]
-#     score = detector.get_score([original_text, paraphrased_text], normalize=False)
-#     try:
-#         id = row["Index"]
-#     except Exception as e:
-#         print(f"Error getting index from row: {e}")
-#         print(f"Row keys: {row.keys()}")
-#     try:
-#         return id, (
-#             np.round(score, 2) if not (score is None) else None
-#         )  # return index + score
-#     except TypeError as e:
-#         raise TypeError(
-#             f"Error rounding score: {score}. Ensure the score is a number. Row: {row}. Error: {str(e)}"
-#         ) from e
-
-
-# async def get_detector_scores(
-#     detector_dict: dict[str, ImpostorDetector],
-#     dataset_dict: dict[str, pd.DataFrame],
-# ) -> pd.DataFrame:
-#     """
-#     Calculate the scores for each detector on the given datasets.
-#     The scores are added to the datasets as new columns.
-#     """
-#     all_dfs = []
-#     detector_scores_save_path = SAVE_PATH / "detector_scores"
-#     detector_scores_save_path.mkdir(parents=True, exist_ok=True)
-
-#     for detector_name in detector_dict.keys():
-#         for dataset_name, dataset in dataset_dict.items():
-#             if detector_name == dataset_name:
-#                 continue  # Skip the detector if it is the same as the dataset name, bc candidate text has same author as some impostors
-
-#             # Skip if already computed
-#             output_file = (
-#                 detector_scores_save_path
-#                 / f"scores_{detector_name}_on_{dataset_name}.csv"
-#             )
-#             if output_file.exists():
-#                 print(f"Loading existing file: {output_file}")
-#                 dataset_scored = pd.read_csv(output_file)
-#                 print(
-#                     f"Read {detector_name} scores:",
-#                     dataset_scored[f"{detector_name}_score"].head(),
-#                 )
-
-#             else:
-#                 score_col = f"{detector_name}_score"
-#                 dataset_scored = dataset.copy()
-#                 dataset_scored[score_col] = np.nan
-#                 rows = list(dataset_scored.itertuples())  # Faster + safer for indexing
-#                 # Exceeds API rate limits if too many requests are sent in parallel
-#                 # with ThreadPoolExecutor() as executor:
-#                 #     futures = [
-#                 #         executor.submit(_compute_score, detector_name, row._asdict())
-#                 #         for row in rows
-#                 #     ]
-#                 #     for future in tqdm(
-#                 #         as_completed(futures),
-#                 #         total=len(futures),
-#                 #         desc=f"Scoring {detector_name} on {dataset_name}",
-#                 #     ):
-#                 #         idx, score = future.result()
-#                 #         dataset_scored.at[idx, score_col] = score
-#                 # print(
-#                 #     f"Created {detector_name} scores:",
-#                 #     dataset_scored[f"{detector_name}_score"].head(),
-#                 # )
-
-#                 # sequential processing to avoid SAIA API rate limits
-#                 for row in rows:
-#                     i = 0
-#                     idx, score = _compute_score(detector_name, row._asdict())
-#                     while score is None:
-#                         print(
-#                             "Exceeded API rate limit and hence score is None. Sleeping for 5 seconds."
-#                         )
-#                         i += 10
-#                         await sleep(i)
-#                         idx, score = _compute_score(detector_name, row._asdict())
-#                         if i > 100:
-#                             break
-#                     try:
-#                         dataset_scored.at[idx, score_col] = score
-#                     except Exception as e:
-#                         print(
-#                             f"Error setting score for index {idx} in {detector_name} on {dataset_name}: {e}"
-#                         )
-#                         print(f"Row: {row._asdict()}")
-#                         continue
-
-#                 dataset_scored.to_csv(output_file, index=False)
-#         all_dfs.append(dataset_scored)
-#     final_dataset = pd.concat(all_dfs, ignore_index=True)
-
-#     final_output_path = (
-#         SAVE_PATH / f"exp_imp_gen_av_scores_cross_genre_dataset_{TIMESTAMP}.csv"
-#     )
-#     final_dataset.to_csv(
-#         final_output_path,
-#         index=False,
-#     )
-#     print(f"Saved final dataset to: {final_output_path}")
-#     return final_dataset
 
 
 def _get_rsme_per_img_gen(
@@ -348,11 +197,6 @@ def read_scores_from_csv(path2csv: Path) -> pd.DataFrame:
             df = pd.concat([df, csv_df], ignore_index=True)
     return df
 
-    print(f"Reading scores from {path2csv}")
-    df = pd.read_csv(path2csv)
-    print(f"Read {len(df)} rows from {path2csv}")
-    return df
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -366,23 +210,14 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # FIXME: only read from existing impostor scores for different impostor generators
+    # only read from existing impostor scores for different impostor generators
     # do not compute scores again, hence read-only!
-
-    # Run the experiment
     if not SAVE_PATH.exists():
         SAVE_PATH.mkdir(parents=True, exist_ok=True)
-    # dataset = get_dataset(path2dataset=args.path2dataset)
-    # dataset_dict = split_dataset_by_paraphraser_naivety(dataset=dataset)
-    # print("Dataset acquistion completed successfully.")
 
-    # FIXME: might have wrong category names for detectors
     detector_dict = load_detectors()
     print("Detectors loaded successfully.")
 
-    # scores = asyncio.run(
-    #     get_detector_scores(detector_dict=detector_dict, dataset_dict=dataset_dict)
-    # )
     path2csv = (
         Path(__file__).resolve().parents[2]
         / CONFIG.SAVE_PATH
