@@ -31,10 +31,10 @@ SAVE_PATH = (
     / "impostor_generator_comparison"
 )
 IMP_GEN_OPTIONS = [
-    "fixed",
     "naive_llm",
     # "non_naive_llm",
     # "llm",
+    "fixed",
     "text_len",
     # "content",    # device error
     # "on-the-fly", # no more api calls
@@ -113,7 +113,12 @@ def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_
 
     impostor_detector = ImpostorDetector(
         impostor_technique=imp_gen,
-        n_impostors=50,
+        n_impostors=(
+            50
+            if imp_gen
+            not in ["mirror_minds", "on-the-fly", "naive_llm", "non_naive_llm", "llm"]
+            else 1  # TODO: higher
+        ),
         rounds=100,  # cf. pg. 181, Koppel et al. (2014)
         top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
         path2imp=path2imp,
