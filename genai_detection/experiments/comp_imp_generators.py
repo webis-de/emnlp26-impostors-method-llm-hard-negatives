@@ -31,12 +31,12 @@ SAVE_PATH = (
     / "impostor_generator_comparison"
 )
 IMP_GEN_OPTIONS = [
-    "naive_llm",
-    "non_naive_llm",
-    "llm",
-    "fixed",
-    "text_len",
-    # "content",  # device error
+    # "naive_llm",
+    # "non_naive_llm",
+    # "llm",
+    # "fixed",
+    # "text_len",
+    "content",  # device error
     # "on-the-fly", # no more api calls
     # "mirror_minds", # device error
 ]
@@ -259,7 +259,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             )
             new_rows = train_dataset[missing_mask].copy()
             max_workers = (
-                len(new_rows)
+                4  # num cpus cores
                 if imp_gen
                 not in [
                     "mirror_minds",
