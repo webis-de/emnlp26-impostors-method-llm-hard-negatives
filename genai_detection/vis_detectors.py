@@ -869,7 +869,8 @@ class VisDetectors:
                 missing_scores=missing_scores,
                 n_imp=n_imp,
             )
-            loaded_data.to_json(existing_scores_filename, indent=4, ensure_ascii=False)
+            with open(existing_scores_filename, "w") as f:
+                json.dump(loaded_data, f, indent=4)
             print(
                 f"Saved missing train scores to {existing_scores_filename} for {len(missing_scores_indices)} rows."
             )
@@ -922,7 +923,8 @@ class VisDetectors:
                 missing_scores=missing_scores,
                 n_imp=n_imp,
             )
-            loaded_data.to_json(existing_scores_filename, indent=4, ensure_ascii=False)
+            with open(existing_scores_filename, "w") as f:
+                json.dump(loaded_data, f, indent=4)
             print(
                 f"Saved missing test scores to {existing_scores_filename} for {len(missing_scores_indices)} rows."
             )
@@ -1057,9 +1059,9 @@ class VisDetectors:
                     missing_scores=missing_scores,
                     n_imp=50,
                 )
-                loaded_data.to_json(
-                    existing_scores_filename, indent=4, ensure_ascii=False
-                )
+                with open(existing_scores_filename, "w") as f:
+                    json.dump(loaded_data, f, indent=4)
+
                 print(
                     f"Saved missing train scores to {existing_scores_filename} for {len(missing_scores_indices)} rows."
                 )
@@ -1125,9 +1127,8 @@ class VisDetectors:
                     n_imp=50,
                     imp_gen=imp_gen,
                 )
-                loaded_data.to_json(
-                    existing_scores_filename, indent=4, ensure_ascii=False
-                )
+                with open(existing_scores_filename, "w") as f:
+                    json.dump(loaded_data, f, indent=4)
                 print(
                     f"Saved missing test scores to {existing_scores_filename} for {len(missing_scores_indices)} rows."
                 )
