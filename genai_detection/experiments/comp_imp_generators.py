@@ -31,12 +31,12 @@ SAVE_PATH = (
     / "impostor_generator_comparison"
 )
 IMP_GEN_OPTIONS = [
-    # "naive_llm",
-    # "non_naive_llm",
-    # "llm",
-    # "fixed",
-    # "text_len",
-    "content",  # device error
+    "naive_llm",
+    "non_naive_llm",
+    "llm",
+    "fixed",
+    "text_len",
+    # "content",  # device error
     # "on-the-fly", # no more api calls
     # "mirror_minds", # device error
 ]
