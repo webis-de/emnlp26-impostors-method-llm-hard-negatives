@@ -49,6 +49,7 @@ PROMPTS = [
     "For the text above: Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
     "For the text above: Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence.",
 ]
+MAX_NUM_CHUNKS = 2  # maximum number of chunks to split the text into
 SAVE_PATH = (
     Path(__file__).resolve().parents[2]
     / CONFIG.SAVE_PATH
@@ -145,10 +146,7 @@ def paraphrase_with_config(
                 p_config["temperature"] = temperature
 
             try:
-                # TODO: dummy
-                paraphrased_chunk = [
-                    "This is a dummy"
-                ]  # paraphraser.paraphrase(**p_config)
+                paraphrased_chunk = paraphraser.paraphrase(**p_config)
                 assert isinstance(
                     paraphrased_chunk, list
                 ), "Paraphrased chunk should be a list."
@@ -207,7 +205,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
         data_loaded.setdefault(text_key, {})
 
         for num_chunks in tqdm(
-            range(1, 6), desc="Evaluating with different chunk sizes"
+            range(1, MAX_NUM_CHUNKS + 1), desc="Evaluating with different chunk sizes"
         ):
             try:
                 chunks = split_text_into_chunks(original_text, n=num_chunks)
@@ -245,7 +243,11 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
                     f"All paraphrases for text {i} with {num_chunks} chunks already exist, skipping."
                 )
                 continue
-            with ThreadPoolExecutor(max_workers=len(missing_configs)) as executor:
+            # number cpu cores is 4, so use 4 workers
+            # FIXME: it is possible that we exceed the API rate limit of the paraphraser, if that happens we need to handle it
+            with ThreadPoolExecutor(
+                max_workers=min(4, len(missing_configs))
+            ) as executor:
                 futures = []
                 for config in missing_configs:
                     paraphraser_name = config[3]
@@ -261,7 +263,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
                     if paraphraser_name not in [
                         "T5_ChatGPT",
                         "T5_Google_PAWS",
-                        # "Ollama",
+                        "Ollama",
                     ]:
                         futures.append(
                             executor.submit(
@@ -289,7 +291,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
             #     if paraphraser_name not in [
             #         "T5_ChatGPT",
             #         "T5_Google_PAWS",
-            #         # "Ollama",
+            #         "Ollama",
             #     ]:
             #         res = paraphrase_with_config(
             #             paraphraser_name,
@@ -518,6 +520,8 @@ def plot_model_metrics(
 
 
 if __name__ == "__main__":
+    # TODO: Should work, run this on all paraphrasers. First test with only up to two chunks
+    # cannot test it on 15.08.2025 in the morning, because other script uses all api calls
     parser = argparse.ArgumentParser(
         description="Assess effect of (Non-) Naive impostor generation."
     )
