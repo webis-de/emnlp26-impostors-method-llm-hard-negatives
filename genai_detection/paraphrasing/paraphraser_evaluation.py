@@ -443,8 +443,10 @@ class ParaphrasingEvaluator:
             gt_topic = getattr(row, "topic", "") or ""
 
             genre_match = np.max(
-                self._semantic_similarity(extr_g.strip().lower(), gt_genre)
-                for extr_g in re.split(r"[ /,]+", str(genre).lower())
+                [
+                    self._semantic_similarity(extr_g.strip().lower(), gt_genre)
+                    for extr_g in re.split(r"[ /,]+", str(genre).lower())
+                ]
             )
             time_match = self._similarity_numbers(
                 other=century, baseline=gt_century
