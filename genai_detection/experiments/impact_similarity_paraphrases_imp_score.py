@@ -255,6 +255,9 @@ def get_metric_by_bin(score_sim_df: pd.DataFrame, metric: str) -> pd.DataFrame:
         .reset_index()
     )
     result = result.rename(columns={0: metric})
+    assert (
+        metric in result.columns
+    ), f"Metric {metric} not found in result DataFrame. But found columns: {result.columns}"
     return result
 
 
@@ -306,11 +309,14 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
             score_sim_df["diff_bin"] = score_sim_df["diff_bin"].map(new_labels)
 
             metric_by_bin = get_metric_by_bin(score_sim_df, metric=metric)
+            print("Before merging, metric_by_bin columns:", metric_by_bin.columns)
+            print("metric_by_bin before merging:", metric_by_bin.columns)
             bin_stats = metric_by_bin.merge(bin_ranges, on="diff_bin")
+            print("After merging, bin_stats columns:", bin_stats.columns)
             fig, ax1 = plt.subplots(figsize=(8, 5))
 
             print("cols:", bin_stats.columns)
-            print("metric:", metric)  # Should be 'Accuracy'
+            print("metric:", metric)
 
             ax1.bar(
                 bin_stats["diff_bin"],
