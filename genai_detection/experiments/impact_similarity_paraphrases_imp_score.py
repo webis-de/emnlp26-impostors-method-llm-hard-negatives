@@ -234,18 +234,23 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
 
 
 def get_metric_by_bin(score_sim_df: pd.DataFrame, metric: str) -> pd.DataFrame:
+    required_cols = ["same", "impostor_prediction"]
+    for col in required_cols:
+        if col not in score_sim_df.columns:
+            raise KeyError(f"Missing required column: {col}")
+
     def compute_metric(g):
         y_true = g["same"]
         y_pred = g["impostor_prediction"]
 
         if metric == "Accuracy":
-            return (y_pred == y_true).mean()
+            return float((y_pred == y_true).mean())
         elif metric == "Precision":
-            return precision_score(y_true, y_pred, zero_division=0)
+            return float(precision_score(y_true, y_pred, zero_division=0))
         elif metric == "Recall":
-            return recall_score(y_true, y_pred, zero_division=0)
+            return float(recall_score(y_true, y_pred, zero_division=0))
         elif metric == "F1":
-            return f1_score(y_true, y_pred, zero_division=0)
+            return float(f1_score(y_true, y_pred, zero_division=0))
         else:
             raise ValueError(f"Unknown metric: {metric}")
 
