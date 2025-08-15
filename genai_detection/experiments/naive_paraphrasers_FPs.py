@@ -26,13 +26,14 @@ from genai_detection.detectors.impostor import ImpostorDetector
 import pandas as pd
 
 NAIVE_PARAPHRASER_NAMES = [
-    "T5_ChatGPT",
-    "T5_Google_PAWS",
-    "Ollama",
+    # "T5_ChatGPT",
+    # "T5_Google_PAWS",
+    # "Ollama",
     "qwen3-32b",
     "mistral-large-instruct",
     "openai-gpt-oss-120b",
     "meta-llama-3.1-8b-instruct",
+    "meta-llama/Llama-3.3-70B-Instruct" "mistralai/Mixtral-8x7B-Instruct-v0.1",
 ]
 NON_NAIVE_PARAPHRASER_NAMES = [
     "BulletPoint",
@@ -112,9 +113,9 @@ def load_detectors(detector_name: str = "all") -> dict[str, ImpostorDetector]:
     # unmasking_detector = UnmaskingDetector()
     # ppmd_detector = PPMdDetector()
     detector_dict = {
-        "naive": naive_impostor_detector,
-        "non_naive": non_naive_impostor_detector,
-        "generalized": generalized_impostor_detector,
+        "naive_llm": naive_impostor_detector,
+        "non_naive_llm": non_naive_impostor_detector,
+        "llm": generalized_impostor_detector,
     }
     if detector_name != "all":
         assert (
@@ -234,46 +235,38 @@ def load_detectors(detector_name: str = "all") -> dict[str, ImpostorDetector]:
 #     return final_dataset
 
 
-def _get_rsme_per_paraphraser(
+def _get_rsme_per_img_gen(
     dataset: pd.DataFrame,
     detector_dict: dict[str, ImpostorDetector],
 ) -> pd.DataFrame:
-    # calculate rmse per paraphraser and AV model
+    """
+    Calculate the RMSE (Root Mean Square Error) for each impostor generator (naive llm, non-naive llm or all lmm) in the dataset.
+    The dataset is expected to have a column 'impostor_generator' that indicates the type of generator used
+    and a column 'same' that indicates whether the text is the same (1) or not (0).
+    The RMSE is calculated as the square root of the mean of the squared differences between the scores and the 'same' column.
+    """
     print(
         "Calculating RMSE per paraphraser and detector...",
         dataset.columns,
         detector_dict.keys(),
     )
-    print("Non-naive scores:", dataset["non_naive_score"])
-    rmse_per_paraphraser = DefaultDict(dict)
-    paraphraser_names = NAIVE_PARAPHRASER_NAMES + NON_NAIVE_PARAPHRASER_NAMES
-    if not any(dataset["paraphraser"].isin(paraphraser_names)):
-        return None
-    for paraphraser in dataset["paraphraser"].unique():
-        if paraphraser not in paraphraser_names:
-            print(
-                f"Skipping paraphraser {paraphraser} as it is not in the expected list."
-            )
-            continue  # Skip if the paraphrasers that are actually human authors
-        print(f"Calculating RMSE for paraphraser: {paraphraser}")
-        for detector_name in detector_dict.keys():
-            fp_for_paraphraser = dataset[dataset["paraphraser"] == paraphraser]
-            if fp_for_paraphraser.empty:
-                print(
-                    f"No data found for paraphraser {paraphraser} with detector {detector_name}. Skipping."
-                )
-                continue
-            print("Juhee", fp_for_paraphraser.columns, fp_for_paraphraser)
+    rmse_per_imp_gen = DefaultDict(dict)
+    for imp_gen in detector_dict.keys():
+        fp_for_imp_gen = dataset[dataset["impostor_generator"] == imp_gen]
+        if fp_for_imp_gen.empty:
+            print(f"No data found for impostor generation with {imp_gen}. Skipping.")
+            continue
+        print("Juhee", fp_for_imp_gen.columns, fp_for_imp_gen)
 
-            scores = fp_for_paraphraser[f"{detector_name}_score"]
-            print(f"scores calculated with {detector_name} detector", scores)
-            rmse = np.sqrt(np.mean((scores - fp_for_paraphraser["same"]) ** 2))
-            rmse_per_paraphraser[paraphraser][detector_name] = rmse
+        scores = fp_for_imp_gen[f"impostor_score_{imp_gen}"]
+        print(f"scores calculated with {imp_gen} detector", scores)
+        rmse = np.sqrt(np.mean((scores - fp_for_imp_gen["same"]) ** 2))
+        rmse_per_imp_gen[imp_gen] = rmse
     # to dataframe
-    rmse_df = pd.DataFrame(rmse_per_paraphraser).T
+    rmse_df = pd.DataFrame(rmse_per_imp_gen).T
     rmse_df.reset_index(inplace=True)
-    rmse_df.rename(columns={"index": "paraphraser"}, inplace=True)
-    print("RMSE per paraphraser and detector:")
+    rmse_df.rename(columns={"index": "impostor_generator"}, inplace=True)
+    print("RMSE per impostor_generator:")
     print(rmse_df)
     return rmse_df
 
@@ -289,7 +282,7 @@ def run_FPs_experiment(
     # check for FPs
     fp_dataset = dataset[~dataset["same"]]
 
-    rmse_df = _get_rsme_per_paraphraser(fp_dataset, detector_dict)
+    rmse_df = _get_rsme_per_img_gen(fp_dataset, detector_dict)
     if rmse_df is None or rmse_df.empty:
         print("No RMSE data found for FPs. Check the dataset and detectors.")
         return pd.DataFrame()
@@ -317,7 +310,7 @@ def run_FNs_experiment(
     # Check for FNs
     fn_dataset = dataset[dataset["same"]]
 
-    rmse_df = _get_rsme_per_paraphraser(fn_dataset, detector_dict)
+    rmse_df = _get_rsme_per_img_gen(fn_dataset, detector_dict)
     if rmse_df is None or rmse_df.empty:
         print("No RMSE data found for FPs. Check the dataset and detectors.")
         return pd.DataFrame()
@@ -346,10 +339,13 @@ def read_scores_from_csv(path2csv: Path) -> pd.DataFrame:
         if not filename.endswith(".csv"):
             continue
         path2csvfile = path2csv / filename
-        csvdf = pd.read_csv(path2csvfile)
-        if not csvdf.empty:
-            print(f"Reading {len(csvdf)} rows from {path2csvfile}")
-            df = pd.concat([df, csvdf], ignore_index=True)
+        csv_df = pd.read_csv(path2csvfile)
+        if not csv_df.empty:
+            csv_df["impostor_generator"] = filename.split("_")[
+                1
+            ]  # Extract generator name
+            print(f"Reading {len(csv_df)} rows from {path2csvfile}")
+            df = pd.concat([df, csv_df], ignore_index=True)
     return df
 
     print(f"Reading scores from {path2csv}")
