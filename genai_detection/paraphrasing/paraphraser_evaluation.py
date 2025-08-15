@@ -1241,7 +1241,7 @@ class ParaphrasingEvaluator:
 
         if save_path:
             save_path = Path(save_path)
-            save_path.parent.mkdir(parents=True, exist_ok=True)
+            save_path.mkdir(parents=True, exist_ok=True)
             for format in ["svg"]:
                 file_name = (
                     save_path
@@ -1369,7 +1369,7 @@ class ParaphrasingEvaluator:
 
         if save_path:
             save_path = Path(save_path)
-            save_path.parent.mkdir(parents=True, exist_ok=True)
+            save_path.mkdir(parents=True, exist_ok=True)
             for format in ["svg"]:
                 full_path = (
                     save_path
@@ -1607,7 +1607,7 @@ class ParaphrasingEvaluator:
 
             if save_path:
                 save_path = Path(save_path) / f"{scale}_scale"
-                save_path.parent.mkdir(parents=True, exist_ok=True)
+                save_path.mkdir(parents=True, exist_ok=True)
                 for format in ["svg"]:
                     filenaname = f"{data_category.replace(' ','_')}_metric_distributions_grouped_by_{group_by}_{scale}_scale.{format}"
                     full_path = save_path / filenaname
