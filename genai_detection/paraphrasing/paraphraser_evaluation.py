@@ -1408,64 +1408,71 @@ class ParaphrasingEvaluator:
         palette = sns.color_palette("tab20", n_colors=len(unique_labels))
 
         for metric in metric_names:
-            sns.kdeplot(
-                data=data,
-                x=metric,
-                hue=group_by,
-                fill=True,
-                common_norm=False,
-                alpha=0.4,
-                palette=palette,
-                legend=True,
-            )
-
-            metric_for_tile = " ".join([t.capitalize() for t in metric.split("_")])
-            if data_category:
-                plt.title(
-                    f"Distribution of {metric_for_tile}\non {data_category} Dataset, grouped by {group_by.capitalize()}"
+            for scale in ["linear", "symlog"]:
+                sns.kdeplot(
+                    data=data,
+                    x=metric,
+                    hue=group_by,
+                    fill=True,
+                    common_norm=False,
+                    alpha=0.4,
+                    palette=palette,
+                    legend=True,
                 )
-            else:
-                plt.title(
-                    f"Distribution of {metric_for_tile}\ngrouped by {group_by.capitalize()}"
+                plt.xscale(scale)
+                if scale == "symlog":
+                    plt.grid(which="both", linestyle="--", linewidth=0.5)
+
+                metric_for_tile = " ".join([t.capitalize() for t in metric.split("_")])
+                if data_category:
+                    plt.title(
+                        f"Distribution of {metric_for_tile}\non {data_category} Dataset, grouped by {group_by.capitalize()}"
+                    )
+                else:
+                    plt.title(
+                        f"Distribution of {metric_for_tile}\ngrouped by {group_by.capitalize()}"
+                    )
+                plt.xlabel(metric)
+                plt.ylabel("Density")
+                min_val = data[metric].min()
+                plt.xlim(left=max(0, min_val), right=None)
+                handles = [
+                    mpatches.Patch(color=palette[i], label=self._wrap_label(str(label)))
+                    for i, label in enumerate(unique_labels)
+                ]
+                plt.legend(
+                    handles=handles,
+                    loc="upper left",
+                    bbox_to_anchor=(1.01, 1),
+                    title=group_by.capitalize(),
+                    fontsize=10,
+                    title_fontsize=12,
                 )
-            plt.xlabel(metric)
-            plt.ylabel("Density")
-            min_val = data[metric].min()
-            plt.xlim(left=max(0, min_val), right=None)
-            handles = [
-                mpatches.Patch(color=palette[i], label=self._wrap_label(str(label)))
-                for i, label in enumerate(unique_labels)
-            ]
-            plt.legend(
-                handles=handles,
-                loc="upper left",
-                bbox_to_anchor=(1.01, 1),
-                title=group_by.capitalize(),
-                fontsize=10,
-                title_fontsize=12,
-            )
 
-            plt.tight_layout()
+                plt.tight_layout()
 
-            # Save with unique name
-            safe_metric = str(metric).replace(" ", "_").replace("/", "_")
-            safe_category = (
-                str(data_category).replace(" ", "_") if data_category else "dataset"
-            )
-            file_name = f"{safe_category}_{safe_metric}_grouped_by_{group_by}.svg"
-            path2dir = (
-                self.paraphrases_save_base_path
-                / "metric_distributions"
-                / "distribution_per_metric"
-            )
-            path2dir.mkdir(parents=True, exist_ok=True)
-            full_path = path2dir / file_name
-            plt.savefig(full_path, bbox_inches="tight", transparent=True, format="svg")
-            print(f"Plot saved to {full_path}")
+                # Save with unique name
+                safe_metric = str(metric).replace(" ", "_").replace("/", "_")
+                safe_category = (
+                    str(data_category).replace(" ", "_") if data_category else "dataset"
+                )
+                file_name = f"{safe_category}_{safe_metric}_grouped_by_{group_by}_{scale}_scale.svg"
+                path2dir = (
+                    self.paraphrases_save_base_path
+                    / "metric_distributions"
+                    / "distribution_per_metric"
+                    / f"{scale}_scale"
+                )
+                path2dir.mkdir(parents=True, exist_ok=True)
+                full_path = path2dir / file_name
+                plt.savefig(
+                    full_path, bbox_inches="tight", transparent=True, format="svg"
+                )
+                print(f"Plot saved to {full_path}")
 
-            if display_plot:
-                plt.show()
-            plt.close()
+                if display_plot:
+                    plt.show()
+                plt.close()
 
     def plot_metric_distributions(
         self,
@@ -1502,9 +1509,6 @@ class ParaphrasingEvaluator:
         n_cols = 2
         n_rows = (n_metrics + 1) // n_cols
 
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=(6 * n_cols, 4 * n_rows))
-        axes = axes.flatten()
-
         unique_labels = data[group_by].unique()
         max_words_in_label = max(len(str(label).split()) for label in unique_labels)
         use_shared_legend = max_words_in_label > 3 or len(unique_labels) > 5
@@ -1513,104 +1517,108 @@ class ParaphrasingEvaluator:
             label: palette[i % len(palette)] for i, label in enumerate(unique_labels)
         }
 
-        for i, metric in enumerate(metric_names):
-            ax = axes[i]
+        for scale in ["linear", "symlog"]:
+            fig, axes = plt.subplots(n_rows, n_cols, figsize=(6 * n_cols, 4 * n_rows))
+            axes = axes.flatten()
+            for i, metric in enumerate(metric_names):
+                ax = axes[i]
 
-            # Find models with only one data point for this metric
-            counts = data.groupby(group_by)[metric].count()
-            assert (
-                counts != 0
-            ).any(), (
-                f"No data points found for metric '{metric}' in group '{group_by}'."
+                # Find models with only one data point for this metric
+                counts = data.groupby(group_by)[metric].count()
+                assert (
+                    counts != 0
+                ).any(), (
+                    f"No data points found for metric '{metric}' in group '{group_by}'."
+                )
+
+                # Models with multiple entries (for KDE)
+                models_multi = counts[counts > 1].index
+                # Models with single entry (for scatter)
+                models_single = counts[counts == 1].index
+
+                # Plot KDE for models with multiple points
+                if len(models_multi) > 0:
+                    sns.kdeplot(
+                        data=data[data[group_by].isin(models_multi)],
+                        x=metric,
+                        hue=group_by,
+                        fill=True,
+                        common_norm=False,
+                        alpha=0.4,
+                        ax=ax,
+                        palette=label_to_color,
+                        legend=False,
+                    )
+
+                # Scatter for models with a single point
+                for model in models_single:
+                    single_val = data[(data[group_by] == model)][metric].values[0]
+                    label = model if not use_shared_legend else None
+                    color = label_to_color[model]
+                    ax.scatter(
+                        single_val,
+                        1,
+                        label=label,
+                        color=color,
+                        s=50,
+                        edgecolor="k",
+                        zorder=5,
+                    )
+                if scale == "symlog":
+                    ax.grid(which="both", linestyle="--", color="gray", alpha=0.5)
+                ax.set_xscale(scale, linthresh=1e-3)
+                metric_for_tile = " ".join([t.capitalize() for t in metric.split("_")])
+                ax.set_title(f"Distribution of {metric_for_tile}")
+                # do not set value range -> results barely visible
+                min_val = data[metric].min()
+                ax.set_xlim(left=max(0, min_val), right=None)
+                ax.set_xlabel(metric_for_tile)
+                ax.set_ylabel("Density")
+
+            # if use_shared_legend:
+            legend_patches = [
+                mpatches.Patch(color=color, label=self._wrap_label(label))
+                for label, color in label_to_color.items()
+            ]
+            fig.legend(
+                handles=legend_patches,
+                loc="upper left",
+                bbox_to_anchor=(
+                    0.95,
+                    0.95,
+                ),  # outside the plot on right (x pos, y pos)
+                title=group_by.capitalize(),
+                frameon=True,
+                borderaxespad=0,
+                fontsize=10,
+                title_fontsize=12,
             )
 
-            # Models with multiple entries (for KDE)
-            models_multi = counts[counts > 1].index
-            # Models with single entry (for scatter)
-            models_single = counts[counts == 1].index
+            # Remove unused axes
+            for j in range(i + 1, len(axes)):
+                fig.delaxes(axes[j])
+            title = (
+                f"Metric Distributions\non {' '.join(word.capitalize() for word in data_category.split())} Dataset, grouped by {group_by.capitalize()}"
+                if data_category
+                else f"Metric Distributions\ngrouped by {group_by.capitalize()}"
+            )
+            fig.suptitle(title, fontsize=18)
+            plt.tight_layout(rect=[0, 0, 0.95, 0.95])
 
-            # Plot KDE for models with multiple points
-            if len(models_multi) > 0:
-                sns.kdeplot(
-                    data=data[data[group_by].isin(models_multi)],
-                    x=metric,
-                    hue=group_by,
-                    fill=True,
-                    common_norm=False,
-                    alpha=0.4,
-                    ax=ax,
-                    palette=label_to_color,
-                    legend=False,
-                )
+            if save_path:
+                save_path = Path(save_path) / f"{scale}_scale"
+                save_path.parent.mkdir(parents=True, exist_ok=True)
+                for format in ["svg"]:
+                    filenaname = f"{data_category.replace(' ','_')}_metric_distributions_grouped_by_{group_by}_{scale}_scale.{format}"
+                    full_path = save_path / filenaname
+                    plt.savefig(
+                        full_path, bbox_inches="tight", transparent=True, format=format
+                    )
+                    print(f"Plot saved to {full_path}")
 
-            # Scatter for models with a single point
-            for model in models_single:
-                single_val = data[(data[group_by] == model)][metric].values[0]
-                label = model if not use_shared_legend else None
-                color = label_to_color[model]
-                ax.scatter(
-                    single_val,
-                    1,
-                    label=label,
-                    color=color,
-                    s=50,
-                    edgecolor="k",
-                    zorder=5,
-                )
-            metric_for_tile = " ".join([t.capitalize() for t in metric.split("_")])
-            ax.set_title(f"Distribution of {metric_for_tile}")
-            # do not set value range -> results barely visible
-            min_val = data[metric].min()
-            ax.set_xlim(left=max(0, min_val), right=None)
-            ax.set_xlabel(metric_for_tile)
-            ax.set_ylabel("Density")
-
-        # if use_shared_legend:
-        legend_patches = [
-            mpatches.Patch(color=color, label=self._wrap_label(label))
-            for label, color in label_to_color.items()
-        ]
-        fig.legend(
-            handles=legend_patches,
-            loc="upper left",
-            bbox_to_anchor=(
-                0.95,
-                0.95,
-            ),  # outside the plot on right (x pos, y pos)
-            title=group_by.capitalize(),
-            frameon=True,
-            borderaxespad=0,
-            fontsize=10,
-            title_fontsize=12,
-        )
-
-        # Remove unused axes
-        for j in range(i + 1, len(axes)):
-            fig.delaxes(axes[j])
-        title = (
-            f"Metric Distributions\non {' '.join(word.capitalize() for word in data_category.split())} Dataset, grouped by {group_by.capitalize()}"
-            if data_category
-            else f"Metric Distributions\ngrouped by {group_by.capitalize()}"
-        )
-        fig.suptitle(title, fontsize=18)
-        plt.tight_layout(rect=[0, 0, 0.95, 0.95])
-
-        if save_path:
-            save_path = Path(save_path)
-            save_path.parent.mkdir(parents=True, exist_ok=True)
-            for format in ["svg"]:
-                full_path = (
-                    save_path
-                    / f"{data_category.replace(' ','_')}_metric_distributions_grouped_by_{group_by}.{format}"
-                )
-                plt.savefig(
-                    full_path, bbox_inches="tight", transparent=True, format=format
-                )
-                print(f"Plot saved to {full_path}")
-
-        if display_plot:
-            plt.show()
-        plt.close()
+            if display_plot:
+                plt.show()
+            plt.close()
         self._plot_one_plot_per_metric_distribution(
             data=data,
             metric_names=metric_names,
