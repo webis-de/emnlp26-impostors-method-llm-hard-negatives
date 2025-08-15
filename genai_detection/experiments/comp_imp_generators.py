@@ -31,12 +31,12 @@ SAVE_PATH = (
     / "impostor_generator_comparison"
 )
 IMP_GEN_OPTIONS = [
-    "naive_llm",
-    "non_naive_llm",
-    "llm",
-    "fixed",
-    "text_len",
-    # "content",    # device error
+    # "naive_llm",
+    # "non_naive_llm",
+    # "llm",
+    # "fixed",
+    # "text_len",
+    "content",  # device error
     # "on-the-fly", # no more api calls
     # "mirror_minds", # device error
 ]
@@ -298,8 +298,6 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         labels = train_dataset["same"].values
         scores = train_dataset[col_score].values
 
-        # print("DEBUG: Predictions in train dataset:", scores)
-        # print("DEBUG: True labels in train dataset:", labels)
         fpr, tpr, roc_thresholds = roc_curve(y_true=labels, y_score=scores)
         print("DEBUG: FPR:", fpr)
         print("DEBUG: TPR:", tpr)
