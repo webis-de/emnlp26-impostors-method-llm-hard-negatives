@@ -124,6 +124,10 @@ def _avg_sim_disputed_paraphrases(impostor_entry: dict, disputed_text: str):
         return None
 
     scores = []
+    assert isinstance(disputed_text, str), "Disputed text must be a string."
+    assert isinstance(
+        impostor_entry, dict
+    ), f"Impostor entry must be a dictionary. But is: {type(impostor_entry)}, content: {impostor_entry}"
     for sub_entry in impostor_entry["text_pair_0"].values():
         paraphrases = sub_entry["paraphrases"].values()
 
