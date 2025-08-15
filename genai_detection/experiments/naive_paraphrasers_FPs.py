@@ -200,6 +200,9 @@ def read_scores_from_csv(path2csv: Path) -> pd.DataFrame:
             (label for key, label in label_map.items() if key in filename), "llm"
         )
 
+        print(
+            f"Reading {path2csvfile} for {imp_gen} generator. Columns: {pd.read_csv(path2csvfile).columns}"
+        )
         csv_df = pd.read_csv(
             path2csvfile, usecols=["same", f"impostor_prediction_{imp_gen}"]
         )  # ,"pair","authors",f"impostor_score_{imp_gen}"])
