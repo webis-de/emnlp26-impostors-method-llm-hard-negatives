@@ -197,6 +197,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             )
             with open(save_path / train_scores_file_name, "r") as f:
                 df_from_csv = pd.read_csv(f)
+            df_from_csv = _split_unhashable(df_from_csv)
             train_dataset = _split_unhashable(train_dataset)
             if col_score not in train_dataset:
                 train_dataset[col_score] = np.nan
@@ -220,6 +221,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             if col_score not in test_dataset:
                 test_dataset[col_score] = np.nan
 
+            df_from_csv = _split_unhashable(df_from_csv)
             df_from_csv = df_from_csv.set_index(matching_cols)
             df_from_csv = df_from_csv[~df_from_csv.index.duplicated(keep="last")]
             test_dataset = test_dataset.set_index(matching_cols)
