@@ -1435,7 +1435,8 @@ class ParaphrasingEvaluator:
                 plt.xlabel(metric)
                 plt.ylabel("Density")
                 min_val = data[metric].min()
-                plt.xlim(left=max(0, min_val), right=None)
+                max_val = data[metric].max()
+                plt.xlim(left=max(0, min_val), right=min(1, max_val))
                 handles = [
                     mpatches.Patch(color=palette[i], label=self._wrap_label(str(label)))
                     for i, label in enumerate(unique_labels)
@@ -1571,7 +1572,8 @@ class ParaphrasingEvaluator:
                 ax.set_title(f"Distribution of {metric_for_tile}")
                 # do not set value range -> results barely visible
                 min_val = data[metric].min()
-                ax.set_xlim(left=max(0, min_val), right=None)
+                max_val = data[metric].max()
+                ax.set_xlim(left=max(0, min_val), right=min(1, max_val))
                 ax.set_xlabel(metric_for_tile)
                 ax.set_ylabel("Density")
 
