@@ -102,8 +102,8 @@ def _get_opt_imp_threshold(fpr, tpr, thresholds):
         return 0.5  # or np.nan, depending on your use case
 
 
-def _avg_sim_ref_paraphrases(impostor_entry):
-    """Compute average sim_sim between reference_text and each paraphrase."""
+def _avg_sim_ref_paraphrases(impostor_entry: dict):
+    """Compute average sim_sim between a reference text and each paraphrase."""
     if not impostor_entry or "text_pair_0" not in impostor_entry:
         return None
 
@@ -114,6 +114,21 @@ def _avg_sim_ref_paraphrases(impostor_entry):
 
         for para in paraphrases:
             scores.append(_syn_sim(ref_text, para))
+
+    return sum(scores) / len(scores) if scores else None
+
+
+def _avg_sim_disputed_paraphrases(impostor_entry: dict, disputed_text: str):
+    """Compute average sim_sim between the disputed text and each paraphrase."""
+    if not impostor_entry or "text_pair_0" not in impostor_entry:
+        return None
+
+    scores = []
+    for sub_entry in impostor_entry["text_pair_0"].values():
+        paraphrases = sub_entry["paraphrases"].values()
+
+        for para in paraphrases:
+            scores.append(_syn_sim(disputed_text, para))
 
     return sum(scores) / len(scores) if scores else None
 
@@ -163,13 +178,6 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 _helper_impostor, [path2imp] * len(train_dataset), train_dataset["pair"]
             )
         )
-
-    # results = []
-    # for pair in train_dataset["pair"]:
-    #     results.append(impostor_detector._get_score_impl(pair))
-
-    # print(f"Computed impostor scores for {len(results)} pairs:", results)
-    # results is a list of tuples: (impostor_score, impostor_dict)
     train_dataset["impostor_score"] = [score for score, _ in results]
     train_dataset["impostor_dict"] = [impostor_dict for _, impostor_dict in results]
 
@@ -253,6 +261,7 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
             "syn_sim_diff",
             "syn_sim_ref_paraphrases",
             "syn_sim_disputed_candidate",
+            "syn_sim_disp_paraphrases",
         ]:
             # Choose number of bins (e.g., quartiles = 4 bins)
             n_bins = 4
@@ -263,6 +272,12 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
                 labels=[f"Bin {i+1}" for i in range(n_bins)],
             )
             bin_ranges = score_sim_df.groupby("diff_bin")[col].agg(["min", "max"])
+            new_labels = {
+                bin_label: f"{bin_label} [{row['min']:.2f}, {row['max']:.2f}]"
+                for bin_label, row in bin_ranges.iterrows()
+            }
+            score_sim_df["diff_bin"] = score_sim_df["diff_bin"].map(new_labels)
+
             metric_by_bin = get_metric_by_bin(score_sim_df, metric=metric)
             bin_stats = metric_by_bin.merge(bin_ranges, on="diff_bin")
             fig, ax1 = plt.subplots(figsize=(8, 5))
@@ -275,15 +290,15 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
             )
 
             # Bin range annotations above bars
-            for i, row in bin_stats.iterrows():
-                ax1.text(
-                    i,
-                    row[metric] + 0.02,
-                    f"[{row['min']:.2f}, {row['max']:.2f}]",
-                    ha="center",
-                    fontsize=9,
-                    color="black",
-                )
+            # for i, row in bin_stats.iterrows():
+            #     ax1.text(
+            #         i,
+            #         row[metric] + 0.02,
+            #         f"[{row['min']:.2f}, {row['max']:.2f}]",
+            #         ha="center",
+            #         fontsize=9,
+            #         color="black",
+            #     )
 
             ax1.set_ylabel(metric)
             ax1.set_ylim(0, 1.1)
@@ -344,6 +359,16 @@ if __name__ == "__main__":
         )
     else:
         student_test_df = pd.read_csv(path2student_df)
+        # TODO: Add average syntactic similarity for disputed + paraphrases
+        # disputed_texts = [pair[0] for pair in student_test_df["pair"]]
+        if "syn_sim_disp_paraphrases" not in student_test_df.columns:
+            student_test_df["syn_sim_disp_paraphrases"] = [
+                _avg_sim_disputed_paraphrases(impostor_dict, disputed_text)
+                for impostor_dict, disputed_text in zip(
+                    student_test_df["impostor_dict"], student_test_df["pair"].str[0]
+                )
+            ]
+            # TODO: if this works, save the df to csv
     print("Visualizing accuracy per syntactic similarity for Student Essays dataset.")
     vis_acc_per_syn_sim(
         score_sim_df=student_test_df,
