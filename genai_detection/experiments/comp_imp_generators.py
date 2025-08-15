@@ -1,5 +1,5 @@
 import argparse
-from asyncio import sleep
+from time import sleep
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import os
