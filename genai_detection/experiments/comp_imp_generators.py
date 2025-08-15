@@ -111,6 +111,7 @@ def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_
         else pd.isna(pair)
     ), "Pair must not be None or NaN"
 
+    # TODO: max 2 calls per second/ 14 calls per minute for SAIA based generators
     impostor_detector = ImpostorDetector(
         impostor_technique=imp_gen,
         n_impostors=(
@@ -125,7 +126,10 @@ def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_
         upsample=False,
     )
     impostor_detector.set_training_mode(training_mode)
-    return impostor_detector._get_score_impl(pair)
+    score = impostor_detector._get_score_impl(pair)
+    if imp_gen in ["mirror_minds", "on-the-fly", "naive_llm", "non_naive_llm", "llm"]:
+        sleep(31)  # wait for the API to be ready
+    return score
 
 
 def _split_unhashable(df: pd.DataFrame) -> pd.DataFrame:
@@ -245,7 +249,19 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 f"DEBUG Missing {col_score} in {missing_mask.sum()} rows of train dataset for {imp_gen} generator."
             )
             new_rows = train_dataset[missing_mask].copy()
-            with ThreadPoolExecutor() as executor:
+            max_workers = (
+                len(new_rows)
+                if imp_gen
+                not in [
+                    "mirror_minds",
+                    "on-the-fly",
+                    "naive_llm",
+                    "non_naive_llm",
+                    "llm",
+                ]
+                else 7
+            )  # 14 per min
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 results = list(
                     executor.map(
                         _helper_impostor,
@@ -290,7 +306,19 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 f"DEBUG Missing {col_score} in {missing_mask.sum()} rows of test dataset for {imp_gen} generator."
             )
             new_rows = test_dataset.loc[missing_mask].copy()
-            with ThreadPoolExecutor() as executor:
+            max_workers = (
+                len(new_rows)
+                if imp_gen
+                not in [
+                    "mirror_minds",
+                    "on-the-fly",
+                    "naive_llm",
+                    "non_naive_llm",
+                    "llm",
+                ]
+                else 7
+            )  # 14 per min
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 results = list(
                     executor.map(
                         _helper_impostor,
