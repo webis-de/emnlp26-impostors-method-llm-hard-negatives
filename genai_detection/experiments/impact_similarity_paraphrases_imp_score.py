@@ -263,6 +263,8 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
         score_sim_df["syn_sim_ref_paraphrases"]
         - score_sim_df["syn_sim_disputed_candidate"]
     )
+    # quartiles = 4 bins
+    n_bins = 4
 
     for metric in ["Accuracy", "Precision", "Recall", "F1"]:
         for col in [
@@ -271,15 +273,17 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
             "syn_sim_disputed_candidate",
             "syn_sim_disp_paraphrases",
         ]:
-            # Choose number of bins (e.g., quartiles = 4 bins)
-            n_bins = 4
 
             score_sim_df["diff_bin"] = pd.qcut(
                 score_sim_df[col],
                 q=n_bins,
                 labels=[f"Bin {i+1}" for i in range(n_bins)],
+                duplicates="drop",
             )
-            bin_ranges = score_sim_df.groupby("diff_bin")[col].agg(["min", "max"])
+            # keep only counted bins (i.e., bins with at least one entry)
+            bin_ranges = score_sim_df.groupby("diff_bin", observed=True)[col].agg(
+                ["min", "max"]
+            )
             new_labels = {
                 bin_label: f"{bin_label} [{row['min']:.2f}, {row['max']:.2f}]"
                 for bin_label, row in bin_ranges.iterrows()
