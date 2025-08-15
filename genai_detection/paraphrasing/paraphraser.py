@@ -1148,12 +1148,12 @@ def get_paraphraser_dict() -> Dict[str, Paraphraser]:
         "mistral-large-instruct": SAIAParaphraser("mistral-large-instruct"),
         "openai-gpt-oss-120b": SAIAParaphraser("openai-gpt-oss-120b"),
         "meta-llama-3.1-8b-instruct": SAIAParaphraser("meta-llama-3.1-8b-instruct"),
-        "meta-llama/Llama-3.3-70B-Instruct": IONOSParaphraser(
-            model_id="meta-llama/Llama-3.3-70B-Instruct"
-        ),
-        "mistralai/Mixtral-8x7B-Instruct-v0.1": IONOSParaphraser(
-            model_id="mistralai/Mixtral-8x7B-Instruct-v0.1"
-        ),
+        # "meta-llama/Llama-3.3-70B-Instruct": IONOSParaphraser(
+        #     model_id="meta-llama/Llama-3.3-70B-Instruct"
+        # ),
+        # "mistralai/Mixtral-8x7B-Instruct-v0.1": IONOSParaphraser(
+        #     model_id="mistralai/Mixtral-8x7B-Instruct-v0.1"
+        # ),
     }
     bullet_point_paraphraser = BulletPointParaphraser(
         text_extractor=paraphrasers["openai-gpt-oss-120b"],
@@ -1195,7 +1195,7 @@ if __name__ == "__main__":
         # 'Blablador': BlabladorParaphraser(model_id="1 - Llama3 405 the best general model and big context size"),
         "Ollama": OllamaParaphraser(),
         "SAIA": SAIAParaphraser(),
-        "IONOS": IONOSParaphraser(),
+        "IONOS": IONOSParaphraser(model_id="mistralai/Mixtral-8x7B-Instruct-v0.1"),
         # "TopicParaphraser": TopicParaphraser(
         #     text_extractor=OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL),
         #     text_generator=OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL),
@@ -1234,8 +1234,8 @@ if __name__ == "__main__":
     # original_text = open(path2datasets / f"{file_name}.txt").read()
     text = "Dear Santa, I wish for a big red nosed reindeer that can fly and a sleigh full of toys for all the children in the world. I promise to be good and help others. Love, Timmy."
     # p = paraphrasers["TranslationParaphraser"]
-    p = paraphrasers["SAIA"]
-    # p = paraphrasers["IONOS"]
+    # p = paraphrasers["SAIA"]
+    p = paraphrasers["IONOS"]
     # p = paraphasers["Ollama"]
     print(f"[DEBUG] Paraphrasing text with {p.__class__.__name__}")
     paraphrased_texts = p.paraphrase(text=text, n_responses=2)

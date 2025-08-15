@@ -528,12 +528,12 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
             )
             self.saiai_paraphraser_gpt = SAIAParaphraser(model_id="openai-gpt-oss-120b")
             self.saiai_paraphraser_qwen = SAIAParaphraser(model_id="qwen3-32b")
-            self.ionos_paraphraser_llama = IONOSParaphraser(
-                model_id="meta-llama/Llama-3.3-70B-Instruct"
-            )
-            self.ionos_paraphraser_mistral = IONOSParaphraser(
-                model_id="mistralai/Mixtral-8x7B-Instruct-v0.1"
-            )
+            # self.ionos_paraphraser_llama = IONOSParaphraser(
+            #     model_id="meta-llama/Llama-3.3-70B-Instruct"
+            # )
+            # self.ionos_paraphraser_mistral = IONOSParaphraser(
+            #     model_id="mistralai/Mixtral-8x7B-Instruct-v0.1"
+            # )
 
             self.topic_paraphraser = TopicParaphraser(
                 text_extractor=self.saiai_paraphraser_gpt,
@@ -563,8 +563,8 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
                 self.saiai_paraphraser_mistral,
                 self.saiai_paraphraser_gpt,
                 self.saiai_paraphraser_qwen,
-                self.ionos_paraphraser_llama,
-                self.ionos_paraphraser_mistral,
+                # self.ionos_paraphraser_llama,
+                # self.ionos_paraphraser_mistral,
                 self.topic_paraphraser,
                 self.task_paraphraser,
                 self.title_paraphraser,
@@ -669,12 +669,12 @@ class NaiveLLMImpostorGenerator(LLMImpostorGenerator):
         saiai_paraphraser_mistral = SAIAParaphraser(model_id="mistral-large-instruct")
         saiai_paraphraser_gpt = SAIAParaphraser(model_id="openai-gpt-oss-120b")
         saiai_paraphraser_qwen = SAIAParaphraser(model_id="qwen3-32b")
-        ionos_paraphraser_llama = IONOSParaphraser(
-            model_id="meta-llama/Llama-3.3-70B-Instruct"
-        )
-        ionos_paraphraser_mistral = IONOSParaphraser(
-            model_id="mistralai/Mixtral-8x7B-Instruct-v0.1"
-        )
+        # ionos_paraphraser_llama = IONOSParaphraser(
+        #     model_id="meta-llama/Llama-3.3-70B-Instruct"
+        # )
+        # ionos_paraphraser_mistral = IONOSParaphraser(
+        #     model_id="mistralai/Mixtral-8x7B-Instruct-v0.1"
+        # )
 
         super().__init__(
             n_impostors=n_impostors,
@@ -686,8 +686,8 @@ class NaiveLLMImpostorGenerator(LLMImpostorGenerator):
                 saiai_paraphraser_mistral,
                 saiai_paraphraser_gpt,
                 saiai_paraphraser_qwen,
-                ionos_paraphraser_llama,
-                ionos_paraphraser_mistral,
+                # ionos_paraphraser_llama,
+                # ionos_paraphraser_mistral,
             ],
         )
 
