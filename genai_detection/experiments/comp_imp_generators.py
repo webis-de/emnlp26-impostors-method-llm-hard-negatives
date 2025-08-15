@@ -103,6 +103,19 @@ def _get_opt_imp_threshold(fpr, tpr, thresholds):
         return 0.5  # or np.nan, depending on your use case
 
 
+def _get_num_impostors(imp_gen: str) -> int:
+    """
+    Returns the number of impostors to generate based on the impostor generator type.
+    :param imp_gen: Impostor generator type.
+    :return: Number of impostors to generate.
+    """
+    # TODO: max 2 calls per second/ 14 calls per minute for SAIA based generators
+    if imp_gen in ["mirror_minds", "on-the-fly", "naive_llm", "non_naive_llm", "llm"]:
+        return 5  # TODO: higher
+    else:
+        return 50  # default for other generators
+
+
 def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_minds"):
     print(f"Generating impostor with {imp_gen} generator")
     assert pair is not None and not (
@@ -111,15 +124,9 @@ def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_
         else pd.isna(pair)
     ), "Pair must not be None or NaN"
 
-    # TODO: max 2 calls per second/ 14 calls per minute for SAIA based generators
     impostor_detector = ImpostorDetector(
         impostor_technique=imp_gen,
-        n_impostors=(
-            50
-            if imp_gen
-            not in ["mirror_minds", "on-the-fly", "naive_llm", "non_naive_llm", "llm"]
-            else 1  # TODO: higher
-        ),
+        n_impostors=_get_num_impostors(imp_gen),
         rounds=100,  # cf. pg. 181, Koppel et al. (2014)
         top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
         path2imp=path2imp,
@@ -128,7 +135,7 @@ def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_
     impostor_detector.set_training_mode(training_mode)
     score = impostor_detector._get_score_impl(pair)
     if imp_gen in ["mirror_minds", "on-the-fly", "naive_llm", "non_naive_llm", "llm"]:
-        sleep(31)  # wait for the API to be ready
+        sleep(61)  # wait for the API to be ready
     return score
 
 
@@ -261,7 +268,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                     "non_naive_llm",
                     "llm",
                 ]
-                else 7
+                else 14 // _get_num_impostors(imp_gen)
             )  # 14 per min
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 results = list(
@@ -318,7 +325,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                     "non_naive_llm",
                     "llm",
                 ]
-                else 7
+                else 14 // _get_num_impostors(imp_gen)
             )  # 14 per min
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 results = list(
