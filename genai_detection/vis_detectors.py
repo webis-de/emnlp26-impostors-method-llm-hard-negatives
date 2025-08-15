@@ -643,16 +643,16 @@ class VisDetectors:
         # TODO: Test on small data subsets
         train_dataset = pd.concat(
             [
-                train_dataset.loc[train_dataset["same"]].head(5),
-                train_dataset.loc[~train_dataset["same"]].head(5),
+                train_dataset.loc[train_dataset["same"]].head(50),
+                train_dataset.loc[~train_dataset["same"]].head(50),
             ],
             ignore_index=False,
         )
 
         test_dataset = pd.concat(
             [
-                test_dataset.loc[test_dataset["same"]].head(5),
-                test_dataset.loc[~test_dataset["same"]].head(5),
+                test_dataset.loc[test_dataset["same"]].head(50),
+                test_dataset.loc[~test_dataset["same"]].head(50),
             ],
             ignore_index=False,
         )
@@ -1200,16 +1200,16 @@ class VisDetectors:
         # TODO: Test on small data subsets
         train_dataset = pd.concat(
             [
-                train_dataset.loc[train_dataset["same"]].head(5),
-                train_dataset.loc[~train_dataset["same"]].head(5),
+                train_dataset.loc[train_dataset["same"]].head(50),
+                train_dataset.loc[~train_dataset["same"]].head(50),
             ],
             ignore_index=False,
         )
 
         test_dataset = pd.concat(
             [
-                test_dataset.loc[test_dataset["same"]].head(5),
-                test_dataset.loc[~test_dataset["same"]].head(5),
+                test_dataset.loc[test_dataset["same"]].head(50),
+                test_dataset.loc[~test_dataset["same"]].head(50),
             ],
             ignore_index=False,
         )
@@ -1560,7 +1560,9 @@ if __name__ == "__main__":
     if fig == 2:
         vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
     elif fig == 4:
-        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args, save_path=None)
+        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
+            args=args, save_path=None, imp_gen_options=["fixed"]
+        )
     elif fig == 5:
         # not really figure 5, but figure 4 with our contributions (LLM based impostors)
         vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
@@ -1584,7 +1586,9 @@ if __name__ == "__main__":
     if fig == 2:
         vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
     elif fig == 4:
-        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(args=args, save_path=None)
+        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
+            args=args, save_path=None, imp_gen_options=["fixed"]
+        )
     elif fig == 5:
         # not really figure 5, but figure 4 with our contributions (LLM based impostors)
         vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
