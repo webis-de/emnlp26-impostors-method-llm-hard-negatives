@@ -390,6 +390,14 @@ if __name__ == "__main__":
         )
     else:
         blog_test_df = pd.read_csv(path2blog_df)
+        if "syn_sim_disp_paraphrases" not in blog_test_df.columns:
+            blog_test_df["syn_sim_disp_paraphrases"] = [
+                _avg_sim_disputed_paraphrases(impostor_dict, disputed_text)
+                for impostor_dict, disputed_text in zip(
+                    blog_test_df["impostor_dict"], blog_test_df["pair"].str[0]
+                )
+            ]
+            # TODO: if this works, save the df to csv
     print("Visualizing accuracy per syntactic similarity for Blog dataset.")
     vis_acc_per_syn_sim(
         score_sim_df=blog_test_df,
