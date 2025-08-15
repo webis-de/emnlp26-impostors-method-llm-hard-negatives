@@ -239,6 +239,8 @@ def get_metric_by_bin(score_sim_df: pd.DataFrame, metric: str) -> pd.DataFrame:
         if col not in score_sim_df.columns:
             raise KeyError(f"Missing required column: {col}")
     print("score_sim_df cols before groupby:", score_sim_df.columns)
+    print("DEBUG: diffbin:", score_sim_df.get("diff_bin", None))
+    print("INFO: diffbin grouped:", score_sim_df.groupby("diff_bin", observed=False))
 
     def compute_metric(g):
         y_true = g["same"]
