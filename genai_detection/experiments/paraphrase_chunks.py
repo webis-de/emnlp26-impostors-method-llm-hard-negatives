@@ -306,9 +306,6 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
         with open(file2existing_paraphrases, "w") as f:
             json.dump(data_loaded, f, indent=4)
         print(f"Saved paraphrases for text {i} to {file2existing_paraphrases}")
-        # text_paraphrases_df = pd.DataFrame(rows)
-        # # Save the results for this text
-        # text_paraphrases_df.to_csv(save_path / f"text_{i}_paraphrases.csv", index=False)
 
 
 def evaluate_paraphrases(path2dataset: str, save_path: Path) -> List[pd.DataFrame]:
@@ -557,6 +554,7 @@ if __name__ == "__main__":
             save_path=paraphrase_save_path,
         )
 
+    # works on minimal example (15.08.2025)
     elif args.task == "evaluate":
         print(
             f"Paraphrasers created and saved to {paraphrase_save_path}. Next, run the evaluation."
@@ -579,16 +577,3 @@ if __name__ == "__main__":
             save=True,
             data_category="Cross-Genre",
         )
-
-    # FIXME: cannot parallelize matplotlib plots
-    # print("Next, plot model metrics per text (parallel).")
-    # with ProcessPoolExecutor() as executor:
-    #     futures = [
-    #         executor.submit(_process_df, item) for item in list(scores_per_text.items())
-    #     ]
-    #     for _ in tqdm(
-    #         as_completed(futures),
-    #         total=len(futures),
-    #         desc="Plotting model metrics per text",
-    #     ):
-    #         pass
