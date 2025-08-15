@@ -188,11 +188,12 @@ def read_scores_from_csv(path2csv: Path) -> pd.DataFrame:
         if not filename.endswith(".csv"):
             continue
         path2csvfile = path2csv / filename
-        csv_df = pd.read_csv(path2csvfile)
+        imp_gen = filename.split("_")[1]
+        csv_df = pd.read_csv(
+            path2csvfile, usecols=["same", f"impostor_prediction_{imp_gen}"]
+        )  # ,"pair","authors",f"impostor_score_{imp_gen}"])
         if not csv_df.empty:
-            csv_df["impostor_generator"] = filename.split("_")[
-                1
-            ]  # Extract generator name
+            csv_df["impostor_generator"] = imp_gen  # Extract generator name
             print(f"Reading {len(csv_df)} rows from {path2csvfile}")
             df = pd.concat([df, csv_df], ignore_index=True)
     return df
