@@ -249,16 +249,12 @@ def get_metric_by_bin(score_sim_df: pd.DataFrame, metric: str) -> pd.DataFrame:
         else:
             raise ValueError(f"Unknown metric: {metric}")
 
-    # result = (
-    #     score_sim_df.groupby("diff_bin", observed=False)
-    #     .apply(compute_metric, include_groups=False)
-    #     .reset_index()
-    # )
     result = (
         score_sim_df.groupby("diff_bin", observed=False)
-        .agg(compute_metric)
+        .apply(compute_metric, include_groups=False)
         .reset_index()
     )
+    print("cols after groupby:", result.columns)
     result = result.rename(columns={0: metric})
     assert (
         metric in result.columns
