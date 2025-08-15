@@ -98,15 +98,12 @@
   - i.e. optimizing scores is not goal for the purpose of "the" AV model
   - Precision-Recall curve can be better than F1 score, bc we can decide what is the focus (i.e. high precision)
 - [o] run `experiments/naive_paraphrasers_FPs.py` on cluster via `scripts/exp_naive_paraphrasers_FPs.sh`
-  - cancelled due to time limitations
+  - Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
+  - **TODO**: refine script
 - [o] run `experiments/paraphrase_chunks.py`via `scripts/exp_chunks_paraphrasing.sh`
-  - cancelled due to time limitations
-  - ~~trying to get parallelization working~~
   - trying to save paraphrases and compute scores separately
     - evaluation works
-    - creation of paraphrases takes too long
-    - creation of Student Essays: Done, Rest: incomplete
-  - ~~cannot download `SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")` or `gensim.downloader.load("glove-twitter-25")`~~
+    - [ ] creation of paraphrases: **TODO** Wait for SAIA API call resources to be free
 - [ ] run `genai_detection/vis_detectors.py`via `scripts/vis_detectors.sh` on cluster again, bc annotation changed
   - [o] Fig 2
     - parallelize does not work, bc tfidf vectorizer isn't correctly initialized in ImpostorDetector
@@ -116,10 +113,11 @@
     - [o] run all but on-the-fly on complete dataset (Student Essay looks good, Blog TODO)
     - [ ] run on-the-fly on subset bc free API calls limited to 250 queries per month
 - [o] Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
-- [o] Compare Impostor generators and MirrorMinds-LLMDetector paraphrase' effect on impostor detector scores (`comp_imp_generators.py`)
-- [ ] Fix MirrorMinds in impostor generator `comp_imp_generators.py` does not work...!!!
-- [ ] Backtranslation (2-step) paraphrasing: How good is LLM (Ollama?)
-  - use only western languages, because LLMs are maybe better with them
+- [o] Compare Impostor generators' effect on impostor detector scores (`comp_imp_generators.py`)
+  - include MirrorMinds-LLMDetector as paraphrase generator
+  - Done: text length, fixed, content, text_len, naive llm
+  - Running (15.05.2025): llm, naive llm, non naive llm, mirror minds
+  - **TODO**: on-the-fly
 - [ ] plot error rate (y-axis) vs. (syntactic) similarity (x-axis) between generated impostors and original text (potential subtract similarity of original text to candidate text)
 - [x] classifier for LLM detection/ AV 
   - [x] train simple classifier on semantic and syntactic similarity scores (based on their 2D distribution) _cf. Supervised Baseline of Koppel et al. 2014's paper_
@@ -182,9 +180,10 @@
     - [o] running on 15 element subset of each dataset
     - [o] running on complete dataset (maybe old code)
   - [o] Fig 4 
-    - [o] run all but on-the-fly on complete dataset (Student Essay looks good, Blog TODO)
+    - [o] run all but on-the-fly on complete dataset (Student Essay looks good, Blog **TODO**)
     - [ ] run on-the-fly on subset bc free API calls limited to 250 queries per month
-- [o] Compare Impostor generators and MirrorMinds-LLMDetector paraphrase' effect on impostor detector scores (`comp_imp_generators.py`)
+- [o] Compare Impostor generators' effect on impostor detector scores (`comp_imp_generators.py`)
+  - include MirrorMinds-LLMDetector as paraphrase generator
   - Done: text length, fixed, content, text_len, naive llm
   - Running (15.05.2025): llm, naive llm, non naive llm, mirror minds
   - **TODO**: on-the-fly
