@@ -116,7 +116,7 @@ def _get_rsme_per_img_gen(
         rmse = np.sqrt(np.mean((scores - fp_for_imp_gen["same"]) ** 2))
         rmse_per_imp_gen[imp_gen] = rmse
     # to dataframe
-    rmse_df = pd.DataFrame(rmse_per_imp_gen).T
+    rmse_df = pd.DataFrame([rmse_per_imp_gen]).T
     rmse_df.reset_index(inplace=True)
     rmse_df.rename(columns={"index": "impostor_generator"}, inplace=True)
     print("RMSE per impostor_generator:")
@@ -205,9 +205,9 @@ def read_scores_from_csv(path2csv: Path) -> pd.DataFrame:
             (label for key, label in label_map.items() if key in filename), "llm"
         )
 
-        print(
-            f"Reading {path2csvfile} for {imp_gen} generator. Columns: {pd.read_csv(path2csvfile).columns}"
-        )
+        # print(
+        #     f"Reading {path2csvfile} for {imp_gen} generator. Columns: {pd.read_csv(path2csvfile).columns}"
+        # )
         if f"impostor_prediction_{imp_gen}" not in pd.read_csv(path2csvfile).columns:
             csv_df = pd.read_csv(
                 path2csvfile, usecols=["same", f"impostor_score_{imp_gen}"]
@@ -225,7 +225,7 @@ def read_scores_from_csv(path2csv: Path) -> pd.DataFrame:
             )
         if not csv_df.empty:
             csv_df["impostor_generator"] = imp_gen  # Extract generator name
-            print(f"Reading {len(csv_df)} rows from {path2csvfile}")
+            # print(f"Reading {len(csv_df)} rows from {path2csvfile}")
             df = pd.concat([df, csv_df], ignore_index=True)
     return df
 
