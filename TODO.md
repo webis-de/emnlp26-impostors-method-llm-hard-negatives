@@ -1,6 +1,6 @@
 # ✅ TODOs
 
-## 📅 09.08.2025- 16.08.2025
+## 📅 16.08.2025- 23.08.2025
 ### 📚 Dataset
 - [ ] original MirrorMinds-LLMDetector dataset
 - [ ] Webis has newer and better fanfiction dataset than PAN20
@@ -93,15 +93,12 @@
     - subset of LLMs of same architecture, i.e. all LLMs are T5
     - subset of LLMs trained on same data, i.e. all LLMs are trained on Wikipedia
 - [ ] statistical significance test: top accuracy of Koppel et al. 2014's in our accuracy plot
-- [ ] are texts that are heavily influenced by preprocessing steps bas (i.e. all caps texts)?
+- [ ] are texts that are heavily influenced by preprocessing steps bad (i.e. all caps texts)?
 - [ ] do not optimize one approach, but compare different approaches
   - i.e. optimizing scores is not goal for the purpose of "the" AV model
   - Precision-Recall curve can be better than F1 score, bc we can decide what is the focus (i.e. high precision)
 - [o] run `experiments/naive_paraphrasers_FPs.py` on cluster via `scripts/exp_naive_paraphrasers_FPs.sh`
   - cancelled due to time limitations
-- [x] run `experiments/run_evaluation.py`via `scripts/evaluate_paraphrasers.sh`
-  - metrics: BLEU, ROUGE-1, ROUGE-L, BERTScore, cosine similarity of SBERT vectors, WMS, ... on paraphrases to reference
-  - (extractor) evaluation (time, genre, topic, length)
 - [o] run `experiments/paraphrase_chunks.py`via `scripts/exp_chunks_paraphrasing.sh`
   - cancelled due to time limitations
   - ~~trying to get parallelization working~~
@@ -120,44 +117,94 @@
     - [ ] run on-the-fly on subset bc free API calls limited to 250 queries per month
 - [o] Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
 - [o] Compare Impostor generators and MirrorMinds-LLMDetector paraphrase' effect on impostor detector scores (`comp_imp_generators.py`)
-- [x] IONOS paraphraser
 - [ ] Fix MirrorMinds in impostor generator `comp_imp_generators.py` does not work...!!!
-- [x] experiment: Syntactic similarity impact on impostor scores
-  - Student Essay dataset: bad
-  - Blog dataset: ok
-- [ ] lowercasing texts for unmasking or other AV/AA: 
-    - Yes: [Janek's Two Paradigms of LLM Detection: AA vs. AV pg. 3768 left 1st paragraph](https://aclanthology.org/2025.findings-acl.194.pdf), [Janek's BA pg. 11](https://downloads.webis.de/theses/papers/bevendorff_2016.pdf)
-    - Currently no, bc loosing information, i.e. capitalization, all caps, etc.
 - [ ] Backtranslation (2-step) paraphrasing: How good is LLM (Ollama?)
   - use only western languages, because LLMs are maybe better with them
-- [o] What are impostor paper (Koppel et al. 2014) baselines: Implement them
-  - 1. Similarity-Based Baseline: Measure the similarity (1a cosine ca. 71% acc, 1b min-max ca. 74% acc) between the candidate text and the original text (space-free 4-gram tfidf of top 100,000 n-grams across corpus) and assign same-author label if similarity is above a certain threshold.
-  - 2. Supervised Baseline: Train a supervised classifier (linear SVM) on 1,000 labeled sample pairs to distinguish between same-author and different-author pairs based on absolute element-wise differences in their top 100,000 tfidf embedding: 79.8% accuracy
-- [ ] scatter semantic/ syntactic scores
-  - [x] change "model" to "Paraphraser" in plot legend
-  - [ ] artificial bins of similarity
-    - quality of prediction per bin
-- [ ] classifier for LLM detection/ AV 
-  - [ ] train simple classifier on semantic and syntactic similarity scores (based on their 2D distribution)
-  - problems: Generate labelled instances
 - [ ] plot error rate (y-axis) vs. (syntactic) similarity (x-axis) between generated impostors and original text (potential subtract similarity of original text to candidate text)
+- [x] classifier for LLM detection/ AV 
+  - [x] train simple classifier on semantic and syntactic similarity scores (based on their 2D distribution) _cf. Supervised Baseline of Koppel et al. 2014's paper_
+  - problems: Generate labelled instances
+  - [x] _Syntactic similarity impact on impostor scores_: not error rate, but performance
+  - How difficult is prediction for AV approach given certain impostor generation strategy?
   - How difficult is prediction for AV approach given certain impostor generation strategy?
   - [ ] error rate: Number of false positives + false negatives / total number of texts
   - [ ] x-axis: Syntactic similarity
   - [ ] y-axis: Error rate
 - [ ] vertical prototype rather than horizontal prototype (get existing modules working rather than generating new modules)
-- [ ] Grid search for hyperparameters 
-  - [ ] smart choice of hyperparameters, ggf. do not use all hyperparameters
 - [ ] [Answer by LLMDet collaborator](https://github.com/TrustedLLM/LLMDet/issues/14#issuecomment-3111760619)
 - [ ] experiment/ hypothesis: Text_extractor information will produce similar text to original text even though information is wrong because extractor/ generator LLM think alike
   - [ ] maybe generate "bad extractions via LLM prompt" and compare to original text (human evaluation)
 - [ ] compare MirrorMinds-LLMDetector paraphrases and our impostor generators
+  - meta copy error on cluster...
 - [ ] compare MirrorMinds-LLMDetector and our impostor approach
 - [ ] Paraphrase metrics: compare metric with human evaluation (correlation): Draw 300 paraphrases stratified by their $\Delta_{sem,syn}=Avg(Semantic Sim)-Avg(Syntactic Sim)$ similarity distribution, rate on a 5-point Likert scale
   - [Marcel's paper](https://downloads.webis.de/publications/papers/gohsen_2023b.pdf)
 - [ ] do all T5 paraphrases loose central conflict of original text?
   - worst paraphrases on _News/ custom dataset_ are T5 (ChatGPT) paraphrases, which are really short and loose central conflict of original text cf. Implementation 08.07.2025- 21.07.2025
   - [ ] compare all (worst to best) T5 paraphrases to original text
+- [o] compare best/worst paraphrase metrics *per dataset* (different genre)
+  - [x] News/ custom dataset (without temperature variation)
+  - [x] Blog dataset
+  - [ ] Gutenberg dataset
+  - [ ] Student Essay dataset
+- [o] compare quality of paraphrase experiment with chunks *per dataset* (different genre)
+  - currently only on first 10 texts of each dataset
+  - not so important task, if works similarly well on all datasets
+  - [x] News/ custom dataset (23.07.2025)
+  - [x] Blog dataset (24.07.2025)
+  - [ ] Gutenberg dataset **TODO: not enough memory on Macbook, run on cluster**
+  - [ ] Student Essay dataset **TODO: crushes Macbook when running locally**
+
+
+
+
+## 📅 09.08.2025- 15.08.2025
+### 📚 Dataset
+- 
+
+### ✍️ Written Work
+- 
+
+### 🛠️ Implementation
+- [o] run `experiments/naive_paraphrasers_FPs.py` on cluster via `scripts/exp_naive_paraphrasers_FPs.sh`
+  - Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
+  - **TODO**: refine script
+- [x] run `experiments/run_evaluation.py`via `scripts/evaluate_paraphrasers.sh`
+  - metrics: BLEU, ROUGE-1, ROUGE-L, BERTScore, cosine similarity of SBERT vectors, WMS, ... on paraphrases to reference
+  - (extractor) evaluation (time, genre, topic, length)
+- [o] run `experiments/paraphrase_chunks.py`via `scripts/exp_chunks_paraphrasing.sh`
+  - trying to save paraphrases and compute scores separately
+    - evaluation works
+    - [ ] creation of paraphrases: **TODO** Wait for SAIA API call resources to be free
+- [ ] run `genai_detection/vis_detectors.py`via `scripts/vis_detectors.sh` on cluster again, bc annotation changed
+  - [o] Fig 2
+    - parallelize does not work, bc tfidf vectorizer isn't correctly initialized in ImpostorDetector
+    - [o] running on 15 element subset of each dataset
+    - [o] running on complete dataset (maybe old code)
+  - [o] Fig 4 
+    - [o] run all but on-the-fly on complete dataset (Student Essay looks good, Blog TODO)
+    - [ ] run on-the-fly on subset bc free API calls limited to 250 queries per month
+- [o] Compare Impostor generators and MirrorMinds-LLMDetector paraphrase' effect on impostor detector scores (`comp_imp_generators.py`)
+  - Done: text length, fixed, content, text_len, naive llm
+  - Running (15.05.2025): llm, naive llm, non naive llm, mirror minds
+  - **TODO**: on-the-fly
+- [x] IONOS paraphraser: `IONOSParaphraser`
+- [x] experiment: Syntactic similarity impact on impostor scores
+- [x] lowercasing texts for unmasking or other AV/AA: 
+    - Yes: [Janek's Two Paradigms of LLM Detection: AA vs. AV pg. 3768 left 1st paragraph](https://aclanthology.org/2025.findings-acl.194.pdf), [Janek's BA pg. 11](https://downloads.webis.de/theses/papers/bevendorff_2016.pdf)
+    - Currently no, bc loosing information, i.e. capitalization, all caps, etc.
+- [x] What are impostor paper (Koppel et al. 2014) baselines: Implement them
+  - 1. Similarity-Based Baseline: Measure the similarity (1a cosine ca. 71% acc, 1b min-max ca. 74% acc) between the candidate text and the original text (space-free 4-gram tfidf of top 100,000 n-grams across corpus) and assign same-author label if similarity is above a certain threshold.
+  - 2. Supervised Baseline: Train a supervised classifier (linear SVM) on 1,000 labeled sample pairs to distinguish between same-author and different-author pairs based on absolute element-wise differences in their top 100,000 tfidf embedding: 79.8% accuracy
+- [x] scatter semantic/ syntactic scores
+  - [x] change "model" to "Paraphraser" in plot legend
+  - [x] artificial bins of similarity: experiment with _Syntactic similarity impact on impostor scores_
+    - quality of prediction per bin
+- [x] Grid search for hyperparameters 
+  - [x] smart choice of hyperparameters, ggf. do not use all hyperparameters
+    - 2 prompts for naive paraphrasers
+    - 2 temperatures for non-naive paraphrasers
+    - do not include T5 or Ollama paraphrasers, because they return errors too often
 - [o] compare best/worst paraphrase metrics *per dataset* (different genre)
   - [x] News/ custom dataset (without temperature variation)
   - [x] Blog dataset
