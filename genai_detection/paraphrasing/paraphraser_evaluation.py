@@ -128,20 +128,12 @@ class ParaphrasingEvaluator:
         )
         tries = 0
         self.sbert_model = None
-        while not self.sbert_model and tries < 10:
-            try:
-                self.sbert_model = SentenceTransformer(
-                    "sentence-transformers/all-MiniLM-L6-v2"  # , device=device    # TODO: for server?
-                )  # for cosine similarity
-            except Exception as e:
-                raise RuntimeError(
-                    "Failed to load SentenceTransformer model: {e}"
-                ) from e
-                print(
-                    "Failed to load SentenceTransformer model. Setting it to None. with error:",
-                    e,
-                )
-                tries += 1
+        try:
+            self.sbert_model = SentenceTransformer(
+                "sentence-transformers/all-MiniLM-L6-v2"  # , device=device    # TODO: for server?
+            )  # for cosine similarity
+        except Exception as e:
+            raise RuntimeError("Failed to load SentenceTransformer model: {e}") from e
         # https://pypi.org/project/word-mover-distance/ Word Mover's Distance (WMD)
         print("Loading pre-trained word vectors for WMD...")
         tries = 0
@@ -184,6 +176,17 @@ class ParaphrasingEvaluator:
     def _similar(self, a, b, sim_thres: float = 0.65) -> bool:
         """Check if two inputs are sufficiently similar."""
         return self._degree_of_similarity(str(a), str(b)) > sim_thres
+
+    def _semantic_similarity(self, a: str, b: str) -> float:
+        """Calculate semantic similarity using BERTScore."""
+        if not self.sbert_model:
+            raise RuntimeError("SBERT model is not loaded.")
+        # -1 = opposite, 0 = no similarity, 1 = identical
+        return torch.cosine_similarity(
+            self.sbert_model.encode(a, convert_to_tensor=True),
+            self.sbert_model.encode(b, convert_to_tensor=True),
+            dim=0,
+        ).item()
 
     @staticmethod
     def _get_century(time_period) -> int:
@@ -415,8 +418,8 @@ class ParaphrasingEvaluator:
             gt_century = getattr(row, "century", 0) or 0
             gt_topic = getattr(row, "topic", "") or ""
 
-            genre_match = any(
-                self._similar(extr_g.strip().lower(), gt_genre)
+            genre_match = np.max(
+                self._semantic_similarity(extr_g.strip().lower(), gt_genre)
                 for extr_g in re.split(r"[ /,]+", str(genre).lower())
             )
             time_match = self._similar(century, gt_century)
@@ -425,7 +428,7 @@ class ParaphrasingEvaluator:
             )
             topic_match = np.max(
                 [
-                    self._degree_of_similarity(
+                    self._semantic_similarity(
                         gt_sub_topic.strip(), extracted_topic.strip()
                     )
                     for gt_sub_topic in str(gt_topic).lower().split(",")
