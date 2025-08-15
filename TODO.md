@@ -85,8 +85,26 @@
     - if used often for one doctor maybe, but rather unlikely for majority of texts
     - [ ] test via table of different preprocessing steps and their impact on vocabulary size (and scores)
 - [ ] cite [KISSKI](https://docs.hpc.gwdg.de/acknowledgements/index.html) in thesis (for SAIAI paraphraser)
+- [ ] define extraction evaluation task: given text, instruction LLM extract genre, topic, century, time period, etc.
+- [ ] workflow for plots and tables:
+  1. question to answer/ finding from exploration or experiment/ response to question
+  2. use data to support finding
+  - plots are only proof/ evidence for findings/ interpretations
+  - [ ] paraphraser distribution: "I think XY is best" (hypethesis), bc data! 
+- [ ] Gohsen score may be better than many scores (many scores: too much information, i.e. not interpretable)
+
+
 
 ### 🛠️ Implementation
+- [ ] experiment: syntactic similarity effect on impostor scores
+  - [ ] syntactic similarity disputed and paraphrases 
+  - [ ] small differences in bin are not interpretable: do not use in thesis!
+  - [ ] Construct big distance scenarios and find out what happens
+- [o] Improve extractor evaluation metrics:
+  - [x] time: relative difference to original century
+  - [x] genre + topic: max cosine similarity of sbert vectors of split extracted and original genre + topic
+  - [ ] all: Ensure similar length
+- [ ] similarity scores paraphrases: do not define 0-1 range, bc results barely visible
 - [ ] LLM detection experiments: 
   - 1. candidate is one LLM
   - 2. subset of all LLMs is candidate: Can we detect all LLMs using subset of LLMs?
