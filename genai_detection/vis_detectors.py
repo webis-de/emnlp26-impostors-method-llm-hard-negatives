@@ -813,7 +813,7 @@ class VisDetectors:
         args: dict,
     ):
         save_path = (
-            Path(__file__).resolve().parent.parent.parent
+            Path(__file__).resolve().parent.parent
             / CONFIG.SAVE_PATH
             / "impostor_scores"
             / "existing_scores"
@@ -999,7 +999,7 @@ class VisDetectors:
                 f"Using {imp_gen} impostor generation with path to imposters: {path2imp}"
             )
             save_path = (
-                Path(__file__).resolve().parent.parent.parent
+                Path(__file__).resolve().parent.parent
                 / CONFIG.SAVE_PATH
                 / "impostor_scores"
                 / "existing_scores"
