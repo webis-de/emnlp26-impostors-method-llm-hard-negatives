@@ -820,6 +820,7 @@ class VisDetectors:
         args: dict,
         save_path=EXISTING_SCORES_BASE_SAVE_PATH,
     ):
+        save_path.mkdir(parents=True, exist_ok=True)
         existing_scores_filename = save_path / f"impostor_scores_reproduction.json"
         assert isinstance(args, dict), "args must be a dictionary"
         assert (
@@ -1006,6 +1007,7 @@ class VisDetectors:
             print(
                 f"Using {imp_gen} impostor generation with path to imposters: {path2imp}"
             )
+            save_path.mkdir(parents=True, exist_ok=True)
             existing_scores_filename = save_path / f"impostor_scores_reproduction.json"
 
             # load existing scores if available
