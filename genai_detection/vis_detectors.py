@@ -759,7 +759,7 @@ class VisDetectors:
     ):
         mask = []
         for row in dataset.itertuples():
-            pair = row.pair
+            pair = str(row.pair)
             if pair not in loaded_data:
                 loaded_data[pair] = {}
             if imp_gen not in loaded_data[pair]:
@@ -777,7 +777,7 @@ class VisDetectors:
     ):
         for row in dataset.itertuples():
             if pd.isna(row.impostor_score):
-                pair = row.pair
+                pair = str(row.pair)
                 if (
                     pair in loaded_data
                     and imp_gen in loaded_data[pair]
@@ -803,7 +803,7 @@ class VisDetectors:
         imp_gen: str = "fixed",
     ):
         for idx, row_idx in enumerate(missing_scores_indices):
-            pair = dataset.loc[row_idx, "pair"]
+            pair = str(dataset.loc[row_idx, "pair"])
             if pair not in loaded_data:
                 loaded_data[pair] = {}
             if imp_gen not in loaded_data[pair]:
