@@ -450,6 +450,7 @@ def plot_model_metrics(
         col
         for col in combined_df.columns
         if col not in ["model", "prompt", "num_chunks"]
+        and pd.api.types.is_numeric_dtype(combined_df[col])
     ]
 
     # Ensure save directory exists
