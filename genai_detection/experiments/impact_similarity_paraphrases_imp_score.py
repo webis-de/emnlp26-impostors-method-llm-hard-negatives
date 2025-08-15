@@ -252,7 +252,7 @@ def get_metric_by_bin(score_sim_df: pd.DataFrame, metric: str) -> pd.DataFrame:
     return (
         score_sim_df.groupby("diff_bin", observed=False)
         .apply(compute_metric, include_groups=False)
-        .reset_index(name=metric)
+        .reset_index()
     )
 
 
