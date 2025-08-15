@@ -198,6 +198,7 @@ def read_scores_from_csv(path2csv: Path) -> pd.DataFrame:
             "text": "text_len",
             "fixed": "fixed",
             "content": "content",
+            "mirror": "mirror_minds",
         }
 
         imp_gen = next(
