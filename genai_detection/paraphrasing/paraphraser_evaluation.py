@@ -188,7 +188,7 @@ class ParaphrasingEvaluator:
             dim=0,
         ).item()
 
-    def _similarity_numbers(self, a, b):
+    def _similarity_numbers(self, baseline, other):
         """
         Calculate the percentual similarity of two integers,
         using the first value as the baseline (100%).
@@ -198,14 +198,14 @@ class ParaphrasingEvaluator:
         similarity_percent(100, 90) -> 0.9
         """
         # Convert to int if strings
-        a = int(a)
-        b = int(b)
+        baseline = int(baseline)
+        other = int(other)
 
-        if a == 0:
+        if baseline == 0:
             return 0
 
         # Calculate percentage similarity
-        similarity = b / a
+        similarity = other / baseline
         return similarity
 
     @staticmethod
@@ -447,7 +447,7 @@ class ParaphrasingEvaluator:
                 for extr_g in re.split(r"[ /,]+", str(genre).lower())
             )
             time_match = self._similarity_numbers(
-                century, gt_century
+                other=century, baseline=gt_century
             )  # self._similar(century, gt_century)
             extracted_topic = (
                 extra.get("topic", extra) if isinstance(extra, dict) else extra
