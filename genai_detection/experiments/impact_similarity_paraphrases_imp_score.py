@@ -250,7 +250,9 @@ def get_metric_by_bin(score_sim_df: pd.DataFrame, metric: str) -> pd.DataFrame:
             raise ValueError(f"Unknown metric: {metric}")
 
     return (
-        score_sim_df.groupby("diff_bin").apply(compute_metric).reset_index(name=metric)
+        score_sim_df.groupby("diff_bin", observed=False)
+        .apply(compute_metric, include_groups=False)
+        .reset_index(name=metric)
     )
 
 
@@ -274,12 +276,23 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
             "syn_sim_disp_paraphrases",
         ]:
 
-            score_sim_df["diff_bin"] = pd.qcut(
-                score_sim_df[col],
-                q=n_bins,
-                labels=[f"Bin {i+1}" for i in range(n_bins)],
-                duplicates="drop",
+            # score_sim_df["diff_bin"] = pd.qcut(
+            #     score_sim_df[col],
+            #     q=n_bins,
+            #     labels=[f"Bin {i+1}" for i in range(n_bins)],
+            #     duplicates="drop",
+            # )
+            # compute qcut first
+            diff_bin, bins = pd.qcut(
+                score_sim_df[col], q=n_bins, duplicates="drop", retbins=True
             )
+
+            # assign labels dynamically
+            labels = [f"Bin {i+1}" for i in range(len(bins) - 1)]
+            score_sim_df["diff_bin"] = pd.cut(
+                score_sim_df[col], bins=bins, labels=labels, include_lowest=True
+            )
+
             # keep only counted bins (i.e., bins with at least one entry)
             bin_ranges = score_sim_df.groupby("diff_bin", observed=True)[col].agg(
                 ["min", "max"]
