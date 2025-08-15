@@ -241,6 +241,7 @@ if __name__ == "__main__":
         help="Path to cross-genre dataset (default: %(default)s).",
     )
     args = parser.parse_args()
+    # works (15.05.2025), only naive llm existent & results are bad
 
     # only read from existing impostor scores for different impostor generators
     # do not compute scores again, hence read-only!
