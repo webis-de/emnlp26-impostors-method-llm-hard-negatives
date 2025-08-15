@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=imp-gen-comp-mm
+#SBATCH --job-name=imp-gen-comp-nn
 #SBATCH --mem=256g
 #SBATCH --cpus-per-task=4
-#SBATCH --output=logs/%j-imp-gen-comp-mirror-minds.log
+#SBATCH --output=logs/%j-imp-gen-comp-non-naive.log
 #SBATCH --container-image=registry.webis.de/code-teaching/theses/artificial-authorship-verification:latest
 #SBATCH --container-mounts=/mnt/ceph/storage/data-tmp/current/kgutekunst/dev/artificial-authorship-verification/:/src 
 python3 genai_detection/experiments/comp_imp_generators.py 
