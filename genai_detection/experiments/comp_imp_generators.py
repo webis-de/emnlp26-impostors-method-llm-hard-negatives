@@ -36,9 +36,9 @@ IMP_GEN_OPTIONS = [
     # "llm",
     # "fixed",
     # "text_len",
-    "content",  # device error
+    # "content",    # no device error when running sequentially and with 256GB RAM, 4 CPU cores
     # "on-the-fly", # no more api calls
-    # "mirror_minds", # device error
+    "mirror_minds",  # device error
 ]
 
 
@@ -269,8 +269,8 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                     "llm",
                 ]
                 else 14 // _get_num_impostors(imp_gen)
-            )  # 14 per min
-            if imp_gen == "content":
+            )  # 14 API calls per minute (2 API calls per second) to avoid SAIA rate limiting
+            if imp_gen in ["content", "mirror_minds"]:
                 results = []
                 for pair in new_rows["pair"]:
                     res = _helper_impostor(
@@ -333,7 +333,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 ]
                 else 14 // _get_num_impostors(imp_gen)
             )  # 14 per min
-            if imp_gen == "content":
+            if imp_gen in ["content", "mirror_minds"]:
                 results = []
                 for pair in new_rows["pair"]:
                     res = _helper_impostor(
@@ -613,19 +613,22 @@ if __name__ == "__main__":
         save_path=SAVE_PATH,
     )
     print(
-        "Visualizing accuracy, prec, recall, f1 per syntactic similarity for Student Essays dataset."
+        "Creating DataFrame for Student Essays dataset completed. Saved to:", SAVE_PATH
     )
-    plot_optimal_threshold_bars(
-        df=student_test_df,
-        save_path=SAVE_PATH,
-        dataset_name=CONFIG.STUDENT_ESSAYS,
-    )
-    plot_threshold_curves_all(
-        df=student_test_df,
-        save_path=SAVE_PATH,
-        dataset_name=CONFIG.STUDENT_ESSAYS,
-    )
-    print("Experiment for Student Essays dataset completed. Plots saved to:", SAVE_PATH)
+    # print(
+    #     "Visualizing accuracy, prec, recall, f1 per syntactic similarity for Student Essays dataset."
+    # )
+    # plot_optimal_threshold_bars(
+    #     df=student_test_df,
+    #     save_path=SAVE_PATH,
+    #     dataset_name=CONFIG.STUDENT_ESSAYS,
+    # )
+    # plot_threshold_curves_all(
+    #     df=student_test_df,
+    #     save_path=SAVE_PATH,
+    #     dataset_name=CONFIG.STUDENT_ESSAYS,
+    # )
+    # print("Experiment for Student Essays dataset completed. Plots saved to:", SAVE_PATH)
 
     # Blog
     # print("Running experiment for Blog dataset.")
