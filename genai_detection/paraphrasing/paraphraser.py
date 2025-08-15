@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import sys
+from time import sleep
 from typing import Any, Dict, List, Literal, Optional, get_args
 import unicodedata
 import openai
@@ -502,6 +503,19 @@ class SAIAParaphraser(NaiveParaphraser):
                     f"[ERROR] Failed to generate paraphrase with {self.model_id}: {e}. Skipping..."
                 )
                 continue
+            except openai.RateLimitError as e:
+                print(
+                    f"[ERROR] Rate limit exceeded for {self.model_id}: {e}. Sleeping 1 minute and trying again..."
+                )
+                sleep(60)
+                return self.paraphrase(
+                    text=text,
+                    prompt=prompt,
+                    max_length=max_length,
+                    temperature=temperature,
+                    n_responses=n_responses,
+                    response_schema=response_schema,
+                )
 
             resp = response.choices[0].message.content
             resp = re.sub("'", " ", resp)  # replace single quotes with double quotes
@@ -1234,8 +1248,8 @@ if __name__ == "__main__":
     # original_text = open(path2datasets / f"{file_name}.txt").read()
     text = "Dear Santa, I wish for a big red nosed reindeer that can fly and a sleigh full of toys for all the children in the world. I promise to be good and help others. Love, Timmy."
     # p = paraphrasers["TranslationParaphraser"]
-    # p = paraphrasers["SAIA"]
-    p = paraphrasers["IONOS"]
+    p = paraphrasers["SAIA"]
+    # p = paraphrasers["IONOS"]
     # p = paraphasers["Ollama"]
     print(f"[DEBUG] Paraphrasing text with {p.__class__.__name__}")
     paraphrased_texts = p.paraphrase(text=text, n_responses=2)
