@@ -329,12 +329,16 @@ def evaluate_paraphrases(path2dataset: str, save_path: Path) -> List[pd.DataFram
         desc="Evaluating paraphrases",
         total=len(loaded_paraphrases),
     ):
-        # [n_total_chunks][f"chunk_{chunk_id}"][
-        #                     paraphraser_name
-        #                 ]
         for n_total_chunks, chunk_data_dict in text_data.items():
             for chunk_id, chunk_data in chunk_data_dict.items():
                 for paraphraser_name, paraphrase_data in chunk_data.items():
+                    if paraphrase_data.get("rouge1", None) is not None:
+                        print(
+                            f"[INFO] Paraphrase for text ID {text_id}, chunk {chunk_id}, paraphraser {paraphraser_name} already evaluated, skipping."
+                        )
+                        rows.append(paraphrase_data)
+                        continue
+
                     original_text = _preprocess_text(paraphrase_data["original_text"])
                     paraphrase_evaluator = ParaphrasingEvaluator(
                         paraphrasers=get_paraphraser_dict(),
@@ -403,6 +407,7 @@ def evaluate_paraphrases(path2dataset: str, save_path: Path) -> List[pd.DataFram
 def get_slim_dfs_for_one_text(n_paragraphs_df: list) -> list:  # of dataframes
     slim_n_paragraphs_dfs = []
     for i in range(len(n_paragraphs_df)):
+        n_paragraphs_df[i] = pd.DataFrame(n_paragraphs_df[i])
         # each row is average score over scores of all chunks
         slim_n_paragraphs_df = n_paragraphs_df[i].drop(
             columns=[
