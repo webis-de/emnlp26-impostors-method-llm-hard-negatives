@@ -270,16 +270,24 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 ]
                 else 14 // _get_num_impostors(imp_gen)
             )  # 14 per min
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                results = list(
-                    executor.map(
-                        _helper_impostor,
-                        [path2imp] * len(new_rows),
-                        new_rows["pair"],
-                        [True] * len(new_rows),  # training mode
-                        [imp_gen] * len(new_rows),
+            if imp_gen == "content":
+                results = []
+                for pair in new_rows["pair"]:
+                    res = _helper_impostor(
+                        path2imp, pair, training_mode=True, imp_gen=imp_gen
                     )
-                )
+                    results.append(res)
+            else:
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    results = list(
+                        executor.map(
+                            _helper_impostor,
+                            [path2imp] * len(new_rows),
+                            new_rows["pair"],
+                            [True] * len(new_rows),  # training mode
+                            [imp_gen] * len(new_rows),
+                        )
+                    )
 
             train_dataset.loc[missing_mask, col_score] = [score for score, _ in results]
             train_dataset.loc[missing_mask, col_dict] = [
@@ -325,16 +333,25 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 ]
                 else 14 // _get_num_impostors(imp_gen)
             )  # 14 per min
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                results = list(
-                    executor.map(
-                        _helper_impostor,
-                        [path2imp] * len(new_rows),
-                        new_rows["pair"],
-                        [False] * len(new_rows),
-                        [imp_gen] * len(new_rows),
+            if imp_gen == "content":
+                results = []
+                for pair in new_rows["pair"]:
+                    res = _helper_impostor(
+                        path2imp, pair, training_mode=False, imp_gen=imp_gen
                     )
-                )
+                    results.append(res)
+            else:
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    results = list(
+                        executor.map(
+                            _helper_impostor,
+                            [path2imp] * len(new_rows),
+                            new_rows["pair"],
+                            [False] * len(new_rows),
+                            [imp_gen] * len(new_rows),
+                        )
+                    )
+
             # results is a list of tuples: (impostor_score, impostor_dict)
             test_dataset.loc[missing_mask, col_score] = [score for score, _ in results]
             test_dataset.loc[missing_mask, col_dict] = [
