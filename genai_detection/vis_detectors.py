@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 from pathlib import Path
 import re
@@ -31,6 +32,13 @@ from genai_detection.detectors.unmasking import UnmaskingDetector
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from genai_detection.config import CONFIG
+
+EXISTING_SCORES_BASE_SAVE_PATH = (
+    Path(__file__).resolve().parents[2]
+    / CONFIG.SAVE_PATH
+    / "impostor_scores"
+    / "existing_scores"
+)
 
 
 class VisDetectors:
@@ -642,16 +650,16 @@ class VisDetectors:
         # TODO: Test on small data subsets
         train_dataset = pd.concat(
             [
-                train_dataset.loc[train_dataset["same"]].head(15),
-                train_dataset.loc[~train_dataset["same"]].head(15),
+                train_dataset.loc[train_dataset["same"]].head(5),
+                train_dataset.loc[~train_dataset["same"]].head(5),
             ],
             ignore_index=False,
         )
 
         test_dataset = pd.concat(
             [
-                test_dataset.loc[test_dataset["same"]].head(15),
-                test_dataset.loc[~test_dataset["same"]].head(15),
+                test_dataset.loc[test_dataset["same"]].head(5),
+                test_dataset.loc[~test_dataset["same"]].head(5),
             ],
             ignore_index=False,
         )
@@ -665,31 +673,7 @@ class VisDetectors:
             if self.dataset_name == CONFIG.BLOG
             else Path(os.getcwd()).resolve() / CONFIG.PATH2STUDENT_ESSAYS
         )
-        # Does not work, bc tfidf vectorizer isnt correctly initialized in ImpostorDetector
-        # print("Start parallel computation for different n_impostors.")
-        # with ProcessPoolExecutor() as executor:
-        #     futures = {
-        #         executor.submit(
-        #             self._run_fig_2_worker,
-        #             n_imp,
-        #             train_dataset,
-        #             test_dataset,
-        #             path2imp,
-        #             args,
-        #         ): n_imp
-        #         for n_imp in n_imp_options
-        #     }
-
-        #     for future in as_completed(futures):
-        #         result = future.result()
-        #         if result:
-        #             precisions[result["n_imp"]] = result["precision"]
-        #             recalls[result["n_imp"]] = result["recall"]
-        #         else:
-        #             print(
-        #                 f"[ERROR] Failed to compute precision and recall for n_imp = {futures[future]}"
-        #             )
-
+        # Parallel does not work, bc tfidf vectorizer isnt correctly initialized in ImpostorDetector
         print("Start sequential computation for different n_impostors.")
         for n_imp in n_imp_options:
             result = self._run_fig_2_worker(
@@ -770,24 +754,124 @@ class VisDetectors:
             plt.savefig(save_path / figure_name)
         plt.close(fig)
 
-    def _fig_2_for_fixed_n_imposters(
-        self, train_dataset, test_dataset, path2imp, n_imp, args: dict
+    def _get_missing_scores_indices(
+        self, dataset: pd.DataFrame, loaded_data: dict, imp_gen: str, n_imp: int = 50
     ):
+        mask = []
+        for row in dataset.itertuples():
+            pair = row.pair
+            if pair not in loaded_data:
+                loaded_data[pair] = {}
+            if imp_gen not in loaded_data[pair]:
+                loaded_data[pair][imp_gen] = {}
+            if n_imp not in loaded_data[pair][imp_gen]:
+                mask.append(row.Index)  # store index of row where score is missing
+        return mask
+
+    def _helper_missing_scores(
+        self,
+        dataset: pd.DataFrame,
+        loaded_data: dict,
+        n_imp: int = 50,
+        imp_gen: str = "fixed",
+    ):
+        for row in dataset.itertuples():
+            if pd.isna(row.impostor_score):
+                pair = row.pair
+                if (
+                    pair in loaded_data
+                    and imp_gen in loaded_data[pair]
+                    and str(n_imp) in loaded_data[pair][imp_gen]
+                ):
+                    dataset.loc[row.Index, "impostor_score"] = loaded_data[pair][
+                        imp_gen
+                    ][str(n_imp)]
+
+        missing_scores_indices = self._get_missing_scores_indices(
+            dataset, loaded_data, imp_gen, n_imp
+        )
+
+        return dataset.iloc[missing_scores_indices], missing_scores_indices
+
+    def _update_loaded_data(
+        self,
+        loaded_data: dict,
+        dataset: pd.DataFrame,
+        missing_scores_indices: list,
+        missing_scores: list,
+        n_imp: int,
+        imp_gen: str = "fixed",
+    ):
+        for idx, row_idx in enumerate(missing_scores_indices):
+            pair = dataset.loc[row_idx, "pair"]
+            if pair not in loaded_data:
+                loaded_data[pair] = {}
+            if imp_gen not in loaded_data[pair]:
+                loaded_data[pair][imp_gen] = {}
+            loaded_data[pair][imp_gen][str(n_imp)] = missing_scores[idx]
+        return loaded_data
+
+    def _fig_2_for_fixed_n_imposters(
+        self,
+        train_dataset,
+        test_dataset,
+        path2imp,
+        n_imp,
+        args: dict,
+        save_path=EXISTING_SCORES_BASE_SAVE_PATH,
+    ):
+        existing_scores_filename = save_path / f"impostor_scores_reproduction.json"
         assert isinstance(args, dict), "args must be a dictionary"
         assert (
             args.get("n_impostors", n_imp) == n_imp
         ), f"n_impostors={args['n_impostors']} in args must match n_imp={n_imp} in function call"
+        # load existing scores if available
+        if "impostor_score" not in train_dataset.columns:
+            train_dataset["impostor_score"] = np.nan
+        if "impostor_score" not in test_dataset.columns:
+            test_dataset["impostor_score"] = np.nan
 
-        with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
-            train_dataset["impostor_score"] = list(
-                executor.map(
-                    self._helper_impostor,
-                    [path2imp] * len(train_dataset),
-                    train_dataset["pair"],
-                    ["fixed"] * len(train_dataset),
-                    [True] * len(train_dataset),  # training mode
-                    [n_imp] * len(train_dataset),  # n_imp
+        if existing_scores_filename.exists():
+            with open(existing_scores_filename, "r") as f:
+                loaded_data = json.load(f)
+
+        else:
+            loaded_data = {}
+
+        rows_without_scores, missing_scores_indices = self._helper_missing_scores(
+            train_dataset, loaded_data, n_imp
+        )
+
+        if len(rows_without_scores) > 0:
+            print(
+                f"Found {len(rows_without_scores)} rows without impostor scores in training data."
+            )
+
+            with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
+                missing_scores = list(
+                    executor.map(
+                        self._helper_impostor,
+                        [path2imp] * len(rows_without_scores),
+                        rows_without_scores["pair"],
+                        ["fixed"] * len(rows_without_scores),
+                        [True] * len(rows_without_scores),  # training mode
+                        [n_imp] * len(rows_without_scores),  # n_imp
+                    )
                 )
+                train_dataset.loc[missing_scores_indices, "impostor_score"] = (
+                    missing_scores
+                )
+
+            loaded_data = self._update_loaded_data(
+                loaded_data=loaded_data,
+                dataset=train_dataset,
+                missing_scores_indices=missing_scores_indices,
+                missing_scores=missing_scores,
+                n_imp=n_imp,
+            )
+            loaded_data.to_json(existing_scores_filename, indent=4, ensure_ascii=False)
+            print(
+                f"Saved missing train scores to {existing_scores_filename} for {len(missing_scores_indices)} rows."
             )
         print("Calculated impostor scores on training data.")
 
@@ -806,17 +890,41 @@ class VisDetectors:
             f"Optimal threshold for impostor detection via Youden's J function: {youdens_j_thres:.2f}/ via best F1: {best_f1_thres:.2f}"
         )
 
-        # work with test dataset
-        with ThreadPoolExecutor() as executor:
-            test_dataset["impostor_score"] = list(
-                executor.map(
-                    self._helper_impostor,
-                    [path2imp] * len(test_dataset),
-                    test_dataset["pair"],
-                    ["fixed"] * len(test_dataset),
-                    [False] * len(test_dataset),  # testing mode
-                    [n_imp] * len(test_dataset),  # n_imp
+        rows_without_scores, missing_scores_indices = self._helper_missing_scores(
+            test_dataset, loaded_data, n_imp
+        )
+
+        if len(rows_without_scores) > 0:
+            print(
+                f"Found {len(rows_without_scores)} rows without impostor scores in test data."
+            )
+
+            # work with test dataset
+            with ThreadPoolExecutor() as executor:
+                missing_scores = list(
+                    executor.map(
+                        self._helper_impostor,
+                        [path2imp] * len(test_dataset),
+                        test_dataset["pair"],
+                        ["fixed"] * len(test_dataset),
+                        [False] * len(test_dataset),  # testing mode
+                        [n_imp] * len(test_dataset),  # n_imp
+                    )
                 )
+                test_dataset.loc[missing_scores_indices, "impostor_score"] = (
+                    missing_scores
+                )
+
+            loaded_data = self._update_loaded_data(
+                loaded_data=loaded_data,
+                dataset=test_dataset,
+                missing_scores_indices=missing_scores_indices,
+                missing_scores=missing_scores,
+                n_imp=n_imp,
+            )
+            loaded_data.to_json(existing_scores_filename, indent=4, ensure_ascii=False)
+            print(
+                f"Saved missing test scores to {existing_scores_filename} for {len(missing_scores_indices)} rows."
             )
 
         test_dataset["impostor_score"] = np.array(
@@ -884,37 +992,77 @@ class VisDetectors:
         res = impostor_detector._get_score_impl(pair)
         return [r[0] for r in res] if isinstance(res, list) else res[0]
 
-    def _run_fig_4_worker(self, imp_gen, train_dataset, test_dataset, path2imp):
+    def _run_fig_4_worker(
+        self,
+        imp_gen,
+        train_dataset,
+        test_dataset,
+        path2imp,
+        save_path=EXISTING_SCORES_BASE_SAVE_PATH,
+    ):
         try:
             print(
                 f"Using {imp_gen} impostor generation with path to imposters: {path2imp}"
             )
-            # initialize impostor detector
-            impostor_detector = ImpostorDetector(
-                impostor_technique=imp_gen,
-                n_impostors=50,
-                rounds=100,  # cf. pg. 181, Koppel et al. (2014)
-                top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
-                path2imp=path2imp,
-                upsample=False,
-                real_time_generation=False,  # TODO: turn True, otherwise on-the-fly generation is not possible (currently too much data for too few free api calls)
+            existing_scores_filename = save_path / f"impostor_scores_reproduction.json"
+
+            # load existing scores if available
+            if "impostor_score" not in train_dataset.columns:
+                train_dataset["impostor_score"] = np.nan
+            if "impostor_score" not in test_dataset.columns:
+                test_dataset["impostor_score"] = np.nan
+
+            if existing_scores_filename.exists():
+                with open(existing_scores_filename, "r") as f:
+                    loaded_data = json.load(f)
+
+            else:
+                loaded_data = {}
+
+            rows_without_scores, missing_scores_indices = self._helper_missing_scores(
+                train_dataset, loaded_data, 50, imp_gen
             )
-            print(
-                f"Initialized impostor detector with {imp_gen} impostors generation technique."
-            )
-            with ThreadPoolExecutor() as executor:
-                train_dataset["impostor_score"] = list(
-                    executor.map(
-                        self._helper_impostor,
-                        [path2imp] * len(train_dataset),
-                        train_dataset["pair"],
-                        [imp_gen] * len(train_dataset),
-                    )
+
+            if len(rows_without_scores) > 0:
+                print(
+                    f"Found {len(rows_without_scores)} rows without impostor scores in training data."
                 )
-            print(
-                "Calculated impostor scores on training data for imposter generation:",
-                imp_gen,
-            )
+                impostor_detector = ImpostorDetector(
+                    impostor_technique=imp_gen,
+                    n_impostors=50,
+                    rounds=100,  # cf. pg. 181, Koppel et al. (2014)
+                    top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
+                    path2imp=path2imp,
+                    upsample=False,
+                    real_time_generation=False,  # TODO: turn True, otherwise on-the-fly generation is not possible (currently too much data for too few free api calls)
+                )
+
+                with ThreadPoolExecutor() as executor:
+                    missing_scores = list(
+                        executor.map(
+                            self._helper_impostor,
+                            [path2imp] * len(rows_without_scores),
+                            rows_without_scores["pair"],
+                            [imp_gen] * len(rows_without_scores),
+                        )
+                    )
+                train_dataset.loc[missing_scores_indices, "impostor_score"] = (
+                    missing_scores
+                )
+
+                loaded_data = self._update_loaded_data(
+                    loaded_data=loaded_data,
+                    dataset=train_dataset,
+                    missing_scores_indices=missing_scores_indices,
+                    missing_scores=missing_scores,
+                    n_imp=50,
+                )
+                loaded_data.to_json(
+                    existing_scores_filename, indent=4, ensure_ascii=False
+                )
+                print(
+                    f"Saved missing train scores to {existing_scores_filename} for {len(missing_scores_indices)} rows."
+                )
 
             # find threshold that best separates impostors from non-impostors in the training set (targets are in the 'same' column)
             args = {
@@ -943,16 +1091,45 @@ class VisDetectors:
             impostor_detector.set_training_mode(
                 False
             )  # set to False for validation: Use training set for impostor generation for fixed impostor technique
-            with ProcessPoolExecutor() as executor:
-                test_dataset["impostor_score"] = list(
-                    executor.map(
-                        self._helper_impostor,
-                        [path2imp] * len(train_dataset),
-                        test_dataset["pair"],
-                        [imp_gen] * len(train_dataset),
-                        [False]
-                        * len(train_dataset),  # training_mode=False for test set
+
+            rows_without_scores, missing_scores_indices = self._helper_missing_scores(
+                test_dataset, loaded_data, 50, imp_gen
+            )
+
+            if len(rows_without_scores) > 0:
+                print(
+                    f"Found {len(rows_without_scores)} rows without impostor scores in test data."
+                )
+                with ProcessPoolExecutor() as executor:
+                    missing_scores = list(
+                        executor.map(
+                            self._helper_impostor,
+                            [path2imp] * len(rows_without_scores),
+                            rows_without_scores["pair"],
+                            [imp_gen] * len(rows_without_scores),
+                            [False]
+                            * len(
+                                rows_without_scores
+                            ),  # training_mode=False for test set
+                        )
                     )
+                    test_dataset.loc[missing_scores_indices, "impostor_score"] = (
+                        missing_scores
+                    )
+
+                loaded_data = self._update_loaded_data(
+                    loaded_data=loaded_data,
+                    dataset=test_dataset,
+                    missing_scores_indices=missing_scores_indices,
+                    missing_scores=missing_scores,
+                    n_imp=50,
+                    imp_gen=imp_gen,
+                )
+                loaded_data.to_json(
+                    existing_scores_filename, indent=4, ensure_ascii=False
+                )
+                print(
+                    f"Saved missing test scores to {existing_scores_filename} for {len(missing_scores_indices)} rows."
                 )
 
             # each entry in scores is a one-element list
@@ -1021,21 +1198,21 @@ class VisDetectors:
         train_dataset, test_dataset = self._load_datasets(balanced=True)
 
         # TODO: Test on small data subsets
-        # train_dataset = pd.concat(
-        #     [
-        #         train_dataset.loc[train_dataset["same"]].head(5),
-        #         train_dataset.loc[~train_dataset["same"]].head(5),
-        #     ],
-        #     ignore_index=False,
-        # )
+        train_dataset = pd.concat(
+            [
+                train_dataset.loc[train_dataset["same"]].head(5),
+                train_dataset.loc[~train_dataset["same"]].head(5),
+            ],
+            ignore_index=False,
+        )
 
-        # test_dataset = pd.concat(
-        #     [
-        #         test_dataset.loc[test_dataset["same"]].head(5),
-        #         test_dataset.loc[~test_dataset["same"]].head(5),
-        #     ],
-        #     ignore_index=False,
-        # )
+        test_dataset = pd.concat(
+            [
+                test_dataset.loc[test_dataset["same"]].head(5),
+                test_dataset.loc[~test_dataset["same"]].head(5),
+            ],
+            ignore_index=False,
+        )
 
         # could be initially different, bc args are from argparse which are irrespective from calling thsi function with defined dataset_name
         args["dataset_name"] = self.dataset_name
@@ -1054,21 +1231,6 @@ class VisDetectors:
         print(
             "Start sequential computation (else OOM) for different impostor generation techniques."
         )
-        # with ProcessPoolExecutor() as executor:
-        #     futures = {
-        #         executor.submit(
-        #             self._run_fig_4_worker,
-        #             imp_gen,
-        #             train_dataset,
-        #             test_dataset,
-        #             path2imp,
-        #         ): imp_gen
-        #         for imp_gen in imp_gen_options
-        #     }
-
-        #     for future in as_completed(futures):
-        #         result = future.result()
-        #         if result:
         for imp_gen in imp_gen_options:
             result = self._run_fig_4_worker(
                 imp_gen, train_dataset, test_dataset, path2imp
@@ -1369,13 +1531,6 @@ if __name__ == "__main__":
         path2imp=args.path2imp,
         upsample=args.upsample,
     )
-
-    # vis_det = VisDetectors(
-    #     dataset_name=args.dataset_name,
-    #     detectors=[impostor],
-    # )
-    # print("impostor Detector initialized.")
-    # vis_det.visualize(balanced=args.balanced)
 
     # reproduction of Figure 2/ 4 from Koppel et al. (2014)
     our_figure_impostor_options = [
