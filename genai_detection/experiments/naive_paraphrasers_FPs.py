@@ -13,6 +13,8 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_compl
 import os
 from pathlib import Path
 from typing import DefaultDict
+
+from sklearn.metrics import roc_curve
 from genai_detection.config import CONFIG
 from datasets import load_from_disk
 import os
@@ -24,6 +26,8 @@ from genai_detection.detectors.impostor import ImpostorDetector
 # from genai_detection.detectors.unmasking import UnmaskingDetector
 # from genai_detection.detectors.ppmd import PPMdDetector
 import pandas as pd
+
+from genai_detection.experiments.comp_imp_generators import _get_opt_imp_threshold
 
 NAIVE_PARAPHRASER_NAMES = [
     # "T5_ChatGPT",
@@ -203,9 +207,19 @@ def read_scores_from_csv(path2csv: Path) -> pd.DataFrame:
         print(
             f"Reading {path2csvfile} for {imp_gen} generator. Columns: {pd.read_csv(path2csvfile).columns}"
         )
-        csv_df = pd.read_csv(
-            path2csvfile, usecols=["same", f"impostor_prediction_{imp_gen}"]
-        )  # ,"pair","authors",f"impostor_score_{imp_gen}"])
+        if f"impostor_prediction_{imp_gen}" not in pd.read_csv(path2csvfile).columns:
+            csv_df = pd.read_csv(
+                path2csvfile, usecols=["same", f"impostor_score_{imp_gen}"]
+            )  # ,"pair","authors",f"impostor_score_{imp_gen}"])
+            fpr, tpr, roc_thresholds = roc_curve(y_true=csv_df["same"], y_score=scores)
+            opt_thres = _get_opt_imp_threshold(fpr, tpr, roc_thresholds)
+            csv_df[f"impostor_prediction_{imp_gen}"] = (
+                csv_df[f"impostor_score_{imp_gen}"] >= opt_thres
+            )
+        else:
+            csv_df = pd.read_csv(
+                path2csvfile, usecols=["same", f"impostor_prediction_{imp_gen}"]
+            )
         if not csv_df.empty:
             csv_df["impostor_generator"] = imp_gen  # Extract generator name
             print(f"Reading {len(csv_df)} rows from {path2csvfile}")
