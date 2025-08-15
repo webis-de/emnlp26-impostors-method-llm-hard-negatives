@@ -33,13 +33,6 @@ from genai_detection.detectors.unmasking import UnmaskingDetector
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from genai_detection.config import CONFIG
 
-EXISTING_SCORES_BASE_SAVE_PATH = (
-    Path(__file__).resolve().parents[2]
-    / CONFIG.SAVE_PATH
-    / "impostor_scores"
-    / "existing_scores"
-)
-
 
 class VisDetectors:
     """
@@ -818,8 +811,13 @@ class VisDetectors:
         path2imp,
         n_imp,
         args: dict,
-        save_path=EXISTING_SCORES_BASE_SAVE_PATH,
     ):
+        save_path = (
+            Path(__file__).resolve().parents[2]
+            / CONFIG.SAVE_PATH
+            / "impostor_scores"
+            / "existing_scores"
+        )
         save_path.mkdir(parents=True, exist_ok=True)
         existing_scores_filename = save_path / f"impostor_scores_reproduction.json"
         assert isinstance(args, dict), "args must be a dictionary"
@@ -995,17 +993,16 @@ class VisDetectors:
         res = impostor_detector._get_score_impl(pair)
         return [r[0] for r in res] if isinstance(res, list) else res[0]
 
-    def _run_fig_4_worker(
-        self,
-        imp_gen,
-        train_dataset,
-        test_dataset,
-        path2imp,
-        save_path=EXISTING_SCORES_BASE_SAVE_PATH,
-    ):
+    def _run_fig_4_worker(self, imp_gen, train_dataset, test_dataset, path2imp):
         try:
             print(
                 f"Using {imp_gen} impostor generation with path to imposters: {path2imp}"
+            )
+            save_path = (
+                Path(__file__).resolve().parents[2]
+                / CONFIG.SAVE_PATH
+                / "impostor_scores"
+                / "existing_scores"
             )
             save_path.mkdir(parents=True, exist_ok=True)
             existing_scores_filename = save_path / f"impostor_scores_reproduction.json"
