@@ -1219,7 +1219,7 @@ class ParaphrasingEvaluator:
         ax.set_xticklabels(labels, fontsize=10)
         ax.tick_params(axis="y", labelsize=8)
 
-        # Optional: Set value range
+        # do not set value range for x-axis -> results barely visible
         ax.set_ylim(0, 1)
 
         # Add legend and title
@@ -1428,7 +1428,8 @@ class ParaphrasingEvaluator:
                 )
             plt.xlabel(metric)
             plt.ylabel("Density")
-            plt.xlim(0, 1)
+            # do not set value range -> results barely visible
+            # plt.xlim(0, 1)
             handles = [
                 mpatches.Patch(color=palette[i], label=self._wrap_label(str(label)))
                 for i, label in enumerate(unique_labels)
@@ -1556,7 +1557,8 @@ class ParaphrasingEvaluator:
                 )
             metric_for_tile = " ".join([t.capitalize() for t in metric.split("_")])
             ax.set_title(f"Distribution of {metric_for_tile}")
-            ax.set_xlim(0, 1)  # assuming similarity metrics in [0, 1]
+            # do not set value range -> results barely visible
+            # ax.set_xlim(0, 1)  # assuming similarity metrics in [0, 1]
             ax.set_xlabel(metric_for_tile)
             ax.set_ylabel("Density")
 
