@@ -1,4 +1,5 @@
 import argparse
+import ast
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
@@ -122,7 +123,7 @@ def _avg_sim_ref_paraphrases(impostor_entry: dict):
 def _avg_sim_disputed_paraphrases(impostor_entry: dict, disputed_text: str):
     """Compute average sim_sim between the disputed text and each paraphrase."""
     if isinstance(impostor_entry, str):
-        impostor_entry = json.loads(impostor_entry)
+        impostor_entry = ast.literal_eval(impostor_entry)
     if not impostor_entry or "text_pair_0" not in impostor_entry:
         return None
 
