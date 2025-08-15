@@ -431,10 +431,10 @@ def plot_model_metrics(
     data_category: str = "News",
 ):
     """
-    Create and save line plots of metric scores per model over n_chunks.
+    Create and save line plots of metric scores per model over num_chunks.
 
     Parameters:
-    - n_paragraphs_df: list of pandas DataFrames with columns ['model', 'prompt', 'n_chunks', <metric columns>]
+    - n_paragraphs_df: list of pandas DataFrames with columns ['model', 'prompt', 'num_chunks', <metric columns>]
     - save_dir: directory to save plots (default "model_plots")
     - show: whether to display plots using plt.show()
     - save: whether to save plots to disk
@@ -447,7 +447,9 @@ def plot_model_metrics(
     # Identify models and metrics
     models = combined_df["model"].unique()
     metric_cols = [
-        col for col in combined_df.columns if col not in ["model", "prompt", "n_chunks"]
+        col
+        for col in combined_df.columns
+        if col not in ["model", "prompt", "num_chunks"]
     ]
 
     # Ensure save directory exists
@@ -463,8 +465,8 @@ def plot_model_metrics(
     for model in models:
         df_model = combined_df[combined_df["model"] == model]
 
-        # Group by n_chunks
-        grouped = df_model.groupby("n_chunks")
+        # Group by num_chunks
+        grouped = df_model.groupby("num_chunks")
         mean_df = grouped[metric_cols].mean()
         std_df = grouped[metric_cols].std()
         x = mean_df.index
@@ -492,7 +494,7 @@ def plot_model_metrics(
             )
 
         plt.title(f"Metrics for paraphraser: {model}")
-        plt.xlabel("n_chunks")
+        plt.xlabel("num_chunks")
         plt.ylabel("Score")
         plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
         plt.legend(
