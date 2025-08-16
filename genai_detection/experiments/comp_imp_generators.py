@@ -170,6 +170,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         ],
         ignore_index=False,
     )
+    print("DEBUG: Obtained train + text dataset:")
     matching_cols = [
         "pair_left",
         "pair_right",
@@ -184,8 +185,10 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         else Path(os.getcwd()).resolve() / CONFIG.PATH2STUDENT_ESSAYS
     )
 
-    print(f"Running experiment for {dataset_name} dataset.")
     for imp_gen in IMP_GEN_OPTIONS:
+        print(
+            f"Running experiment for {dataset_name} dataset and {imp_gen} Impostor generator."
+        )
         col_score = f"impostor_score_{imp_gen}"
         col_dict = f"impostor_dict_{imp_gen}"
 
