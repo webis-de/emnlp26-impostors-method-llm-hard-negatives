@@ -49,7 +49,7 @@ PROMPTS = [
     "For the text above: Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
     "For the text above: Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence.",
 ]
-MAX_NUM_CHUNKS = 2  # maximum number of chunks to split the text into
+MAX_NUM_CHUNKS = 5  # maximum number of chunks to split the text into
 SAVE_PATH = (
     Path(__file__).resolve().parents[2]
     / CONFIG.SAVE_PATH
