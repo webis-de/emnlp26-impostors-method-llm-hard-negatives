@@ -132,17 +132,11 @@ def _avg_sim_disputed_paraphrases(impostor_entry: dict, disputed_text: str):
     assert (
         "text_pair_0" in impostor_entry
     ), f"Impostor entry must contain 'text_pair_0' key. But found: {impostor_entry.columns}"
-
     scores = []
     for sub_entry in impostor_entry["text_pair_0"].values():
         paraphrases = sub_entry["paraphrases"].values()
-
         for para in paraphrases:
-            print(
-                f"Comparing disputed text: {disputed_text[:100]} with paraphrase: {para[:100]}"
-            )
             scores.append(_syn_sim(disputed_text, para))
-
     return sum(scores) / len(scores) if scores else None
 
 
@@ -335,7 +329,9 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
             }
             assert (
                 len(score_sim_df["diff_bin"].isna()) == 0
-            ), "1 There are NaN values in 'diff_bin'. This should not happen. "
+            ), "1 There are NaN values in 'diff_bin'. This should not happen. number of NaN values: {}".format(
+                len(score_sim_df["diff_bin"].isna())
+            )
             score_sim_df["diff_bin"] = score_sim_df["diff_bin"].map(new_labels)
             assert (
                 len(score_sim_df["diff_bin"].isna()) == 0
@@ -445,12 +441,7 @@ if __name__ == "__main__":
     assert (
         nan_count == 0
     ), f"There are {nan_count}/{len(student_test_df)} NaN values in the 'syn_sim_disp_paraphrases' column."
-    print("Visualizing accuracy per syntactic similarity for Student Essays dataset.")
-    print("DEBUG: student_test_df columns:", student_test_df.columns)
-    print(
-        "DEBUG: syn_sim_disp_paraphrases added to student_test_df:",
-        student_test_df["syn_sim_disp_paraphrases"],
-    )
+
     vis_acc_per_syn_sim(
         score_sim_df=student_test_df,
         save_path=SAVE_PATH,
