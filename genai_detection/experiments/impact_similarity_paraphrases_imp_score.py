@@ -442,6 +442,10 @@ if __name__ == "__main__":
                     blog_test_df["impostor_dict"], blog_test_df["pair"].str[0]
                 )
             ]
+            print(
+                "DEBUG: syn_sim_disp_paraphrases added to blog_test_df:",
+                blog_test_df["syn_sim_disp_paraphrases"],
+            )
             # TODO: if this works, save the df to csv
     print("Visualizing accuracy per syntactic similarity for Blog dataset.")
     vis_acc_per_syn_sim(
