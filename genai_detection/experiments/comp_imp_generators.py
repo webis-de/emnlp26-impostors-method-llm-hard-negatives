@@ -607,8 +607,6 @@ if __name__ == "__main__":
     if not SAVE_PATH.exists():
         SAVE_PATH.mkdir(parents=True, exist_ok=True)
 
-    SAVE_PATH.mkdir(parents=True, exist_ok=True)
-
     # Student Essays
     print("Running experiment for Student Essays dataset.")
     student_test_df = create_df(
