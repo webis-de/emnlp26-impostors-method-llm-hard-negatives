@@ -433,11 +433,11 @@ if __name__ == "__main__":
         # TODO: Add average syntactic similarity for disputed + paraphrases
         # disputed_texts = [pair[0] for pair in student_test_df["pair"]]
         if "syn_sim_disp_paraphrases" not in student_test_df.columns:
-            pairs = student_test_df["pair"].apply(ast.literal_eval).to_numpy()
+            pairs = student_test_df["pair"].apply(ast.literal_eval)
             student_test_df["syn_sim_disp_paraphrases"] = [
                 _avg_sim_disputed_paraphrases(impostor_dict, disputed_text)
                 for impostor_dict, disputed_text in zip(
-                    student_test_df["impostor_dict"], pairs[:, 0]
+                    student_test_df["impostor_dict"], pairs.str[0]
                 )
             ]
             # TODO: if this works, save the df to csv
