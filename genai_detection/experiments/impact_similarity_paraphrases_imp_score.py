@@ -328,13 +328,13 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
                 for bin_label, row in bin_ranges.iterrows()
             }
             assert (
-                len(score_sim_df["diff_bin"].isna()) == 0
+                score_sim_df["diff_bin"].isna().sum() == 0
             ), "1 There are NaN values in 'diff_bin'. This should not happen. number of NaN values: {}".format(
-                len(score_sim_df["diff_bin"].isna())
+                score_sim_df["diff_bin"].isna().sum()
             )
             score_sim_df["diff_bin"] = score_sim_df["diff_bin"].map(new_labels)
             assert (
-                len(score_sim_df["diff_bin"].isna()) == 0
+                score_sim_df["diff_bin"].isna().sum() == 0
             ), "2 There are NaN values in 'diff_bin'. This should not happen. "
             assert (
                 len(score_sim_df[metric].isna()) == 0
