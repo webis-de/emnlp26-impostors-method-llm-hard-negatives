@@ -298,6 +298,14 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
             #     labels=[f"Bin {i+1}" for i in range(n_bins)],
             #     duplicates="drop",
             # )
+            nan_count = len(score_sim_df[col].isna())
+            if nan_count > 0:
+                print(
+                    f"Warning: {nan_count} NaN values found in column '{col}'. These will be dropped."
+                )
+                print(
+                    f"Rows with NaN in '{col}':", score_sim_df[score_sim_df[col].isna()]
+                )
             # compute qcut first
             diff_bin, bins = pd.qcut(
                 score_sim_df[col], q=n_bins, duplicates="drop", retbins=True
@@ -306,7 +314,12 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
             # assign labels dynamically
             labels = [f"Bin {i+1}" for i in range(len(bins) - 1)]
             score_sim_df["diff_bin"] = pd.cut(
-                score_sim_df[col], bins=bins, labels=labels, include_lowest=True
+                score_sim_df[col],
+                bins=bins,
+                labels=labels,
+                retbins=False,
+                duplicates="drop",
+                include_lowest=True,
             )
 
             # keep only counted bins (i.e., bins with at least one entry)
@@ -317,8 +330,16 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
                 bin_label: f"{bin_label} [{row['min']:.2f}, {row['max']:.2f}]"
                 for bin_label, row in bin_ranges.iterrows()
             }
+            assert (
+                len(score_sim_df["diff_bin"].isna()) == 0
+            ), "1 There are NaN values in 'diff_bin'. This should not happen. "
             score_sim_df["diff_bin"] = score_sim_df["diff_bin"].map(new_labels)
-
+            assert (
+                len(score_sim_df["diff_bin"].isna()) == 0
+            ), "2 There are NaN values in 'diff_bin'. This should not happen. "
+            assert (
+                len(score_sim_df[metric].isna()) == 0
+            ), f"There are NaN values in '{metric}'. This should not happen. "
             metric_by_bin = get_metric_by_bin(score_sim_df, metric=metric)
             print("Before merging, metric_by_bin columns:", metric_by_bin.columns)
             print("metric_by_bin before merging:", metric_by_bin.columns)
@@ -421,6 +442,11 @@ if __name__ == "__main__":
         nan_count == 0
     ), f"There are {nan_count}/{len(student_test_df)} NaN values in the 'syn_sim_disp_paraphrases' column."
     print("Visualizing accuracy per syntactic similarity for Student Essays dataset.")
+    print("DEBUG: student_test_df columns:", student_test_df.columns)
+    print(
+        "DEBUG: syn_sim_disp_paraphrases added to student_test_df:",
+        student_test_df["syn_sim_disp_paraphrases"],
+    )
     vis_acc_per_syn_sim(
         score_sim_df=student_test_df,
         save_path=SAVE_PATH,
