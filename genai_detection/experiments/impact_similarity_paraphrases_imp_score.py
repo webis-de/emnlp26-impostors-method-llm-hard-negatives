@@ -138,6 +138,9 @@ def _avg_sim_disputed_paraphrases(impostor_entry: dict, disputed_text: str):
         paraphrases = sub_entry["paraphrases"].values()
 
         for para in paraphrases:
+            print(
+                f"Comparing disputed text: {disputed_text[:100]} with paraphrase: {para[:100]}"
+            )
             scores.append(_syn_sim(disputed_text, para))
 
     return sum(scores) / len(scores) if scores else None
