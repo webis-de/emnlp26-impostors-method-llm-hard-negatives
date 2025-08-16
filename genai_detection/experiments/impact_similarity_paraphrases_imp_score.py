@@ -337,9 +337,11 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
                 score_sim_df["diff_bin"].isna().sum() == 0
             ), "2 There are NaN values in 'diff_bin'. This should not happen. "
             metric_by_bin = get_metric_by_bin(score_sim_df, metric=metric)
-            assert (
-                len(metric_by_bin[metric].isna()) == 0
-            ), f"There are NaN values in '{metric}'. This should not happen. "
+            assert len(metric_by_bin[metric].isna()) == 0 and len(
+                bin_stats["diff_bin"]
+            ) - len(metric_by_bin[metric].isna()) != len(
+                bin_stats[metric].isna()
+            ), f"There are NaN values in '{metric}' and thus, differnt length than diff_bin. Number of NaN values: {len(metric_by_bin[metric].isna())}"
             print("Before merging, metric_by_bin columns:", metric_by_bin.columns)
             print("metric_by_bin before merging:", metric_by_bin.columns)
             bin_stats = metric_by_bin.merge(bin_ranges, on="diff_bin")
