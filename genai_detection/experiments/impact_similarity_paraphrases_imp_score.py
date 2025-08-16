@@ -124,14 +124,15 @@ def _avg_sim_disputed_paraphrases(impostor_entry: dict, disputed_text: str):
     """Compute average sim_sim between the disputed text and each paraphrase."""
     if isinstance(impostor_entry, str):
         impostor_entry = ast.literal_eval(impostor_entry)
-    if not impostor_entry or "text_pair_0" not in impostor_entry:
-        return None
-
-    scores = []
+    assert impostor_entry is not None, "Impostor entry must not be None."
     assert isinstance(disputed_text, str), "Disputed text must be a string."
     assert isinstance(
         impostor_entry, dict
     ), f"Impostor entry must be a dictionary. But is: {type(impostor_entry)}, content: {impostor_entry}"
+    assert "text_pair_0" in impostor_entry, (
+        f"Impostor entry must contain 'text_pair_0' key. But found: {impostor_entry.columns}"    )
+
+    scores = []
     for sub_entry in impostor_entry["text_pair_0"].values():
         paraphrases = sub_entry["paraphrases"].values()
 
@@ -414,6 +415,10 @@ if __name__ == "__main__":
                 )
             ]
             # TODO: if this works, save the df to csv
+    assert len(student_test_df[student_test_df["syn_sim_disp_paraphrases"].isna()]) == 0, (
+        f"There are {len(student_test_df[student_test_df["syn_sim_disp_paraphrases"].isna()])}/{len(student_test_df)} NaN values in the 'syn_sim_disp_paraphrases' column. "
+        "Please check the computation of average syntactic similarity for disputed + paraphrases."
+    )
     print("Visualizing accuracy per syntactic similarity for Student Essays dataset.")
     vis_acc_per_syn_sim(
         score_sim_df=student_test_df,
