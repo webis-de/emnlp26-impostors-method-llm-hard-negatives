@@ -286,9 +286,9 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
 
     for metric in ["Accuracy", "Precision", "Recall", "F1"]:
         for col in [
-            "syn_sim_diff",
-            "syn_sim_ref_paraphrases",
-            "syn_sim_disputed_candidate",
+            # "syn_sim_diff",
+            # "syn_sim_ref_paraphrases",
+            # "syn_sim_disputed_candidate",
             "syn_sim_disp_paraphrases",
         ]:
 
@@ -298,7 +298,7 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
             #     labels=[f"Bin {i+1}" for i in range(n_bins)],
             #     duplicates="drop",
             # )
-            nan_count = len(score_sim_df[col].isna())
+            nan_count = score_sim_df[col].isna().sum()
             if nan_count > 0:
                 print(
                     f"Warning: {nan_count} NaN values found in column '{col}'. These will be dropped."
