@@ -435,6 +435,7 @@ if __name__ == "__main__":
         )
     else:
         blog_test_df = pd.read_csv(path2blog_df)
+        print("DEBUG: blog_test_df columns:", blog_test_df.columns)
         if "syn_sim_disp_paraphrases" not in blog_test_df.columns:
             blog_test_df["syn_sim_disp_paraphrases"] = [
                 _avg_sim_disputed_paraphrases(impostor_dict, disputed_text)
