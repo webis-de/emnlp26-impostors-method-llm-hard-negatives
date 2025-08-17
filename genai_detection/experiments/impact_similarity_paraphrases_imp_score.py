@@ -237,9 +237,6 @@ def get_metric_by_bin(score_sim_df: pd.DataFrame, metric: str) -> pd.DataFrame:
     for col in required_cols:
         if col not in score_sim_df.columns:
             raise KeyError(f"Missing required column: {col}")
-    print("score_sim_df cols before groupby:", score_sim_df.columns)
-    print("DEBUG: diffbin:", score_sim_df.get("diff_bin", None))
-    print("INFO: diffbin grouped:", score_sim_df.groupby("diff_bin", observed=False))
 
     def compute_metric(g):
         y_true = g["same"]
@@ -261,7 +258,6 @@ def get_metric_by_bin(score_sim_df: pd.DataFrame, metric: str) -> pd.DataFrame:
         .apply(compute_metric, include_groups=False)
         .reset_index()
     )
-    print("cols after groupby:", result.columns)
     result = result.rename(columns={0: metric})
     assert (
         metric in result.columns
@@ -283,18 +279,11 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
 
     for metric in ["Accuracy", "Precision", "Recall", "F1"]:
         for col in [
-            # "syn_sim_diff",
-            # "syn_sim_ref_paraphrases",
-            # "syn_sim_disputed_candidate",
+            "syn_sim_diff",
+            "syn_sim_ref_paraphrases",
+            "syn_sim_disputed_candidate",
             "syn_sim_disp_paraphrases",
         ]:
-
-            # score_sim_df["diff_bin"] = pd.qcut(
-            #     score_sim_df[col],
-            #     q=n_bins,
-            #     labels=[f"Bin {i+1}" for i in range(n_bins)],
-            #     duplicates="drop",
-            # )
             nan_count = score_sim_df[col].isna().sum()
             if nan_count > 0:
                 print(
@@ -337,15 +326,7 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
                 score_sim_df["diff_bin"].isna().sum() == 0
             ), "2 There are NaN values in 'diff_bin'. This should not happen. "
             metric_by_bin = get_metric_by_bin(score_sim_df, metric=metric)
-            # assert len(metric_by_bin[metric].isna()) == 0 and len(
-            #     bin_stats["diff_bin"]
-            # ) - len(metric_by_bin[metric].isna()) != len(
-            #     bin_stats[metric].isna()
-            # ), f"There are NaN values in '{metric}' and thus, differnt length than diff_bin. Number of NaN values: {len(metric_by_bin[metric].isna())}"
-            print("Before merging, metric_by_bin columns:", metric_by_bin.columns)
-            print("metric_by_bin before merging:", metric_by_bin.columns)
             bin_stats = metric_by_bin.merge(bin_ranges, on="diff_bin")
-            print("After merging, bin_stats columns:", bin_stats.columns)
             fig, ax1 = plt.subplots(figsize=(8, 5))
 
             print("cols:", bin_stats.columns)
@@ -357,17 +338,6 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
                 color="skyblue",
                 label=metric,
             )
-
-            # Bin range annotations above bars
-            # for i, row in bin_stats.iterrows():
-            #     ax1.text(
-            #         i,
-            #         row[metric] + 0.02,
-            #         f"[{row['min']:.2f}, {row['max']:.2f}]",
-            #         ha="center",
-            #         fontsize=9,
-            #         color="black",
-            #     )
 
             ax1.set_ylabel(metric)
             ax1.set_ylim(0, 1.1)
@@ -429,7 +399,6 @@ if __name__ == "__main__":
     else:
         student_test_df = pd.read_csv(path2student_df)
         # TODO: Add average syntactic similarity for disputed + paraphrases
-        # disputed_texts = [pair[0] for pair in student_test_df["pair"]]
         if "syn_sim_disp_paraphrases" not in student_test_df.columns:
             pairs = student_test_df["pair"].apply(ast.literal_eval)
             student_test_df["syn_sim_disp_paraphrases"] = [
@@ -464,7 +433,6 @@ if __name__ == "__main__":
         )
     else:
         blog_test_df = pd.read_csv(path2blog_df)
-        print("DEBUG: blog_test_df columns:", blog_test_df.columns)
         if "syn_sim_disp_paraphrases" not in blog_test_df.columns:
             blog_test_df["syn_sim_disp_paraphrases"] = [
                 _avg_sim_disputed_paraphrases(impostor_dict, disputed_text)
