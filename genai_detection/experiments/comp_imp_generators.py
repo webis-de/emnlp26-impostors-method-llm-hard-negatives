@@ -32,8 +32,8 @@ SAVE_PATH = (
 )
 IMP_GEN_OPTIONS = [
     # "naive_llm",
-    "non_naive_llm",
-    # "llm",
+    # "non_naive_llm",
+    "llm",
     # "fixed",
     # "text_len",
     # "content",    # no device error when running sequentially and with 256GB RAM, 4 CPU cores
