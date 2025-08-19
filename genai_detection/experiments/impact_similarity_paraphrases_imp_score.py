@@ -141,9 +141,10 @@ def _avg_sim_disputed_paraphrases(impostor_entry: dict, disputed_text: str):
 
 
 def _helper_impostor(path2imp, pair, training_mode=True):
+    imp_gen = "llm"  # "fixed"
     impostor_detector = ImpostorDetector(
-        impostor_technique="fixed",
-        n_impostors=50,
+        impostor_technique=imp_gen,
+        n_impostors=50 if imp_gen != "llm" else 5,
         rounds=100,  # cf. pg. 181, Koppel et al. (2014)
         top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
         path2imp=path2imp,
