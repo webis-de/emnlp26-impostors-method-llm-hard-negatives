@@ -104,7 +104,8 @@
   - [x] time: relative difference to original century
   - [x] genre + topic: max cosine similarity of sbert vectors of split extracted and original genre + topic
   - [ ] all: Ensure similar length
-- [ ] similarity scores paraphrases: do not define 0-1 range, bc results barely visible
+- [x] similarity scores paraphrases: do not define 0-1 range, bc results barely visible
+  - min/max or 0-1 x-axis lim + log or linear scale
 - [ ] LLM detection experiments: 
   - 1. candidate is one LLM
   - 2. subset of all LLMs is candidate: Can we detect all LLMs using subset of LLMs?
@@ -115,13 +116,14 @@
 - [ ] do not optimize one approach, but compare different approaches
   - i.e. optimizing scores is not goal for the purpose of "the" AV model
   - Precision-Recall curve can be better than F1 score, bc we can decide what is the focus (i.e. high precision)
-- [o] run `experiments/naive_paraphrasers_FPs.py` on cluster via `scripts/exp_naive_paraphrasers_FPs.sh`
+- [ ] run `experiments/naive_paraphrasers_FPs.py` on cluster via `scripts/exp_naive_paraphrasers_FPs.sh`
   - Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
-  - **TODO**: refine script
-- [o] run `experiments/paraphrase_chunks.py`via `scripts/exp_chunks_paraphrasing.sh`
+  - works, but rerun, when non-naive and llm data is available
+  - results bad
+- [x] run `experiments/paraphrase_chunks.py`via `scripts/exp_chunks_paraphrasing.sh`
   - trying to save paraphrases and compute scores separately
     - evaluation works
-    - [ ] creation of paraphrases: **TODO** Wait for SAIA API call resources to be free
+    - creation worked (15.08.2025) on one file and <= 2 chunks
 - [ ] run `genai_detection/vis_detectors.py`via `scripts/vis_detectors.sh` on cluster again, bc annotation changed
   - [o] Fig 2
     - parallelize does not work, bc tfidf vectorizer isn't correctly initialized in ImpostorDetector
@@ -188,7 +190,7 @@
 - [x] run `experiments/run_evaluation.py`via `scripts/evaluate_paraphrasers.sh`
   - metrics: BLEU, ROUGE-1, ROUGE-L, BERTScore, cosine similarity of SBERT vectors, WMS, ... on paraphrases to reference
   - (extractor) evaluation (time, genre, topic, length)
-- [o] run `experiments/paraphrase_chunks.py`via `scripts/exp_chunks_paraphrasing.sh`
+- [x] run `experiments/paraphrase_chunks.py`via `scripts/exp_chunks_paraphrasing.sh`
   - trying to save paraphrases and compute scores separately
     - evaluation works
     - [ ] creation of paraphrases: **TODO** Wait for SAIA API call resources to be free
@@ -199,13 +201,13 @@
     - [o] running on complete dataset (maybe old code)
   - [o] Fig 4 
     - [o] run all but on-the-fly on complete dataset (Student Essay looks good, Blog **TODO**)
-    - [ ] run on-the-fly on subset bc free API calls limited to 250 queries per month
+    - [o] run on-the-fly on subset bc free API calls limited to 250 queries per month
 - [o] Compare Impostor generators' effect on impostor detector scores (`comp_imp_generators.py`)
   - include MirrorMinds-LLMDetector as paraphrase generator
   - Done: text length, fixed, content, text_len, naive llm
   - Running (15.05.2025): llm, naive llm, non naive llm, mirror minds
   - **TODO**: on-the-fly
-- [x] IONOS paraphraser: `IONOSParaphraser`
+- [x] ~~IONOS paraphraser: `IONOSParaphraser`~~
 - [x] experiment: Syntactic similarity impact on impostor scores
 - [x] lowercasing texts for unmasking or other AV/AA: 
     - Yes: [Janek's Two Paradigms of LLM Detection: AA vs. AV pg. 3768 left 1st paragraph](https://aclanthology.org/2025.findings-acl.194.pdf), [Janek's BA pg. 11](https://downloads.webis.de/theses/papers/bevendorff_2016.pdf)
