@@ -39,14 +39,20 @@ SAVE_PATH = (
     / "impostor_generator_comparison"
 )
 IMP_GEN_OPTIONS = [
-    # "naive_llm",
+    "naive_llm",
     # "non_naive_llm",
     # "llm",
-    # "fixed",
+    "fixed",
     "text_len",
-    # "content",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores
+    "content",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores
     # "on-the-fly", # no more api calls
-    # "mirror_minds",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores, TODO: rerun bc in csv files is , missing
+    "mirror_minds",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores, TODO: rerun bc in csv files is , missing
+]
+
+BASELINES = [
+    "unsupervised baseline min-max",
+    "unsupervised baseline cosine",
+    "supervised baseline",
 ]
 
 
@@ -423,26 +429,23 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         #         save_path / test_scores_file_name,
         #     )
 
-        # # Add missing columns from train_dataset, initialized with NaN
-        # original_test_dataset = original_test_dataset.reindex(
-        #     columns=original_test_dataset.columns.union(test_dataset.columns)
-        # )
-        # original_train_dataset = original_train_dataset.reindex(
-        #     columns=original_train_dataset.columns.union(train_dataset.columns)
-        # )
+        # NEVER COMMENT THIS: Add missing columns from train_dataset, initialized with NaN
+        original_test_dataset = original_test_dataset.reindex(
+            columns=original_test_dataset.columns.union(test_dataset.columns)
+        )
+        original_train_dataset = original_train_dataset.reindex(
+            columns=original_train_dataset.columns.union(train_dataset.columns)
+        )
 
-        # # Fill NaNs in those columns with values from train_dataset
-        # original_test_dataset = original_test_dataset.fillna(test_dataset)
-        # original_train_dataset = original_train_dataset.fillna(train_dataset)
+        # Fill NaNs in those columns with values from train_dataset
+        original_test_dataset = original_test_dataset.fillna(test_dataset)
+        original_train_dataset = original_train_dataset.fillna(train_dataset)
 
-    baselines = [
-        "unsupervised baseline min-max",
-        "unsupervised baseline cosine",
-        "supervised baseline",
-    ]
+    # FIXME
+    print("Columns in original test dataset:", original_test_dataset.columns)
 
     for baseline_name, baseline in zip(
-        baselines,
+        BASELINES,
         [
             UnSupervisedImpostorBaseline(
                 use_cosine_simiarity=False, dataset_name=dataset_name
@@ -459,6 +462,13 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         test_dataset[f"{baseline_name.replace(' ','_')}_score"] = np.array(
             preds.tolist()
         ).ravel()
+
+        original_test_dataset = original_test_dataset.reindex(
+            columns=original_test_dataset.columns.union(test_dataset.columns)
+        )
+
+        # Fill NaNs in those columns with values from train_dataset
+        original_test_dataset = original_test_dataset.fillna(test_dataset)
 
     original_test_dataset = original_test_dataset.dropna(axis=1, how="all")
     original_test_dataset.to_json(
@@ -588,6 +598,8 @@ def compute_metrics_over_thresholds(y_trues, y_scores, thresholds=None):
             'c@1s': [...],
         }
     """
+    print("DEBUG: y_trues:", y_trues)
+    print("DEBUG: y_scores:", y_scores)
     if thresholds is None:
         thresholds = np.linspace(0, 1, 101)  # 0.00 to 1.00 in steps of 0.01
 
@@ -629,11 +641,19 @@ def get_scores_dict_for_diff_thres(df: pd.DataFrame):
         ...
     }"""
     scores_per_imp_gen_per_thres = {}
-    for imp_gen in IMP_GEN_OPTIONS:
-        if f"impostor_score_{imp_gen}" not in df.columns:
+    for imp_gen in IMP_GEN_OPTIONS + BASELINES:
+        if (
+            f"impostor_score_{imp_gen}" not in df.columns
+            and f"{imp_gen.replace(' ','_')}_score" not in df.columns
+        ):
+            print(f"ERROR: Skipping {imp_gen} as it is not in the DataFrame columns.")
             continue
         y_true = df["same"].values
-        y_scores = df[f"impostor_score_{imp_gen}"].values
+        y_scores = (
+            df[f"impostor_score_{imp_gen}"].values
+            if imp_gen in IMP_GEN_OPTIONS
+            else df[f"{imp_gen.replace(' ','_')}_score"].values
+        )
         scores_per_imp_gen_per_thres[imp_gen] = compute_metrics_over_thresholds(
             y_true, y_scores
         )
@@ -719,6 +739,8 @@ if __name__ == "__main__":
     print(
         "Creating DataFrame for Student Essays dataset completed. Saved to:", SAVE_PATH
     )
+    print("DEBUG: Student Essays test DataFrame:", student_test_df.head())
+    print("DEBUG: Student Essays test DataFrame columns:", student_test_df.columns)
     print(
         "Visualizing accuracy, prec, recall, f1 per syntactic similarity for Student Essays dataset."
     )
