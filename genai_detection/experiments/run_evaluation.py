@@ -28,8 +28,8 @@ N_RESPONSES = 1
 MAX_LENGTH = 512
 TEMPERATURE = 0.7
 PROMPTS = [
-    "For the text above: Paraphrase the sentence by first identifying the main subject, verb, and object. Then find synonyms for each and construct a new sentence. Only output the final paraphrased sentence.",
-    "For the text above: Paraphrase this sentence. Do not change the meaning, but use different words and structure. Output only the paraphrased sentence.",
+    "Paraphrase the given sentence by identifying the main subject, verb, and object. Replace each with synonyms or closely related words, adjusting grammar naturally. Keep the new sentence close in length to the original. Output only the final paraphrased sentence.",
+    "Paraphrase the sentence above without changing its meaning. Use different words and vary the sentence structure while keeping the tone consistent. Keep the new sentence similar in length to the original. Output only the paraphrased sentence, with no explanations or extra text.",
 ]
 
 CATEGORY2DIRECTORY = {
@@ -166,7 +166,7 @@ def run_evaluation():
         print("_" * 50)
 
     # works (14.08.2025)
-    # run_extraction_evaluation()
+    run_extraction_evaluation()
 
     return results
 
