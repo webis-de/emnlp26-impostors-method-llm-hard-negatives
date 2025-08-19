@@ -491,17 +491,16 @@ def df2optimal_metrics(score_dif_imp_gen_df: pd.DataFrame):
     """
     optimal_metrics = {}
     for imp_gen in IMP_GEN_OPTIONS:
+        print(f"Computing optimal metrics for impostor generator: {imp_gen}")
         if f"impostor_prediction_{imp_gen}" not in score_dif_imp_gen_df.columns:
-            continue
+            if f"impostor_score_{imp_gen}" not in score_dif_imp_gen_df.columns:
+                continue
+            else:
+                score_dif_imp_gen_df[f"impostor_prediction_{imp_gen}"] = (
+                    score_dif_imp_gen_df[f"impostor_score_{imp_gen}"]
+                    > score_dif_imp_gen_df["thres"]
+                )
         pred = score_dif_imp_gen_df[f"impostor_prediction_{imp_gen}"]
-        print(
-            "Total predictions for",
-            imp_gen,
-            ":",
-            len(pred),
-            "number of non nan:",
-            pred.notna().sum(),
-        )
         non_nan_indices = pred.notna()
         pred = pred[non_nan_indices].to_list()  # filter out NaN values
         if all(p == 0 for p in pred):
@@ -511,12 +510,6 @@ def df2optimal_metrics(score_dif_imp_gen_df: pd.DataFrame):
         true_labels = score_dif_imp_gen_df["same"]
         true_labels = true_labels[non_nan_indices].to_list()  # filter out NaN values
 
-        print(
-            "Number of true labels:",
-            len(true_labels),
-            "number of predictions:",
-            len(pred),
-        )
         acc = np.mean([p == t for p, t in zip(pred, true_labels)])
         assert isinstance(
             pred, list
