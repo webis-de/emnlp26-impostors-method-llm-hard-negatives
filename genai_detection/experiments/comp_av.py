@@ -662,7 +662,7 @@ def get_scores_dict_for_diff_thres(df: pd.DataFrame):
 
 def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: str):
     scores_per_imp_gen_per_thres_dict = get_scores_dict_for_diff_thres(df)
-    fig, axes = plt.subplots(3, 2, figsize=(12, 14))
+    fig, axes = plt.subplots(3, 2, figsize=(14, 14))
     cmap = plt.get_cmap("tab10")
     colors = {
         ig: cmap(i % 10)
@@ -714,7 +714,7 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
         frameon=False,
     )
 
-    plt.tight_layout(rect=[0, 0, 0.92, 1])  # leave space for legend
+    plt.tight_layout(rect=[0, 0, 0.8, 1])  # leave space for legend
     plt.subplots_adjust(hspace=0.2)
     save_path.mkdir(parents=True, exist_ok=True)
     plt.savefig(
