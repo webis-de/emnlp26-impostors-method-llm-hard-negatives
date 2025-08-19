@@ -112,7 +112,7 @@ def _get_num_impostors(imp_gen: str) -> int:
     """
     # TODO: max 2 calls per second/ 14 calls per minute for SAIA based generators
     if imp_gen in ["mirror_minds", "on-the-fly", "naive_llm", "non_naive_llm", "llm"]:
-        return 5  # TODO: higher
+        return 25  # TODO: higher
     else:
         return 50  # default for other generators
 
@@ -318,7 +318,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 save_path / train_scores_file_name, orient="records", indent=4
             )
             print(
-                "DEBUG: Saved train dataset with predictions to CSV, path:",
+                "DEBUG: Saved train dataset with predictions to JSON, path:",
                 save_path / train_scores_file_name,
             )
 
@@ -404,7 +404,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 save_path / test_scores_file_name, orient="records", indent=4
             )
             print(
-                "DEBUG: Saved test dataset with predictions to CSV, path:",
+                "DEBUG: Saved test dataset with predictions to JSON, path:",
                 save_path / test_scores_file_name,
             )
 
@@ -422,7 +422,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
 
     original_test_dataset = original_test_dataset.dropna(axis=1, how="all")
     original_test_dataset.to_json(
-        save_path / f"complete_{dataset_name}_test_dataset.csv",
+        save_path / f"complete_{dataset_name}_test_dataset.json",
         orient="records",
         indent=4,
     )
