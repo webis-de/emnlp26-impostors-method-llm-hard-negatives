@@ -157,8 +157,8 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     test_dataset = get_dataset(path2dataset, split="test")
     # TODO: Test on small data subsets, too small does not work for optimal threshold computation
 
-    n_train = 7  # 7
-    n_test = 10  # 10
+    n_train = 100  # 7
+    n_test = 100  # 10
     original_train_dataset = pd.concat(
         [
             train_dataset.loc[train_dataset["same"]].head(n_train),
