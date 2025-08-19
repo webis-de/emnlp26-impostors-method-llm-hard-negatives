@@ -32,11 +32,11 @@ SAVE_PATH = (
     / "impostor_generator_comparison"
 )
 IMP_GEN_OPTIONS = [
-    "naive_llm",
+    # "naive_llm",
     # "non_naive_llm",
     # "llm",
     # "fixed",
-    # "text_len",
+    "text_len",
     # "content",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores
     # "on-the-fly", # no more api calls
     # "mirror_minds",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores, TODO: rerun bc in csv files is , missing
