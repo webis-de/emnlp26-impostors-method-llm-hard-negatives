@@ -256,65 +256,67 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         )
         if missing_mask.sum() > 0:
             # TODO: uncomment this for generation
+            print(
+                f"Only eval, skipping generation for {missing_mask.sum()} pairs und keep {len(train_dataset[train_dataset[col_score].notna()])} existent scores."
+            )
+            train_dataset = train_dataset[train_dataset[col_score].notna()]
+
             # print(
-            #     f"Only eval, skipping generation for {missing_mask.sum()} pairs und keep only existent scores."
+            #     f"DEBUG Missing {col_score} in {missing_mask.sum()} rows of train dataset for {imp_gen} generator."
             # )
-            # train_dataset = train_dataset[train_dataset[col_score].notna()]
+            # new_rows = train_dataset[missing_mask].copy()
+            # max_workers = (
+            #     4  # num cpus cores
+            #     if imp_gen
+            #     not in [
+            #         "mirror_minds",
+            #         "on-the-fly",
+            #         "naive_llm",
+            #         "non_naive_llm",
+            #         "llm",
+            #     ]
+            #     else 14 // _get_num_impostors(imp_gen)
+            # )  # 14 API calls per minute (2 API calls per second) to avoid SAIA rate limiting
+            # if imp_gen in ["content", "mirror_minds", "non_naive_llm"]:
+            #     results = []
+            #     for p, pair in enumerate(new_rows["pair"]):
+            #         res = _helper_impostor(
+            #             path2imp, pair, training_mode=True, imp_gen=imp_gen
+            #         )
+            #         print(
+            #             f"DEBUG: {p+1}/{len(new_rows)}: successfully generated impostor."
+            #         )
+            #         results.append(res)
+            # else:
+            #     with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            #         results = list(
+            #             executor.map(
+            #                 _helper_impostor,
+            #                 [path2imp] * len(new_rows),
+            #                 new_rows["pair"],
+            #                 [True] * len(new_rows),  # training mode
+            #                 [imp_gen] * len(new_rows),
+            #             )
+            #         )
 
-            print(
-                f"DEBUG Missing {col_score} in {missing_mask.sum()} rows of train dataset for {imp_gen} generator."
-            )
-            new_rows = train_dataset[missing_mask].copy()
-            max_workers = (
-                4  # num cpus cores
-                if imp_gen
-                not in [
-                    "mirror_minds",
-                    "on-the-fly",
-                    "naive_llm",
-                    "non_naive_llm",
-                    "llm",
-                ]
-                else 14 // _get_num_impostors(imp_gen)
-            )  # 14 API calls per minute (2 API calls per second) to avoid SAIA rate limiting
-            if imp_gen in ["content", "mirror_minds", "non_naive_llm"]:
-                results = []
-                for p, pair in enumerate(new_rows["pair"]):
-                    res = _helper_impostor(
-                        path2imp, pair, training_mode=True, imp_gen=imp_gen
-                    )
-                    print(
-                        f"DEBUG: {p+1}/{len(new_rows)}: successfully generated impostor."
-                    )
-                    results.append(res)
-            else:
-                with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    results = list(
-                        executor.map(
-                            _helper_impostor,
-                            [path2imp] * len(new_rows),
-                            new_rows["pair"],
-                            [True] * len(new_rows),  # training mode
-                            [imp_gen] * len(new_rows),
-                        )
-                    )
-
-            train_dataset.loc[missing_mask, col_score] = [score for score, _ in results]
-            train_dataset.loc[missing_mask, col_dict] = [
-                imp_dict for _, imp_dict in results
-            ]
-            assert results is not None, "Results should not be None"
-            train_dataset.to_csv(
-                save_path / train_scores_file_name,
-                index=False,
-            )
-            print(
-                "DEBUG: Saved train dataset with predictions to CSV, path:",
-                save_path / train_scores_file_name,
-            )
+            # train_dataset.loc[missing_mask, col_score] = [score for score, _ in results]
+            # train_dataset.loc[missing_mask, col_dict] = [
+            #     imp_dict for _, imp_dict in results
+            # ]
+            # assert results is not None, "Results should not be None"
+            # train_dataset.to_csv(
+            #     save_path / train_scores_file_name,
+            #     index=False,
+            # )
+            # print(
+            #     "DEBUG: Saved train dataset with predictions to CSV, path:",
+            #     save_path / train_scores_file_name,
+            # )
 
         labels = train_dataset["same"].values
         scores = train_dataset[col_score].values
+        print("DEBUG: Labels:", labels)
+        print("DEBUG: Scores:", scores)
 
         fpr, tpr, roc_thresholds = roc_curve(y_true=labels, y_score=scores)
         print("DEBUG: FPR:", fpr)
@@ -328,51 +330,51 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         )
         if missing_mask.sum() > 0:
             # TODO: uncomment this for generation
-            # print(
-            #     f"Only eval, skipping generation for {missing_mask.sum()} pairs und keep only existent scores."
-            # )
-            # test_dataset = test_dataset[test_dataset[col_score].notna()]
-
             print(
-                f"DEBUG Missing {col_score} in {missing_mask.sum()} rows of test dataset for {imp_gen} generator."
+                f"Only eval, skipping generation for {missing_mask.sum()} pairs und keep only existent scores."
             )
-            new_rows = test_dataset.loc[missing_mask].copy()
-            max_workers = (
-                len(new_rows)
-                if imp_gen
-                not in [
-                    "mirror_minds",
-                    "on-the-fly",
-                    "naive_llm",
-                    "non_naive_llm",
-                    "llm",
-                ]
-                else 14 // _get_num_impostors(imp_gen)
-            )  # 14 per min
-            if imp_gen in ["content", "mirror_minds"]:
-                results = []
-                for pair in new_rows["pair"]:
-                    res = _helper_impostor(
-                        path2imp, pair, training_mode=False, imp_gen=imp_gen
-                    )
-                    results.append(res)
-            else:
-                with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    results = list(
-                        executor.map(
-                            _helper_impostor,
-                            [path2imp] * len(new_rows),
-                            new_rows["pair"],
-                            [False] * len(new_rows),
-                            [imp_gen] * len(new_rows),
-                        )
-                    )
+            test_dataset = test_dataset[test_dataset[col_score].notna()]
 
-            # results is a list of tuples: (impostor_score, impostor_dict)
-            test_dataset.loc[missing_mask, col_score] = [score for score, _ in results]
-            test_dataset.loc[missing_mask, col_dict] = [
-                imp_dict for _, imp_dict in results
-            ]
+            # print(
+            #     f"DEBUG Missing {col_score} in {missing_mask.sum()} rows of test dataset for {imp_gen} generator."
+            # )
+            # new_rows = test_dataset.loc[missing_mask].copy()
+            # max_workers = (
+            #     len(new_rows)
+            #     if imp_gen
+            #     not in [
+            #         "mirror_minds",
+            #         "on-the-fly",
+            #         "naive_llm",
+            #         "non_naive_llm",
+            #         "llm",
+            #     ]
+            #     else 14 // _get_num_impostors(imp_gen)
+            # )  # 14 per min
+            # if imp_gen in ["content", "mirror_minds"]:
+            #     results = []
+            #     for pair in new_rows["pair"]:
+            #         res = _helper_impostor(
+            #             path2imp, pair, training_mode=False, imp_gen=imp_gen
+            #         )
+            #         results.append(res)
+            # else:
+            #     with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            #         results = list(
+            #             executor.map(
+            #                 _helper_impostor,
+            #                 [path2imp] * len(new_rows),
+            #                 new_rows["pair"],
+            #                 [False] * len(new_rows),
+            #                 [imp_gen] * len(new_rows),
+            #             )
+            #         )
+
+            # # results is a list of tuples: (impostor_score, impostor_dict)
+            # test_dataset.loc[missing_mask, col_score] = [score for score, _ in results]
+            # test_dataset.loc[missing_mask, col_dict] = [
+            #     imp_dict for _, imp_dict in results
+            # ]
 
         missing_pred_mask = (
             [t != opt_thres for t in test_dataset["thres"]]
@@ -385,18 +387,18 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 test_dataset.loc[missing_pred_mask, col_score] > opt_thres
             )
         # TODO: uncomment this for generation
-        # print(
-        #     f"Only eval, skipping saving for {sum(missing_pred_mask)} pairs. Consists of {len(test_dataset)} rows in total."
-        # )
-        if any(missing_pred_mask) or missing_mask.sum() > 0:
-            test_dataset.to_csv(
-                save_path / test_scores_file_name,
-                index=False,
-            )
-            print(
-                "DEBUG: Saved test dataset with predictions to CSV, path:",
-                save_path / test_scores_file_name,
-            )
+        print(
+            f"Only eval, skipping saving for {sum(missing_pred_mask)} pairs. Consists of {len(test_dataset)} rows in total."
+        )
+        # if any(missing_pred_mask) or missing_mask.sum() > 0:
+        #     test_dataset.to_csv(
+        #         save_path / test_scores_file_name,
+        #         index=False,
+        #     )
+        #     print(
+        #         "DEBUG: Saved test dataset with predictions to CSV, path:",
+        #         save_path / test_scores_file_name,
+        #     )
 
         # Add missing columns from train_dataset, initialized with NaN
         original_test_dataset = original_test_dataset.reindex(
@@ -633,7 +635,7 @@ def get_scores_dict_for_diff_thres(df: pd.DataFrame):
 
 def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: str):
     scores_per_imp_gen_per_thres_dict = get_scores_dict_for_diff_thres(df)
-    fig, axes = plt.subplots(2, 2, figsize=(18, 10))
+    fig, axes = plt.subplots(3, 2, figsize=(12, 14))
     cmap = plt.get_cmap("tab10")
     colors = {
         ig: cmap(i % 10)
@@ -647,7 +649,7 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
         "Threshold vs Accuracy Score",
         "Threshold vs Precision Score",
         "Threshold vs Recall Score",
-        "Threshold vs F0.5 Score",
+        "Threshold vs $F_{0.5}$ Score",
         "Threshold vs C@1 Score",
     ]
     ylabels = [
@@ -655,8 +657,8 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
         "Accuracy Score $\\frac{{TP + TN}}{{N}}$",
         "Precision $\\frac{{TP}}{{TP + FP}}$",
         "Recall $\\frac{{TP}}{{TP + FN}}$",
-        "F0.5 Score $\\frac{{(1 + 0.5^2)TP}}{{(1 + 0.5^2)TP + 0.5^2(FN + unanswered) + FP}}$",
-        "C@1 Score $\\frac{{# correct answer}}{{# problems}} \\cdot (1 + \\frac{{# unanswered}}{{# problems}})$",
+        "$F_{0.5}$ Score $\\frac{{(1 + 0.5^2)TP}}{{(1 + 0.5^2)TP + 0.5^2(FN + unanswered) + FP}}$",
+        "C@1 Score $\\frac{{TP + TN}}{{TP + TN + FP + FN}} \\cdot (1 + \\frac{{unanswered}}{{TP + TN + FP + FN}})$",
     ]
     for ax, metric, title, ylabel in zip(axes.flat, metrics, titles, ylabels):
         for i, (imp_gen, vals) in enumerate(scores_per_imp_gen_per_thres_dict.items()):
@@ -685,7 +687,7 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
         frameon=False,
     )
 
-    plt.tight_layout(rect=[0, 0, 0.95, 1])  # leave space for legend
+    plt.tight_layout(rect=[0, 0, 0.92, 1])  # leave space for legend
     plt.subplots_adjust(hspace=0.2)
     save_path.mkdir(parents=True, exist_ok=True)
     plt.savefig(
@@ -712,16 +714,16 @@ if __name__ == "__main__":
     print(
         "Visualizing accuracy, prec, recall, f1 per syntactic similarity for Student Essays dataset."
     )
-    # plot_optimal_threshold_bars(
-    #     df=student_test_df,
-    #     save_path=SAVE_PATH,
-    #     dataset_name=CONFIG.STUDENT_ESSAYS,
-    # )
-    # plot_threshold_curves_all(
-    #     df=student_test_df,
-    #     save_path=SAVE_PATH,
-    #     dataset_name=CONFIG.STUDENT_ESSAYS,
-    # )
+    plot_optimal_threshold_bars(
+        df=student_test_df,
+        save_path=SAVE_PATH,
+        dataset_name=CONFIG.STUDENT_ESSAYS,
+    )
+    plot_threshold_curves_all(
+        df=student_test_df,
+        save_path=SAVE_PATH,
+        dataset_name=CONFIG.STUDENT_ESSAYS,
+    )
     print("Experiment for Student Essays dataset completed. Plots saved to:", SAVE_PATH)
 
     # Blog
