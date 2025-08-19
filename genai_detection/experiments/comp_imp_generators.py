@@ -524,13 +524,42 @@ def plot_optimal_threshold_bars(
     plt.close(fig)
 
 
-def compute_metrics_over_thresholds(y_true, y_scores, thresholds=None):
+def _f05(y_trues: list, y_preds: list):
+    """
+    Compute F0.5 score, which gives more weight to precision than recall.
+    F0.5 = (1 + 0.5^2) * # TP / ((1 + 0.5^2) * # TP + 0.5^2 (# FN + # unanswered) + # FP)
+    """
+    n_unanswered = [y_pred == 0.5 for y_pred in y_preds].count(True)
+    n_tp = sum(y_true == 1 and y_pred == 1 for y_true, y_pred in zip(y_trues, y_preds))
+    n_fp = sum(y_true == 0 and y_pred == 1 for y_true, y_pred in zip(y_trues, y_preds))
+    n_fn = sum(y_true == 1 and y_pred == 0 for y_true, y_pred in zip(y_trues, y_preds))
+    nominator = (1 + 0.5**2) * n_tp
+    denominator = (1 + 0.5**2) * n_tp + 0.5**2 * (n_fn + n_unanswered) + n_fp
+
+    if denominator == 0:
+        return 0.0
+    return nominator / denominator
+
+
+def _c_at_1(y_trues: list, y_preds: list):
+    """
+    Compute C@1 score, which is the proportion of instances where the top prediction is correct.
+    C@1 = (# correct answer / # problems) * ( 1 + # unanswered / # problems )
+    """
+    n_correct = sum(y_true == y_pred for y_true, y_pred in zip(y_trues, y_preds))
+    n_unanswered = [y_pred == 0.5 for y_pred in y_preds].count(True)
+    n_total = len(y_trues)
+
+    return (n_correct / n_total) * (1 + n_unanswered / n_total) if n_total > 0 else 0.0
+
+
+def compute_metrics_over_thresholds(y_trues, y_scores, thresholds=None):
     """
     Compute F1, Accuracy, Precision, and Recall for a range of thresholds.
 
     Parameters
     ----------
-    y_true : array-like
+    y_trues : array-like
         True binary labels (0 or 1).
     y_scores : array-like
         Predicted scores/probabilities (continuous).
@@ -545,21 +574,25 @@ def compute_metrics_over_thresholds(y_true, y_scores, thresholds=None):
             'f1s': [...],
             'accs': [...],
             'precisions': [...],
-            'recalls': [...]
+            'recalls': [...],
+            'f05s': [...],
+            'c@1s': [...],
         }
     """
     if thresholds is None:
         thresholds = np.linspace(0, 1, 101)  # 0.00 to 1.00 in steps of 0.01
 
-    f1s, accs, precisions, recalls = [], [], [], []
+    f1s, accs, precisions, recalls, f05s, c1s = [], [], [], [], [], []
 
     for th in thresholds:
-        y_pred = (y_scores >= th).astype(int)
+        y_preds = (y_scores >= th).astype(int)
 
-        f1s.append(f1_score(y_true, y_pred, zero_division=0))
-        accs.append(accuracy_score(y_true, y_pred))
-        precisions.append(precision_score(y_true, y_pred, zero_division=0))
-        recalls.append(recall_score(y_true, y_pred, zero_division=0))
+        f1s.append(f1_score(y_trues, y_preds, zero_division=0))
+        accs.append(accuracy_score(y_trues, y_preds))
+        precisions.append(precision_score(y_trues, y_preds, zero_division=0))
+        recalls.append(recall_score(y_trues, y_preds, zero_division=0))
+        f05s.append(_f05(y_trues, y_preds))
+        c1s.append(_c_at_1(y_trues, y_preds))
 
     return {
         "thresholds": np.array(thresholds),
@@ -567,6 +600,8 @@ def compute_metrics_over_thresholds(y_true, y_scores, thresholds=None):
         "accs": np.array(accs),
         "precisions": np.array(precisions),
         "recalls": np.array(recalls),
+        "f05s": np.array(f05s),
+        "c@1s": np.array(c1s),
     }
 
 
@@ -578,6 +613,8 @@ def get_scores_dict_for_diff_thres(df: pd.DataFrame):
             'accs': [...],
             'precisions': [...],
             'recalls': [...],
+            'f05s': [...],
+            'c@1s': [...],
             'pr_thresholds': [...]
         },
         ...
@@ -604,18 +641,22 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
     }
     line_styles = ["-", "--", "-.", ":"]
 
-    metrics = ["f1s", "accs", "precisions", "recalls"]
+    metrics = ["f1s", "accs", "precisions", "recalls", "f05s", "c@1s"]
     titles = [
         "Threshold vs F1 Score",
         "Threshold vs Accuracy Score",
         "Threshold vs Precision Score",
         "Threshold vs Recall Score",
+        "Threshold vs F0.5 Score",
+        "Threshold vs C@1 Score",
     ]
     ylabels = [
         "F1 Score $\\frac{{2PR}}{{P+R}}$",
         "Accuracy Score $\\frac{{TP + TN}}{{N}}$",
         "Precision $\\frac{{TP}}{{TP + FP}}$",
         "Recall $\\frac{{TP}}{{TP + FN}}$",
+        "F0.5 Score $\\frac{{(1 + 0.5^2)TP}}{{(1 + 0.5^2)TP + 0.5^2(FN + unanswered) + FP}}$",
+        "C@1 Score $\\frac{{# correct answer}}{{# problems}} \\cdot (1 + \\frac{{# unanswered}}{{# problems}})$",
     ]
     for ax, metric, title, ylabel in zip(axes.flat, metrics, titles, ylabels):
         for i, (imp_gen, vals) in enumerate(scores_per_imp_gen_per_thres_dict.items()):
