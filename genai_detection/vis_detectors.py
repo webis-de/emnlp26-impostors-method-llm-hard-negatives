@@ -1232,8 +1232,26 @@ class VisDetectors:
             "Start sequential computation (else OOM) for different impostor generation techniques."
         )
         for imp_gen in imp_gen_options:
+            if imp_gen == "on-the-fly":
+                train_dataset_tmp = pd.concat(
+                    [
+                        train_dataset.loc[train_dataset["same"]].head(5),
+                        train_dataset.loc[~train_dataset["same"]].head(5),
+                    ],
+                    ignore_index=False,
+                )
+                test_dataset_tmp = pd.concat(
+                    [
+                        test_dataset.loc[test_dataset["same"]].head(5),
+                        test_dataset.loc[~test_dataset["same"]].head(5),
+                    ],
+                    ignore_index=False,
+                )
+            else:
+                train_dataset_tmp = train_dataset
+                test_dataset_tmp = test_dataset
             result = self._run_fig_4_worker(
-                imp_gen, train_dataset, test_dataset, path2imp
+                imp_gen, train_dataset_tmp, test_dataset_tmp, path2imp
             )
             assert result is not None, f"Failed for imp_gen: {imp_gen}"
             same_author_precisions[result["imp_gen"]] = result[
@@ -1550,32 +1568,32 @@ if __name__ == "__main__":
         f"Reproducing Figure {fig} from Koppel et al. (2014) on BLOG and STUDENT data."
     )
 
-    # vis_det = VisDetectors(
-    #     dataset_name=CONFIG.STUDENT_ESSAYS,
-    #     detectors=[impostor],
-    # )
-    # print(
-    #     f"impostor Detector initialized for fig {fig} and dataset {CONFIG.STUDENT_ESSAYS}."
-    # )
-    # if fig == 2:
-    #     vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
-    # elif fig == 4:
-    #     vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
-    #         args=args, save_path=None, imp_gen_options=["fixed"]
-    #     )
-    # elif fig == 5:
-    #     # not really figure 5, but figure 4 with our contributions (LLM based impostors)
-    #     vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
-    #         args=args,
-    #         imp_gen_options=our_figure_impostor_options,
-    #         save_path=vis_det.savefig_base
-    #         / "impostor_scores"
-    #         / vis_det.dataset_name
-    #         / "our_contributions_scores",
-    #     )
-    # print(
-    #     f"Finished reproducing Figure {fig} from Koppel et al. (2014) on STUDENT data."
-    # )
+    vis_det = VisDetectors(
+        dataset_name=CONFIG.STUDENT_ESSAYS,
+        detectors=[impostor],
+    )
+    print(
+        f"impostor Detector initialized for fig {fig} and dataset {CONFIG.STUDENT_ESSAYS}."
+    )
+    if fig == 2:
+        vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
+    elif fig == 4:
+        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
+            args=args, save_path=None, imp_gen_options=["fixed", "on-the-fly"]
+        )
+    elif fig == 5:
+        # not really figure 5, but figure 4 with our contributions (LLM based impostors)
+        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
+            args=args,
+            imp_gen_options=our_figure_impostor_options,
+            save_path=vis_det.savefig_base
+            / "impostor_scores"
+            / vis_det.dataset_name
+            / "our_contributions_scores",
+        )
+    print(
+        f"Finished reproducing Figure {fig} from Koppel et al. (2014) on STUDENT data."
+    )
 
     vis_det = VisDetectors(
         dataset_name=CONFIG.BLOG,
@@ -1587,7 +1605,7 @@ if __name__ == "__main__":
         vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
     elif fig == 4:
         vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
-            args=args, save_path=None, imp_gen_options=["fixed"]
+            args=args, save_path=None, imp_gen_options=["fixed", "on-the-fly"]
         )
     elif fig == 5:
         # not really figure 5, but figure 4 with our contributions (LLM based impostors)
