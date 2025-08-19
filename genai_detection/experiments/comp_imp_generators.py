@@ -38,7 +38,7 @@ IMP_GEN_OPTIONS = [
     "text_len",
     "content",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores
     # "on-the-fly", # no more api calls
-    "mirror_minds",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores
+    # "mirror_minds",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores, TODO: rerun bc in csv files is , missing
 ]
 
 
@@ -155,18 +155,19 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     train_dataset = get_dataset(path2dataset, split="train")
     test_dataset = get_dataset(path2dataset, split="test")
     # TODO: Test on small data subsets, too small does not work for optimal threshold computation
-    train_dataset = pd.concat(
+
+    original_train_dataset = pd.concat(
         [
-            train_dataset.loc[train_dataset["same"]].head(7),
-            train_dataset.loc[~train_dataset["same"]].head(7),
+            train_dataset.loc[train_dataset["same"]],  # .head(7),
+            train_dataset.loc[~train_dataset["same"]],  # .head(7),
         ],
         ignore_index=False,
     )
 
-    test_dataset = pd.concat(
+    original_test_dataset = pd.concat(
         [
-            test_dataset.loc[test_dataset["same"]].head(10),
-            test_dataset.loc[~test_dataset["same"]].head(10),
+            test_dataset.loc[test_dataset["same"]],  # .head(10),
+            test_dataset.loc[~test_dataset["same"]],  # .head(10),
         ],
         ignore_index=False,
     )
@@ -186,6 +187,9 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     )
 
     for imp_gen in IMP_GEN_OPTIONS:
+        train_dataset = original_train_dataset.copy()
+        test_dataset = original_test_dataset.copy()
+
         print(
             f"Running experiment for {dataset_name} dataset and {imp_gen} Impostor generator."
         )
@@ -205,7 +209,13 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             )
             with open(save_path / train_scores_file_name, "r") as f:
                 df_from_csv = pd.read_csv(f)
-            df_from_csv = _split_unhashable(df_from_csv)
+            if any(col not in df_from_csv.columns for col in matching_cols):
+                df_from_csv = _split_unhashable(df_from_csv)
+                # df_from_csv.to_csv(save_path / train_scores_file_name, index=False)
+                print(
+                    "DEBUG: Columns in df_from_csv after splitting unhashable:",
+                    df_from_csv.columns,
+                )
             train_dataset = _split_unhashable(train_dataset)
             if col_score not in train_dataset:
                 train_dataset[col_score] = np.nan
@@ -225,20 +235,62 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         if (save_path / test_scores_file_name).exists():
             with open(save_path / test_scores_file_name, "r") as f:
                 df_from_csv = pd.read_csv(f)
+                print("original length of df_from_csv:", len(df_from_csv))
             test_dataset = _split_unhashable(test_dataset)
+            print("DEBUG: test_dataset length:", len(test_dataset))
             if col_score not in test_dataset:
                 test_dataset[col_score] = np.nan
 
-            df_from_csv = _split_unhashable(df_from_csv)
+            if any(col not in df_from_csv.columns for col in matching_cols):
+                df_from_csv = _split_unhashable(df_from_csv)
             df_from_csv = df_from_csv.set_index(matching_cols)
             df_from_csv = df_from_csv[~df_from_csv.index.duplicated(keep="last")]
+            print("DEBUG cols of test_dataset:", test_dataset.columns)
             test_dataset = test_dataset.set_index(matching_cols)
+            print("SAME in test_dataset:", test_dataset.columns)
+            # print("Columns in loaded dataset:", df_from_csv.columns, df_from_csv.index)
+            # print("Columns in test dataset:", test_dataset.columns, test_dataset.index)
+            # for col in df_from_csv.columns:
+            #     if "pair" not in col:
+            #         print("col:", col, "exmaple:", df_from_csv[col].head(2))
+            # print(
+            #     "DEBUG: Test dataset before filling missing scores:",
+            #     df_from_csv.head(),
+            # )
+            # print("Scores of impostor generator:", df_from_csv[col_score])
 
             # Fill only missing col_score values
             print(
                 "Number of nan in score column before filling:",
                 test_dataset[col_score].isna().sum(),
+                " of total rows:",
+                len(test_dataset),
             )
+            print(
+                "!!!!!!Number of same indices in test dataset:",
+                len(test_dataset.index.intersection(df_from_csv.index)),
+            )
+            print("number of rows in loaded dataset:", len(df_from_csv))
+            # for idx, row in test_dataset.iterrows():
+            #     if pd.notna(row.get(col_score, np.nan)):
+            #         continue
+            #     for _, loaded_row in df_from_csv.iterrows():
+            #         match = True
+            #         for col in matching_cols:
+            #             if row[col] != loaded_row[col]:
+            #                 match = False
+            #                 # print(f"DEBUG: No match for {col} in row {idx}")
+            #                 # if isinstance(row[col], str):
+            #                 #     print(
+            #                 #         f"DEBUG: {col} in row {idx} is a string: {row[col][:10]}..., loaded_row[col]: {loaded_row[col][:10]}..."
+            #                 #     )
+            #                 break
+
+            #         if match:
+            #             test_dataset.at[idx, col_score] = loaded_row[col_score]
+            #             print("match")
+            #             break  # stop after first match
+
             test_dataset[col_score] = test_dataset[col_score].fillna(
                 df_from_csv[col_score]
             )
@@ -246,8 +298,9 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 "Number of nan in score column after filling:",
                 test_dataset[col_score].isna().sum(),
             )
-            test_dataset.index.names = matching_cols
-            test_dataset.reset_index(inplace=True)
+            if "same" not in test_dataset.columns:
+                test_dataset.index.names = matching_cols
+                test_dataset.reset_index(inplace=True)
 
         missing_mask = (
             train_dataset[col_score].isna()
@@ -260,6 +313,9 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 f"Only eval, skipping generation for {missing_mask.sum()} pairs und keep only existent scores."
             )
             train_dataset = train_dataset[train_dataset[col_score].notna()]
+            print(
+                "Number of rows in train dataset after filtering:", len(train_dataset)
+            )
             # print(
             #     f"DEBUG Missing {col_score} in {missing_mask.sum()} rows of train dataset for {imp_gen} generator."
             # )
@@ -314,6 +370,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
 
         labels = train_dataset["same"].values
         scores = train_dataset[col_score].values
+        print("DEBUG: Student Essays test DataFrame head:", train_dataset.head())
 
         fpr, tpr, roc_thresholds = roc_curve(y_true=labels, y_score=scores)
         print("DEBUG: FPR:", fpr)
@@ -383,8 +440,11 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             test_dataset.loc[missing_pred_mask, f"impostor_prediction_{imp_gen}"] = (
                 test_dataset.loc[missing_pred_mask, col_score] > opt_thres
             )
+        print("Column names at the end of processing:", test_dataset.columns)
         # TODO: uncomment this for generation
-        print(f"Only eval, skipping saving for {missing_pred_mask.sum()} pairs.")
+        print(
+            f"Only eval, skipping saving for {sum(missing_pred_mask)} pairs. Consists of {len(test_dataset)} rows in total."
+        )
         # if any(missing_pred_mask) or missing_mask.sum() > 0:
         #     test_dataset.to_csv(
         #         save_path / test_scores_file_name,
@@ -395,7 +455,21 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         #         save_path / test_scores_file_name,
         #     )
 
-    return test_dataset
+        # Add missing columns from train_dataset, initialized with NaN
+        original_test_dataset = original_test_dataset.reindex(
+            columns=original_test_dataset.columns.union(test_dataset.columns)
+        )
+        original_train_dataset = original_train_dataset.reindex(
+            columns=original_train_dataset.columns.union(train_dataset.columns)
+        )
+
+        # Fill NaNs in those columns with values from train_dataset
+        original_test_dataset = original_test_dataset.fillna(test_dataset)
+        original_train_dataset = original_train_dataset.fillna(train_dataset)
+    original_test_dataset.to_csv(
+        save_path / f"complete_{dataset_name}_test_dataset.csv",
+    )
+    return original_test_dataset
 
 
 def df2optimal_metrics(score_dif_imp_gen_df: pd.DataFrame):
@@ -420,13 +494,38 @@ def df2optimal_metrics(score_dif_imp_gen_df: pd.DataFrame):
         if f"impostor_prediction_{imp_gen}" not in score_dif_imp_gen_df.columns:
             continue
         pred = score_dif_imp_gen_df[f"impostor_prediction_{imp_gen}"]
+        print(
+            "Total predictions for",
+            imp_gen,
+            ":",
+            len(pred),
+            "number of non nan:",
+            pred.notna().sum(),
+        )
+        non_nan_indices = pred.notna()
+        pred = pred[non_nan_indices].to_list()  # filter out NaN values
         if all(p == 0 for p in pred):
             print(
                 f"Warning: All predictions for {imp_gen} are 0. Prec, Recall, F1 will be 0."
             )
         true_labels = score_dif_imp_gen_df["same"]
+        true_labels = true_labels[non_nan_indices].to_list()  # filter out NaN values
 
-        acc = (pred == true_labels).mean()
+        print(
+            "Number of true labels:",
+            len(true_labels),
+            "number of predictions:",
+            len(pred),
+        )
+        acc = np.mean([p == t for p, t in zip(pred, true_labels)])
+        assert isinstance(
+            pred, list
+        ), "pred should be a list of predictions but got: {}".format(type(pred))
+        assert isinstance(
+            true_labels, list
+        ), "true_labels should be a list of true labels but got: {}".format(
+            type(true_labels)
+        )
         f1 = evaluate.load("f1").compute(predictions=pred, references=true_labels)["f1"]
         precision = evaluate.load("precision").compute(
             predictions=pred, references=true_labels
@@ -627,6 +726,12 @@ if __name__ == "__main__":
         dataset_name=CONFIG.STUDENT_ESSAYS,
         save_path=SAVE_PATH,
     )
+    print(
+        "DEBUG: Student Essays test DataFrame created with shape:",
+        student_test_df.shape,
+    )
+    print("DEBUG: Student Essays test DataFrame columns:", student_test_df.columns)
+    print("DEBUG: Student Essays test DataFrame head:", student_test_df.head())
     print(
         "Creating DataFrame for Student Essays dataset completed. Saved to:", SAVE_PATH
     )
