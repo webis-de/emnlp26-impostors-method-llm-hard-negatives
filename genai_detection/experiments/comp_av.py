@@ -27,6 +27,8 @@ from genai_detection.detectors.impostor_supervised_baseline import (
 from genai_detection.detectors.impostor_unsupervised_baseline import (
     UnSupervisedImpostorBaseline,
 )
+from genai_detection.detectors.ppmd import PPMdDetector
+from genai_detection.detectors.unmasking import UnmaskingDetector
 from genai_detection.impostor_generators.MirrorMinds_generator import (
     MirrorMindsGenerator,
 )
@@ -53,6 +55,8 @@ BASELINES = [
     "unsupervised baseline min-max",
     "unsupervised baseline cosine",
     "supervised baseline",
+    "unmasking baseline",
+    "ppmd baseline",
 ]
 
 
@@ -454,11 +458,19 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 use_cosine_simiarity=True, dataset_name=dataset_name
             ),
             SupervisedImpostorBaseline(dataset_name=dataset_name),
+            UnmaskingDetector(),
+            PPMdDetector(),
         ],
     ):
 
         test_dataset = original_test_dataset.copy()
-        preds = baseline.get_score(test_dataset["pair"])
+        if baseline_name in ["unmasking baseline", "ppmd baseline"]:
+            preds = np.concatenate(
+                [baseline.get_score(p) for p in test_dataset["pair"]]
+            )
+        else:
+            preds = baseline.get_score(test_dataset["pair"])
+        print(f"DEBUG: {baseline_name} predictions:", preds)
         test_dataset[f"{baseline_name.replace(' ','_')}_score"] = np.array(
             preds.tolist()
         ).ravel()
