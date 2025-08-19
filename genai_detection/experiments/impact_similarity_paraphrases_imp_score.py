@@ -282,7 +282,7 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
             "syn_sim_diff",
             "syn_sim_ref_paraphrases",
             "syn_sim_disputed_candidate",
-            "syn_sim_disp_paraphrases",
+            # "syn_sim_disp_paraphrases",
         ]:
             nan_count = score_sim_df[col].isna().sum()
             if nan_count > 0:
@@ -296,6 +296,7 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
             diff_bin, bins = pd.qcut(
                 score_sim_df[col], q=n_bins, duplicates="drop", retbins=True
             )
+            # print(f"Bins for {col}: {bins}")
 
             # assign labels dynamically
             labels = [f"Bin {i+1}" for i in range(len(bins) - 1)]
@@ -312,8 +313,9 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
             bin_ranges = score_sim_df.groupby("diff_bin", observed=True)[col].agg(
                 ["min", "max"]
             )
+            # print(f"Bin ranges for {col}:\n{bin_ranges}")
             new_labels = {
-                bin_label: f"{bin_label} [{row['min']:.2f}, {row['max']:.2f}]"
+                bin_label: f"[{row['min']:.2f}, {row['max']:.2f}]"
                 for bin_label, row in bin_ranges.iterrows()
             }
             assert (
@@ -322,15 +324,26 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
                 score_sim_df["diff_bin"].isna().sum()
             )
             score_sim_df["diff_bin"] = score_sim_df["diff_bin"].map(new_labels)
+            bin_ranges.index = bin_ranges.index.map(new_labels)
             assert (
                 score_sim_df["diff_bin"].isna().sum() == 0
             ), "2 There are NaN values in 'diff_bin'. This should not happen. "
             metric_by_bin = get_metric_by_bin(score_sim_df, metric=metric)
+            # print(
+            #     f"Metric by bin for {metric}:\n{metric_by_bin}, type of diff_bin: {type(metric_by_bin.index[0])}"
+            # )
+            # print(
+            #     f"DEBUG: bin_ranges: {bin_ranges}, type of diff_bin: {type(bin_ranges.index[0])}"
+            # )
             bin_stats = metric_by_bin.merge(bin_ranges, on="diff_bin")
+            assert not bin_stats.empty, (
+                f"bin_stats is empty for {metric} and {col}. " "This should not happen"
+            )
             fig, ax1 = plt.subplots(figsize=(8, 5))
 
-            print("cols:", bin_stats.columns)
-            print("metric:", metric)
+            # print("cols:", bin_stats.columns)
+            # print("metric:", metric)
+            # print("DEBUG bin_stats:\n", bin_stats)
 
             ax1.bar(
                 bin_stats["diff_bin"],
@@ -375,6 +388,9 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
                 path
                 / f"{dataset_name}_syn_sim_{quantile_type.replace(' ', '_')}_{metric.lower()}.svg"
             )
+            print(
+                f"Saved plot for {metric} across {quantile_type} quantiles to: {path}"
+            )
 
 
 if __name__ == "__main__":
@@ -400,18 +416,24 @@ if __name__ == "__main__":
         student_test_df = pd.read_csv(path2student_df)
         # TODO: Add average syntactic similarity for disputed + paraphrases
         if "syn_sim_disp_paraphrases" not in student_test_df.columns:
-            pairs = student_test_df["pair"].apply(ast.literal_eval)
-            student_test_df["syn_sim_disp_paraphrases"] = [
-                _avg_sim_disputed_paraphrases(impostor_dict, disputed_text)
-                for impostor_dict, disputed_text in zip(
-                    student_test_df["impostor_dict"], pairs.str[0]
-                )
-            ]
+            print(
+                "DEBUG: syn_sim_disp_paraphrases not in student_test_df columns. Adding it now."
+            )
+            # pairs = student_test_df["pair"].apply(ast.literal_eval)
+            # student_test_df["syn_sim_disp_paraphrases"] = [
+            #     _avg_sim_disputed_paraphrases(impostor_dict, disputed_text)
+            #     for impostor_dict, disputed_text in zip(
+            #         student_test_df["impostor_dict"], pairs.str[0]
+            #     )
+            # ]
             # TODO: if this works, save the df to csv
-    nan_count = len(student_test_df[student_test_df["syn_sim_disp_paraphrases"].isna()])
-    assert (
-        nan_count == 0
-    ), f"There are {nan_count}/{len(student_test_df)} NaN values in the 'syn_sim_disp_paraphrases' column."
+    # nan_count = len(student_test_df[student_test_df["syn_sim_disp_paraphrases"].isna()])
+    # assert (
+    #     nan_count == 0
+    # ), f"There are {nan_count}/{len(student_test_df)} NaN values in the 'syn_sim_disp_paraphrases' column."
+    # print(
+    #     f"Visualizing accuracy per syntactic similarity for Student Essays dataset. {nan_count} NaN values in 'syn_sim_disp_paraphrases' column."
+    # )
 
     vis_acc_per_syn_sim(
         score_sim_df=student_test_df,
@@ -420,36 +442,36 @@ if __name__ == "__main__":
     )
 
     # Blog
-    print("Running experiment for Blog dataset.")
-    path2blog_df = SAVE_PATH / f"{CONFIG.BLOG}_impostor_scores_syn_sim.csv"
-    if not path2blog_df.exists():
-        raise ValueError(
-            f"Blog dataset not found at {CONFIG.PATH2BLOG}. Please ensure the dataset is available."
-        )
-        blog_test_df = create_df(
-            path2dataset=CONFIG.PATH2BLOG,
-            dataset_name=CONFIG.BLOG,
-            save_path=SAVE_PATH,
-        )
-    else:
-        blog_test_df = pd.read_csv(path2blog_df)
-        if "syn_sim_disp_paraphrases" not in blog_test_df.columns:
-            blog_test_df["syn_sim_disp_paraphrases"] = [
-                _avg_sim_disputed_paraphrases(impostor_dict, disputed_text)
-                for impostor_dict, disputed_text in zip(
-                    blog_test_df["impostor_dict"], blog_test_df["pair"].str[0]
-                )
-            ]
-            print(
-                "DEBUG: syn_sim_disp_paraphrases added to blog_test_df:",
-                blog_test_df["syn_sim_disp_paraphrases"],
-            )
-            # TODO: if this works, save the df to csv
-    print("Visualizing accuracy per syntactic similarity for Blog dataset.")
-    vis_acc_per_syn_sim(
-        score_sim_df=blog_test_df,
-        save_path=SAVE_PATH,
-        dataset_name=CONFIG.BLOG,
-    )
+    # print("Running experiment for Blog dataset.")
+    # path2blog_df = SAVE_PATH / f"{CONFIG.BLOG}_impostor_scores_syn_sim.csv"
+    # if not path2blog_df.exists():
+    #     raise ValueError(
+    #         f"Blog dataset not found at {CONFIG.PATH2BLOG}. Please ensure the dataset is available."
+    #     )
+    #     blog_test_df = create_df(
+    #         path2dataset=CONFIG.PATH2BLOG,
+    #         dataset_name=CONFIG.BLOG,
+    #         save_path=SAVE_PATH,
+    #     )
+    # else:
+    #     blog_test_df = pd.read_csv(path2blog_df)
+    #     if "syn_sim_disp_paraphrases" not in blog_test_df.columns:
+    #         blog_test_df["syn_sim_disp_paraphrases"] = [
+    #             _avg_sim_disputed_paraphrases(impostor_dict, disputed_text)
+    #             for impostor_dict, disputed_text in zip(
+    #                 blog_test_df["impostor_dict"], blog_test_df["pair"].str[0]
+    #             )
+    #         ]
+    #         print(
+    #             "DEBUG: syn_sim_disp_paraphrases added to blog_test_df:",
+    #             blog_test_df["syn_sim_disp_paraphrases"],
+    #         )
+    #         # TODO: if this works, save the df to csv
+    # print("Visualizing accuracy per syntactic similarity for Blog dataset.")
+    # vis_acc_per_syn_sim(
+    #     score_sim_df=blog_test_df,
+    #     save_path=SAVE_PATH,
+    #     dataset_name=CONFIG.BLOG,
+    # )
 
-    print("Experiment completed. Results saved to:", SAVE_PATH)
+    # print("Experiment completed. Results saved to:", SAVE_PATH)
