@@ -1276,10 +1276,11 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
         def llm_student_prompt(assignment_desc: str) -> str:
             return (
                 f"You are an 18-year-old first-year psychology major in 2006 at the "
-                f"University of Texas in Austin (U.S.A.). You are writing {assignment_desc}. "
+                f"University of Texas in Austin (U.S.A.). "
                 f"Your voice reflects the mindset of a college freshman in 2006: culturally aware "
                 f"of the era, slightly anxious about school, curious about big ideas, and peppered "
                 f"with references to early-2000s life, music, technology, and campus culture."
+                f"Write a response to this task: '{assignment_desc}' with at least 700 words that is authentic to this persona."
             )
 
         # ==========================
