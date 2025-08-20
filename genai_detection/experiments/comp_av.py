@@ -674,6 +674,10 @@ def get_scores_dict_for_diff_thres(df: pd.DataFrame):
 
 def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: str):
     scores_per_imp_gen_per_thres_dict = get_scores_dict_for_diff_thres(df)
+    print(
+        "DEBUG: Scores per impostor generator per threshold for keys:",
+        scores_per_imp_gen_per_thres_dict.keys(),
+    )
     fig, axes = plt.subplots(3, 2, figsize=(14, 14))
     cmap = plt.get_cmap("tab10")
     colors = {
@@ -702,6 +706,9 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
     for ax, metric, title, ylabel in zip(axes.flat, metrics, titles, ylabels):
         for i, (imp_gen, vals) in enumerate(scores_per_imp_gen_per_thres_dict.items()):
             print("DEBUG: Imp gen:", imp_gen)
+            assert (
+                metric in vals
+            ), f"Metric {metric} not found in values for {imp_gen}. Has only {vals.keys()} keys."
             ax.plot(
                 vals["thresholds"],
                 vals[metric],
