@@ -867,6 +867,7 @@ class VisDetectors:
                 missing_scores_indices=missing_scores_indices,
                 missing_scores=missing_scores,
                 n_imp=n_imp,
+                imp_gen="fixed",
             )
             with open(existing_scores_filename, "w") as f:
                 json.dump(loaded_data, f, indent=4)
@@ -921,6 +922,7 @@ class VisDetectors:
                 missing_scores_indices=missing_scores_indices,
                 missing_scores=missing_scores,
                 n_imp=n_imp,
+                imp_gen="fixed",
             )
             with open(existing_scores_filename, "w") as f:
                 json.dump(loaded_data, f, indent=4)
@@ -1057,6 +1059,7 @@ class VisDetectors:
                     missing_scores_indices=missing_scores_indices,
                     missing_scores=missing_scores,
                     n_imp=50,
+                    imp_gen=imp_gen,
                 )
                 with open(existing_scores_filename, "w") as f:
                     json.dump(loaded_data, f, indent=4)
