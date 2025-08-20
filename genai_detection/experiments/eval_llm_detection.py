@@ -48,14 +48,14 @@ SAVE_PATH = (
     / "detection_scenarios"
 )
 IMP_GEN_OPTIONS = [
-    "fixed",
-    "text_len",
     "content",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores
-    # "naive_llm",
+    "fixed",
     # "non_naive_llm",
     # "llm",
     # "on-the-fly", # no more api calls
-    # "mirror_minds",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores, TODO: rerun bc in csv files is , missing
+    "mirror_minds",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores, TODO: rerun bc in csv files is , missing
+    "naive_llm",
+    "text_len",
 ]
 
 BASELINES = [
@@ -662,6 +662,7 @@ def plot_threshold_curves_all_single(df: pd.DataFrame, save_path: Path, df_name:
 
 
 if __name__ == "__main__":
+    # works local (20.08.2025)
     # Run the experiment
     if not SAVE_PATH.exists():
         SAVE_PATH.mkdir(parents=True, exist_ok=True)

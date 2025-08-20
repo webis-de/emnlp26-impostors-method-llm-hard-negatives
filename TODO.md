@@ -84,7 +84,7 @@
   - is capitalization important for AV/AA? Is a style feature of importance?
     - if used often for one doctor maybe, but rather unlikely for majority of texts
     - [ ] test via table of different preprocessing steps and their impact on vocabulary size (and scores)
-- [ ] cite [KISSKI](https://docs.hpc.gwdg.de/acknowledgements/index.html) in thesis (for SAIAI paraphraser)
+- [x] cite [KISSKI](https://docs.hpc.gwdg.de/acknowledgements/index.html) in thesis (for SAIAI paraphraser)
 - [ ] define extraction evaluation task: given text, instruction LLM extract genre, topic, century, time period, etc.
 - [ ] workflow for plots and tables:
   1. question to answer/ finding from exploration or experiment/ response to question
@@ -96,7 +96,19 @@
 
 
 ### 🛠️ Implementation
-- [ ] experiment: syntactic similarity effect on impostor scores
+- [o] create artificial Student Essay dataset (TODO: RERUN, bc API Call limit reached!!!!!!!!!)
+  -  Human-human
+  - Human-LLM
+  - LLM-LLM same author
+  - LLM-LLM different author
+  - [x] LLM detection experiments: 
+    - 1. candidate is one LLM (cf. above)
+    - 2. subset of all LLMs is candidate: Can we detect all LLMs using subset of LLMs? will not be doing that
+      - ~~subset of LLMs of same architecture, i.e. all LLMs are T5~~
+      - ~~subset of LLMs trained on same data, i.e. all LLMs are trained on Wikipedia~~
+- [ ] run AV methods on different scenarios of artificial Student Essay dataset!!!!!
+  - waiting on dataset to be generated
+- [o] experiment: syntactic similarity effect on impostor scores
   - [ ] syntactic similarity disputed and paraphrases 
   - [ ] small differences in bin are not interpretable: do not use in thesis!
   - [ ] Construct big distance scenarios and find out what happens
@@ -106,11 +118,6 @@
   - [ ] all: Ensure similar length
 - [x] similarity scores paraphrases: do not define 0-1 range, bc results barely visible
   - min/max or 0-1 x-axis lim + log or linear scale
-- [ ] LLM detection experiments: 
-  - 1. candidate is one LLM
-  - 2. subset of all LLMs is candidate: Can we detect all LLMs using subset of LLMs?
-    - subset of LLMs of same architecture, i.e. all LLMs are T5
-    - subset of LLMs trained on same data, i.e. all LLMs are trained on Wikipedia
 - [ ] statistical significance test: top accuracy of Koppel et al. 2014's in our accuracy plot
 - [ ] are texts that are heavily influenced by preprocessing steps bad (i.e. all caps texts)?
 - [ ] do not optimize one approach, but compare different approaches
@@ -135,9 +142,9 @@
 - [o] Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
 - [o] Compare Impostor generators' effect on impostor detector scores (`comp_imp_generators.py`)
   - include MirrorMinds-LLMDetector as paraphrase generator
-  - Done: text length, fixed, content, text_len, naive llm
-  - Running (15.05.2025): llm, naive llm, non naive llm, mirror minds
-  - **TODO**: on-the-fly
+  - Done: text length, fixed, content, text_len, naive llm, mirror minds
+  - Running (20.08.2025): llm, non naive llm
+  - **TODO**: on-the-fly (maybe not, i use my api calls for fig 4 reproduction)
 - [ ] plot error rate (y-axis) vs. (syntactic) similarity (x-axis) between generated impostors and original text (potential subtract similarity of original text to candidate text)
 - [x] classifier for LLM detection/ AV 
   - [x] train simple classifier on semantic and syntactic similarity scores (based on their 2D distribution) _cf. Supervised Baseline of Koppel et al. 2014's paper_
@@ -149,7 +156,7 @@
   - [ ] x-axis: Syntactic similarity
   - [ ] y-axis: Error rate
 - [ ] vertical prototype rather than horizontal prototype (get existing modules working rather than generating new modules)
-- [ ] [Answer by LLMDet collaborator](https://github.com/TrustedLLM/LLMDet/issues/14#issuecomment-3111760619)
+- [-] [Answer by LLMDet collaborator](https://github.com/TrustedLLM/LLMDet/issues/14#issuecomment-3111760619)
 - [ ] experiment/ hypothesis: Text_extractor information will produce similar text to original text even though information is wrong because extractor/ generator LLM think alike
   - [ ] maybe generate "bad extractions via LLM prompt" and compare to original text (human evaluation)
 - [ ] compare MirrorMinds-LLMDetector paraphrases and our impostor generators
@@ -204,9 +211,9 @@
     - [o] run on-the-fly on subset bc free API calls limited to 250 queries per month
 - [o] Compare Impostor generators' effect on impostor detector scores (`comp_imp_generators.py`)
   - include MirrorMinds-LLMDetector as paraphrase generator
-  - Done: text length, fixed, content, text_len, naive llm
-  - Running (15.05.2025): llm, naive llm, non naive llm, mirror minds
-  - **TODO**: on-the-fly
+  - Done: text length, fixed, content, text_len, naive llm, mirror minds
+  - Running (15.05.2025): llm, non naive llm
+  - **TODO**: on-the-fly (maybe not, i use my api calls for fig 4 reproduction)
 - [x] ~~IONOS paraphraser: `IONOSParaphraser`~~
 - [x] experiment: Syntactic similarity impact on impostor scores
 - [x] lowercasing texts for unmasking or other AV/AA: 
