@@ -691,7 +691,15 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
         ig: cmap(i % 10)
         for i, ig in enumerate(scores_per_imp_gen_per_thres_dict.keys())
     }
-    line_styles = ["-", "--", ":", "-."]
+    line_styles = [
+        "--",
+        ":",
+        "-.",
+        (5, (10, 3)),
+        (0, (3, 1, 1, 1, 1, 1)),
+        # (0, (3, 5, 1, 5, 1, 5)),
+        (0, (3, 1, 1, 1)),
+    ]
 
     metrics = ["f1s", "accs", "precisions", "recalls", "f05s", "c@1s"]
     titles = [
@@ -764,7 +772,15 @@ def plot_threshold_curves_all_single(
         ig: cmap(i % 10)
         for i, ig in enumerate(scores_per_imp_gen_per_thres_dict.keys())
     }
-    line_styles = ["-", "--", ":", "-."]
+    line_styles = [
+        "--",
+        ":",
+        "-.",
+        (5, (10, 3)),
+        (0, (3, 1, 1, 1, 1, 1)),
+        # (0, (3, 5, 1, 5, 1, 5)),
+        (0, (3, 1, 1, 1)),
+    ]
 
     metrics = ["f1s", "accs", "precisions", "recalls", "f05s", "c@1s"]
     titles = [
@@ -784,6 +800,7 @@ def plot_threshold_curves_all_single(
         "C@1 Score $\\frac{{TP + TN}}{{TP + TN + FP + FN}} \\cdot (1 + \\frac{{unanswered}}{{TP + TN + FP + FN}})$",
     ]
     for metric, title, ylabel in zip(metrics, titles, ylabels):
+        plt.figure(figsize=(12, 6))
         for i, (imp_gen, vals) in enumerate(scores_per_imp_gen_per_thres_dict.items()):
             print("DEBUG: Imp gen:", imp_gen)
             assert (
@@ -803,13 +820,13 @@ def plot_threshold_curves_all_single(
         plt.title(title, fontsize=14)
         plt.grid(False)
         plt.legend(
-            loc="center right",
-            bbox_to_anchor=(1.02, 0.8),
+            loc="center left",
+            bbox_to_anchor=(1.02, 0.5),
             ncol=1,
             frameon=False,
         )
 
-        plt.tight_layout(rect=[0, 0, 0.8, 1])  # leave space for legend
+        plt.tight_layout(rect=[0, 0, 0.85, 1])  # leave space for legend
         plt.subplots_adjust(hspace=0.2)
         save_path.mkdir(parents=True, exist_ok=True)
         plt.savefig(
@@ -840,11 +857,11 @@ if __name__ == "__main__":
     print(
         "Visualizing accuracy, prec, recall, f1 per syntactic similarity for Student Essays dataset."
     )
-    plot_threshold_curves_all(
-        df=student_test_df,
-        save_path=SAVE_PATH,
-        dataset_name=CONFIG.STUDENT_ESSAYS,
-    )
+    # plot_threshold_curves_all(
+    #     df=student_test_df,
+    #     save_path=SAVE_PATH,
+    #     dataset_name=CONFIG.STUDENT_ESSAYS,
+    # )
     plot_threshold_curves_all_single(
         df=student_test_df,
         save_path=SAVE_PATH / "single_metrics",
