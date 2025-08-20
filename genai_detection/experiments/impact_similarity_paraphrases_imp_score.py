@@ -227,9 +227,27 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         return _syn_sim(pair[0], pair[1])
 
     test_dataset["syn_sim_disputed_candidate"] = test_dataset["pair"].apply(sim_pair)
-    test_dataset.to_csv(
-        save_path / f"{dataset_name}_impostor_scores_syn_sim.csv", index=False
+    test_dataset.to_json(
+        save_path / f"{dataset_name}_impostor_scores_syn_sim.json",
+        orient="records",
+        indent=4,
     )
+
+    # (3) Add syn_sim_disp_paraphrases column to test_dataset
+    pairs = test_dataset["pair"].apply(ast.literal_eval)
+    test_dataset["syn_sim_disp_paraphrases"] = [
+        _avg_sim_disputed_paraphrases(impostor_dict, disputed_text)
+        for impostor_dict, disputed_text in zip(
+            test_dataset["impostor_dict"], pairs.str[0]
+        )
+    ]
+
+    test_dataset.to_json(
+        save_path / f"{dataset_name}_impostor_scores_syn_sim.json",
+        orient="records",
+        indent=4,
+    )
+
     return test_dataset
 
 
@@ -242,15 +260,22 @@ def get_metric_by_bin(score_sim_df: pd.DataFrame, metric: str) -> pd.DataFrame:
     def compute_metric(g):
         y_true = g["same"]
         y_pred = g["impostor_prediction"]
+        assert not y_pred.isna().any(), "y_pred contains NaN values. But is: {}".format(
+            y_pred
+        )
 
         if metric == "Accuracy":
             return float((y_pred == y_true).mean())
         elif metric == "Precision":
-            return float(precision_score(y_true, y_pred, zero_division=0))
+            print(
+                f"DEBUG: Precision calculation for group {g.name}:",
+                float(precision_score(y_true, y_pred, zero_division="warn")),
+            )
+            return float(precision_score(y_true, y_pred, zero_division="warn"))
         elif metric == "Recall":
-            return float(recall_score(y_true, y_pred, zero_division=0))
+            return float(recall_score(y_true, y_pred, zero_division="warn"))
         elif metric == "F1":
-            return float(f1_score(y_true, y_pred, zero_division=0))
+            return float(f1_score(y_true, y_pred, zero_division="warn"))
         else:
             raise ValueError(f"Unknown metric: {metric}")
 
@@ -334,6 +359,13 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
             )
             fig, ax1 = plt.subplots(figsize=(8, 5))
 
+            print(
+                f"DEBUG: Plotting {metric} across quantiles of {col} with bins: {bin_ranges.index.tolist()}"
+            )
+            print(f"DEBUG: Bin ranges: {bin_ranges}")
+            # FIXME: Can prec, rec etc be zero if accuracy is not zero?
+            print(bin_stats[metric])
+
             ax1.bar(
                 bin_stats["diff_bin"],
                 bin_stats[metric],
@@ -377,6 +409,7 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
                 path
                 / f"{dataset_name}_syn_sim_{quantile_type.replace(' ', '_')}_{metric.lower()}.svg"
             )
+            plt.close(fig)
             print(
                 f"Saved plot for {metric} across {quantile_type} quantiles to: {path}"
             )
@@ -391,7 +424,9 @@ if __name__ == "__main__":
 
     # Student Essays
     print("Running experiment for Student Essays dataset.")
-    path2student_df = SAVE_PATH / f"{CONFIG.STUDENT_ESSAYS}_impostor_scores_syn_sim.csv"
+    path2student_df = (
+        SAVE_PATH / f"{CONFIG.STUDENT_ESSAYS}_impostor_scores_syn_sim.json"
+    )
     if not path2student_df.exists():
         # raise ValueError(
         #     f"Student Essays dataset not found at {CONFIG.PATH2STUDENT_ESSAYS}. Please ensure the dataset is available."
@@ -402,27 +437,29 @@ if __name__ == "__main__":
             save_path=SAVE_PATH,
         )
     else:
-        student_test_df = pd.read_csv(path2student_df)
+        with open(path2student_df, "r") as f:
+            student_test_df = json.load(f)
+            student_test_df = pd.DataFrame(student_test_df)
         # TODO: Add average syntactic similarity for disputed + paraphrases
-        if "syn_sim_disp_paraphrases" not in student_test_df.columns:
-            print(
-                "DEBUG: syn_sim_disp_paraphrases not in student_test_df columns. Adding it now."
-            )
-            pairs = student_test_df["pair"].apply(ast.literal_eval)
-            student_test_df["syn_sim_disp_paraphrases"] = [
-                _avg_sim_disputed_paraphrases(impostor_dict, disputed_text)
-                for impostor_dict, disputed_text in zip(
-                    student_test_df["impostor_dict"], pairs.str[0]
-                )
-            ]
-            student_test_df.to_csv(path2student_df, index=False)
-    nan_count = len(student_test_df[student_test_df["syn_sim_disp_paraphrases"].isna()])
-    assert (
-        nan_count == 0
-    ), f"There are {nan_count}/{len(student_test_df)} NaN values in the 'syn_sim_disp_paraphrases' column."
-    print(
-        f"Visualizing accuracy per syntactic similarity for Student Essays dataset. {nan_count} NaN values in 'syn_sim_disp_paraphrases' column."
-    )
+    #     if "syn_sim_disp_paraphrases" not in student_test_df.columns:
+    #         print(
+    #             "DEBUG: syn_sim_disp_paraphrases not in student_test_df columns. Adding it now."
+    #         )
+    #         pairs = student_test_df["pair"].apply(ast.literal_eval)
+    #         student_test_df["syn_sim_disp_paraphrases"] = [
+    #             _avg_sim_disputed_paraphrases(impostor_dict, disputed_text)
+    #             for impostor_dict, disputed_text in zip(
+    #                 student_test_df["impostor_dict"], pairs.str[0]
+    #             )
+    #         ]
+    #         student_test_df.to_csv(path2student_df, index=False)
+    # nan_count = len(student_test_df[student_test_df["syn_sim_disp_paraphrases"].isna()])
+    # assert (
+    #     nan_count == 0
+    # ), f"There are {nan_count}/{len(student_test_df)} NaN values in the 'syn_sim_disp_paraphrases' column."
+    # print(
+    #     f"Visualizing accuracy per syntactic similarity for Student Essays dataset. {nan_count} NaN values in 'syn_sim_disp_paraphrases' column."
+    # )
 
     vis_acc_per_syn_sim(
         score_sim_df=student_test_df,
@@ -432,7 +469,7 @@ if __name__ == "__main__":
 
     # Blog
     print("Running experiment for Blog dataset.")
-    path2blog_df = SAVE_PATH / f"{CONFIG.BLOG}_impostor_scores_syn_sim.csv"
+    path2blog_df = SAVE_PATH / f"{CONFIG.BLOG}_impostor_scores_syn_sim.json"
     if not path2blog_df.exists():
         # raise ValueError(
         #     f"Blog dataset not found at {CONFIG.PATH2BLOG}. Please ensure the dataset is available."
@@ -443,19 +480,21 @@ if __name__ == "__main__":
             save_path=SAVE_PATH,
         )
     else:
-        blog_test_df = pd.read_csv(path2blog_df)
-        if "syn_sim_disp_paraphrases" not in blog_test_df.columns:
-            blog_test_df["syn_sim_disp_paraphrases"] = [
-                _avg_sim_disputed_paraphrases(impostor_dict, disputed_text)
-                for impostor_dict, disputed_text in zip(
-                    blog_test_df["impostor_dict"], blog_test_df["pair"].str[0]
-                )
-            ]
-            print(
-                "DEBUG: syn_sim_disp_paraphrases added to blog_test_df:",
-                blog_test_df["syn_sim_disp_paraphrases"],
-            )
-            blog_test_df.to_csv(path2blog_df, index=False)
+        with open(path2blog_df, "r") as f:
+            blog_test_df = json.load(f)
+            blog_test_df = pd.DataFrame(blog_test_df)
+        # if "syn_sim_disp_paraphrases" not in blog_test_df.columns:
+        #     blog_test_df["syn_sim_disp_paraphrases"] = [
+        #         _avg_sim_disputed_paraphrases(impostor_dict, disputed_text)
+        #         for impostor_dict, disputed_text in zip(
+        #             blog_test_df["impostor_dict"], blog_test_df["pair"].str[0]
+        #         )
+        #     ]
+        #     print(
+        #         "DEBUG: syn_sim_disp_paraphrases added to blog_test_df:",
+        #         blog_test_df["syn_sim_disp_paraphrases"],
+        #     )
+        #     blog_test_df.to_csv(path2blog_df, index=False)
     print("Visualizing accuracy per syntactic similarity for Blog dataset.")
     vis_acc_per_syn_sim(
         score_sim_df=blog_test_df,
