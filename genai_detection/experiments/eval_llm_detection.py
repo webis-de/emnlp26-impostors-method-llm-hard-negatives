@@ -51,7 +51,7 @@ IMP_GEN_OPTIONS = [
     "fixed",
     "text_len",
     "content",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores
-    "naive_llm",
+    # "naive_llm",
     # "non_naive_llm",
     # "llm",
     # "on-the-fly", # no more api calls
@@ -172,15 +172,15 @@ def create_df(df_name: str, save_path: Path):
     test_df = get_df(split="test")
     # TODO: Test on small data subsets, too small does not work for optimal threshold computation
 
-    n_train = 1  # 100  # 7
-    n_test = 1  # 100  # 10
-    original_train_df = pd.concat(
-        [
-            train_df.loc[train_df["same"]].head(n_train),
-            train_df.loc[~train_df["same"]].head(n_train),
-        ],
-        ignore_index=False,
-    )
+    # n_train = 100  # 7
+    n_test = 100  # 10
+    original_train_df = []  # pd.concat(
+    #     [
+    #         train_df.loc[train_df["same"]].head(n_train),
+    #         train_df.loc[~train_df["same"]].head(n_train),
+    #     ],
+    #     ignore_index=False,
+    # )
 
     original_test_df = pd.concat(
         [
@@ -210,8 +210,24 @@ def create_df(df_name: str, save_path: Path):
     )
 
     for imp_gen in IMP_GEN_OPTIONS:
-        train_df = original_train_df.copy()
-        test_df = original_test_df.copy()
+        if imp_gen == "on-the-fly":
+            # train_df = pd.concat(
+            #     [
+            #         original_train_df.loc[original_train_df["same"]].head(5),
+            #         original_train_df.loc[~original_train_df["same"]].head(5),
+            #     ],
+            #     ignore_index=False,
+            # )
+            test_df = pd.concat(
+                [
+                    original_test_df.loc[original_test_df["same"]].head(5),
+                    original_test_df.loc[~original_test_df["same"]].head(5),
+                ],
+                ignore_index=False,
+            )
+        else:
+            # train_df = original_train_df.copy()
+            test_df = original_test_df.copy()
 
         print(f"Running experiment for {df_name} df and {imp_gen} Impostor generator.")
         col_score = f"impostor_score_{imp_gen}"
@@ -224,26 +240,27 @@ def create_df(df_name: str, save_path: Path):
             f"{df_name}_{imp_gen}_train_impostor_scores_detection_scenarios.json"
         )
 
-        if (save_path / train_scores_file_name).exists():
-            print(
-                f"Reading {imp_gen} for {df_name} df from existing file {save_path / train_scores_file_name}"
-            )
-            with open(save_path / train_scores_file_name, "r") as f:
-                df_from_json = json.load(f)
-                df_from_json = pd.DataFrame(df_from_json)
+        # if (save_path / train_scores_file_name).exists():
+        #     print(
+        #         f"Reading {imp_gen} for {df_name} df from existing file {save_path / train_scores_file_name}"
+        #     )
+        #     with open(save_path / train_scores_file_name, "r") as f:
+        #         df_from_json = json.load(f)
+        #         df_from_json = pd.DataFrame(df_from_json)
 
-            if col_score not in train_df:
-                train_df[col_score] = np.nan
+        #     if col_score not in train_df:
+        #         train_df[col_score] = np.nan
 
-            df_from_json = df_from_json.set_index(matching_cols)
-            df_from_json = df_from_json[~df_from_json.index.duplicated(keep="last")]
-            train_df = train_df.set_index(matching_cols)
+        #     df_from_json = df_from_json.set_index(matching_cols)
+        #     df_from_json = df_from_json[~df_from_json.index.duplicated(keep="last")]
+        #     train_df = train_df.set_index(matching_cols)
 
-            # Fill only missing col_score values
-            train_df[col_score] = train_df[col_score].fillna(df_from_json[col_score])
-            if "same" not in train_df.columns:
-                train_df.index.names = matching_cols
-                train_df.reset_index(inplace=True)
+        #     # Fill only missing col_score values
+        #     train_df[col_score] = train_df[col_score].fillna(df_from_json[col_score])
+        #     if "same" not in train_df.columns:
+        #         train_df.index.names = matching_cols
+        #         train_df.reset_index(inplace=True)
+
         # # TODO: only to avoid generation
         # else:
         #     continue
@@ -267,79 +284,79 @@ def create_df(df_name: str, save_path: Path):
         # else:
         #     continue
 
-        missing_mask = (
-            train_df[col_score].isna()
-            if col_score in train_df.columns
-            else pd.Series(True, index=train_df.index)
-        )
+        # missing_mask = (
+        #     train_df[col_score].isna()
+        #     if col_score in train_df.columns
+        #     else pd.Series(True, index=train_df.index)
+        # )
 
-        if missing_mask.sum() > 0:
-            # TODO: uncomment this for generation
-            # print(
-            #     f"Only eval, skipping generation for {missing_mask.sum()} pairs und keep {len(train_df[train_df[col_score].notna()])} existent scores."
-            # )
-            # train_df = train_df[train_df[col_score].notna()]
+        # if missing_mask.sum() > 0:
+        #     # TODO: uncomment this for generation
+        #     # print(
+        #     #     f"Only eval, skipping generation for {missing_mask.sum()} pairs und keep {len(train_df[train_df[col_score].notna()])} existent scores."
+        #     # )
+        #     # train_df = train_df[train_df[col_score].notna()]
 
-            print(
-                f"DEBUG Missing {col_score} in {missing_mask.sum()} rows of train df for {imp_gen} generator."
-            )
-            new_rows = train_df[missing_mask].copy()
-            max_workers = (
-                4  # num cpus cores
-                if imp_gen
-                not in [
-                    "mirror_minds",
-                    "on-the-fly",
-                    "naive_llm",
-                    "non_naive_llm",
-                    "llm",
-                ]
-                else max(1, 14 // _get_num_impostors(imp_gen))
-            )  # 14 API calls per minute (2 API calls per second) to avoid SAIA rate limiting
-            if imp_gen in ["content", "mirror_minds", "non_naive_llm"]:
-                results = []
-                for p, pair in enumerate(new_rows["pair"]):
-                    res = _helper_impostor(
-                        path2imp, pair, training_mode=True, imp_gen=imp_gen
-                    )
-                    print(
-                        f"DEBUG: {p+1}/{len(new_rows)}: successfully generated impostor."
-                    )
-                    results.append(res)
-            else:
-                with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    results = list(
-                        executor.map(
-                            _helper_impostor,
-                            [path2imp] * len(new_rows),
-                            new_rows["pair"],
-                            [True] * len(new_rows),  # training mode
-                            [imp_gen] * len(new_rows),
-                        )
-                    )
+        #     print(
+        #         f"DEBUG Missing {col_score} in {missing_mask.sum()} rows of train df for {imp_gen} generator."
+        #     )
+        #     new_rows = train_df[missing_mask].copy()
+        #     max_workers = (
+        #         4  # num cpus cores
+        #         if imp_gen
+        #         not in [
+        #             "mirror_minds",
+        #             "on-the-fly",
+        #             "naive_llm",
+        #             "non_naive_llm",
+        #             "llm",
+        #         ]
+        #         else max(1, 14 // _get_num_impostors(imp_gen))
+        #     )  # 14 API calls per minute (2 API calls per second) to avoid SAIA rate limiting
+        #     if imp_gen in ["content", "mirror_minds", "non_naive_llm"]:
+        #         results = []
+        #         for p, pair in enumerate(new_rows["pair"]):
+        #             res = _helper_impostor(
+        #                 path2imp, pair, training_mode=True, imp_gen=imp_gen
+        #             )
+        #             print(
+        #                 f"DEBUG: {p+1}/{len(new_rows)}: successfully generated impostor."
+        #             )
+        #             results.append(res)
+        #     else:
+        #         with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        #             results = list(
+        #                 executor.map(
+        #                     _helper_impostor,
+        #                     [path2imp] * len(new_rows),
+        #                     new_rows["pair"],
+        #                     [True] * len(new_rows),  # training mode
+        #                     [imp_gen] * len(new_rows),
+        #                 )
+        #             )
 
-            train_df.loc[missing_mask, col_score] = [score for score, _ in results]
-            train_df.loc[missing_mask, col_dict] = [imp_dict for _, imp_dict in results]
-            assert results is not None, "Results should not be None"
+        #     train_df.loc[missing_mask, col_score] = [score for score, _ in results]
+        #     train_df.loc[missing_mask, col_dict] = [imp_dict for _, imp_dict in results]
+        #     assert results is not None, "Results should not be None"
 
-            train_df.to_json(
-                save_path / train_scores_file_name, orient="records", indent=4
-            )
-            print(
-                "DEBUG: Saved train df with predictions to JSON, path:",
-                save_path / train_scores_file_name,
-            )
+        #     train_df.to_json(
+        #         save_path / train_scores_file_name, orient="records", indent=4
+        #     )
+        #     print(
+        #         "DEBUG: Saved train df with predictions to JSON, path:",
+        #         save_path / train_scores_file_name,
+        #     )
 
-        labels = train_df["same"].values
-        scores = train_df[col_score].values
-        print("DEBUG: Labels:", labels)
-        print("DEBUG: Scores:", scores)
+        # labels = train_df["same"].values
+        # scores = train_df[col_score].values
+        # print("DEBUG: Labels:", labels)
+        # print("DEBUG: Scores:", scores)
 
-        fpr, tpr, roc_thresholds = roc_curve(y_true=labels, y_score=scores)
-        print("DEBUG: FPR:", fpr)
-        print("DEBUG: TPR:", tpr)
-        print("DEBUG: ROC thresholds:", roc_thresholds)
-        opt_thres = _get_opt_imp_threshold(fpr, tpr, roc_thresholds)
+        # fpr, tpr, roc_thresholds = roc_curve(y_true=labels, y_score=scores)
+        # print("DEBUG: FPR:", fpr)
+        # print("DEBUG: TPR:", tpr)
+        # print("DEBUG: ROC thresholds:", roc_thresholds)
+        # opt_thres = _get_opt_imp_threshold(fpr, tpr, roc_thresholds)
         missing_mask = (
             test_df[col_score].isna()
             if col_score in test_df.columns
@@ -391,21 +408,22 @@ def create_df(df_name: str, save_path: Path):
             test_df.loc[missing_mask, col_score] = [score for score, _ in results]
             test_df.loc[missing_mask, col_dict] = [imp_dict for _, imp_dict in results]
 
-        missing_pred_mask = (
-            [t != opt_thres for t in test_df["thres"]]
-            if "thres" in test_df.columns
-            else [True] * len(test_df)
-        )
-        test_df["thres"] = opt_thres
-        if any(missing_pred_mask):
-            test_df.loc[missing_pred_mask, f"impostor_prediction_{imp_gen}"] = (
-                test_df.loc[missing_pred_mask, col_score] > opt_thres
-            )
-        # # TODO: uncomment this for generation
-        # print(
-        #     f"Only eval, skipping saving for {sum(missing_pred_mask)} pairs. Consists of {len(test_df)} rows in total."
+        # missing_pred_mask = (
+        #     [t != opt_thres for t in test_df["thres"]]
+        #     if "thres" in test_df.columns
+        #     else [True] * len(test_df)
         # )
-        if any(missing_pred_mask) or missing_mask.sum() > 0:
+        # test_df["thres"] = opt_thres
+        # if any(missing_pred_mask):
+        #     test_df.loc[missing_pred_mask, f"impostor_prediction_{imp_gen}"] = (
+        #         test_df.loc[missing_pred_mask, col_score] > opt_thres
+        #     )
+        # # # TODO: uncomment this for generation
+        # # print(
+        # #     f"Only eval, skipping saving for {sum(missing_pred_mask)} pairs. Consists of {len(test_df)} rows in total."
+        # # )
+        # if any(missing_pred_mask) or missing_mask.sum() > 0:
+        if missing_mask.sum() > 0:
             test_df.to_json(
                 save_path / test_scores_file_name, orient="records", indent=4
             )
@@ -418,13 +436,13 @@ def create_df(df_name: str, save_path: Path):
         original_test_df = original_test_df.reindex(
             columns=original_test_df.columns.union(test_df.columns)
         )
-        original_train_df = original_train_df.reindex(
-            columns=original_train_df.columns.union(train_df.columns)
-        )
+        # original_train_df = original_train_df.reindex(
+        #     columns=original_train_df.columns.union(train_df.columns)
+        # )
 
         # Fill NaNs in those columns with values from train_df
         original_test_df = original_test_df.fillna(test_df)
-        original_train_df = original_train_df.fillna(train_df)
+        # original_train_df = original_train_df.fillna(train_df)
 
     # FIXME
     print("Columns in original test df:", original_test_df.columns)
@@ -463,7 +481,8 @@ def create_df(df_name: str, save_path: Path):
 
     original_test_df = original_test_df.dropna(axis=1, how="all")
     original_test_df.to_json(
-        save_path / f"complete_{df_name}_incl_baselines_test_df.json",
+        save_path
+        / f"complete_{df_name}_detection_scenarios_incl_baselines_test_df.json",
         orient="records",
         indent=4,
     )
