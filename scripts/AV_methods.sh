@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=AV methods
+#SBATCH --job-name=AV_methods
 #SBATCH --mem=64g
 #SBATCH --cpus-per-task=4
 #SBATCH --output=logs/%j-av-methods.log
