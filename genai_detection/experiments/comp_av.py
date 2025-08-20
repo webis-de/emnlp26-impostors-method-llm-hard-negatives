@@ -174,16 +174,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     train_dataset = get_dataset(path2dataset, split="train")
     test_dataset = get_dataset(path2dataset, split="test")
     # TODO: Test on small data subsets, too small does not work for optimal threshold computation
-
-    n_train = 100  # 7
     n_test = 100  # 10
-    original_train_dataset = pd.concat(
-        [
-            train_dataset.loc[train_dataset["same"]].head(n_train),
-            train_dataset.loc[~train_dataset["same"]].head(n_train),
-        ],
-        ignore_index=False,
-    )
 
     original_test_dataset = pd.concat(
         [
@@ -208,7 +199,6 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     )
 
     for imp_gen in IMP_GEN_OPTIONS:
-        train_dataset = original_train_dataset.copy()
         test_dataset = original_test_dataset.copy()
 
         print(
@@ -220,42 +210,6 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         test_scores_file_name = (
             f"{dataset_name}_{imp_gen}_test_impostor_scores_syn_sim.json"
         )
-        train_scores_file_name = (
-            f"{dataset_name}_{imp_gen}_train_impostor_scores_syn_sim.json"
-        )
-
-        if (save_path / train_scores_file_name).exists():
-            print(
-                f"Reading {imp_gen} for {dataset_name} dataset from existing file {save_path / train_scores_file_name}"
-            )
-            with open(save_path / train_scores_file_name, "r") as f:
-                df_from_json = json.load(f)
-                df_from_json = pd.DataFrame(df_from_json)
-            # FIXME
-            if any(col not in df_from_json.columns for col in matching_cols):
-                df_from_json = _split_unhashable(df_from_json)
-                df_from_json.to_json(
-                    save_path / train_scores_file_name, orient="records", indent=4
-                )
-
-            train_dataset = _split_unhashable(train_dataset)
-            if col_score not in train_dataset:
-                train_dataset[col_score] = np.nan
-
-            df_from_json = df_from_json.set_index(matching_cols)
-            df_from_json = df_from_json[~df_from_json.index.duplicated(keep="last")]
-            train_dataset = train_dataset.set_index(matching_cols)
-            train_dataset = train_dataset[~train_dataset.index.duplicated(keep="last")]
-
-            # Fill only missing col_score values
-            train_dataset[col_score] = train_dataset[col_score].fillna(
-                df_from_json[col_score]
-            )
-            train_dataset.index.names = matching_cols
-            train_dataset.reset_index(inplace=True)
-        # TODO: only to avoid generation
-        else:
-            continue
 
         if (save_path / test_scores_file_name).exists():
             with open(save_path / test_scores_file_name, "r") as f:
@@ -282,81 +236,6 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         else:
             continue
 
-        missing_mask = (
-            train_dataset[col_score].isna()
-            if col_score in train_dataset.columns
-            else pd.Series(True, index=train_dataset.index)
-        )
-
-        if missing_mask.sum() > 0:
-            # TODO: uncomment this for generation
-            print(
-                f"Only eval, skipping generation for {missing_mask.sum()} pairs und keep {len(train_dataset[train_dataset[col_score].notna()])} existent scores."
-            )
-            train_dataset = train_dataset[train_dataset[col_score].notna()]
-
-            # print(
-            #     f"DEBUG Missing {col_score} in {missing_mask.sum()} rows of train dataset for {imp_gen} generator."
-            # )
-            # new_rows = train_dataset[missing_mask].copy()
-            # max_workers = (
-            #     4  # num cpus cores
-            #     if imp_gen
-            #     not in [
-            #         "mirror_minds",
-            #         "on-the-fly",
-            #         "naive_llm",
-            #         "non_naive_llm",
-            #         "llm",
-            #     ]
-            #     else 14 // _get_num_impostors(imp_gen)
-            # )  # 14 API calls per minute (2 API calls per second) to avoid SAIA rate limiting
-            # if imp_gen in ["content", "mirror_minds", "non_naive_llm"]:
-            #     results = []
-            #     for p, pair in enumerate(new_rows["pair"]):
-            #         res = _helper_impostor(
-            #             path2imp, pair, training_mode=True, imp_gen=imp_gen
-            #         )
-            #         print(
-            #             f"DEBUG: {p+1}/{len(new_rows)}: successfully generated impostor."
-            #         )
-            #         results.append(res)
-            # else:
-            #     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            #         results = list(
-            #             executor.map(
-            #                 _helper_impostor,
-            #                 [path2imp] * len(new_rows),
-            #                 new_rows["pair"],
-            #                 [True] * len(new_rows),  # training mode
-            #                 [imp_gen] * len(new_rows),
-            #             )
-            #         )
-
-            # train_dataset.loc[missing_mask, col_score] = [score for score, _ in results]
-            # train_dataset.loc[missing_mask, col_dict] = [
-            #     imp_dict for _, imp_dict in results
-            # ]
-            # assert results is not None, "Results should not be None"
-
-            # train_dataset.to_json(
-            #     save_path / train_scores_file_name, orient="records", indent=4
-            # )
-            # print(
-            #     "DEBUG: Saved train dataset with predictions to JSON, path:",
-            #     save_path / train_scores_file_name,
-            # )
-
-        labels = train_dataset["same"].values
-        scores = train_dataset[col_score].values
-        print("DEBUG: Labels:", labels)
-        print("DEBUG: Scores:", scores)
-
-        fpr, tpr, roc_thresholds = roc_curve(y_true=labels, y_score=scores)
-        print("DEBUG: FPR:", fpr)
-        print("DEBUG: TPR:", tpr)
-        print("DEBUG: ROC thresholds:", roc_thresholds)
-        opt_thres = _get_opt_imp_threshold(fpr, tpr, roc_thresholds)
         missing_mask = (
             test_dataset[col_score].isna()
             if col_score in test_dataset.columns
@@ -410,21 +289,8 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             #     imp_dict for _, imp_dict in results
             # ]
 
-        missing_pred_mask = (
-            [t != opt_thres for t in test_dataset["thres"]]
-            if "thres" in test_dataset.columns
-            else [True] * len(test_dataset)
-        )
-        test_dataset["thres"] = opt_thres
-        if any(missing_pred_mask):
-            test_dataset.loc[missing_pred_mask, f"impostor_prediction_{imp_gen}"] = (
-                test_dataset.loc[missing_pred_mask, col_score] > opt_thres
-            )
         # TODO: uncomment this for generation
-        print(
-            f"Only eval, skipping saving for {sum(missing_pred_mask)} pairs. Consists of {len(test_dataset)} rows in total."
-        )
-        # if any(missing_pred_mask) or missing_mask.sum() > 0:
+        # if missing_mask.sum() > 0:
         #     test_dataset.to_json(
         #         save_path / test_scores_file_name, orient="records", indent=4
         #     )
@@ -437,13 +303,9 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         original_test_dataset = original_test_dataset.reindex(
             columns=original_test_dataset.columns.union(test_dataset.columns)
         )
-        original_train_dataset = original_train_dataset.reindex(
-            columns=original_train_dataset.columns.union(train_dataset.columns)
-        )
 
         # Fill NaNs in those columns with values from train_dataset
         original_test_dataset = original_test_dataset.fillna(test_dataset)
-        original_train_dataset = original_train_dataset.fillna(train_dataset)
 
     # FIXME
     print("Columns in original test dataset:", original_test_dataset.columns)
@@ -464,6 +326,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
     ):
 
         test_dataset = original_test_dataset.copy()
+        # preds are scores, not 0/1
         if baseline_name in ["unmasking baseline", "ppmd baseline"]:
             preds = np.concatenate(
                 [baseline.get_score(p) for p in test_dataset["pair"]]
