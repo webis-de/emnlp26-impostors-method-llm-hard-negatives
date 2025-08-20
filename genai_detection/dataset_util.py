@@ -25,6 +25,7 @@ from datasets import (
 import numpy as np
 import pandas as pd
 import pyreadstat
+from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -655,7 +656,7 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
         )
 
 
-# === Gutenberg LOADER ===
+# === Student Essay LOADER ===
 
 
 class StudentEssayDatasetLoader(BaseDatasetLoader):
@@ -1148,7 +1149,481 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
         )
 
 
+# === Artificial Student Essay LOADER ===
+
+
+class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
+    def __init__(
+        self, path: str = "", name: str = CONFIG.PATH2ARTIFICIAL_STUDENT_ESSAYS
+    ):
+        """
+        Loader for the Cross-genre dataset, i.e. from Blog, Gutenberg, and Student Essays.
+        """
+        super().__init__(name=name)
+
+    def generate_existing_pairs(
+        self, df: pd.DataFrame, n: int, random_state: int = 42
+    ) -> pd.DataFrame:
+        rng = np.random.default_rng(random_state)
+
+        pairs = []
+
+        # --- SAME AUTHOR, DIFFERENT TASK ---
+        same_author_groups = df.groupby("author_id")
+        same_author_pairs = []
+        for author, group in same_author_groups:
+            tasks = group["task"].unique()
+            if len(tasks) < 2:
+                continue
+            task_pairs = [
+                (t1, t2) for i, t1 in enumerate(tasks) for t2 in tasks[i + 1 :]
+            ]
+            for t1, t2 in task_pairs:
+                g1 = group[group["task"] == t1]
+                g2 = group[group["task"] == t2]
+                for _, row1 in g1.iterrows():
+                    for _, row2 in g2.iterrows():
+                        same_author_pairs.append((row1, row2))
+        random.seed(42)  # for reproducibility
+        same_author_samples = random.sample(
+            same_author_pairs, min(n, len(same_author_pairs))
+        )
+
+        for row1, row2 in same_author_samples:
+            print(row1)
+            pairs.append(
+                {
+                    "candidate_assignment": row1["task"],
+                    "candidate_assignment_description": row1["task_description"],
+                    "disputed_assignment": row2["task"],
+                    "disputed_assignment_description": row2["task_description"],
+                    "disputed_text": row1["text"],
+                    "candidate_text": row2["text"],
+                    "same": True,
+                    "pair": [row1["text"], row2["text"]],
+                    "artificial_generation": False,
+                    "disputed_author": row1["author_id"],
+                    "candidate_author": row2["author_id"],
+                    "authors": [row1["author_id"], row2["author_id"]],
+                }
+            )
+
+        # --- DIFFERENT AUTHORS, DIFFERENT TASKS ---
+        all_rows = df.to_dict("records")
+        diff_author_pairs = []
+        for i, row1 in enumerate(all_rows):
+            for row2 in all_rows[i + 1 :]:
+                if (
+                    row1["author_id"] != row2["author_id"]
+                    and row1["task"] != row2["task"]
+                ):
+                    diff_author_pairs.append((row1, row2))
+
+        diff_author_samples = random.sample(
+            same_author_pairs, min(n, len(diff_author_pairs))
+        )
+
+        for row1, row2 in diff_author_samples:
+            pairs.append(
+                {
+                    "candidate_assignment": row1["task"],
+                    "candidate_assignment_description": row1["task_description"],
+                    "disputed_assignment": row2["task"],
+                    "disputed_assignment_description": row2["task_description"],
+                    "disputed_text": row1["text"],
+                    "candidate_text": row2["text"],
+                    "same": False,
+                    "pair": [row1["text"], row2["text"]],
+                    "artificial_generation": False,
+                    "disputed_author": row1["author_id"],
+                    "candidate_author": row2["author_id"],
+                    "authors": [row1["author_id"], row2["author_id"]],
+                }
+            )
+
+        return pd.DataFrame(
+            pairs,
+            columns=[
+                "candidate_assignment",
+                "candidate_assignment_description",
+                "disputed_assignment",
+                "disputed_assignment_description",
+                "disputed_text",
+                "candidate_text",
+                "same",
+                "pair",
+                "artificial_generation",
+                "disputed_author",
+                "candidate_author",
+                "authors",
+            ],
+        )
+
+    def generate_llm_paraphrase_pairs(
+        self,
+        df: pd.DataFrame,
+        paraphrasers: dict,
+        task_description: dict,
+        n: int = 100,
+        random_state=42,
+    ):
+        rng = np.random.default_rng(random_state)
+        pairs = []
+
+        # ===================================
+        # PROMPT TEMPLATE for LLM generated texts
+        # ===================================
+        def llm_student_prompt(assignment_desc: str) -> str:
+            return (
+                f"You are an 18-year-old first-year psychology major in 2006 at the "
+                f"University of Texas in Austin (U.S.A.). You are writing {assignment_desc}. "
+                f"Your voice reflects the mindset of a college freshman in 2006: culturally aware "
+                f"of the era, slightly anxious about school, curious about big ideas, and peppered "
+                f"with references to early-2000s life, music, technology, and campus culture."
+            )
+
+        # ==========================
+        # STEP 1: LLM–AUTHOR PAIRS
+        # ==========================
+        sampled_rows = []
+        tasks = list(task_description.keys())
+        for t in tasks:  # ensure coverage of tasks
+            candidates = df[df["task"] == t]
+            if not candidates.empty:
+                sampled_rows.append(
+                    candidates.sample(1, random_state=random_state).iloc[0]
+                )
+
+        if len(sampled_rows) < n:
+            extra = df.sample(n - len(sampled_rows), random_state=random_state).to_dict(
+                "records"
+            )
+            sampled_rows.extend(extra)
+
+        for row in sampled_rows[:n]:
+            text = row["text"]
+            task1 = row["task"]
+            # choose a different task
+            task2 = rng.choice([t for t in tasks if t != task1])
+
+            paraphrase_config = {
+                "text": text,
+                "n_responses": 1,
+                "temperature": 0.5,
+            }
+            for paraphraser_name, paraphraser in paraphrasers.items():
+                paraphrase_config["prompt"] = llm_student_prompt(
+                    task_description[task2]
+                )
+                try:
+                    paraphrase = _preprocess_text(
+                        paraphraser.paraphrase(**paraphrase_config)[0]
+                    )
+                except Exception as e:
+                    print(f"[ERROR] {paraphraser_name} failed: {e}")
+                    continue
+
+                pairs.append(
+                    {
+                        "candidate_assignment": task2,
+                        "candidate_assignment_description": task_description[task2],
+                        "disputed_assignment": task1,
+                        "disputed_assignment_description": task_description[task1],
+                        "disputed_text": text,
+                        "candidate_text": paraphrase,
+                        "same": False,
+                        "pair": [text, paraphrase],
+                        "artificial_generation": True,
+                        "disputed_author": row["author_id"],
+                        "candidate_author": paraphraser_name,
+                        "authors": [row["author_id"], paraphraser_name],
+                    }
+                )
+
+        # ================================
+        # STEP 2: LLM–LLM SAME PARAPHRASER
+        # ================================
+        rows_for_llm = df.sample(n, random_state=random_state).to_dict("records")
+        for row in rows_for_llm:
+            task1 = row["task"]
+            # choose a different task
+            task2 = rng.choice([t for t in tasks if t != task1])
+            for paraphraser_name, paraphraser in paraphrasers.items():
+                prompt1 = llm_student_prompt(task_description[task1])
+                prompt2 = llm_student_prompt(task_description[task2])
+                try:
+                    text1 = _preprocess_text(
+                        paraphraser.paraphrase(
+                            text=row["text"],
+                            n_responses=1,
+                            temperature=1,
+                            prompt=prompt1,
+                        )[0]
+                    )
+                    text2 = _preprocess_text(
+                        paraphraser.paraphrase(
+                            text=row["text"],
+                            n_responses=1,
+                            temperature=1,
+                            prompt=prompt2,
+                        )[0]
+                    )
+                except Exception as e:
+                    print(f"[ERROR] {paraphraser_name} failed: {e}")
+                    continue
+
+                pairs.append(
+                    {
+                        "candidate_assignment": task1,
+                        "candidate_assignment_description": task_description[task1],
+                        "disputed_assignment": task2,
+                        "disputed_assignment_description": task_description[task2],
+                        "disputed_text": text2,
+                        "candidate_text": text1,
+                        "same": True,
+                        "pair": [text2, text1],
+                        "artificial_generation": True,
+                        "disputed_author": paraphraser_name,
+                        "candidate_author": paraphraser_name,
+                        "authors": [paraphraser_name, paraphraser_name],
+                    }
+                )
+
+        # ================================
+        # STEP 3: LLM–LLM DIFFERENT PARAPHRASERS
+        # ================================
+        rows_for_llm = df.sample(n, random_state=random_state + 1).to_dict("records")
+        paraphraser_names = list(paraphrasers.keys())
+        for row in rows_for_llm:
+            task1 = row["task"]
+            # choose a different task
+            task2 = rng.choice([t for t in tasks if t != task1])
+            p1, p2 = rng.choice(paraphraser_names, size=2, replace=False)
+            prompt1 = llm_student_prompt(task_description[task1])
+            prompt2 = llm_student_prompt(task_description[task2])
+            try:
+                text1 = _preprocess_text(
+                    paraphrasers[p1].paraphrase(
+                        text=row["text"], n_responses=1, temperature=1, prompt=prompt1
+                    )[0]
+                )
+                text2 = _preprocess_text(
+                    paraphrasers[p2].paraphrase(
+                        text=row["text"], n_responses=1, temperature=1, prompt=prompt2
+                    )[0]
+                )
+            except Exception as e:
+                print(f"[ERROR] LLM diff failed ({p1},{p2}): {e}")
+                continue
+
+            pairs.append(
+                {
+                    "candidate_assignment": task2,
+                    "candidate_assignment_description": task_description[task2],
+                    "disputed_assignment": task1,
+                    "disputed_assignment_description": task_description[task1],
+                    "disputed_text": text1,
+                    "candidate_text": text2,
+                    "same": False,
+                    "pair": [text1, text2],
+                    "artificial_generation": True,
+                    "disputed_author": p1,
+                    "candidate_author": p2,
+                    "authors": [p1, p2],
+                }
+            )
+
+        return pd.DataFrame(
+            pairs,
+            columns=[
+                "candidate_assignment",
+                "candidate_assignment_description",
+                "disputed_assignment",
+                "disputed_assignment_description",
+                "disputed_text",
+                "candidate_text",
+                "same",
+                "pair",
+                "artificial_generation",
+                "disputed_author",
+                "candidate_author",
+                "authors",
+            ],
+        )
+
+    def balanced_train_test_split(
+        self,
+        dataset: pd.DataFrame,
+        paraphrasers: dict,
+        test_size: float = 0.2,
+        seed: int = 42,
+    ):
+        """
+        Splits the dataset into train/test such that all combinations of:
+            - artificial_generation (True/False)
+            - same (True/False)
+            - author type (LLM vs HUMAN)
+        are represented in both sets.
+
+        Args:
+            dataset: pd.DataFrame with columns 'artificial_generation', 'same', 'disputed_author', 'candidate_author'
+            paraphrasers: dict of LLM names (used to determine which authors are LLM)
+            test_size: fraction of dataset to use as test set
+            seed: random seed
+        Returns:
+            train_df, test_df
+        """
+        df = dataset.copy()
+
+        # Define author type
+        df["disputed_author_type"] = df["disputed_author"].apply(
+            lambda x: "LLM" if x in paraphrasers.keys() else "HUMAN"
+        )
+        df["candidate_author_type"] = df["candidate_author"].apply(
+            lambda x: "LLM" if x in paraphrasers.keys() else "HUMAN"
+        )
+
+        # Create a composite strata column for stratification
+        df["strata"] = (
+            df["artificial_generation"].astype(str)
+            + "_"
+            + df["same"].astype(str)
+            + "_"
+            + df["disputed_author_type"]
+            + "_"
+            + df["candidate_author_type"]
+        )
+
+        # Perform stratified split
+        train_df, test_df = train_test_split(
+            df, test_size=test_size, random_state=seed, stratify=df["strata"]
+        )
+
+        # Drop helper columns
+        train_df = train_df.drop(
+            columns=["disputed_author_type", "candidate_author_type", "strata"]
+        )
+        test_df = test_df.drop(
+            columns=["disputed_author_type", "candidate_author_type", "strata"]
+        )
+
+        return train_df.reset_index(drop=True), test_df.reset_index(drop=True)
+
+    def load(
+        self, n_samples: int = 10, train_split_portion: float = 0.7
+    ) -> DatasetDict:
+        """
+        Loader for the Artificial Student Essay dataset.
+        The dataset is expected to be a directory with text files, where each file is named in the format "author_genre.txt".
+        Each file contains the text of a book, and the author and genre are derived from the filename.
+        """
+        # not-artifical generated pairs
+        seed = 42
+        np.random.seed(seed)
+        task_description = {
+            "Ass1": "Stream of consciousness",
+            "Ass2": "Talk about your childhood",
+            "Ass3": "Describe your personality",
+            "Ass4": "Thematic Apperception Test",
+            # "Ass5": "Give four examples of four different theories",  # not used in Koppel et al. (2014)
+        }
+
+        student_essay_base_dir = (
+            Path(__file__).resolve().parent.parent
+            / CONFIG.DATA_BASE_PATH
+            / "student_essays/Intro2006"
+        )
+        assert (
+            student_essay_base_dir.exists()
+        ), f"Path {student_essay_base_dir} to student essays dataset does not exist."
+
+        loader = StudentEssayDatasetLoader(path=student_essay_base_dir)
+        complete_df = loader._load_student_essays()
+
+        all_paraphrasers_dict = get_paraphraser_dict()
+        paraphrasers = {
+            k: all_paraphrasers_dict[k]
+            for k in [
+                # "T5_ChatGPT",
+                # "T5_Google_PAWS",
+                # "Ollama",
+                "qwen3-32b",
+                "mistral-large-instruct",
+                "openai-gpt-oss-120b",
+                "meta-llama-3.1-8b-instruct",
+            ]
+            if k in all_paraphrasers_dict
+        }
+
+        print("Generating existing pairs from student essays dataset...")
+        existing_pairs = self.generate_existing_pairs(
+            complete_df, n_samples, random_state=seed
+        )
+        print(f"Generated {len(existing_pairs)} existing pairs from student essays.")
+        print("Generating artifical pairs from student essays dataset...")
+
+        artificial_pairs = self.generate_llm_paraphrase_pairs(
+            complete_df,
+            paraphrasers,
+            task_description,
+            n=n_samples,
+            random_state=seed,
+        )
+        print(f"Generated {len(artificial_pairs)} artificial pairs.")
+
+        dataset = pd.concat([existing_pairs, artificial_pairs], ignore_index=True)
+        features = Features(
+            {
+                "candidate_assignment": Value("string"),
+                "candidate_assignment_description": Value("string"),
+                "disputed_assignment": Value("string"),
+                "disputed_assignment_description": Value("string"),
+                "disputed_author": Value("string"),
+                "candidate_author": Value("string"),
+                "pair": Sequence(Value("string")),
+                "authors": Sequence(Value("string")),
+                "same": Value("bool"),
+                "disputed_text": Value("string"),
+                "candidate_text": Value("string"),
+                "artificial_generation": Value("bool"),
+            }
+        )
+        train_df, test_df = self.balanced_train_test_split(
+            dataset, paraphrasers, test_size=1 - train_split_portion, seed=seed
+        )
+        # Create DatasetDict
+        return DatasetDict(
+            {
+                "train": Dataset.from_list(
+                    train_df.to_dict("records"), features=features
+                ),
+                "test": Dataset.from_list(
+                    test_df.to_dict("records"), features=features
+                ),
+            }
+        )
+
+
 # === SYSTEM SPECIFIC USAGE ===
+def run_artificial_student_essay_dataset():
+    base_dir = (
+        Path(__file__).resolve().parent.parent
+        / CONFIG.DATA_BASE_PATH
+        / "student_essays/Intro2006"
+    )
+    assert (
+        base_dir.exists()
+    ), f"Path {base_dir} to student essays dataset does not exist."
+    output_dir = (
+        Path(__file__).resolve().parent.parent / CONFIG.PATH2ARTIFICIAL_STUDENT_ESSAYS
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    loader = ArtificialStudentEssayDatasetLoader(path=base_dir)
+    dataset = loader.load()
+    dataset.save_to_disk(output_dir)
+
+
 def run_student_essay():
     base_dir = (
         Path(__file__).resolve().parent.parent
@@ -1287,4 +1762,5 @@ if __name__ == "__main__":
     # run_blog_corpus()
     # run_gutenberg_corpus()
     # run_student_essay()
-    run_cross_genre()
+    # run_cross_genre()
+    run_artificial_student_essay_dataset()

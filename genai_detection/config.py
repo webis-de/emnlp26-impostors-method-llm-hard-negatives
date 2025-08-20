@@ -27,6 +27,7 @@ class BaseConfig:
     PATH2STUDENT_ESSAYS = (
         f"{DATA_BASE_PATH}/student_essays/Intro2006/student-essays-dataset-converted"
     )
+    PATH2ARTIFICIAL_STUDENT_ESSAYS = f"{DATA_BASE_PATH}/artificial_student_essays/artificial-student-essays-dataset-converted"
     PATH2GENERIC_ON_FLY_IMP = f"{DATA_BASE_PATH}/google-on-the-fly-impostors"
     PATH2CROSS_GENRE = f"{DATA_BASE_PATH}/cross_genre/cross-genre-dataset"
     SAVE_PATH = "results/"
@@ -37,6 +38,7 @@ class BaseConfig:
     BLOG = "blog"
     GUTENBERG = "gutenberg"
     STUDENT_ESSAYS = "student_essays"
+    ARTIFICIAL_STUDENT_ESSAYS = "artificial_student_essays"
     IMPOSTOR = "impostor"
     UNMASKING = "unmasking"
     TEMPERATURE = 0.7
