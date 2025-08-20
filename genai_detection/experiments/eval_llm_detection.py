@@ -48,14 +48,14 @@ SAVE_PATH = (
     / "detection_scenarios"
 )
 IMP_GEN_OPTIONS = [
-    "naive_llm",
-    # "non_naive_llm",
-    # "llm",
     "fixed",
     "text_len",
     "content",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores
+    "naive_llm",
+    # "non_naive_llm",
+    # "llm",
     # "on-the-fly", # no more api calls
-    "mirror_minds",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores, TODO: rerun bc in csv files is , missing
+    # "mirror_minds",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores, TODO: rerun bc in csv files is , missing
 ]
 
 BASELINES = [
@@ -136,10 +136,10 @@ def _get_num_impostors(imp_gen: str) -> int:
     :param imp_gen: Impostor generator type.
     :return: Number of impostors to generate.
     """
-    return 50
+    # return 50
     # TODO: max 2 calls per second/ 14 calls per minute for SAIA based generators
     if imp_gen in ["mirror_minds", "on-the-fly", "naive_llm", "non_naive_llm", "llm"]:
-        return 25
+        return 2  # 25
     else:
         return 50  # default for other generators
 
@@ -158,7 +158,7 @@ def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_
         rounds=100,  # cf. pg. 181, Koppel et al. (2014)
         top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
         path2imp=path2imp,
-        upsample=False,
+        upsample=True,  # some impostor texts are too short otherwise
     )
     impostor_detector.set_training_mode(training_mode)
     score = impostor_detector._get_score_impl(pair)
@@ -190,7 +190,7 @@ def create_df(df_name: str, save_path: Path):
         ignore_index=False,
     )
     print(
-        f"DEBUG: Obtained train ({len(train_df)} items) + text df ({len(test_df)} items)."
+        f"DEBUG: Obtained train ({len(train_df)} items) + test df ({len(test_df)} items)."
     )
 
     matching_cols = [
@@ -294,7 +294,7 @@ def create_df(df_name: str, save_path: Path):
                     "non_naive_llm",
                     "llm",
                 ]
-                else 14 // _get_num_impostors(imp_gen)
+                else max(1, 14 // _get_num_impostors(imp_gen))
             )  # 14 API calls per minute (2 API calls per second) to avoid SAIA rate limiting
             if imp_gen in ["content", "mirror_minds", "non_naive_llm"]:
                 results = []
