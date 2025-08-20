@@ -612,6 +612,7 @@ def compute_metrics_over_thresholds(y_trues, y_scores, thresholds=None):
     """
     print("DEBUG: y_trues:", y_trues)
     print("DEBUG: y_scores:", y_scores)
+    y_scores = np.array(y_scores, dtype=np.float64)
     nan_indices = np.isnan(y_scores)
     print("DEBUG: Number of NaN in y_scores:", np.sum(nan_indices))
     y_scores = y_scores[~nan_indices]
