@@ -167,9 +167,9 @@ def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_
     return score
 
 
-def create_df(path2df: str, df_name: str, save_path: Path):
-    train_df = get_df(path2df, split="train")
-    test_df = get_df(path2df, split="test")
+def create_df(df_name: str, save_path: Path):
+    train_df = get_df(split="train")
+    test_df = get_df(split="test")
     # TODO: Test on small data subsets, too small does not work for optimal threshold computation
 
     n_train = 1  # 100  # 7
@@ -789,7 +789,6 @@ if __name__ == "__main__":
     # Student Essays
     print("Running experiment for Artificial Student Essays df.")
     student_test_df = create_df(
-        path2df=CONFIG.PATH2STUDENT_ESSAYS,
         df_name=CONFIG.STUDENT_ESSAYS,
         save_path=SAVE_PATH,
     )
