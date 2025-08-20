@@ -432,9 +432,13 @@ def create_df(df_name: str, save_path: Path):
     for baseline_name, baseline in zip(
         BASELINES,
         [
-            UnSupervisedImpostorBaseline(use_cosine_simiarity=False, df_name=df_name),
-            UnSupervisedImpostorBaseline(use_cosine_simiarity=True, df_name=df_name),
-            SupervisedImpostorBaseline(df_name=df_name),
+            UnSupervisedImpostorBaseline(
+                use_cosine_simiarity=False, dataset_name=df_name
+            ),
+            UnSupervisedImpostorBaseline(
+                use_cosine_simiarity=True, dataset_name=df_name
+            ),
+            SupervisedImpostorBaseline(dataset_name=df_name),
             UnmaskingDetector(),
             PPMdDetector(),
         ],
