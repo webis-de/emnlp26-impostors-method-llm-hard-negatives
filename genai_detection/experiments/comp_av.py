@@ -612,6 +612,11 @@ def compute_metrics_over_thresholds(y_trues, y_scores, thresholds=None):
     """
     print("DEBUG: y_trues:", y_trues)
     print("DEBUG: y_scores:", y_scores)
+    nan_indices = np.isnan(y_scores)
+    print("DEBUG: Number of NaN in y_scores:", np.sum(nan_indices))
+    y_scores = y_scores[~nan_indices]
+    y_trues = y_trues[~nan_indices]
+
     if thresholds is None:
         thresholds = np.linspace(0, 1, 101)  # 0.00 to 1.00 in steps of 0.01
 
@@ -666,6 +671,7 @@ def get_scores_dict_for_diff_thres(df: pd.DataFrame):
             if imp_gen in IMP_GEN_OPTIONS
             else df[f"{imp_gen.replace(' ','_')}_score"].values
         )
+        print("---------------\nIMP GEN:", imp_gen)
         scores_per_imp_gen_per_thres[imp_gen] = compute_metrics_over_thresholds(
             y_true, y_scores
         )
