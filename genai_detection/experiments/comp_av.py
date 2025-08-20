@@ -691,7 +691,7 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
         ig: cmap(i % 10)
         for i, ig in enumerate(scores_per_imp_gen_per_thres_dict.keys())
     }
-    line_styles = ["-", "--", "-.", ":"]
+    line_styles = ["-", "--", ":", "-."]
 
     metrics = ["f1s", "accs", "precisions", "recalls", "f05s", "c@1s"]
     titles = [
@@ -751,6 +751,75 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
     plt.close(fig)
 
 
+def plot_threshold_curves_all_single(
+    df: pd.DataFrame, save_path: Path, dataset_name: str
+):
+    scores_per_imp_gen_per_thres_dict = get_scores_dict_for_diff_thres(df)
+    print(
+        "DEBUG: Scores per impostor generator per threshold for keys:",
+        scores_per_imp_gen_per_thres_dict.keys(),
+    )
+    cmap = plt.get_cmap("tab10")
+    colors = {
+        ig: cmap(i % 10)
+        for i, ig in enumerate(scores_per_imp_gen_per_thres_dict.keys())
+    }
+    line_styles = ["-", "--", ":", "-."]
+
+    metrics = ["f1s", "accs", "precisions", "recalls", "f05s", "c@1s"]
+    titles = [
+        "Threshold vs F1 Score",
+        "Threshold vs Accuracy Score",
+        "Threshold vs Precision Score",
+        "Threshold vs Recall Score",
+        "Threshold vs $F_{0.5}$ Score",
+        "Threshold vs C@1 Score",
+    ]
+    ylabels = [
+        "F1 Score $\\frac{{2PR}}{{P+R}}$",
+        "Accuracy Score $\\frac{{TP + TN}}{{N}}$",
+        "Precision $\\frac{{TP}}{{TP + FP}}$",
+        "Recall $\\frac{{TP}}{{TP + FN}}$",
+        "$F_{0.5}$ Score $\\frac{{(1 + 0.5^2)TP}}{{(1 + 0.5^2)TP + 0.5^2(FN + unanswered) + FP}}$",
+        "C@1 Score $\\frac{{TP + TN}}{{TP + TN + FP + FN}} \\cdot (1 + \\frac{{unanswered}}{{TP + TN + FP + FN}})$",
+    ]
+    for metric, title, ylabel in zip(metrics, titles, ylabels):
+        for i, (imp_gen, vals) in enumerate(scores_per_imp_gen_per_thres_dict.items()):
+            print("DEBUG: Imp gen:", imp_gen)
+            assert (
+                metric in vals
+            ), f"Metric {metric} not found in values for {imp_gen}. Has only {vals.keys()} keys."
+            plt.plot(
+                vals["thresholds"],
+                vals[metric],
+                label=imp_gen,
+                color=colors[imp_gen],
+                linewidth=1.5,
+                linestyle=line_styles[i % len(line_styles)],
+            )
+        plt.xlabel("Threshold", fontsize=14)
+        plt.ylabel(ylabel, fontsize=14)
+        plt.ylim(0, 1)
+        plt.title(title, fontsize=14)
+        plt.grid(False)
+        plt.legend(
+            loc="center right",
+            bbox_to_anchor=(1.02, 0.8),
+            ncol=1,
+            frameon=False,
+        )
+
+        plt.tight_layout(rect=[0, 0, 0.8, 1])  # leave space for legend
+        plt.subplots_adjust(hspace=0.2)
+        save_path.mkdir(parents=True, exist_ok=True)
+        plt.savefig(
+            save_path
+            / f"{dataset_name}_threshold_{metric}_curves_all_incl_baselines.svg",
+            bbox_inches="tight",
+        )
+        plt.close()
+
+
 if __name__ == "__main__":
     # Run the experiment
     if not SAVE_PATH.exists():
@@ -774,6 +843,11 @@ if __name__ == "__main__":
     plot_threshold_curves_all(
         df=student_test_df,
         save_path=SAVE_PATH,
+        dataset_name=CONFIG.STUDENT_ESSAYS,
+    )
+    plot_threshold_curves_all_single(
+        df=student_test_df,
+        save_path=SAVE_PATH / "single_metrics",
         dataset_name=CONFIG.STUDENT_ESSAYS,
     )
     print("Experiment for Student Essays dataset completed. Plots saved to:", SAVE_PATH)
