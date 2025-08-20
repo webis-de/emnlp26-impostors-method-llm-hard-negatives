@@ -701,6 +701,7 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
     ]
     for ax, metric, title, ylabel in zip(axes.flat, metrics, titles, ylabels):
         for i, (imp_gen, vals) in enumerate(scores_per_imp_gen_per_thres_dict.items()):
+            print("DEBUG: Imp gen:", imp_gen)
             ax.plot(
                 vals["thresholds"],
                 vals[metric],
