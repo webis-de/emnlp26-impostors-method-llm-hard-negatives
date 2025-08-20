@@ -1388,6 +1388,13 @@ class VisDetectors:
             "DEBUG Plotting Precision-Recall Curves for different impostor generation techniques:",
             same_author_precisions.keys(),
         )
+        label_translations = {
+            "fixed": "Fixed",
+            "on-the-fly": "On-the-Fly",
+            "unsupervised_baseline_min_max": "Unsup. Min-Max (B)",
+            "unsupervised_baseline_cosine": "Unsup. Cosine (B)",
+            "supervised_baseline": "Sup. SVC (B)",
+        }
 
         line_styles = dict(zip(baselines, [":", "--", "-."]))
         for kind, data in zip(
@@ -1405,7 +1412,7 @@ class VisDetectors:
                 plt.plot(
                     recall,
                     precision,
-                    label=imp_gen,
+                    label=label_translations[imp_gen],
                     linestyle=(
                         "-"
                         if imp_gen in imp_gen_options
@@ -1421,9 +1428,10 @@ class VisDetectors:
             plt.gca().set_aspect("equal")
             plt.xlabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
             plt.ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
-            title = self._format_title(
-                base=f"Precision-Recall Curve for {kind} Data", kwargs=args
-            )
+            title = f"Precision-Recall Curve for {kind} Data"
+            # self._format_title(
+            #     base=f"Precision-Recall Curve for {kind} Data", kwargs=args
+            # )
             plt.title(title)
             plt.legend()
             plt.tight_layout()
