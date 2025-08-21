@@ -1511,7 +1511,7 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
         return train_df.reset_index(drop=True), test_df.reset_index(drop=True)
 
     def load(
-        self, n_samples: int = 10, train_split_portion: float = 0.7
+        self, n_samples: int = 10, train_split_portion: float = 0.3
     ) -> DatasetDict:
         """
         Loader for the Artificial Student Essay dataset.
