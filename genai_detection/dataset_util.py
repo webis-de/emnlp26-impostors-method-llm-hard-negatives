@@ -1195,6 +1195,7 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
             )
 
         # --- DIFFERENT AUTHORS, DIFFERENT TASKS ---
+        # does not cosider pairing according to subgroup
         all_rows = df.to_dict("records")
         diff_author_pairs = []
         for i, row1 in enumerate(all_rows):
