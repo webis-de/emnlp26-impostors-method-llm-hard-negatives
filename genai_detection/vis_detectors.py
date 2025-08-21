@@ -989,7 +989,7 @@ class VisDetectors:
             top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
             path2imp=path2imp,
             upsample=False,
-            real_time_generation=False,  # TODO: turn True, otherwise on-the-fly generation is not possible (currently too much data for too few free api calls)
+            real_time_generation=True,  # TODO: turn True, otherwise on-the-fly generation is not possible (currently too much data for too few free api calls)
         )
         impostor_detector.set_training_mode(training_mode)
         res = impostor_detector._get_score_impl(pair)
@@ -1039,16 +1039,22 @@ class VisDetectors:
                     upsample=False,
                     real_time_generation=True,  # TODO: turn True, otherwise on-the-fly generation is not possible (currently too much data for too few free api calls)
                 )
-
-                with ThreadPoolExecutor() as executor:
-                    missing_scores = list(
-                        executor.map(
-                            self._helper_impostor,
-                            [path2imp] * len(rows_without_scores),
-                            rows_without_scores["pair"],
-                            [imp_gen] * len(rows_without_scores),
+                if imp_gen in ["on-the-fly", "content", "mirror_minds"]:
+                    missing_scores = []
+                    for row in rows_without_scores.itertuples():
+                        pair = row.pair
+                        score = self._helper_impostor(path2imp, pair, imp_gen)
+                        missing_scores.append(score)
+                else:
+                    with ThreadPoolExecutor() as executor:
+                        missing_scores = list(
+                            executor.map(
+                                self._helper_impostor,
+                                [path2imp] * len(rows_without_scores),
+                                rows_without_scores["pair"],
+                                [imp_gen] * len(rows_without_scores),
+                            )
                         )
-                    )
                 train_dataset.loc[missing_scores_indices, "impostor_score"] = (
                     missing_scores
                 )
