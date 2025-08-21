@@ -843,14 +843,12 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             if num_nans > 0:
                 print(f"Column '{col}' has {num_nans} NaN values.")
                 # print(f"Rows with NaN in '{col}':\n{df[df[col].isna()]}\n")
-
-        grouped = df.groupby(
-            groupby_cols, dropna=False, observed=True
-        )  # keep NaNs, no answer is also an answer group
         pairs = []
 
         # each author appears <=1 time per task: same-author pairs have to be generated across tasks
-        # Same-author pairs
+        # ----------------
+        # Same-author pairs (same subgroup, different tasks)
+        # ----------------
         same_author_pairs = []
         # group texts by author disregarding the task
         author_groups = {}
@@ -866,77 +864,64 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             random.shuffle(selected)
             for i in range(0, len(selected) - 1, 2):
                 a, b = selected[i], selected[i + 1]
-                same_author_pairs.append(
-                    {
-                        "pair": [a["text"], b["text"]],
-                        "authors": [author, author],
-                        "same": True,
-                    }
-                )
+                if (
+                    a["task"] != b["task"]
+                ):  # enforce different tasks (should always be the case)
+                    same_author_pairs.append(
+                        {
+                            "pair": [a["text"], b["text"]],
+                            "authors": [author, author],
+                            "same": True,
+                        }
+                    )
         pairs.extend(same_author_pairs)
         print(f"Generated {len(same_author_pairs)} same-author pairs.")
 
-        # Store author_id -> list of texts across all groups
-        global_author_texts = defaultdict(list)
-
-        # Mapping author_id to group_id to ensure authors come from different tasks
-        author_group_map = {}
-
-        # First loop: collect data across groups
-        for group_values, group in grouped:
-            group_id = str(group_values)
-            data = group.to_dict(orient="records")
-
-            for item in data:
-                author_id = item["author_id"]
-                global_author_texts[author_id].append(item)
-                author_group_map[author_id] = group_id
-
         # Prepare cross-task (cf. Koppel et al. (2014)) different-author pairs
-        authors = list(global_author_texts.keys())
-        author_pairs = []
-        for i in range(len(authors)):
-            for j in range(i + 1, len(authors)):
-                a1, a2 = authors[i], authors[j]
-                if (
-                    author_group_map[a1] != author_group_map[a2]
-                ):  # ensure from different tasks
-                    author_pairs.append((a1, a2))
+        # ----------------
+        # Different-author pairs (same subgroup, different tasks)
+        # ----------------
+        # Separate task from other grouping cols
+        subgroup_cols = [c for c in groupby_cols if c != "task"]
 
-        random.shuffle(author_pairs)
+        subgrouped = df.groupby(subgroup_cols, dropna=False, observed=True)
+        diff_author_pairs = []
 
-        # Determine how many different-author pairs to generate
+        for subgroup_values, subgroup_df in subgrouped:
+            # Collect authors by task inside this subgroup
+            task_buckets = defaultdict(list)
+            for row in subgroup_df.to_dict(orient="records"):
+                task_buckets[row["task"]].append(row)
+
+            tasks = list(task_buckets.keys())
+            if len(tasks) < 2:
+                continue  # need at least 2 tasks to cross-pair
+
+            # All cross-task combinations
+            for i in range(len(tasks)):
+                for j in range(i + 1, len(tasks)):
+                    t1, t2 = tasks[i], tasks[j]
+                    texts1, texts2 = task_buckets[t1], task_buckets[t2]
+
+                    for r1, r2 in product(texts1, texts2):
+                        if r1["author_id"] == r2["author_id"]:
+                            continue  # skip same-author, already handled
+                        diff_author_pairs.append(
+                            {
+                                "pair": [r1["text"], r2["text"]],
+                                "authors": [r1["author_id"], r2["author_id"]],
+                                "same": False,
+                            }
+                        )
+
+        # Randomly sample to balance with same-author pairs
         n_diff_pairs_target = len(same_author_pairs)
-        max_pairs_per_pair = max(n_diff_pairs_target // len(author_pairs), 1)
+        random.shuffle(diff_author_pairs)
+        diff_author_pairs = diff_author_pairs[:n_diff_pairs_target]
 
-        count = 0
-        for a1, a2 in author_pairs:
-            texts_a1 = global_author_texts[a1]
-            texts_a2 = global_author_texts[a2]
+        pairs.extend(diff_author_pairs)
+        print(f"Generated {len(diff_author_pairs)} different-author pairs.\n")
 
-            if not texts_a1 or not texts_a2:
-                continue
-
-            all_combinations = list(product(texts_a1, texts_a2))
-            random.shuffle(all_combinations)
-
-            num_to_sample = min(len(all_combinations), max_pairs_per_pair)
-            for t1, t2 in all_combinations[:num_to_sample]:
-                pairs.append(
-                    {
-                        "pair": [t1["text"], t2["text"]],
-                        "authors": [a1, a2],
-                        "same": False,
-                    }
-                )
-                count += 1
-
-            if count >= n_diff_pairs_target:
-                break
-
-        print(
-            f"Generated {len(pairs) - len(same_author_pairs)} different-author pairs.\n"
-        )
         return pairs
 
     def _load_student_metadata(self):
@@ -1768,6 +1753,6 @@ if __name__ == "__main__":
     # run_koppel_webis()
     # run_blog_corpus()
     # run_gutenberg_corpus()
-    # run_student_essay()
+    run_student_essay()
     # run_cross_genre()
-    run_artificial_student_essay_dataset()
+    # run_artificial_student_essay_dataset()
