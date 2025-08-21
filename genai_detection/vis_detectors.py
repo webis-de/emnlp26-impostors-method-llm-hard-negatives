@@ -1612,26 +1612,26 @@ if __name__ == "__main__":
         f"Finished reproducing Figure {fig} from Koppel et al. (2014) on STUDENT data."
     )
 
-    vis_det = VisDetectors(
-        dataset_name=CONFIG.BLOG,
-        detectors=[impostor],
-    )
-    print(f"impostor Detector initialized for fig {fig} and dataset {CONFIG.BLOG}.")
+    # vis_det = VisDetectors(
+    #     dataset_name=CONFIG.BLOG,
+    #     detectors=[impostor],
+    # )
+    # print(f"impostor Detector initialized for fig {fig} and dataset {CONFIG.BLOG}.")
 
-    if fig == 2:
-        vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
-    elif fig == 4:
-        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
-            args=args, save_path=None, imp_gen_options=["fixed", "on-the-fly"]
-        )
-    elif fig == 5:
-        # not really figure 5, but figure 4 with our contributions (LLM based impostors)
-        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
-            args=args,
-            imp_gen_options=our_figure_impostor_options,
-            save_path=vis_det.savefig_base
-            / "impostor_scores"
-            / vis_det.dataset_name
-            / "our_contributions_scores",
-        )
-    print(f"Finished reproducing Figure {fig} from Koppel et al. (2014) on BLOG data.")
+    # if fig == 2:
+    #     vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
+    # elif fig == 4:
+    #     vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
+    #         args=args, save_path=None, imp_gen_options=["fixed", "on-the-fly"]
+    #     )
+    # elif fig == 5:
+    #     # not really figure 5, but figure 4 with our contributions (LLM based impostors)
+    #     vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
+    #         args=args,
+    #         imp_gen_options=our_figure_impostor_options,
+    #         save_path=vis_det.savefig_base
+    #         / "impostor_scores"
+    #         / vis_det.dataset_name
+    #         / "our_contributions_scores",
+    #     )
+    # print(f"Finished reproducing Figure {fig} from Koppel et al. (2014) on BLOG data.")
