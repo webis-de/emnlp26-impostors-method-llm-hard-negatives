@@ -1328,7 +1328,7 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
                     paraphrase = _preprocess_text(
                         paraphraser.paraphrase(**paraphrase_config)[0]
                     )
-                    sleep(5)  # only 14 requests per minute
+                    sleep(10)  # only 14 requests per minute
                 except Exception as e:
                     print(f"[ERROR] {paraphraser_name} failed: {e}")
                     continue
@@ -1378,7 +1378,7 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
                             prompt=prompt2,
                         )[0]
                     )
-                    sleep(10)  # only 14 requests per minute
+                    sleep(15)  # only 14 requests per minute
                 except Exception as e:
                     print(f"[ERROR] {paraphraser_name} failed: {e}")
                     continue
@@ -1423,7 +1423,7 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
                         text=row["text"], n_responses=1, temperature=1, prompt=prompt2
                     )[0]
                 )
-                sleep(10)  # only 14 requests per minute
+                sleep(15)  # only 14 requests per minute
             except Exception as e:
                 print(f"[ERROR] LLM diff failed ({p1},{p2}): {e}")
                 continue
