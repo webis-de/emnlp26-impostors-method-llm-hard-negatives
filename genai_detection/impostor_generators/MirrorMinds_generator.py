@@ -38,6 +38,7 @@ class MirrorMindsGenerator(BaseImpostorGenerator):
         :return: The generated impostor text.
         """
         start_time = time.time()
+        assert isinstance(text, str), "Input text must be a string."
 
         text_df = pd.DataFrame({"Essay": [text]})
         # make tmp directory if it does not exist
@@ -78,6 +79,11 @@ class MirrorMindsGenerator(BaseImpostorGenerator):
                 impostor_texts[f"impostor_{i}_mirror_minds"] = df[
                     "generated_text"
                 ].iloc[0]
+            else:
+                print(f"ERROR: No valid response generated. Original was: {text[:200]}")
+                impostor_texts[f"impostor_{i}_mirror_minds"] = (
+                    "ERROR: No valid response generated."
+                )
 
         # print(f"Total script runtime: {time.time() - start_time:.2f} seconds")
         # print("Generated questions and responses saved successfully.")
