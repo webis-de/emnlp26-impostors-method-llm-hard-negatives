@@ -43,7 +43,11 @@ class ImpostorBase(DetectorBase):
         :return: list of n-gram tokens
         """
         # remove first and last whitespace
-        text = text.strip()
+        try:
+            text = text.strip()
+        except AttributeError as e:
+            print(f"Input text is not a string. Text: {text}...\nError: {e}")
+            raise e
         if normalize_ws:
             text = re.sub(r"\s+", " ", text)
         if space_free:

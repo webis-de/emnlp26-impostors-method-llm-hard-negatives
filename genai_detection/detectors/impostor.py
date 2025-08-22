@@ -377,6 +377,13 @@ class ImpostorDetector(ImpostorBase):
                     "paraphrases": impostor_candidates,
                 }
 
+                assert all(
+                    isinstance(imp_texts, str)
+                    for imp_texts in impostor_candidates.values()
+                ), "Impostor candidates must be strings, but got: {}".format(
+                    [type(t) for t in impostor_candidates.values()]
+                )
+
                 tmp_store = {
                     impostor_name: {
                         "tfidf": self.tokens_to_matrix(
