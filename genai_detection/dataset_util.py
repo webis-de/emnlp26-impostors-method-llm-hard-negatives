@@ -1195,7 +1195,11 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
             )
 
         # --- DIFFERENT AUTHORS, DIFFERENT TASKS ---
-        # does not cosider pairing according to subgroup
+        matching_cols = [
+            "sex",
+            "ethnicity",
+            "political_orientation",
+        ]
         all_rows = df.to_dict("records")
         diff_author_pairs = []
         for i, row1 in enumerate(all_rows):
@@ -1204,7 +1208,9 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
                     row1["author_id"] != row2["author_id"]
                     and row1["task"] != row2["task"]
                 ):
-                    diff_author_pairs.append((row1, row2))
+                    # Check if matching on subgroup columns
+                    if all(row1[col] == row2[col] for col in matching_cols):
+                        diff_author_pairs.append((row1, row2))
 
         diff_author_samples = random.sample(
             same_author_pairs, min(n, len(diff_author_pairs))
@@ -1260,15 +1266,25 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
         # ===================================
         # PROMPT TEMPLATE for LLM generated texts
         # ===================================
-        def llm_student_prompt(assignment_desc: str) -> str:
-            return (
+        def llm_student_prompt(assignment_desc: str, persona: dict = None) -> str:
+            persona_prompt = (
                 f"You are an 18-year-old first-year psychology major in 2006 at the "
                 f"University of Texas in Austin (U.S.A.). "
+            )
+            situation_prompt = (
                 f"Your voice reflects the mindset of a college freshman in 2006: culturally aware "
                 f"of the era, slightly anxious about school, curious about big ideas, and peppered "
                 f"with references to early-2000s life, music, technology, and campus culture."
                 f"Write a response to this task: '{assignment_desc}' with at least 700 words that is authentic to this persona."
             )
+            if (
+                persona
+                and "ethnicity" in persona
+                and "sex" in persona
+                and "political_orientation" in persona
+            ):
+                persona_prompt += f" You are a {persona['ethnicity']} {persona['sex']} with a {persona['political_orientation']} political orientation."
+            return persona_prompt + situation_prompt
 
         # ==========================
         # STEP 1: LLM–AUTHOR PAIRS
@@ -1299,9 +1315,14 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
                 "n_responses": 1,
                 "temperature": 0.5,
             }
+            persona = {
+                "sex": row["sex"],
+                "ethnicity": row["ethnicity"],
+                "political_orientation": row["political_orientation"],
+            }
             for paraphraser_name, paraphraser in paraphrasers.items():
                 paraphrase_config["prompt"] = llm_student_prompt(
-                    task_description[task2]
+                    task_description[task2], persona=persona
                 )
                 try:
                     paraphrase = _preprocess_text(
@@ -1754,6 +1775,6 @@ if __name__ == "__main__":
     # run_koppel_webis()
     # run_blog_corpus()
     # run_gutenberg_corpus()
-    run_student_essay()
+    # run_student_essay()
     # run_cross_genre()
-    # run_artificial_student_essay_dataset()
+    run_artificial_student_essay_dataset()
