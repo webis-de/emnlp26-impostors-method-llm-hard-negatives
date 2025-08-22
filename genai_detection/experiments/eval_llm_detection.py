@@ -5,7 +5,7 @@ df used is Student Essays.
 Similar to Koppel et al. (2014), we configured each pair of input pairs to originate from different tasks.
 """
 
-# TODO: copy code from comp_imp_generators.py and adapt such that unmasking and PPMD work as well.
+# Code from comp_imp_generators.py and adapt such that unmasking and PPMD work as well.
 # plot results for optimal thresholds, or compare threshold if possible else make horizontal line for baselines
 
 import argparse
@@ -50,12 +50,12 @@ SAVE_PATH = (
 IMP_GEN_OPTIONS = [
     "content",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores
     "fixed",
+    "text_len",
     # "non_naive_llm",
     # "llm",
     # "on-the-fly", # no more api calls
     "mirror_minds",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores, TODO: rerun bc in csv files is , missing
     "naive_llm",
-    "text_len",
 ]
 
 BASELINES = [
@@ -169,7 +169,7 @@ def _helper_impostor(path2imp, pair, training_mode=True, imp_gen: str = "mirror_
 
 def create_df(df_name: str, save_path: Path):
     train_df = get_df(split="train")
-    test_df = get_df(split="test")
+    test_df = pd.concat([get_df(split="test"), train_df], ignore_index=True)
     # TODO: Test on small data subsets, too small does not work for optimal threshold computation
     n_test = 100  # 10
     original_test_df = pd.concat(
@@ -252,7 +252,7 @@ def create_df(df_name: str, save_path: Path):
             )
             new_rows = test_df.loc[missing_mask].copy()
             max_workers = (
-                len(new_rows)
+                max(1, min(16, len(new_rows)))  # number of cpus cores = 16
                 if imp_gen
                 not in [
                     "mirror_minds",
@@ -261,8 +261,8 @@ def create_df(df_name: str, save_path: Path):
                     "non_naive_llm",
                     "llm",
                 ]
-                else max(1, 14 // _get_num_impostors(imp_gen))
-            )  # 14 per minute
+                else max(1, 4 // _get_num_impostors(imp_gen))
+            )  # 14 per minute, use fewer to be save
             if imp_gen in ["content", "mirror_minds"]:
                 results = []
                 for pair in new_rows["pair"]:
