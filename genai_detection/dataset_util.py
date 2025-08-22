@@ -1551,6 +1551,14 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
 
         loader = StudentEssayDatasetLoader(path=student_essay_base_dir)
         complete_df = loader._load_student_essays()
+        author_metadata = loader._load_student_metadata()
+
+        complete_df = complete_df.join(
+            author_metadata.set_index("author_id"),
+            on="author_id",
+            how="left",
+            rsuffix="_meta",
+        )
 
         all_paraphrasers_dict = get_paraphraser_dict()
         paraphrasers = {
