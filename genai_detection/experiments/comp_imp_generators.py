@@ -358,7 +358,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                     "non_naive_llm",
                     "llm",
                 ]
-                else 14 // _get_num_impostors(imp_gen)
+                else max(1, 14 // _get_num_impostors(imp_gen))
             )  # 14 per min
             if imp_gen in ["content", "mirror_minds"]:
                 results = []
