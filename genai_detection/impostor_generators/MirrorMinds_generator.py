@@ -76,9 +76,9 @@ class MirrorMindsGenerator(BaseImpostorGenerator):
                 response_config.input_path, response_config.output_path
             )
             if not df.empty:
-                impostor_texts[f"impostor_{i}_mirror_minds"] = df[
-                    "generated_text"
-                ].iloc[0]
+                val = df["generated_text"].iloc[0]
+                if pd.notna(val) and not (isinstance(val, float)):
+                    impostor_texts[f"impostor_{i}_mirror_minds"] = val
             else:
                 print(f"ERROR: No valid response generated. Original was: {text[:200]}")
                 impostor_texts[f"impostor_{i}_mirror_minds"] = (
