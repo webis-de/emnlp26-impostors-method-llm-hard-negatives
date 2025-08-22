@@ -739,11 +739,11 @@ class VisDetectors:
         )
         save_path.mkdir(parents=True, exist_ok=True)
         for format in ["svg"]:  # "png",
-            figure_name = (
-                f"roc_prec_recall_curve_dif_n_imp.{format}"
-                if len(args.keys()) == 0
-                else f"roc_prec_recall_curve_r{args['rounds']}_top{args['top_n']}_dif_n_imp.{format}"
-            )
+            if len(args.keys()) == 0:
+                figure_name = f"roc_prec_recall_curve_dif_n_imp.{format}"
+            else:
+                imp_gen = args.get("impostor_technique", "fixed")
+                figure_name = f"roc_prec_recall_curve_{imp_gen}_r{args['rounds']}_top{args['top_n']}_dif_n_imp.{format}"
             plt.savefig(save_path / figure_name)
         plt.close(fig)
 
@@ -837,8 +837,9 @@ class VisDetectors:
         else:
             loaded_data = {}
 
+        imp_gen = args.get("impostor_technique", "fixed")
         rows_without_scores, missing_scores_indices = self._helper_missing_scores(
-            train_dataset, loaded_data, n_imp
+            train_dataset, loaded_data, n_imp, imp_gen=imp_gen
         )
 
         if len(rows_without_scores) > 0:
@@ -852,7 +853,7 @@ class VisDetectors:
                         self._helper_impostor,
                         [path2imp] * len(rows_without_scores),
                         rows_without_scores["pair"],
-                        ["fixed"] * len(rows_without_scores),
+                        [imp_gen] * len(rows_without_scores),
                         [True] * len(rows_without_scores),  # training mode
                         [n_imp] * len(rows_without_scores),  # n_imp
                     )
@@ -867,7 +868,7 @@ class VisDetectors:
                 missing_scores_indices=missing_scores_indices,
                 missing_scores=missing_scores,
                 n_imp=n_imp,
-                imp_gen="fixed",
+                imp_gen=imp_gen,
             )
             with open(existing_scores_filename, "w") as f:
                 json.dump(loaded_data, f, indent=4)
@@ -892,7 +893,7 @@ class VisDetectors:
         )
 
         rows_without_scores, missing_scores_indices = self._helper_missing_scores(
-            test_dataset, loaded_data, n_imp
+            test_dataset, loaded_data, n_imp, imp_gen=imp_gen
         )
 
         if len(rows_without_scores) > 0:
@@ -907,7 +908,7 @@ class VisDetectors:
                         self._helper_impostor,
                         [path2imp] * len(test_dataset),
                         test_dataset["pair"],
-                        ["fixed"] * len(test_dataset),
+                        [imp_gen] * len(test_dataset),
                         [False] * len(test_dataset),  # testing mode
                         [n_imp] * len(test_dataset),  # n_imp
                     )
@@ -922,7 +923,7 @@ class VisDetectors:
                 missing_scores_indices=missing_scores_indices,
                 missing_scores=missing_scores,
                 n_imp=n_imp,
-                imp_gen="fixed",
+                imp_gen=imp_gen,
             )
             with open(existing_scores_filename, "w") as f:
                 json.dump(loaded_data, f, indent=4)
@@ -973,7 +974,7 @@ class VisDetectors:
             save_path.mkdir(parents=True, exist_ok=True)
             for format in ["svg"]:  # "png",
                 print(f"Saving confusion matrix to {save_path / filename}.{format}")
-                plt.savefig(save_path / f"{filename}.{format}")
+                plt.savefig(save_path / f"{filename}_{imp_gen}.{format}")
             plt.close()
         return precision, recall
 
