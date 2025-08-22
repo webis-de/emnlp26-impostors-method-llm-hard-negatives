@@ -123,7 +123,7 @@
 - [ ] do not optimize one approach, but compare different approaches
   - i.e. optimizing scores is not goal for the purpose of "the" AV model
   - Precision-Recall curve can be better than F1 score, bc we can decide what is the focus (i.e. high precision)
-- [ ] run `experiments/naive_paraphrasers_FPs.py` on cluster via `scripts/exp_naive_paraphrasers_FPs.sh`
+- [-] run `experiments/naive_paraphrasers_FPs.py` on cluster via `scripts/exp_naive_paraphrasers_FPs.sh`
   - Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
   - works, but rerun, when non-naive and llm data is available
   - results bad
@@ -139,7 +139,7 @@
   - [o] Fig 4 
     - [o] run all but on-the-fly on complete dataset (Student Essay looks good, Blog TODO)
     - [ ] run on-the-fly on subset bc free API calls limited to 250 queries per month
-- [o] Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
+- [-] Test whether Naive Paraphrasers risk FPs bc (hypothesis) paraphrasers (LLMs) knows too much about original
 - [o] Compare Impostor generators' effect on impostor detector scores (`comp_imp_generators.py`)
   - include MirrorMinds-LLMDetector as paraphrase generator
   - Done: text length, fixed, content, text_len, naive llm, mirror minds
@@ -209,11 +209,12 @@
   - [o] Fig 4 
     - [o] run all but on-the-fly on complete dataset (Student Essay looks good, Blog **TODO**)
     - [o] run on-the-fly on subset bc free API calls limited to 250 queries per month
-- [o] Compare Impostor generators' effect on impostor detector scores (`comp_imp_generators.py`)
+- [-] ~~Compare Impostor generators' effect on impostor detector scores (`comp_imp_generators.py`)~~
   - include MirrorMinds-LLMDetector as paraphrase generator
   - Done: text length, fixed, content, text_len, naive llm, mirror minds
   - Running (15.05.2025): llm, non naive llm
-  - **TODO**: on-the-fly (maybe not, i use my api calls for fig 4 reproduction)
+  - TODO: on-the-fly (maybe not, i use my api calls for fig 4 reproduction)
+  - is included in AV comparison experiment
 - [x] ~~IONOS paraphraser: `IONOSParaphraser`~~
 - [x] experiment: Syntactic similarity impact on impostor scores
 - [x] lowercasing texts for unmasking or other AV/AA: 

@@ -1,3 +1,5 @@
+# works, but is included in AV comparison experiment (which is also better visualized)
+
 import argparse
 import json
 from time import sleep
@@ -36,8 +38,8 @@ IMP_GEN_OPTIONS = [
     "text_len",
     "content",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores
     # "on-the-fly", # no more api calls
-    # "mirror_minds",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores, TODO: rerun bc in csv files is , missing
-    # "naive_llm",
+    "mirror_minds",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores, TODO: rerun bc in csv files is , missing
+    "naive_llm",  # TODO: failed bc API rate limit exceeded
     # "non_naive_llm"
     # "llm",
 ]
@@ -213,7 +215,7 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
             with open(save_path / train_scores_file_name, "r") as f:
                 df_from_json = json.load(f)
                 df_from_json = pd.DataFrame(df_from_json)
-            # FIXME
+
             if any(col not in df_from_json.columns for col in matching_cols):
                 df_from_json = _split_unhashable(df_from_json)
                 df_from_json.to_json(
@@ -379,11 +381,11 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                         )
                     )
 
-            # results is a list of tuples: (impostor_score, impostor_dict)
-            test_dataset.loc[missing_mask, col_score] = [score for score, _ in results]
-            test_dataset.loc[missing_mask, col_dict] = [
-                imp_dict for _, imp_dict in results
-            ]
+            # # results is a list of tuples: (impostor_score, impostor_dict)
+            # test_dataset.loc[missing_mask, col_score] = [score for score, _ in results]
+            # test_dataset.loc[missing_mask, col_dict] = [
+            #     imp_dict for _, imp_dict in results
+            # ]
 
         missing_pred_mask = (
             [t != opt_thres for t in test_dataset["thres"]]
@@ -671,6 +673,9 @@ def plot_threshold_curves_all(df: pd.DataFrame, save_path: Path, dataset_name: s
     ]
     for ax, metric, title, ylabel in zip(axes.flat, metrics, titles, ylabels):
         for i, (imp_gen, vals) in enumerate(scores_per_imp_gen_per_thres_dict.items()):
+            print(
+                f"Plotting {metric} for {imp_gen} with thresholds: {vals['thresholds']}"
+            )
             ax.plot(
                 vals["thresholds"],
                 vals[metric],
@@ -723,6 +728,7 @@ if __name__ == "__main__":
     print(
         "Visualizing accuracy, prec, recall, f1 per syntactic similarity for Student Essays dataset."
     )
+    # works, but is included in AV comparison experiment (which is also better visualized)
     plot_optimal_threshold_bars(
         df=student_test_df,
         save_path=SAVE_PATH,
