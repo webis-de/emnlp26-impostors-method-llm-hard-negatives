@@ -519,6 +519,110 @@ def plot_model_metrics(
             plt.close()
 
 
+def plot_model_metrics_per_data_category(
+    n_paragraphs_df: pd.DataFrame,
+    save_dir: str = "model_plots",
+    show: bool = True,
+    save: bool = True,
+    figsize=(10, 6),
+    data_category: str = "News",
+):
+    """
+    Create and save line plots of metric scores per model over num_chunks.
+
+    Parameters:
+    - n_paragraphs_df: list of pandas DataFrames with columns ['model', 'prompt', 'num_chunks', <metric columns>]
+    - save_dir: directory to save plots (default "model_plots")
+    - show: whether to display plots using plt.show()
+    - save: whether to save plots to disk
+    - figsize: figure size for each plot
+    """
+
+    # Combine all DataFrames
+    combined_df = pd.concat(n_paragraphs_df, ignore_index=True)
+
+    # Identify models and metrics
+    data_categories = combined_df["category"].unique()
+    for category in data_categories:
+        df_category = combined_df[combined_df["category"] == category]
+        print(f"Plot metrics for data category: {category}")
+        models = df_category["model"].unique()
+        metric_cols = [
+            col
+            for col in df_category.columns
+            if col not in ["model", "prompt", "num_chunks"]
+            and pd.api.types.is_numeric_dtype(df_category[col])
+        ]
+
+        # Ensure save directory exists
+        if save:
+            os.makedirs(save_dir, exist_ok=True)
+
+        # Get color map with enough unique colors
+        colors = sns.color_palette("colorblind", len(metric_cols))
+        line_styles = ["-", "--", "-.", ":"]
+        markers = ["o", "s", "^", "D", "v", "P", "*", "X", "<", ">", "H", "|", "_"]
+
+        # Loop over each model
+        for model in models:
+            df_model = df_category[df_category["model"] == model]
+
+            # Group by num_chunks
+            grouped = df_model.groupby("num_chunks")
+            mean_df = grouped[metric_cols].mean()
+            std_df = grouped[metric_cols].std()
+            x = mean_df.index
+
+            # Plot
+            plt.figure(figsize=figsize)
+            for i, metric in enumerate(metric_cols):
+                color = colors[i % len(colors)]
+                linestyle = line_styles[i % len(line_styles)]
+                marker = markers[i % len(markers)]
+                plt.plot(
+                    x,
+                    mean_df[metric],
+                    label=metric,
+                    color=color,
+                    linestyle=linestyle,
+                    marker=marker,
+                )
+                plt.fill_between(
+                    x,
+                    mean_df[metric] - std_df[metric],
+                    mean_df[metric] + std_df[metric],
+                    color=color,
+                    alpha=0.3,
+                )
+
+            plt.title(f"Metrics for paraphraser: {model}")
+            plt.xlabel("num_chunks")
+            plt.ylabel("Score")
+            plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
+            plt.legend(
+                title="Metric",
+                bbox_to_anchor=(1.05, 1),
+                loc="upper left",
+                borderaxespad=0.0,
+            )
+            plt.grid(True)
+            plt.tight_layout()
+
+            # Save plot
+            if save:
+                path = save_dir / f"category_{category}"
+                path.mkdir(parents=True, exist_ok=True)
+                filename = os.path.join(
+                    path, f"{model}_metrics_plot_category_{category}.svg"
+                )
+                plt.savefig(filename, format="svg", bbox_inches="tight")
+
+            if show:
+                plt.show()
+            else:
+                plt.close()
+
+
 if __name__ == "__main__":
     # TODO: Should work, run this on all paraphrasers. First test with only up to two chunks
     # cannot test it on 15.08.2025 in the morning, because other script uses all api calls
@@ -577,7 +681,14 @@ if __name__ == "__main__":
         assert type(results) is list, "Results should be a list."
         slim_df = get_slim_dfs_for_one_text(results)
         assert type(slim_df) is list, "Slim DataFrame should be a list of DataFrames."
-        plot_model_metrics(
+        # plot_model_metrics(
+        #     n_paragraphs_df=slim_df,
+        #     save_dir=SAVE_PATH / "cross_genre" / "plots",
+        #     show=False,
+        #     save=True,
+        #     data_category="Cross-Genre",
+        # )
+        plot_model_metrics_per_data_category(
             n_paragraphs_df=slim_df,
             save_dir=SAVE_PATH / "cross_genre" / "plots",
             show=False,
