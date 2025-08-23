@@ -41,14 +41,14 @@ SAVE_PATH = (
     / "impostor_generator_comparison"
 )
 IMP_GEN_OPTIONS = [
-    # "naive_llm",
-    # "non_naive_llm",
-    # "llm",
+    "naive_llm",
+    "mirror_minds",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores, TODO: rerun bc in csv files is , missing
+    "non_naive_llm",
+    "llm",
     "fixed",
     "text_len",
     "content",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores
     # "on-the-fly", # no more api calls
-    # "mirror_minds",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores, TODO: rerun bc in csv files is , missing
 ]
 
 BASELINES = [
@@ -233,8 +233,8 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 test_dataset.index.names = matching_cols
                 test_dataset.reset_index(inplace=True)
         # TODO: only to avoid generation
-        else:
-            continue
+        # else:
+        #     continue
 
         missing_mask = (
             test_dataset[col_score].isna()
@@ -243,61 +243,61 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
         )
         if missing_mask.sum() > 0:
             # TODO: uncomment this for generation
-            print(
-                f"Only eval, skipping generation for {missing_mask.sum()} pairs und keep only existent scores."
-            )
-            test_dataset = test_dataset[test_dataset[col_score].notna()]
-
             # print(
-            #     f"DEBUG Missing {col_score} in {missing_mask.sum()} rows of test dataset for {imp_gen} generator."
+            #     f"Only eval, skipping generation for {missing_mask.sum()} pairs und keep only existent scores."
             # )
-            # new_rows = test_dataset.loc[missing_mask].copy()
-            # max_workers = (
-            #     len(new_rows)
-            #     if imp_gen
-            #     not in [
-            #         "mirror_minds",
-            #         "on-the-fly",
-            #         "naive_llm",
-            #         "non_naive_llm",
-            #         "llm",
-            #     ]
-            #     else max(1, 14 // _get_num_impostors(imp_gen))
-            # )  # 14 per min
-            # if imp_gen in ["content", "mirror_minds"]:
-            #     results = []
-            #     for pair in new_rows["pair"]:
-            #         res = _helper_impostor(
-            #             path2imp, pair, training_mode=False, imp_gen=imp_gen
-            #         )
-            #         results.append(res)
-            # else:
-            #     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            #         results = list(
-            #             executor.map(
-            #                 _helper_impostor,
-            #                 [path2imp] * len(new_rows),
-            #                 new_rows["pair"],
-            #                 [False] * len(new_rows),
-            #                 [imp_gen] * len(new_rows),
-            #             )
-            #         )
+            # test_dataset = test_dataset[test_dataset[col_score].notna()]
 
-            # # results is a list of tuples: (impostor_score, impostor_dict)
-            # test_dataset.loc[missing_mask, col_score] = [score for score, _ in results]
-            # test_dataset.loc[missing_mask, col_dict] = [
-            #     imp_dict for _, imp_dict in results
-            # ]
+            print(
+                f"DEBUG Missing {col_score} in {missing_mask.sum()} rows of test dataset for {imp_gen} generator."
+            )
+            new_rows = test_dataset.loc[missing_mask].copy()
+            max_workers = (
+                len(new_rows)
+                if imp_gen
+                not in [
+                    "mirror_minds",
+                    "on-the-fly",
+                    "naive_llm",
+                    "non_naive_llm",
+                    "llm",
+                ]
+                else max(1, 14 // _get_num_impostors(imp_gen))
+            )  # 14 per min
+            if imp_gen in ["content", "mirror_minds"]:
+                results = []
+                for pair in new_rows["pair"]:
+                    res = _helper_impostor(
+                        path2imp, pair, training_mode=False, imp_gen=imp_gen
+                    )
+                    results.append(res)
+            else:
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    results = list(
+                        executor.map(
+                            _helper_impostor,
+                            [path2imp] * len(new_rows),
+                            new_rows["pair"],
+                            [False] * len(new_rows),
+                            [imp_gen] * len(new_rows),
+                        )
+                    )
+
+            # results is a list of tuples: (impostor_score, impostor_dict)
+            test_dataset.loc[missing_mask, col_score] = [score for score, _ in results]
+            test_dataset.loc[missing_mask, col_dict] = [
+                imp_dict for _, imp_dict in results
+            ]
 
         # TODO: uncomment this for generation
-        # if missing_mask.sum() > 0:
-        #     test_dataset.to_json(
-        #         save_path / test_scores_file_name, orient="records", indent=4
-        #     )
-        #     print(
-        #         "DEBUG: Saved test dataset with predictions to JSON, path:",
-        #         save_path / test_scores_file_name,
-        #     )
+        if missing_mask.sum() > 0:
+            test_dataset.to_json(
+                save_path / test_scores_file_name, orient="records", indent=4
+            )
+            print(
+                "DEBUG: Saved test dataset with predictions to JSON, path:",
+                save_path / test_scores_file_name,
+            )
 
         # NEVER COMMENT THIS: Add missing columns from train_dataset, initialized with NaN
         original_test_dataset = original_test_dataset.reindex(
