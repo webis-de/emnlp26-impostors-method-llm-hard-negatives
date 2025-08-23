@@ -568,9 +568,12 @@ def get_scores_dict_for_diff_thres(df: pd.DataFrame):
                 continue
             if group_name == "LLM-LLM_different":
                 # we only want to detect if artificial generation is involved in disputed text
-                y_true = [
-                    author in llm_names for author in group_df["disputed_author"].values
-                ]
+                y_true = np.array(
+                    [
+                        author in llm_names
+                        for author in group_df["disputed_author"].values
+                    ]
+                )
             else:
                 y_true = group_df["same"].values
             y_scores = (
