@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
+from time import sleep
 
 import evaluate
 import numpy as np
@@ -144,14 +145,17 @@ def _helper_impostor(path2imp, pair, training_mode=True):
     imp_gen = "llm"  # "fixed"
     impostor_detector = ImpostorDetector(
         impostor_technique=imp_gen,
-        n_impostors=50 if imp_gen != "llm" else 5,
+        n_impostors=50,
         rounds=100,  # cf. pg. 181, Koppel et al. (2014)
         top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
         path2imp=path2imp,
         upsample=False,
     )
     impostor_detector.set_training_mode(training_mode)
-    return impostor_detector._get_score_impl(pair)
+    score = impostor_detector._get_score_impl(pair)
+    if imp_gen in ["llm", "naive_llm", "non_naive_llm"]:
+        sleep(60)
+    return score
 
 
 def create_df(path2dataset: str, dataset_name: str, save_path: Path):
@@ -416,6 +420,7 @@ def vis_acc_per_syn_sim(score_sim_df: pd.DataFrame, save_path: Path, dataset_nam
 
 
 if __name__ == "__main__":
+    # FIXME: vis worked but all scores are zero (20.08, morning)
     # Run the experiment
     if not SAVE_PATH.exists():
         SAVE_PATH.mkdir(parents=True, exist_ok=True)
