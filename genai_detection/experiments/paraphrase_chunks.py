@@ -474,24 +474,25 @@ def plot_model_metrics(
         # Plot
         plt.figure(figsize=figsize)
         for i, metric in enumerate(metric_cols):
-            color = colors[i % len(colors)]
-            linestyle = line_styles[i % len(line_styles)]
-            marker = markers[i % len(markers)]
-            plt.plot(
-                x,
-                mean_df[metric],
-                label=metric,
-                color=color,
-                linestyle=linestyle,
-                marker=marker,
-            )
-            plt.fill_between(
-                x,
-                mean_df[metric] - std_df[metric],
-                mean_df[metric] + std_df[metric],
-                color=color,
-                alpha=0.3,
-            )
+            if metric != "temperature":
+                color = colors[i % len(colors)]
+                linestyle = line_styles[i % len(line_styles)]
+                marker = markers[i % len(markers)]
+                plt.plot(
+                    x,
+                    mean_df[metric],
+                    label=metric,
+                    color=color,
+                    linestyle=linestyle,
+                    marker=marker,
+                )
+                plt.fill_between(
+                    x,
+                    mean_df[metric] - std_df[metric],
+                    mean_df[metric] + std_df[metric],
+                    color=color,
+                    alpha=0.3,
+                )
 
         plt.title(f"Metrics for paraphraser: {model}")
         plt.xlabel("num_chunks")
@@ -576,24 +577,25 @@ def plot_model_metrics_per_data_category(
             # Plot
             plt.figure(figsize=figsize)
             for i, metric in enumerate(metric_cols):
-                color = colors[i % len(colors)]
-                linestyle = line_styles[i % len(line_styles)]
-                marker = markers[i % len(markers)]
-                plt.plot(
-                    x,
-                    mean_df[metric],
-                    label=metric,
-                    color=color,
-                    linestyle=linestyle,
-                    marker=marker,
-                )
-                plt.fill_between(
-                    x,
-                    mean_df[metric] - std_df[metric],
-                    mean_df[metric] + std_df[metric],
-                    color=color,
-                    alpha=0.3,
-                )
+                if metric != "temperature":
+                    color = colors[i % len(colors)]
+                    linestyle = line_styles[i % len(line_styles)]
+                    marker = markers[i % len(markers)]
+                    plt.plot(
+                        x,
+                        mean_df[metric],
+                        label=metric,
+                        color=color,
+                        linestyle=linestyle,
+                        marker=marker,
+                    )
+                    plt.fill_between(
+                        x,
+                        mean_df[metric] - std_df[metric],
+                        mean_df[metric] + std_df[metric],
+                        color=color,
+                        alpha=0.3,
+                    )
 
             plt.title(f"Metrics for paraphraser: {model}")
             plt.xlabel("num_chunks")
@@ -681,13 +683,13 @@ if __name__ == "__main__":
         assert type(results) is list, "Results should be a list."
         slim_df = get_slim_dfs_for_one_text(results)
         assert type(slim_df) is list, "Slim DataFrame should be a list of DataFrames."
-        # plot_model_metrics(
-        #     n_paragraphs_df=slim_df,
-        #     save_dir=SAVE_PATH / "cross_genre" / "plots",
-        #     show=False,
-        #     save=True,
-        #     data_category="Cross-Genre",
-        # )
+        plot_model_metrics(
+            n_paragraphs_df=slim_df,
+            save_dir=SAVE_PATH / "cross_genre" / "plots",
+            show=False,
+            save=True,
+            data_category="Cross-Genre",
+        )
         plot_model_metrics_per_data_category(
             n_paragraphs_df=slim_df,
             save_dir=SAVE_PATH / "cross_genre" / "plots",
