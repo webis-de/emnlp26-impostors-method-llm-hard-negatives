@@ -528,16 +528,14 @@ def get_scores_dict_for_diff_thres(df: pd.DataFrame):
     group2a = df[
         df["candidate_author"].isin(llm_names)
     ]  # human-LLM: All text pairs where candidate is LLM (LLM detection)
-    group3a = df[
-        df["disputed_author"].isin(llm_names)
-    ]  # disputed_author is LLM, LLM AV with human candidate texts
+    group3a = group2a  # candidate is LLM, LLM AV with human and llm disputed texts (other way arounf does not work, bc there are no human candidates for llm disputed texts in this dataset)
     group3b = df[
         df["candidate_author"].isin(llm_names) & df["disputed_author"].isin(llm_names)
     ]  # LLM Author Verification
     groups = {
         "Human-Human-(AV)": group1,  # disputed is always human
         "LLM-Detection": group2a,  # detect if LLM involved; candidate is always LLM
-        "LLM-AV": group3a,  # disputed is always LLM
+        "LLM-AV": group3a,  # candidate is LLM, LLM AV with human and llm disputed texts (other way arounf does not work, bc there are no human candidates for llm disputed texts in this dataset)
         "LLM-AV-(only-LLMs)": group3b,  # disputed + candidate is always LLM
     }
 
@@ -585,8 +583,8 @@ def plot_threshold_curves_all_single(df: pd.DataFrame, save_path: Path, df_name:
     group_descriptions = {
         "Human-Human-(AV)": "no artificial generation",
         "LLM-Detection": "LLM candidate",
-        "LLM-AV": "LLM disputed text",
-        "LLM-AV-(only-LLMs)": "disputed & candidate LLM.",
+        "LLM-AV": r"$\geq 1 \text{ LLM text}$",
+        "LLM-AV-(only-LLMs)": "disputed & candidate LLM",
     }
     for (
         scenario_name,
@@ -655,7 +653,7 @@ def plot_threshold_curves_all_single(df: pd.DataFrame, save_path: Path, df_name:
             plt.ylabel(ylabel, fontsize=14)
             plt.ylim(0, 1)
             plt.title(
-                f"{title}\nin {' '.join(scenario_name.split('_')[:2])} scenario\n({group_descriptions[scenario_name]})",
+                f"{title}\nin {' '.join(scenario_name.split('-')[:2])} scenario\n({group_descriptions[scenario_name]})",
                 fontsize=14,
             )
             plt.grid(False)
