@@ -524,29 +524,20 @@ def get_scores_dict_for_diff_thres(df: pd.DataFrame):
     ]
 
     # group 3 scenarios together, i.e. same LLM, different LLMs, human-LLM
-    group1 = df[df["artificial_generation"] == False]  # human-human
-    group2 = df[
-        (df["candidate_author"].isin(llm_names) & df["artificial_generation"] == True)
-    ]  # human-LLM
-    group3a = df[
-        (df["artificial_generation"] == True)
-        & df["candidate_author"].isin(llm_names)
-        & df["disputed_author"].isin(llm_names)
-    ]  # llm-llm same (i.e. can we distinguish between different llms? each LLM is one author). We need both authors to be LLMs.
-    group3b = df[
-        (df["artificial_generation"] == True)
-        & (
-            df["candidate_author"].isin(llm_names)
-            | df["disputed_author"].isin(llm_names)
-        )
-    ]  # llm-llm same (i.e. can we distinguish between different llms? each LLM is one author). We need both authors to be LLMs.
-    group4 = group3b  # llm-llm different (i.e. can identify LLMs as author? -> all LLMs are considered one author). We need at least one LLM in each pair.
+    group1 = df[df["artificial_generation"] == False]  # human-human (AV)
+    group2a = df[
+        df["candidate_author"].isin(llm_names)
+    ]  # human-LLM: All texts with where candidate is either human or LLM, but disputed is human (LLM detection)
+    group3 = df[
+        df["candidate_author"].isin(llm_names) & df["disputed_author"].isin(llm_names)
+    ]  # llm-llm same: both authors are LLMs. (LLM Author Verification)
+
+    group2b = group2a  # llm-llm different (i.e. can identify LLMs as author? -> all LLMs are considered one author). We need at least one LLM in each pair.
     groups = {
-        "Human-Human": group1,
-        "Human-LLM": group2,
-        "LLM-LLM_same_only_llm": group3a,
-        "LLM-LLM_same_at_least_one_llm": group3b,
-        "LLM-LLM_different": group4,
+        "Human-Human-(AV)": group1,
+        "Human-LLM-(LLM-Detection)": group2a,
+        "Human-LLM-(LLM-AV)": group2b,
+        "LLM-LLM-(AV)": group3,
     }
 
     for group_name, group_df in groups.items():
@@ -566,7 +557,7 @@ def get_scores_dict_for_diff_thres(df: pd.DataFrame):
                     f"ERROR: Skipping {imp_gen} as it is not in the DataFrame columns."
                 )
                 continue
-            if group_name == "LLM-LLM_different":
+            if group_name == "Human-LLM-(LLM-Detection)":
                 # we only want to detect if artificial generation is involved in disputed text
                 y_true = np.array(
                     [
