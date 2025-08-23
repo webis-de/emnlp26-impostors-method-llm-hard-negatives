@@ -527,17 +527,18 @@ def get_scores_dict_for_diff_thres(df: pd.DataFrame):
     group1 = df[df["artificial_generation"] == False]  # human-human (AV)
     group2a = df[
         df["candidate_author"].isin(llm_names)
-    ]  # human-LLM: All texts with where candidate is either human or LLM, but disputed is human (LLM detection)
-    group3 = df[
+    ]  # human-LLM: All text pairs where candidate is LLM (LLM detection)
+    group3a = df[
+        df["disputed_author"].isin(llm_names)
+    ]  # disputed_author is LLM, LLM AV with human candidate texts
+    group3b = df[
         df["candidate_author"].isin(llm_names) & df["disputed_author"].isin(llm_names)
-    ]  # llm-llm same: both authors are LLMs. (LLM Author Verification)
-
-    group2b = group2a  # llm-llm different (i.e. can identify LLMs as author? -> all LLMs are considered one author). We need at least one LLM in each pair.
+    ]  # LLM Author Verification
     groups = {
-        "Human-Human-(AV)": group1,
-        "Human-LLM-(LLM-Detection)": group2a,
-        "Human-LLM-(LLM-AV)": group2b,
-        "LLM-LLM-(AV)": group3,
+        "Human-Human-(AV)": group1,  # disputed is always human
+        "LLM-Detection": group2a,  # detect if LLM involved; candidate is always LLM
+        "LLM-AV": group3a,  # disputed is always LLM
+        "LLM-AV-(only-LLMs)": group3b,  # disputed + candidate is always LLM
     }
 
     for group_name, group_df in groups.items():
@@ -557,7 +558,7 @@ def get_scores_dict_for_diff_thres(df: pd.DataFrame):
                     f"ERROR: Skipping {imp_gen} as it is not in the DataFrame columns."
                 )
                 continue
-            if group_name == "Human-LLM-(LLM-Detection)":
+            if group_name == "LLM-Detection":
                 # we only want to detect if artificial generation is involved in disputed text
                 y_true = np.array(
                     [
@@ -581,6 +582,12 @@ def get_scores_dict_for_diff_thres(df: pd.DataFrame):
 
 def plot_threshold_curves_all_single(df: pd.DataFrame, save_path: Path, df_name: str):
     scores_diff_scenarios = get_scores_dict_for_diff_thres(df)
+    group_descriptions = {
+        "Human-Human-(AV)": "no artificial generation",
+        "LLM-Detection": "LLM candidate",
+        "LLM-AV": "LLM disputed text",
+        "LLM-AV-(only-LLMs)": "disputed & candidate LLM.",
+    }
     for (
         scenario_name,
         scores_per_imp_gen_per_thres_dict,
@@ -648,7 +655,8 @@ def plot_threshold_curves_all_single(df: pd.DataFrame, save_path: Path, df_name:
             plt.ylabel(ylabel, fontsize=14)
             plt.ylim(0, 1)
             plt.title(
-                f"{title}\nin {scenario_name.replace('_', ' ')} scenario", fontsize=14
+                f"{title}\nin {' '.join(scenario_name.split('_')[:2])} scenario\n({group_descriptions[scenario_name]})",
+                fontsize=14,
             )
             plt.grid(False)
             plt.legend(
