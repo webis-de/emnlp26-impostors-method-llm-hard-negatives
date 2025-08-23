@@ -54,7 +54,7 @@ IMP_GEN_OPTIONS = [
     # "non_naive_llm",
     # "llm",
     # "on-the-fly", # no more api calls
-    "mirror_minds",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores, TODO: rerun bc in csv files is , missing
+    "mirror_minds",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores
     "naive_llm",
 ]
 
@@ -528,16 +528,24 @@ def get_scores_dict_for_diff_thres(df: pd.DataFrame):
     group2 = df[
         (df["candidate_author"].isin(llm_names) & df["artificial_generation"] == True)
     ]  # human-LLM
-    group3 = df[
-        (df["artificial_generation"] == True) & (df["same"] == True)
-    ]  # llm-llm same
-    group4 = df[
-        (df["artificial_generation"] == True) & (df["same"] == False)
-    ]  # llm-llm different
+    group3a = df[
+        (df["artificial_generation"] == True)
+        & df["candidate_author"].isin(llm_names)
+        & df["disputed_author"].isin(llm_names)
+    ]  # llm-llm same (i.e. can we distinguish between different llms? each LLM is one author). We need both authors to be LLMs.
+    group3b = df[
+        (df["artificial_generation"] == True)
+        & (
+            df["candidate_author"].isin(llm_names)
+            | df["disputed_author"].isin(llm_names)
+        )
+    ]  # llm-llm same (i.e. can we distinguish between different llms? each LLM is one author). We need both authors to be LLMs.
+    group4 = group3b  # llm-llm different (i.e. can identify LLMs as author? -> all LLMs are considered one author). We need at least one LLM in each pair.
     groups = {
         "Human-Human": group1,
         "Human-LLM": group2,
-        "LLM-LLM_same": group3,
+        "LLM-LLM_same_only_llm": group3a,
+        "LLM-LLM_same_at_least_one_llm": group3b,
         "LLM-LLM_different": group4,
     }
 
@@ -558,7 +566,13 @@ def get_scores_dict_for_diff_thres(df: pd.DataFrame):
                     f"ERROR: Skipping {imp_gen} as it is not in the DataFrame columns."
                 )
                 continue
-            y_true = group_df["same"].values
+            if group_name == "LLM-LLM_different":
+                # we only want to detect if artificial generation is involved in disputed text
+                y_true = [
+                    author in llm_names for author in group_df["disputed_author"].values
+                ]
+            else:
+                y_true = group_df["same"].values
             y_scores = (
                 group_df[f"impostor_score_{imp_gen}"].values
                 if imp_gen in IMP_GEN_OPTIONS
