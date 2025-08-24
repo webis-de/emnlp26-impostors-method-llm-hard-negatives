@@ -224,8 +224,7 @@ class ParaphrasingEvaluator:
 
         if time_period > 100:
             century = time_period // 100
-            if time_period % 100 != 0:
-                century += 1
+            century += 1
             return int(century)
         return int(time_period)
 
