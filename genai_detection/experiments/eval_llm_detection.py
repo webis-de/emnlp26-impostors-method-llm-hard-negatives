@@ -578,7 +578,55 @@ def get_scores_dict_for_diff_thres(df: pd.DataFrame):
     return scores_per_imp_gen_per_thres
 
 
+def plot_rocs_threshold_imposter(
+    df, savefig_basepath: str = None, pos_label: int = 1, title_kwargs: dict = None
+):
+    for imp_gen in IMP_GEN_OPTIONS + BASELINES:
+        y_true = df["same"].values
+        y_scores = (
+            df[f"impostor_score_{imp_gen}"].values
+            if imp_gen in IMP_GEN_OPTIONS
+            else df[f"{imp_gen.replace(' ','_')}_score"].values
+        )
+
+        # ROC Curve: Balanced classes or when you care about TPR vs. FPR
+        # displayed for different thresholds
+        # scores: probability estimates of the positive class, confidence values, or non-thresholded measure of decisions (as returned by “decision_function” on some classifiers)
+        # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.roc_curve.html (05.06.2025)
+        fpr, tpr, roc_thresholds = roc_curve(
+            y_true=y_true, y_score=y_scores, pos_label=pos_label
+        )
+        plt.plot(fpr, tpr, label="ROC Curve")
+    plt.plot([0, 1], [0, 1], linestyle="--", color="gray")
+    plt.xlabel("False Positive Rate $FPR = 1 - \\frac{{TN}}{{TN + FP}}$", fontsize=14)
+    plt.ylabel("True Positive Rate $TPR = R = \\frac{{TP}}{{TP + FN}}$", fontsize=14)
+    title = "ROC Curve" if not title_kwargs else f"ROC Curve\n{title_kwargs}"
+    plt.title(title)
+    plt.legend()
+    plt.tight_layout()
+    if savefig_basepath:
+        figure_name = (
+            "roc_curve.svg"
+            if not title_kwargs
+            else f"roc_curve_dif_impg_gen_{title_kwargs['dataset_name']}.svg"
+        )
+        savefig = os.path.join(savefig_basepath, figure_name)
+        plt.savefig(savefig)
+    plt.show()
+    plt.close()
+
+
 def plot_threshold_curves_all_single(df: pd.DataFrame, save_path: Path, df_name: str):
+    # ROC curve for each impostor generator
+    plot_rocs_threshold_imposter(
+        df,
+        pos_label=1,
+        title_kwargs={"dataset_name": df_name},
+        savefig_basepath=save_path,
+    )
+    # TODO: for testing
+    return None
+
     scores_diff_scenarios = get_scores_dict_for_diff_thres(df)
     group_descriptions = {
         "Human-Human-(AV)": "no artificial generation",
