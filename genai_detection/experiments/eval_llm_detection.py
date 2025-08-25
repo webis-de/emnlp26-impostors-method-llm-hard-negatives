@@ -596,7 +596,7 @@ def plot_rocs_threshold_imposter(
         fpr, tpr, roc_thresholds = roc_curve(
             y_true=y_true, y_score=y_scores, pos_label=pos_label
         )
-        plt.plot(fpr, tpr, label="ROC Curve")
+        plt.plot(fpr, tpr, label=imp_gen)
     plt.plot([0, 1], [0, 1], linestyle="--", color="gray")
     plt.xlabel("False Positive Rate $FPR = 1 - \\frac{{TN}}{{TN + FP}}$", fontsize=14)
     plt.ylabel("True Positive Rate $TPR = R = \\frac{{TP}}{{TP + FN}}$", fontsize=14)
