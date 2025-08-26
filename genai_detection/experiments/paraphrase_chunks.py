@@ -43,7 +43,7 @@ CATEGORIES = [
     "Blog",
     # "News",
     "Gutenberg",
-    "Student Essay",
+    "Student Essays",
 ]
 PROMPTS = [
     "Paraphrase the given sentence by identifying the main subject, verb, and object. Replace each with synonyms or closely related words, adjusting grammar naturally. Keep the new sentence close in length to the original. Output only the final paraphrased sentence.",
@@ -451,6 +451,7 @@ def chunk_difference_df(slim_df: pd.DataFrame, save_dir: Path) -> pd.DataFrame:
             df_model_category = df_model[df_model["category"] == data_category]
 
             if df_model_category.empty:
+                print(f"Skipping model {model} for category {data_category} (no data).")
                 continue
 
             grouped = df_model_category.groupby("num_chunks")[
@@ -473,8 +474,8 @@ def chunk_difference_df(slim_df: pd.DataFrame, save_dir: Path) -> pd.DataFrame:
                 {
                     "category": data_category,
                     "model_type": model_type,
-                    "syn_diff": syn_n - syn_1,
-                    "sem_diff": sem_n - sem_1,
+                    "syn_diff": np.round(syn_n - syn_1, 2),
+                    "sem_diff": np.round(sem_n - sem_1, 2),
                 }
             )
 
@@ -485,6 +486,9 @@ def chunk_difference_df(slim_df: pd.DataFrame, save_dir: Path) -> pd.DataFrame:
     summary_df = (
         diff_df.groupby(["category", "model_type"]).agg(["mean", "std"]).sort_index()
     )
+
+    # round to 2 decimal places
+    summary_df = summary_df.round(2)
 
     # Flatten column names
     summary_df.columns = ["_".join(col) for col in summary_df.columns]
