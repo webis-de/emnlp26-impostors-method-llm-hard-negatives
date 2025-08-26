@@ -421,6 +421,80 @@ def get_slim_dfs_for_one_text(n_paragraphs_df: list) -> list:  # of dataframes
     return slim_n_paragraphs_dfs
 
 
+def chunk_difference_df(slim_df: pd.DataFrame, save_dir: Path) -> pd.DataFrame:
+    """
+    Compute mean and std of difference in metric scores between chunked paraphrasing
+    and full-text paraphrasing, aggregated by two-step vs. one-step models.
+
+    Parameters:
+    - slim_df: pandas DataFrame with columns
+               ['model', 'prompt', 'num_chunks', 'category', 'syn_sim_avg', 'sem_sim_avg']
+    - save_dir: directory to save results
+
+    Returns:
+    - A pandas DataFrame with MultiIndex (category, model_type)
+      containing mean and std of the differences.
+    """
+    combined_df = slim_df
+    models = combined_df["model"].unique()
+
+    os.makedirs(save_dir, exist_ok=True)
+    results = []
+
+    two_step_models = {"Topic", "Task", "Title", "Translation", "BulletPoint"}
+
+    # Loop over each model
+    for model in models:
+        df_model = combined_df[combined_df["model"] == model]
+
+        for data_category in CATEGORIES:
+            df_model_category = df_model[df_model["category"] == data_category]
+
+            if df_model_category.empty:
+                continue
+
+            grouped = df_model_category.groupby("num_chunks")[
+                ["syn_sim_avg", "sem_sim_avg"]
+            ].mean()
+
+            if 1 not in grouped.index:
+                print(
+                    f"Skipping model {model} for category {data_category} (no 1-chunk results)."
+                )
+                continue
+
+            syn_1, sem_1 = grouped.loc[1]
+            max_chunks = grouped.index.max()
+            syn_n, sem_n = grouped.loc[max_chunks]
+
+            model_type = "two-step" if model in two_step_models else "one-step"
+
+            results.append(
+                {
+                    "category": data_category,
+                    "model_type": model_type,
+                    "syn_diff": syn_n - syn_1,
+                    "sem_diff": sem_n - sem_1,
+                }
+            )
+
+    # Build dataframe of differences
+    diff_df = pd.DataFrame(results)
+
+    # Aggregate mean + std for each category × model_type
+    summary_df = (
+        diff_df.groupby(["category", "model_type"]).agg(["mean", "std"]).sort_index()
+    )
+
+    # Flatten column names
+    summary_df.columns = ["_".join(col) for col in summary_df.columns]
+
+    # Save
+    summary_df.to_csv(os.path.join(save_dir, "syn_sem_diff_summary.csv"))
+
+    return summary_df
+
+
 def plot_model_metrics(
     n_paragraphs_df: pd.DataFrame,
     save_dir: str = "model_plots",
@@ -654,47 +728,54 @@ if __name__ == "__main__":
     paraphrase_save_path = SAVE_PATH / "cross_genre" / "paraphrases_per_text"
     paraphrase_save_path.mkdir(parents=True, exist_ok=True)
 
-    # works on minimal example (15.08.2025)
-    if args.task == "create":
-        # only create paraphrasers and save them
-        print(f"Creating and saving paraphrasers to {paraphrase_save_path}.")
+    diff_df_loaded = pd.read_csv(
+        os.path.join(
+            paraphrase_save_path.parent, "text_paraphrases_evaluation_results.csv"
+        )
+    )
+    chunk_difference_df(slim_df=diff_df_loaded, save_dir=paraphrase_save_path.parent)
 
-        create_and_save_paraphrasers(
-            path2dataset=args.path2dataset,
-            save_path=paraphrase_save_path,
-        )
-        print(
-            f"Paraphrasers created and saved to {paraphrase_save_path}. Next, run the evaluation."
-        )
+    # # works on minimal example (15.08.2025)
+    # if args.task == "create":
+    #     # only create paraphrasers and save them
+    #     print(f"Creating and saving paraphrasers to {paraphrase_save_path}.")
 
-    # works on minimal example (15.08.2025)
-    elif args.task == "evaluate":
-        print(
-            f"Paraphrasers created and saved to {paraphrase_save_path}. Next, run the evaluation."
-        )
+    #     create_and_save_paraphrasers(
+    #         path2dataset=args.path2dataset,
+    #         save_path=paraphrase_save_path,
+    #     )
+    #     print(
+    #         f"Paraphrasers created and saved to {paraphrase_save_path}. Next, run the evaluation."
+    #     )
 
-        results = evaluate_paraphrases(
-            path2dataset=paraphrase_save_path,
-            save_path=SAVE_PATH / "cross_genre",
-        )
-        print(
-            f"Evaluation results saved to {SAVE_PATH / 'cross_genre' / 'text_paraphrases_evaluation_results.csv'}."
-        )
-        assert type(results) is list, "Results should be a list."
-        slim_df = get_slim_dfs_for_one_text(results)
-        assert type(slim_df) is list, "Slim DataFrame should be a list of DataFrames."
-        plot_model_metrics(
-            n_paragraphs_df=slim_df,
-            save_dir=SAVE_PATH / "cross_genre" / "plots",
-            show=False,
-            save=True,
-            data_category="Cross-Genre",
-        )
-        plot_model_metrics_per_data_category(
-            n_paragraphs_df=slim_df,
-            save_dir=SAVE_PATH / "cross_genre" / "plots",
-            show=False,
-            save=True,
-            data_category="Cross-Genre",
-        )
-        print("Plots saved to plots directory:", SAVE_PATH / "cross_genre" / "plots")
+    # # works on minimal example (15.08.2025)
+    # elif args.task == "evaluate":
+    #     print(
+    #         f"Paraphrasers created and saved to {paraphrase_save_path}. Next, run the evaluation."
+    #     )
+
+    #     results = evaluate_paraphrases(
+    #         path2dataset=paraphrase_save_path,
+    #         save_path=SAVE_PATH / "cross_genre",
+    #     )
+    #     print(
+    #         f"Evaluation results saved to {SAVE_PATH / 'cross_genre' / 'text_paraphrases_evaluation_results.csv'}."
+    #     )
+    #     assert type(results) is list, "Results should be a list."
+    #     slim_df = get_slim_dfs_for_one_text(results)
+    #     assert type(slim_df) is list, "Slim DataFrame should be a list of DataFrames."
+    #     plot_model_metrics(
+    #         n_paragraphs_df=slim_df,
+    #         save_dir=SAVE_PATH / "cross_genre" / "plots",
+    #         show=False,
+    #         save=True,
+    #         data_category="Cross-Genre",
+    #     )
+    #     plot_model_metrics_per_data_category(
+    #         n_paragraphs_df=slim_df,
+    #         save_dir=SAVE_PATH / "cross_genre" / "plots",
+    #         show=False,
+    #         save=True,
+    #         data_category="Cross-Genre",
+    #     )
+    #     print("Plots saved to plots directory:", SAVE_PATH / "cross_genre" / "plots")
