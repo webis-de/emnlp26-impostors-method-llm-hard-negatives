@@ -154,7 +154,7 @@ def _helper_impostor(path2imp, pair, training_mode=True):
     impostor_detector.set_training_mode(training_mode)
     score = impostor_detector._get_score_impl(pair)
     if imp_gen in ["llm", "naive_llm", "non_naive_llm"]:
-        sleep(60)
+        sleep(30)
     return score
 
 
@@ -184,12 +184,15 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
 
     print(f"Running experiment for {dataset_name} dataset.")
 
-    with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
-        results = list(
-            executor.map(
-                _helper_impostor, [path2imp] * len(train_dataset), train_dataset["pair"]
-            )
-        )
+    # with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
+    #     results = list(
+    #         executor.map(
+    #             _helper_impostor, [path2imp] * len(train_dataset), train_dataset["pair"]
+    #         )
+    #     )
+    results = []
+    for pair in test_dataset["pair"]:
+        results.append(_helper_impostor(path2imp, pair, training_mode=True))
     train_dataset["impostor_score"] = [score for score, _ in results]
     train_dataset["impostor_dict"] = [impostor_dict for _, impostor_dict in results]
 
@@ -204,15 +207,18 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
 
     test_dataset["thres"] = opt_thres
     print(f"Set threshold to optimal threshold for {dataset_name} dataset: {opt_thres}")
-    with ThreadPoolExecutor() as executor:
-        results = list(
-            executor.map(
-                _helper_impostor,
-                [path2imp] * len(test_dataset),
-                test_dataset["pair"],
-                [False] * len(test_dataset),
-            )
-        )
+    # with ThreadPoolExecutor() as executor:
+    #     results = list(
+    #         executor.map(
+    #             _helper_impostor,
+    #             [path2imp] * len(test_dataset),
+    #             test_dataset["pair"],
+    #             [False] * len(test_dataset),
+    #         )
+    #     )
+    results = []
+    for pair in test_dataset["pair"]:
+        results.append(_helper_impostor(path2imp, pair, training_mode=False))
     # results is a list of tuples: (impostor_score, impostor_dict)
     test_dataset["impostor_score"] = [score for score, _ in results]
     test_dataset["impostor_dict"] = [impostor_dict for _, impostor_dict in results]
