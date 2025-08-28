@@ -70,7 +70,9 @@ def load_metadata(path, file_name):
 
 
 def evaluate_category(data_category, data_root):
-    use_ground_truth = not (data_category in ["Blog", "Student Essays"])
+    use_ground_truth = not (
+        data_category in ["Blog", "Student Essays"]
+    )  # FIXME: Student Essays has metadata, but it is not used for now (and blog can be derived from CSV file)
     print(
         f"Evaluating category: {data_category} using ground truth: {use_ground_truth}"
     )
