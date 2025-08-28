@@ -535,7 +535,7 @@ def get_scores_dict_for_diff_thres(df: pd.DataFrame):
     groups = {
         "Human-Human-(AV)": group1,  # disputed is always human
         "LLM-Detection": group2a,  # detect if LLM involved; candidate is always LLM
-        "LLM-AV": group3a,  # candidate is LLM, LLM AV with human and llm disputed texts (other way arounf does not work, bc there are no human candidates for llm disputed texts in this dataset)
+        "LLM-AV": group3a,  # candidate is LLM, LLM AV with human and llm disputed texts (other way around does not work, bc there are no human candidates for llm disputed texts in this dataset)
         "LLM-AV-(only-LLMs)": group3b,  # disputed + candidate is always LLM
     }
 
