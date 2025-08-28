@@ -507,7 +507,7 @@ class SAIAParaphraser(NaiveParaphraser):
                 print(
                     f"[ERROR] Rate limit exceeded for {self.model_id}: {e}. Sleeping 1 minute and trying again..."
                 )
-                sleep(60)
+                sleep(20)
                 return self.paraphrase(
                     text=text,
                     prompt=prompt,
