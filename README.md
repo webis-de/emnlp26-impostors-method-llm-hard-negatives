@@ -75,7 +75,7 @@ Note that you have to comment dataset methods you do not need at the bottom of t
 - **Koppel et al. (2014)**: [Blog Authorship Corpus](https://www.kaggle.com/datasets/rtatman/blog-authorship-corpus?resource=download)
   - Contains blog posts with authorship information.
   - The dataset is in CSV format.
-- **Koppel et al. (2014) Student Essays**: WIP dataset (not available currently)
+- **Koppel et al. (2014) Student Essays**: not publicly available
   - Contains student essays with authorship information.
 - **Fanfiction (PAN20)**: [PAN20 dataset](https://zenodo.org/records/5106099) 
   - Contains fanfiction texts with authorship information.
