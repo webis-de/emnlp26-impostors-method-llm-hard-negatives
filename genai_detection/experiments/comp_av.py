@@ -41,13 +41,13 @@ SAVE_PATH = (
     / "impostor_generator_comparison"
 )
 IMP_GEN_OPTIONS = [
-    "naive_llm",
-    "mirror_minds",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores, TODO: rerun bc in csv files is , missing
+    # "naive_llm",
+    # "mirror_minds",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores, TODO: rerun bc in csv files is , missing
     "non_naive_llm",
-    "llm",
-    "fixed",
-    "text_len",
-    "content",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores
+    # "llm",
+    # "fixed",
+    # "text_len",
+    # "content",  # no device error when running sequentially and with 256GB RAM, 4 CPU cores
     # "on-the-fly", # no more api calls
 ]
 
@@ -264,7 +264,13 @@ def create_df(path2dataset: str, dataset_name: str, save_path: Path):
                 ]
                 else max(1, 14 // _get_num_impostors(imp_gen))
             )  # 14 per min
-            if imp_gen in ["content", "mirror_minds"]:
+            if imp_gen in [
+                "content",
+                "mirror_minds",
+                "llm",
+                "naive_llm",
+                "non_naive_llm",
+            ]:
                 results = []
                 for pair in new_rows["pair"]:
                     res = _helper_impostor(
