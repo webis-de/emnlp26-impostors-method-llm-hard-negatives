@@ -414,7 +414,7 @@ class VisDetectors:
 
         data = self._load_datasets(
             save_path=save_path,
-            min_samples=1,
+            min_samples=5,
             dataset_name=self.dataset_name.lower(),
         )
         # we do not need training set for unsupervised baselines, or impostor methods bc precision-recall across all thresholds
