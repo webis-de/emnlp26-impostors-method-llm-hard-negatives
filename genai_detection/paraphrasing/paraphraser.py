@@ -543,123 +543,6 @@ class OllamaParaphraser(SAIAParaphraser):
         )
 
 
-class IONOSParaphraser(SAIAParaphraser):
-    """
-    IONOS paraphrasing model hosted by IONOS.
-
-    for more information, see https://docs.ionos.com/cloud/ai/ai-model-hub/tutorials/text-generation (11.08.2025).
-
-    Get all models via curl: curl https://openai.inference.de-txl.ionos.com/v1/models -H "Authorization: Bearer KEY | jq
-    Models as of 11.08.2025 (those in brackets are not suitable for paraphrasing/ text generation):
-    - ("black-forest-labs/FLUX.1-schnell",)
-    - "meta-llama/Llama-3.3-70B-Instruct",
-    - "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8",
-    - ("BAAI/bge-m3",)
-    - "mistralai/Mixtral-8x7B-Instruct-v0.1",
-    - "openGPT-X/Teuken-7B-instruct-commercial",
-    - "mistralai/Mistral-Small-24B-Instruct",
-    - "meta-llama/Meta-Llama-3.1-8B-Instruct",
-    - ("meta-llama/CodeLlama-13b-Instruct-hf",)
-    - ("sentence-transformers/paraphrase-multilingual-mpnet-base-v2",)
-    - "mistralai/Mistral-Nemo-Instruct-2407",
-    - ("BAAI/bge-large-en-v1.5",)
-    - ("stabilityai/stable-diffusion-xl-base-1.0",)
-    """
-
-    def __init__(self, model_id: str = CONFIG.IONOS_MODEL):
-        super().__init__(model_id=model_id)
-        self.client = OpenAI(
-            base_url=CONFIG.IONOS_URL,
-            api_key=CONFIG.IONOS_KEY,
-        )
-
-
-class BlabladorParaphraser(NaiveParaphraser):
-    """
-    Blablador paraphrasing model hosted by Jülich/ Helmholtz AI.
-    """
-
-    def __init__(self, model_id: ModelName = CONFIG.BLABLADOR_MODEL):
-        self.base_url = CONFIG.BLABLADOR_URL
-        self.headers = {
-            "Authorization": f"Bearer {CONFIG.BLABLADOR_KEY}",
-            "Accept": "application/json",
-        }
-        assert model_id in self._get_available_models(
-            verbose=False
-        ), f"Model {model_id} is not available. Please choose from the available models."
-        self.model_id = model_id
-
-    def _get_available_models(self, verbose: bool = True) -> list[str]:
-        """
-        Fetch the list of available models from the Blablador API.
-
-        :return: A list of model IDs.
-        """
-        response = requests.get(f"{self.base_url}/models", headers=self.headers)
-
-        if response.status_code == 200:
-            models = [model["id"] for model in response.json()["data"]]
-            if verbose:
-                print("Available Blablador models:")
-                for model in models:
-                    print(model)
-            return models
-        else:
-            raise Exception(
-                f"Error fetching models: {response.status_code} - {response.text}"
-            )
-
-    def paraphrase(
-        self,
-        text: str,
-        prompt: str,
-        verbose: bool = False,
-        max_length: int = CONFIG.MAX_LENGTH,
-        temperature: float = CONFIG.TEMPERATURE,
-        n_responses: int = 5,
-        response_schema: Optional[dict[str, Any]] = None,
-    ) -> List[str]:
-        """
-        Generate a paraphrase of the input text.
-
-        :param text: The input text to be paraphrased.
-        :param verbose: If True, prints the paraphrased text.
-        :param max_length: The maximum number of tokens to generate in the paraphrase.
-        :param temperature: Controls the randomness of the output. Lower values make the output more deterministic.
-        :return: A paraphrased version of the input text.
-        """
-        print("Blablador model")
-        payload = {
-            "model": self.model_id,  # model ID
-            "prompt": f"{prompt.strip()} {text}",
-            "max_tokens": max_length,
-            "temperature": temperature,
-            "n": n_responses,
-            "use_beam_search": True,
-            "presence_penalty": 2.0,  # encourage diversity, new content
-            "frequency_penalty": 2.0,  # discourage repetition, word-level redundancy
-        }
-        # use completions endpoint for paraphrasing, bc we don't need a multi-turn role-based instruction chat
-        response = requests.post(
-            f"{self.base_url}/completions",
-            headers={**self.headers, "Content-Type": "application/json"},
-            data=json.dumps(payload),
-        )
-
-        if response.status_code == 200:
-            paraphrased_texts = (
-                [choice["text"] for choice in response.json()["choices"]]
-                if n_responses > 1
-                else [response.json()["choices"][0]["text"]]
-            )
-            if verbose:
-                print("Paraphrased text(s):\n", paraphrased_texts)
-            return paraphrased_texts
-        else:
-            print("Error:", response.status_code, response.text)
-
-
 class BulletPointParaphraser(NonNaiveParaphraser):
     """
     A paraphrasing model that first extracts bullet points, tone and genre from the input text using one LLM and then generates a paraphrase based on this information.
@@ -1162,12 +1045,6 @@ def get_paraphraser_dict() -> Dict[str, Paraphraser]:
         "mistral-large-instruct": SAIAParaphraser("mistral-large-instruct"),
         "openai-gpt-oss-120b": SAIAParaphraser("openai-gpt-oss-120b"),
         "meta-llama-3.1-8b-instruct": SAIAParaphraser("meta-llama-3.1-8b-instruct"),
-        # "meta-llama/Llama-3.3-70B-Instruct": IONOSParaphraser(
-        #     model_id="meta-llama/Llama-3.3-70B-Instruct"
-        # ),
-        # "mistralai/Mixtral-8x7B-Instruct-v0.1": IONOSParaphraser(
-        #     model_id="mistralai/Mixtral-8x7B-Instruct-v0.1"
-        # ),
     }
     bullet_point_paraphraser = BulletPointParaphraser(
         text_extractor=paraphrasers["openai-gpt-oss-120b"],
@@ -1209,7 +1086,6 @@ if __name__ == "__main__":
         # 'Blablador': BlabladorParaphraser(model_id="1 - Llama3 405 the best general model and big context size"),
         "Ollama": OllamaParaphraser(),
         "SAIA": SAIAParaphraser(),
-        "IONOS": IONOSParaphraser(model_id="mistralai/Mixtral-8x7B-Instruct-v0.1"),
         # "TopicParaphraser": TopicParaphraser(
         #     text_extractor=OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL),
         #     text_generator=OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL),
@@ -1249,7 +1125,6 @@ if __name__ == "__main__":
     text = "Dear Santa, I wish for a big red nosed reindeer that can fly and a sleigh full of toys for all the children in the world. I promise to be good and help others. Love, Timmy."
     # p = paraphrasers["TranslationParaphraser"]
     p = paraphrasers["SAIA"]
-    # p = paraphrasers["IONOS"]
     # p = paraphasers["Ollama"]
     print(f"[DEBUG] Paraphrasing text with {p.__class__.__name__}")
     paraphrased_texts = p.paraphrase(text=text, n_responses=2)
