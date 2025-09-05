@@ -326,15 +326,6 @@ class ImpostorDetector(ImpostorBase):
             freqs_left = Counter({k: v for k, v in freqs_left.items() if v > 1})
             freqs_right = Counter({k: v for k, v in freqs_right.items() if v > 1})
 
-            # if self.shared_vocab_only:  # TODO: over all corpus documents
-            #     shared_tokens = freqs_left.keys() & freqs_right.keys()
-            # else:
-            #     shared_tokens = freqs_left.keys() | freqs_right.keys()
-
-            # top_tokens = heapq.nlargest(
-            #     self.top_n, shared_tokens, key=lambda x: freqs_left[x] + freqs_right[x]
-            # )
-
             # TFIDF vectorizer fit on training corpus
             x_left = self.tokens_to_matrix(
                 tokens_left, path2imp=self.path2imp  # top_tokens,
@@ -360,7 +351,19 @@ class ImpostorDetector(ImpostorBase):
 
             # for evaluating the impact of text similarity on the scores
             impostors_per_candidate[f"text_pair_{i}"] = {}
+
+            existing_scores_filename = Path(CONFIG.SAVE_PATH) / "dumps"
+            existing_scores_filename.mkdir(parents=True, exist_ok=True)
+            existing_scores_filename = (
+                existing_scores_filename / f"impostor_{self.impostor_technique}.json"
+            )
+
             # two iterations, generating impostors for each candidate once
+            if existing_scores_filename.exists():
+                with open(existing_scores_filename, "r") as f:
+                    loaded_data = json.load(f)
+            else:
+                loaded_data = {}
             for j, (disputed, candidate) in enumerate(
                 itertools.permutations(list(store.keys()), 2)
             ):
@@ -376,6 +379,8 @@ class ImpostorDetector(ImpostorBase):
                     "other_text": store[disputed]["text"],
                     "paraphrases": impostor_candidates,
                 }
+                # add generated impostors
+                loaded_data[store[candidate]["text"]] = impostor_candidates
 
                 assert all(
                     isinstance(imp_texts, str)
@@ -431,7 +436,11 @@ class ImpostorDetector(ImpostorBase):
                 scores_per_pair[i] += scores_over_different_rounds
                 scores_per_pair[i] /= j + 1
 
-        # one elmenent = averaged score of X,Y and Y,X pair (score=number of rounds where the candidate was the most similar)
+        # dump generated impostors for later analysis
+        with open(existing_scores_filename, "w") as f:
+            json.dump(loaded_data, f, indent=2)
+
+        # one element = averaged score of X,Y and Y,X pair (score=number of rounds where the candidate was the most similar)
         # return list(scores_per_pair.values())
         # threshold is in [0,1], hence: normalized by rounds
         # TODO: Omit second return value if not evaluating the impact of text similarity on the scores
