@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 
 results/
+results_alt/
 logs/
 models/
 
