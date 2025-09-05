@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import re
 import sys
+from time import sleep
 from typing import List, Dict, Optional
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -21,7 +22,6 @@ import serpapi
 from dotenv import load_dotenv
 import torch
 from genai_detection.paraphrasing.paraphraser import (
-    IONOSParaphraser,
     SAIAParaphraser,
     T5ChatGPTParaphraser,
     T5GooglePAWSParaphraser,
@@ -528,12 +528,6 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
             )
             self.saiai_paraphraser_gpt = SAIAParaphraser(model_id="openai-gpt-oss-120b")
             self.saiai_paraphraser_qwen = SAIAParaphraser(model_id="qwen3-32b")
-            # self.ionos_paraphraser_llama = IONOSParaphraser(
-            #     model_id="meta-llama/Llama-3.3-70B-Instruct"
-            # )
-            # self.ionos_paraphraser_mistral = IONOSParaphraser(
-            #     model_id="mistralai/Mixtral-8x7B-Instruct-v0.1"
-            # )
 
             self.topic_paraphraser = TopicParaphraser(
                 text_extractor=self.saiai_paraphraser_gpt,
@@ -562,9 +556,7 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
                 self.saiai_paraphraser_llama,
                 self.saiai_paraphraser_mistral,
                 self.saiai_paraphraser_gpt,
-                self.saiai_paraphraser_qwen,
-                # self.ionos_paraphraser_llama,
-                # self.ionos_paraphraser_mistral,
+                self.saiai_paraphraser_qwen,  # explanations in the output, separated by </think>
                 self.topic_paraphraser,
                 self.task_paraphraser,
                 self.title_paraphraser,
@@ -578,40 +570,44 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
             assert len(paraphrasers) > 0, "At least one paraphraser must be provided."
             self.paraphrasers = paraphrasers
         self.prompts = [
-            "Paraphrase the given sentence by identifying the main subject, verb, and object. Replace each with synonyms or closely related words, adjusting grammar naturally. Keep the new sentence close in length to the original. Output only the final paraphrased sentence.",
-            "Paraphrase the sentence above without changing its meaning. Use different words and vary the sentence structure while keeping the tone consistent. Keep the new sentence similar in length to the original. Output only the paraphrased sentence, with no explanations or extra text.",
+            "Paraphrase the text above without changing its meaning. Use different words and vary the sentence structure while maintaining a consistent tone. Your paraphrase should be three times as long than the original. Output only the paraphrased sentence, with NO explanations or extra text.",
+            # "Paraphrase the given sentence by identifying the main subject, verb, and object. Replace each with synonyms or closely related words, adjusting grammar naturally. Keep the new sentence close in length to the original. Output only the final paraphrased sentence.",
+            # "Paraphrase the sentence above without changing its meaning. Use different words and vary the sentence structure while keeping the tone consistent. Keep the new sentence similar in length to the original. Output only the paraphrased sentence, with no explanations or extra text.",
         ]
 
     def generate_impostors(
         self, text: str, path2imp: str = None, real_time_generation: bool = False
     ) -> Dict[str, str]:
-        # returns a dictionary of impostor texts: min(n_impostors, len(paraphrasers) * len(prompts))
+        # returns a dictionary of impostor texts with n_impostors impostors
         impostors = {}
         random.shuffle(self.paraphrasers)
-        count = 0
-        for paraphraser in self.paraphrasers:
-            if count >= self.n_impostors:
-                break
-            for p_id, prompt in enumerate(self.prompts):
-                if count >= self.n_impostors:
-                    break
-                if p_id > 0 and isinstance(paraphraser, NonNaiveParaphraser):
-                    # skip non-naive paraphrasers: They use their own prompts
-                    continue
-                try:
-                    impostor_texts = paraphraser.paraphrase(
-                        text, prompt=prompt, n_responses=1
-                    )
-                    for imp in impostor_texts:
-                        if imp:  # only non-empty
-                            impostors[
-                                f"impostor_{count}_prompt{p_id}_{paraphraser.model_id}"
-                            ] = imp
-                            count += 1
-                            if count >= self.n_impostors:
-                                break
-                except Exception as e:
-                    print(f"Error generating impostor with {paraphraser}: {e}")
+        for i in range(self.n_impostors):
+            # randomly select a paraphraser and a prompt
+            paraphraser = self.paraphrasers[i % len(self.paraphrasers)]
+            p_id = random.randint(0, len(self.prompts) - 1)
+            prompt = self.prompts[p_id]
+            try:
+                impostor_texts = paraphraser.paraphrase(
+                    text, prompt=prompt, n_responses=1
+                )
+                if (
+                    isinstance(paraphraser, NaiveParaphraser)
+                    and paraphraser.model_id == "qwen3-32b"
+                ):
+                    # qwen3-32b returns thinking steps and the final answer, separated by </think>
+                    impostor_texts = [
+                        item.split("</think>")[-1] for item in impostor_texts
+                    ]
+
+                for imp in impostor_texts:
+                    if (
+                        imp and (len(imp.split()) / len(text.split())) >= 0.6
+                    ):  # only non-empty + valid length filter
+                        impostors[
+                            f"impostor_{i}_prompt{p_id}_{paraphraser.model_id}"
+                        ] = imp
+            except Exception as e:
+                print(f"Error generating impostor with {paraphraser}: {e}")
 
         return impostors
 
@@ -669,12 +665,6 @@ class NaiveLLMImpostorGenerator(LLMImpostorGenerator):
         saiai_paraphraser_mistral = SAIAParaphraser(model_id="mistral-large-instruct")
         saiai_paraphraser_gpt = SAIAParaphraser(model_id="openai-gpt-oss-120b")
         saiai_paraphraser_qwen = SAIAParaphraser(model_id="qwen3-32b")
-        # ionos_paraphraser_llama = IONOSParaphraser(
-        #     model_id="meta-llama/Llama-3.3-70B-Instruct"
-        # )
-        # ionos_paraphraser_mistral = IONOSParaphraser(
-        #     model_id="mistralai/Mixtral-8x7B-Instruct-v0.1"
-        # )
 
         super().__init__(
             n_impostors=n_impostors,
@@ -686,8 +676,6 @@ class NaiveLLMImpostorGenerator(LLMImpostorGenerator):
                 saiai_paraphraser_mistral,
                 saiai_paraphraser_gpt,
                 saiai_paraphraser_qwen,
-                # ionos_paraphraser_llama,
-                # ionos_paraphraser_mistral,
             ],
         )
 
