@@ -34,7 +34,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from genai_detection.config import CONFIG
 
 # TODO: Bigger
-NUM_SAMPLES = 1
+NUM_SAMPLES = 5
 
 
 class VisDetectors:
