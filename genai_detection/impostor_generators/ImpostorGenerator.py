@@ -576,8 +576,20 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
         ]
 
     def generate_impostors(
-        self, text: str, path2imp: str = None, real_time_generation: bool = False
+        self, text: str, path2imp: Path = None, real_time_generation: bool = False
     ) -> Dict[str, str]:
+        # if already computed impostors are available, load them from path2imp
+        if path2imp.suffix == ".json" and path2imp.exists():
+            # TODO: read impostors from json dump file: {reference: {paraphraser_prompt: paraphrase, ...}, ...}
+            with open(path2imp, "r") as f:
+                loaded_data = json.load(f)
+                for split in loaded_data.keys():
+                    if text in loaded_data[split]:
+                        print(
+                            f"IMPOSTOR GENERATOR: Loaded precomputed {len(loaded_data[split][text].keys())} impostors from file {path2imp}."
+                        )
+                        return loaded_data[split][text]
+
         # returns a dictionary of impostor texts with n_impostors impostors
         impostors = {}
         random.shuffle(self.paraphrasers)
