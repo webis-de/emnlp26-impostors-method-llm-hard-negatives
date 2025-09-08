@@ -510,7 +510,11 @@ class ImpostorDetector(ImpostorBase):
         candidate_texts = [" ".join(input_tokens)]
         if path2imp and path2imp.exists():
             split = "train" if self._training_mode else "test"
-            train_data = load_from_disk(path2imp)[split].to_pandas()
+            if path2imp.suffix == ".json":
+                with open(path2imp, "r") as f:
+                    train_data = pd.json_normalize(json.load(f)[split])
+            else:
+                train_data = load_from_disk(path2imp)[split].to_pandas()
             assert isinstance(
                 train_data, pd.DataFrame
             ), f"Expected train_data to be a pandas DataFrame, but got {type(train_data)}."
