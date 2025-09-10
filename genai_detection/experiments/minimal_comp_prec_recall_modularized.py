@@ -815,7 +815,8 @@ if __name__ == "__main__":
         f"impostor Detector initialized for fig {fig} and dataset {CONFIG.STUDENT_ESSAYS}."
     )
     # {reference: {paraphraser_prompt: paraphrase, ...}, ...}
-    impostors_dict = vis_det.generate_impostors(imp_gen="naive_llm")
+    # TODO: uncomment
+    # impostors_dict = vis_det.generate_impostors(imp_gen="naive_llm")
 
     # run impostor approach with pre-generated impostors (loaded automatically from disk in impostor generator)
     vis_det.reproduce_fig4_prec_recall_dif_imp_appr(

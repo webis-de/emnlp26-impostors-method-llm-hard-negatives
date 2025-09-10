@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name=min_comp
-#SBATCH --mem=128g
+#SBATCH --job-name=eval_min_comp
+#SBATCH --mem=64g
 #SBATCH --cpus-per-task=4
 #SBATCH --output=logs/%j-min-comparison-prec-rec.log
 #SBATCH --container-image=registry.webis.de/code-teaching/theses/artificial-authorship-verification:latest
