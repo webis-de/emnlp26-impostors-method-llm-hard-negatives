@@ -584,6 +584,8 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
             with open(path2imp, "r") as f:
                 loaded_data = json.load(f)
                 for split in loaded_data.keys():
+                    if split == text:  # dump file contains no test/train/val splits
+                        return loaded_data[split]
                     if text in loaded_data[split]:
                         print(
                             f"IMPOSTOR GENERATOR: Loaded precomputed {len(loaded_data[split][text].keys())} impostors from file {path2imp}."

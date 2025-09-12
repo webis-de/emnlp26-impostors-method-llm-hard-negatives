@@ -655,8 +655,10 @@ class VisDetectors:
             min_samples=NUM_SAMPLES,
             dataset_name=self.dataset_name.lower(),
         )
+        if "test" in data:
+            data = data["test"]
         # only use test dataset
-        test_dataset = pd.json_normalize(data["test"])
+        test_dataset = pd.json_normalize(data)
         existing_paraphrases_filename = save_path / "dumps"
         existing_paraphrases_filename.mkdir(parents=True, exist_ok=True)
         existing_paraphrases_filename = (
