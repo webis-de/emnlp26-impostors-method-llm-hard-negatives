@@ -1,4 +1,5 @@
 from collections import Counter, defaultdict
+import json5
 from more_itertools import ichunked
 import itertools
 import json
@@ -363,8 +364,13 @@ class ImpostorDetector(ImpostorBase):
 
             # two iterations, generating impostors for each candidate once
             if existing_scores_filename.exists():
-                with open(existing_scores_filename, "r") as f:
-                    loaded_data = json.load(f)
+                try:
+                    with open(existing_scores_filename, "r") as f:
+                        loaded_data = json.load(f)
+                except json.decoder.JSONDecodeError as e:
+                    print("Try using json5 because of JSONDecodeError:", e)
+                    with open(existing_scores_filename, "r") as f:
+                        loaded_data = json5.load(f)
             else:
                 loaded_data = {}
             for j, (disputed, candidate) in enumerate(
