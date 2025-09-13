@@ -336,6 +336,7 @@ class VisDetectors:
 
             for idx, row in rows_without_scores.iterrows():
                 try:
+                    print("IMP Gen:", imp_gen)
                     score = self._helper_impostor(path2imp, row["pair"], imp_gen, False)
                     test_dataset.at[idx, f"{imp_gen}_score"] = score
                     missing_scores_indices.remove(idx)
@@ -346,7 +347,7 @@ class VisDetectors:
                     )
                 except Exception as e:
                     print(
-                        f"Error computing impostor score for row {idx} with pair {row['pair']}: {e}"
+                        f"Error computing impostor score for row {idx} with pair {row['pair'][0][:100]}..., {row['pair'][1][:100]}...: {e}"
                     )
                     traceback.print_exc()
 

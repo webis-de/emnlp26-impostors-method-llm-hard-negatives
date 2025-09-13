@@ -295,7 +295,7 @@ class ImpostorDetector(ImpostorBase):
                     )
                 )
 
-            # Controll situation via preprocessing: remove genre artifacts, remove html tags (e.g., <nl>), etc.
+            # Control situation via preprocessing: remove genre artifacts, remove html tags (e.g., <nl>), etc.
             # Koppel et al. (2014) do not normalize text pairs.
             # preprocess_text omits all layout/ structural information to keep only style
             # Koppel et al. (2014) use documents of length 500 words exactly -> we DON'T crop at min_n_tokens to keep more information
@@ -327,6 +327,9 @@ class ImpostorDetector(ImpostorBase):
             freqs_right = Counter({k: v for k, v in freqs_right.items() if v > 1})
 
             # TFIDF vectorizer fit on training corpus
+            assert (
+                tokens_left is not None and tokens_right is not None
+            ), "Tokens must not be None."
             x_left = self.tokens_to_matrix(
                 tokens_left, path2imp=self.path2imp  # top_tokens,
             )
@@ -508,11 +511,32 @@ class ImpostorDetector(ImpostorBase):
     def _update_vectorizer_if_necessary(self, path2imp, input_tokens):  # top_token_list
         train_data = None
         candidate_texts = [" ".join(input_tokens)]
+        print(
+            f"Fitting TFIDF vectorizer on input tokens and candidate texts from {path2imp}. Init candidate texts len: {len(candidate_texts)}"
+        )
         if path2imp and path2imp.exists():
             split = "train" if self._training_mode else "test"
             if path2imp.suffix == ".json":
+                print(f"Loading impostor data from JSON file: {path2imp}")
                 with open(path2imp, "r") as f:
-                    train_data = pd.json_normalize(json.load(f)[split])
+                    # train_data = pd.json_normalize(json.load(f))
+
+                    # dumps have structure {outer_key: {inner_key: value}} -> load as dict and then reshape to long format
+                    raw = json.load(f)
+                    train_data = pd.DataFrame.from_dict(raw, orient="index")
+                    train_data = train_data.reset_index().melt(
+                        id_vars="index", var_name="inner_key", value_name="value"
+                    )
+                    train_data = train_data.dropna(subset=["value"])  # drop missing
+                    train_data["pair"] = train_data.apply(
+                        lambda row: [row["index"], row["value"]], axis=1
+                    )
+                    assert isinstance(
+                        train_data, pd.DataFrame
+                    ), f"Expected train_data to be a pandas DataFrame, but got {type(train_data)}."
+                    if split in train_data:
+                        train_data = train_data[split]
+                    # print("TRAIN DATA:", train_data)
             else:
                 train_data = load_from_disk(path2imp)[split].to_pandas()
             assert isinstance(
@@ -527,6 +551,14 @@ class ImpostorDetector(ImpostorBase):
                     ), f"Each entry in the dataset must be a dictionary (tokens_to_matrix). But is {type(entry)}/entry:{entry}/row:{row}."
                     pair = entry.get("pair", [])
                     candidate_texts.extend(pair)
+        else:
+            print(
+                f"Warning: path2imp {path2imp} does not exist. Using only input tokens for vectorizer fitting."
+            )
+        assert isinstance(
+            candidate_texts, list
+        ), f"Candidate texts must be a list, but got {type(candidate_texts)}."
+        assert len(candidate_texts) > 0, f"No candidate texts found in {path2imp}."
         tokens = [
             token
             for t in candidate_texts
