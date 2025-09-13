@@ -337,6 +337,7 @@ class ImpostorDetector(ImpostorBase):
             x_right = self.tokens_to_matrix(
                 tokens_right, path2imp=self.path2imp  # top_tokens,
             )
+            print("Obtained tokens")
 
             store = {
                 "left": {
@@ -378,11 +379,57 @@ class ImpostorDetector(ImpostorBase):
             ):
                 scores_over_different_rounds = 0
                 # get impostors for the candidate text, NOT the disputed text
-                impostor_candidates = self.impostor_generator.generate_impostors(
-                    text=store[candidate]["text"],
-                    real_time_generation=self.real_time_generation,
-                    path2imp=self.path2imp,
-                )
+                if store[candidate]["text"] not in loaded_data:
+                    print(
+                        f"Generating new impostors...\nBecause data not key in loaded_data: {store[candidate]['text'] not in loaded_data}."
+                    )
+                    new_impostors = self.impostor_generator.generate_impostors(
+                        text=store[candidate]["text"],
+                        real_time_generation=self.real_time_generation,
+                        path2imp=self.path2imp,
+                    )
+                    impostor_candidates = new_impostors
+                else:
+                    # load previously generated impostors
+                    old_impostor_candidates = loaded_data[store[candidate]["text"]]
+                    print(
+                        f"Loaded {len(old_impostor_candidates)}/{self.n_impostors} existing impostors for candidate text."
+                    )
+                    impostor_candidates = dict(
+                        old_impostor_candidates
+                    )  # copy to avoid mutating in place
+
+                    # add missing impostors if not enough
+                    new_impostors = {}
+                    if self.n_impostors > len(impostor_candidates):
+                        print(
+                            f"Generating new impostors because not enough existing ones (i.e. {self.n_impostors - len(impostor_candidates)} missing)."
+                        )
+                        new_impostors = self.impostor_generator.generate_impostors(
+                            text=store[candidate]["text"],
+                            real_time_generation=self.real_time_generation,
+                            path2imp=self.path2imp,
+                        )
+                        # merge dicts (old + new)
+                        impostor_candidates.update(new_impostors)
+
+                # if we have too many, keep only self.n_impostors (favoring new ones)
+                if len(impostor_candidates) > self.n_impostors:
+                    new_keys = list(new_impostors.keys())
+                    if new_keys:
+                        # prioritize new impostors
+                        prioritized_keys = new_keys + [
+                            k for k in impostor_candidates if k not in new_keys
+                        ]
+                    else:
+                        # fallback: keep arbitrary first N
+                        prioritized_keys = list(impostor_candidates.keys())
+
+                    impostor_candidates = {
+                        k: impostor_candidates[k]
+                        for k in prioritized_keys[: self.n_impostors]
+                    }
+
                 impostors_per_candidate[f"text_pair_{i}"][j] = {
                     "reference_text": store[candidate]["text"],
                     "other_text": store[disputed]["text"],
@@ -448,6 +495,7 @@ class ImpostorDetector(ImpostorBase):
         # dump generated impostors for later analysis
         with open(existing_scores_filename, "w") as f:
             json.dump(loaded_data, f, indent=2)
+            print(f"Saved generated impostors to {existing_scores_filename}")
 
         # one element = averaged score of X,Y and Y,X pair (score=number of rounds where the candidate was the most similar)
         # return list(scores_per_pair.values())
@@ -542,7 +590,7 @@ class ImpostorDetector(ImpostorBase):
                     ), f"Expected train_data to be a pandas DataFrame, but got {type(train_data)}."
                     if split in train_data:
                         train_data = train_data[split]
-                    # print("TRAIN DATA:", train_data)
+                    print("Num TRAIN DATA:", len(train_data))
             else:
                 train_data = load_from_disk(path2imp)[split].to_pandas()
             assert isinstance(

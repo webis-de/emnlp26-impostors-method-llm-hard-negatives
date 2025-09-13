@@ -60,7 +60,9 @@ class VisDetectors:
             isinstance(detector, DetectorBase) for detector in detectors
         ), "All detectors must inheret from DetectorBase."
         self.detectors = detectors if detectors is not None else []
-        self.savefig_base = Path(__file__).resolve().parent.parent / CONFIG.SAVE_PATH
+        self.savefig_base = (
+            Path(__file__).resolve().parent.parent.parent / CONFIG.SAVE_PATH
+        )
 
     def _title2filename(self, title: str) -> str:
         """
@@ -447,14 +449,16 @@ class VisDetectors:
             else:
                 path2imp = (
                     self.savefig_base
-                    / "impostor_scores"
-                    / self.dataset_name
-                    / "modularized"
+                    # / "impostor_scores"
+                    # / self.dataset_name
+                    # / "modularized"
                     / "dumps"
-                    / f"modularized_impostors_{imp_gen}.json"
+                    / f"impostor_{imp_gen}.json"
+                    # / f"modularized_impostors_{imp_gen}_old.json"  # FIXME TODO
                 )
 
             result = self._run_fig_4_worker(imp_gen, test_dataset, path2imp, save_path)
+            print("\n\nResult for imp gen:", imp_gen, result)
             assert result is not None, f"Failed for imp_gen: {imp_gen}"
             same_author_precisions[result["imp_gen"]] = result[
                 "same_author_precisions"
@@ -801,9 +805,9 @@ if __name__ == "__main__":
     # reproduction of Figure 2/ 4 from Koppel et al. (2014)
     our_figure_impostor_options = [
         # "on-the-fly",
-        "fixed",
         "naive_llm",
-        "non_naive_llm",
+        "fixed",
+        # "non_naive_llm",
     ]
     fig = 4
     print(
@@ -819,7 +823,7 @@ if __name__ == "__main__":
     )
     # {reference: {paraphraser_prompt: paraphrase, ...}, ...}
     # TODO: uncomment
-    impostors_dict = vis_det.generate_impostors(imp_gen="naive_llm")
+    # impostors_dict = vis_det.generate_impostors(imp_gen="naive_llm")
 
     # run impostor approach with pre-generated impostors (loaded automatically from disk in impostor generator)
     vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
