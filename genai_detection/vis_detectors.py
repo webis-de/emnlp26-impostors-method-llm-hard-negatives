@@ -666,7 +666,7 @@ class VisDetectors:
             if self.dataset_name == CONFIG.BLOG
             else Path(os.getcwd()).resolve() / CONFIG.PATH2STUDENT_ESSAYS
         )
-        # Parallel does not work, bc tfidf vectorizer isnt correctly initialized in ImpostorDetector
+        # Parallel does not work, bc tfidf vectorizer isn't correctly initialized in ImpostorDetector
         print("Start sequential computation for different n_impostors.")
         for n_imp in n_imp_options:
             result = self._run_fig_2_worker(
