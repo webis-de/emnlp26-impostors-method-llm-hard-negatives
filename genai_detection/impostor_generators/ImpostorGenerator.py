@@ -617,6 +617,8 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
                     if (
                         imp and (len(imp.split()) / len(text.split())) >= 0.6
                     ):  # only non-empty + valid length filter
+                        # read json requires no " or { }
+                        imp = imp.replace("{", "(").replace("}", ")").replace('"', "'")
                         impostors[
                             f"impostor_{i}_prompt{p_id}_{paraphraser.model_id}"
                         ] = imp
