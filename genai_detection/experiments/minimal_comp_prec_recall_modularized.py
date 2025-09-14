@@ -34,7 +34,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from genai_detection.config import CONFIG
 
 # TODO: Bigger
-NUM_SAMPLES = 5
+NUM_SAMPLES = 10
 
 
 class VisDetectors:
@@ -827,7 +827,7 @@ if __name__ == "__main__":
     )
     # {reference: {paraphraser_prompt: paraphrase, ...}, ...}
     # TODO: uncomment
-    # impostors_dict = vis_det.generate_impostors(imp_gen="naive_llm")
+    impostors_dict = vis_det.generate_impostors(imp_gen="naive_llm")
 
     # run impostor approach with pre-generated impostors (loaded automatically from disk in impostor generator)
     vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
