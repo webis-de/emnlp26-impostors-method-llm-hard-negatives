@@ -608,7 +608,7 @@ class VisDetectors:
                     if len(args_dict) == 0
                     else f"roc_prec_recall_curve_r{args_dict.get('rounds', 'NA')}_top{args_dict.get('top_n', 'NA')}_{kind.replace(' ', '_')}_dif_imp_gen.{format}"
                 )
-                plt.savefig(save_path / figure_name)
+                plt.savefig(save_path / figure_name, bbox_inches="tight")
                 print(f"Saved figure {figure_name} to {save_path}.")
             plt.close(fig)
 
