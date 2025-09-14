@@ -602,10 +602,11 @@ class VisDetectors:
             plt.tight_layout()
 
             for format in ["svg"]:  # "png",
+                args_dict = vars(args)  # convert Namespace -> dict
                 figure_name = (
                     f"roc_prec_recall_curve_dif_{kind.replace(' ', '_')}_imp_gen.{format}"
-                    if len(args.keys()) == 0
-                    else f"roc_prec_recall_curve_r{args['rounds']}_top{args['top_n']}_{kind.replace(' ', '_')}_dif_imp_gen.{format}"
+                    if len(args_dict) == 0
+                    else f"roc_prec_recall_curve_r{args_dict.get('rounds', 'NA')}_top{args_dict.get('top_n', 'NA')}_{kind.replace(' ', '_')}_dif_imp_gen.{format}"
                 )
                 plt.savefig(save_path / figure_name)
                 print(f"Saved figure {figure_name} to {save_path}.")
