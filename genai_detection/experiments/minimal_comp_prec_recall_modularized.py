@@ -606,6 +606,7 @@ class VisDetectors:
                     else f"roc_prec_recall_curve_r{args['rounds']}_top{args['top_n']}_{kind.replace(' ', '_')}_dif_imp_gen.{format}"
                 )
                 plt.savefig(save_path / figure_name)
+                print(f"Saved figure {figure_name} to {save_path}.")
             plt.close(fig)
 
     def _save_prec_recall_values(
