@@ -357,7 +357,10 @@ class ImpostorDetector(ImpostorBase):
             # for evaluating the impact of text similarity on the scores
             impostors_per_candidate[f"text_pair_{i}"] = {}
 
-            existing_scores_filename = Path(CONFIG.SAVE_PATH) / "dumps"
+            # FIXME: Maybe wrong path? Add resolving parent path
+            existing_scores_filename = (
+                Path(__file__).resolve().parent.parent / CONFIG.SAVE_PATH / "dumps"
+            )
             existing_scores_filename.mkdir(parents=True, exist_ok=True)
             existing_scores_filename = (
                 existing_scores_filename / f"impostor_{self.impostor_technique}.json"
