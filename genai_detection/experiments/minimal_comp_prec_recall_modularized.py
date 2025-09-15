@@ -513,8 +513,8 @@ class VisDetectors:
                     use_cosine_simiarity=True, dataset_name=self.dataset_name
                 ),
                 SupervisedImpostorBaseline(dataset_name=self.dataset_name),
-                UnmaskingDetector(dataset_name=self.dataset_name),
-                PPMdDetector(dataset_name=self.dataset_name),
+                UnmaskingDetector(),
+                PPMdDetector(),
             ],
         ):
             preds = baseline.get_score(test_dataset["pair"])
