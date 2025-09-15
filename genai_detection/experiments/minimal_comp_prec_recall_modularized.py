@@ -382,12 +382,6 @@ class VisDetectors:
                     )
                     traceback.print_exc()
 
-            # print(
-            #     "Missing scores computed for",
-            #     len(missing_scores),
-            #     "rows:",
-            #     missing_scores,
-            # )
             loaded_data = self._update_loaded_data(
                 loaded_data=loaded_data,
                 missing_scores=missing_scores,
