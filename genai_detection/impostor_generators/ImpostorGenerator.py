@@ -578,6 +578,8 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
     def generate_impostors(
         self, text: str, path2imp: Path = None, real_time_generation: bool = False
     ) -> Dict[str, str]:
+        # returns a dictionary of impostor texts with n_impostors impostors
+        impostors = {}
         # if already computed impostors are available, load them from path2imp
         if path2imp.suffix == ".json" and path2imp.exists():
             # TODO: read impostors from json dump file: {reference: {paraphraser_prompt: paraphrase, ...}, ...}
@@ -585,17 +587,25 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
                 loaded_data = json.load(f)
                 for split in loaded_data.keys():
                     if split == text:  # dump file contains no test/train/val splits
-                        return loaded_data[split]
+                        print(
+                            f"IMPOSTOR GENERATOR: Loaded precomputed {len(loaded_data[split])} impostors from file {path2imp}."
+                        )
+                        impostors = loaded_data[split]
                     if text in loaded_data[split]:
                         print(
                             f"IMPOSTOR GENERATOR: Loaded precomputed {len(loaded_data[split][text].keys())} impostors from file {path2imp}."
                         )
-                        return loaded_data[split][text]
+                        impostors = loaded_data[split][text]
+            if len(impostors) >= self.n_impostors:
+                # ensure we return enough impostors
+                return dict(list(impostors.items())[: self.n_impostors])
 
-        # returns a dictionary of impostor texts with n_impostors impostors
-        impostors = {}
         random.shuffle(self.paraphrasers)
-        for i in range(self.n_impostors):
+        n_imp_to_generate = self.n_impostors - len(impostors)
+        print(
+            f"{len(impostors)} precomputed impostors found in {path2imp}. Generating {n_imp_to_generate} impostors for text {text[:100]}..."
+        )
+        for i in range(n_imp_to_generate):
             # randomly select a paraphraser and a prompt
             paraphraser = self.paraphrasers[i % len(self.paraphrasers)]
             p_id = random.randint(0, len(self.prompts) - 1)
@@ -619,9 +629,12 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
                     ):  # only non-empty + valid length filter
                         # read json requires no " or { }
                         imp = imp.replace("{", "(").replace("}", ")").replace('"', "'")
-                        impostors[
-                            f"impostor_{i}_prompt{p_id}_{paraphraser.model_id}"
-                        ] = imp
+                        key = f"impostor_{i}_prompt{p_id}_{paraphraser.model_id}"
+                        j = i
+                        while key in list(impostors.keys()):
+                            j += 1
+                            key = f"impostor_{j}_prompt{p_id}_{paraphraser.model_id}"
+                        impostors[key] = imp
             except Exception as e:
                 print(f"Error generating impostor with {paraphraser}: {e}")
 
