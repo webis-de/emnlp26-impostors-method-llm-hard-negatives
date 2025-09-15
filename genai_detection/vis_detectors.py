@@ -641,7 +641,7 @@ class VisDetectors:
         ], "This method is only implemented for BLOG and Student Essays datasets."
         train_dataset, test_dataset = self._load_datasets(balanced=True)
         # TODO: Test on small data subsets
-        n_samples_per_class = 10  # 50
+        n_samples_per_class = 20  # 50
         train_dataset = pd.concat(
             [
                 train_dataset.loc[train_dataset["same"]].head(n_samples_per_class),
@@ -660,7 +660,7 @@ class VisDetectors:
         print("Loaded datasets for Figure 2:", self.dataset_name)
         # could be initially different, bc args are from argparse which are irrespective from calling thsi function with defined dataset_name
         args["dataset_name"] = self.dataset_name
-        n_imp_options = [50, 500, 5000]
+        n_imp_options = [50, 500, 1000]  # TODO: 5000]
         precisions, recalls = {}, {}
         path2imp = (
             Path(os.getcwd()).resolve() / CONFIG.PATH2BLOG
