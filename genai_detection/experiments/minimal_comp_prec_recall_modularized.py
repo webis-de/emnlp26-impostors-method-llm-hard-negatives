@@ -34,7 +34,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from genai_detection.config import CONFIG
 
 # TODO: Bigger
-NUM_SAMPLES = 10
+NUM_SAMPLES = 1
 
 
 class VisDetectors:
@@ -166,9 +166,6 @@ class VisDetectors:
             dataset = pd.read_json(datapath / datafile_name)
             for split in ["train", "test"]:
                 assert split in dataset, f"Dataset must contain '{split}' split."
-                # print(
-                #     f"Dataset {split} split has {len(dataset[split])//2} samples per class.\n{dataset[split]}"
-                # )
                 n_samples_missing[split] = min_samples - len(dataset[split]) // 2
                 print(
                     f"Dataset {split} split has {len(dataset[split])//2} samples per class, needs {n_samples_missing[split]} more to reach min_samples={min_samples}."
@@ -176,7 +173,10 @@ class VisDetectors:
             # print("Data type:", type(dataset), len(dataset["train"]))
             if sum([n_samples_missing[split] for split in ["train", "test"]]) <= 0:
                 print("Dataset already has enough samples. Returning existing dataset.")
-                return dataset
+                return {
+                    "train": dataset["train"][:min_samples],
+                    "test": dataset["test"][:min_samples],
+                }
 
         train_dataset = self.load_data(split="train")
         test_dataset = self.load_data(split="test")
@@ -462,6 +462,7 @@ class VisDetectors:
             "unsupervised baseline min-max",
             "unsupervised baseline cosine",
             "supervised baseline",
+            "unmasking",
         ]
         same_author_precisions, same_author_recalls = {}, {}
 
@@ -516,6 +517,7 @@ class VisDetectors:
                     use_cosine_simiarity=True, dataset_name=self.dataset_name
                 ),
                 SupervisedImpostorBaseline(dataset_name=self.dataset_name),
+                UnmaskingDetector(dataset_name=self.dataset_name),
             ],
         ):
             preds = baseline.get_score(test_dataset["pair"])
@@ -592,6 +594,7 @@ class VisDetectors:
             "unsupervised_baseline_min-max": "Unsup. Min-Max (B)",
             "unsupervised_baseline_cosine": "Unsup. Cosine (B)",
             "supervised_baseline": "Sup. SVC (B)",
+            "unmasking": "Unmasking",
         }
 
         line_styles = dict(zip(baselines, [":", "--", "-."]))
@@ -696,6 +699,7 @@ class VisDetectors:
         print("Obtained dataset.")
         if "test" in data:
             data = data["test"]
+
         # only use test dataset
         test_dataset = pd.json_normalize(data)
         existing_paraphrases_filename = save_path / "dumps"
@@ -726,7 +730,10 @@ class VisDetectors:
             disputed_text = item.disputed_text
             known_text = item.known_text
             for text in [disputed_text, known_text]:
-                # generate 50 paraphrases for each text if not already done
+                if known_text not in loaded_data:
+                    loaded_data[known_text] = {}
+
+                # generate n_impostors (=50) paraphrases for each text if not already done
                 impostor_candidates = (
                     impostor_detector.impostor_generator.generate_impostors(
                         text=text,
@@ -734,8 +741,6 @@ class VisDetectors:
                         path2imp=existing_paraphrases_filename,
                     )
                 )
-                if known_text not in loaded_data:
-                    loaded_data[known_text] = {}
                 # add new keys if not already present
                 new_keys = impostor_candidates.keys() - loaded_data[known_text].keys()
                 for k in new_keys:
