@@ -159,27 +159,51 @@ class VisDetectors:
         datapath.mkdir(parents=True, exist_ok=True)
         datafile_name = f"{dataset_name}_subset.json"
 
+        n_samples_missing = {"train": min_samples, "test": min_samples}
         print(f"Checking for existing dataset at {datapath / datafile_name}")
         if (datapath / datafile_name).exists() and (datapath / datafile_name).is_file():
-            print(f"Loading dataset from {datafile_name}")
+            print(f"Loading dataset from {datafile_name} in {datapath}.")
             dataset = pd.read_json(datapath / datafile_name)
-            return dataset
+            for split in ["train", "test"]:
+                assert split in dataset, f"Dataset must contain '{split}' split."
+                # print(
+                #     f"Dataset {split} split has {len(dataset[split])//2} samples per class.\n{dataset[split]}"
+                # )
+                n_samples_missing[split] = min_samples - len(dataset[split]) // 2
+                print(
+                    f"Dataset {split} split has {len(dataset[split])//2} samples per class, needs {n_samples_missing[split]} more to reach min_samples={min_samples}."
+                )
+            # print("Data type:", type(dataset), len(dataset["train"]))
+            if sum([n_samples_missing[split] for split in ["train", "test"]]) <= 0:
+                print("Dataset already has enough samples. Returning existing dataset.")
+                return dataset
 
         train_dataset = self.load_data(split="train")
         test_dataset = self.load_data(split="test")
 
-        def downsample(df, target_col="same"):
+        def downsample(df, target_col="same", n_samples=min_samples):
             """Downsample each class in df to the size of the smallest class."""
-            size_smaller_class = min(min_samples, df[target_col].value_counts().min())
+            print(
+                f"Downsampling dataset with {len(df)} samples to min_samples={n_samples} per class."
+            )
+            size_smaller_class = min(n_samples, df[target_col].value_counts().min())
             return (
                 df.groupby(target_col, group_keys=False)
-                .apply(lambda x: x.sample(size_smaller_class, random_state=42))
+                .apply(
+                    lambda x: x.sample(
+                        size_smaller_class, random_state=42 + min_samples
+                    )
+                )
                 .reset_index(drop=True)
             )
 
         # Apply to both train and test sets
-        train_dataset = downsample(train_dataset, target_col="same")
-        test_dataset = downsample(test_dataset, target_col="same")
+        train_dataset = downsample(
+            train_dataset, target_col="same", n_samples=n_samples_missing["train"]
+        )
+        test_dataset = downsample(
+            test_dataset, target_col="same", n_samples=n_samples_missing["test"]
+        )
 
         if train_dataset.empty or test_dataset.empty:
             raise ValueError(
@@ -187,7 +211,11 @@ class VisDetectors:
             )
         data = dict()
         for df, split in zip([train_dataset, test_dataset], ["train", "test"]):
-            data[split] = []
+            data[split] = (
+                []
+                if ("dataset" not in locals() or split not in dataset)
+                else dataset[split]
+            )
             for row in df.itertuples():
                 text_l, text_r = row.pair
                 gt_label = (
@@ -214,9 +242,10 @@ class VisDetectors:
                     }
                 )
 
-        # print("Data type:", type(data), data["train"].keys())
+        print("Data type:", type(data), len(data["train"]))
         with open(datapath / datafile_name, "w") as f:
             json.dump(data, f, indent=4)
+            print(f"Saved dataset to {datapath / datafile_name}.")
         return data
 
     #################################################################################
@@ -664,6 +693,7 @@ class VisDetectors:
             min_samples=NUM_SAMPLES,
             dataset_name=self.dataset_name.lower(),
         )
+        print("Obtained dataset.")
         if "test" in data:
             data = data["test"]
         # only use test dataset
@@ -691,6 +721,7 @@ class VisDetectors:
             real_time_generation=True,
         )
 
+        print("Starting impostor generation for dataset.")
         for item in test_dataset.itertuples():
             disputed_text = item.disputed_text
             known_text = item.known_text
@@ -828,6 +859,7 @@ if __name__ == "__main__":
     # {reference: {paraphraser_prompt: paraphrase, ...}, ...}
     # TODO: uncomment
     impostors_dict = vis_det.generate_impostors(imp_gen="naive_llm")
+    print(f"Generated impostors for {len(impostors_dict)} candidates.")
 
     # run impostor approach with pre-generated impostors (loaded automatically from disk in impostor generator)
     vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
