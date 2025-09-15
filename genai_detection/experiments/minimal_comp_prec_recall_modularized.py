@@ -28,6 +28,7 @@ from genai_detection.detectors.impostor_supervised_baseline import (
 from genai_detection.detectors.impostor_unsupervised_baseline import (
     UnSupervisedImpostorBaseline,
 )
+from genai_detection.detectors.ppmd import PPMdDetector
 from genai_detection.detectors.unmasking import UnmaskingDetector
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -457,6 +458,7 @@ class VisDetectors:
             "unsupervised baseline cosine",
             "supervised baseline",
             "unmasking",
+            "ppmd",
         ]
         same_author_precisions, same_author_recalls = {}, {}
 
@@ -512,6 +514,7 @@ class VisDetectors:
                 ),
                 SupervisedImpostorBaseline(dataset_name=self.dataset_name),
                 UnmaskingDetector(dataset_name=self.dataset_name),
+                PPMdDetector(dataset_name=self.dataset_name),
             ],
         ):
             preds = baseline.get_score(test_dataset["pair"])
@@ -589,6 +592,7 @@ class VisDetectors:
             "unsupervised_baseline_cosine": "Unsup. Cosine (B)",
             "supervised_baseline": "Sup. SVC (B)",
             "unmasking": "Unmasking",
+            "ppmd": "PPMd",
         }
 
         line_styles = dict(zip(baselines, [":", "--", "-."]))
