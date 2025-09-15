@@ -641,18 +641,19 @@ class VisDetectors:
         ], "This method is only implemented for BLOG and Student Essays datasets."
         train_dataset, test_dataset = self._load_datasets(balanced=True)
         # TODO: Test on small data subsets
+        n_samples_per_class = 50
         train_dataset = pd.concat(
             [
-                train_dataset.loc[train_dataset["same"]].head(50),
-                train_dataset.loc[~train_dataset["same"]].head(50),
+                train_dataset.loc[train_dataset["same"]].head(n_samples_per_class),
+                train_dataset.loc[~train_dataset["same"]].head(n_samples_per_class),
             ],
             ignore_index=False,
         )
 
         test_dataset = pd.concat(
             [
-                test_dataset.loc[test_dataset["same"]].head(50),
-                test_dataset.loc[~test_dataset["same"]].head(50),
+                test_dataset.loc[test_dataset["same"]].head(n_samples_per_class),
+                test_dataset.loc[~test_dataset["same"]].head(n_samples_per_class),
             ],
             ignore_index=False,
         )
