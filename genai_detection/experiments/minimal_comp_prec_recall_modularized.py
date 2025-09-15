@@ -587,8 +587,8 @@ class VisDetectors:
         label_translations = {
             "fixed": "Fixed",
             "on-the-fly": "On-the-Fly",
-            "naive_llm": "Naive LLM",
-            "non_naive_llm": "Non-Naive LLM",
+            "naive_llm": "One-Step Paraphraser (LLM)",
+            "non_naive_llm": "Two-Step Paraphraser (LLM)",
             "unsupervised_baseline_min-max": "Unsup. Min-Max (B)",
             "unsupervised_baseline_cosine": "Unsup. Cosine (B)",
             "supervised_baseline": "Sup. SVC (B)",
