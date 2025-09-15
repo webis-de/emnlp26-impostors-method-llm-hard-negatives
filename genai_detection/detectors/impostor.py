@@ -359,7 +359,9 @@ class ImpostorDetector(ImpostorBase):
 
             # FIXME: Maybe wrong path? Add resolving parent path
             existing_scores_filename = (
-                Path(__file__).resolve().parent.parent / CONFIG.SAVE_PATH / "dumps"
+                Path(__file__).resolve().parent.parent.parent
+                / CONFIG.SAVE_PATH
+                / "dumps"
             )
             existing_scores_filename.mkdir(parents=True, exist_ok=True)
             existing_scores_filename = (
@@ -384,7 +386,7 @@ class ImpostorDetector(ImpostorBase):
                 # get impostors for the candidate text, NOT the disputed text
                 if store[candidate]["text"] not in loaded_data:
                     print(
-                        f"Generating new impostors...\nBecause data not key in loaded_data: {store[candidate]['text'] not in loaded_data}."
+                        f"Generating new impostors...\nBecause data not key in loaded_data: {store[candidate]['text'] not in loaded_data}. Path to dump {existing_scores_filename}."
                     )
                     new_impostors = self.impostor_generator.generate_impostors(
                         text=store[candidate]["text"],
