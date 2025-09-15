@@ -641,7 +641,7 @@ class VisDetectors:
         ], "This method is only implemented for BLOG and Student Essays datasets."
         train_dataset, test_dataset = self._load_datasets(balanced=True)
         # TODO: Test on small data subsets
-        n_samples_per_class = 50
+        n_samples_per_class = 10  # 50
         train_dataset = pd.concat(
             [
                 train_dataset.loc[train_dataset["same"]].head(n_samples_per_class),
@@ -746,6 +746,7 @@ class VisDetectors:
                 imp_gen = args.get("impostor_technique", "fixed")
                 figure_name = f"roc_prec_recall_curve_{imp_gen}_r{args['rounds']}_top{args['top_n']}_dif_n_imp.{format}"
             plt.savefig(save_path / figure_name)
+            print(f"Saved figure to {save_path / figure_name}")
         plt.close(fig)
 
     def _get_missing_scores_indices(
@@ -826,8 +827,8 @@ class VisDetectors:
             args.get("n_impostors", n_imp) == n_imp
         ), f"n_impostors={args['n_impostors']} in args must match n_imp={n_imp} in function call"
         # load existing scores if available
-        if "impostor_score" not in train_dataset.columns:
-            train_dataset["impostor_score"] = np.nan
+        # if "impostor_score" not in train_dataset.columns:
+        #     train_dataset["impostor_score"] = np.nan
         if "impostor_score" not in test_dataset.columns:
             test_dataset["impostor_score"] = np.nan
 
@@ -839,59 +840,59 @@ class VisDetectors:
             loaded_data = {}
 
         imp_gen = args.get("impostor_technique", "fixed")
-        rows_without_scores, missing_scores_indices = self._helper_missing_scores(
-            train_dataset, loaded_data, n_imp, imp_gen=imp_gen
-        )
+        # rows_without_scores, missing_scores_indices = self._helper_missing_scores(
+        #     train_dataset, loaded_data, n_imp, imp_gen=imp_gen
+        # )
 
-        if len(rows_without_scores) > 0:
-            print(
-                f"Found {len(rows_without_scores)} rows without impostor scores in training data."
-            )
+        # if len(rows_without_scores) > 0:
+        #     print(
+        #         f"Found {len(rows_without_scores)} rows without impostor scores in training data."
+        #     )
 
-            with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
-                missing_scores = list(
-                    executor.map(
-                        self._helper_impostor,
-                        [path2imp] * len(rows_without_scores),
-                        rows_without_scores["pair"],
-                        [imp_gen] * len(rows_without_scores),
-                        [True] * len(rows_without_scores),  # training mode
-                        [n_imp] * len(rows_without_scores),  # n_imp
-                    )
-                )
-                train_dataset.loc[missing_scores_indices, "impostor_score"] = (
-                    missing_scores
-                )
+        #     with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
+        #         missing_scores = list(
+        #             executor.map(
+        #                 self._helper_impostor,
+        #                 [path2imp] * len(rows_without_scores),
+        #                 rows_without_scores["pair"],
+        #                 [imp_gen] * len(rows_without_scores),
+        #                 [True] * len(rows_without_scores),  # training mode
+        #                 [n_imp] * len(rows_without_scores),  # n_imp
+        #             )
+        #         )
+        #         train_dataset.loc[missing_scores_indices, "impostor_score"] = (
+        #             missing_scores
+        #         )
 
-            loaded_data = self._update_loaded_data(
-                loaded_data=loaded_data,
-                dataset=train_dataset,
-                missing_scores_indices=missing_scores_indices,
-                missing_scores=missing_scores,
-                n_imp=n_imp,
-                imp_gen=imp_gen,
-            )
-            with open(existing_scores_filename, "w") as f:
-                json.dump(loaded_data, f, indent=4)
-            print(
-                f"Saved missing train scores to {existing_scores_filename} for {len(missing_scores_indices)} rows."
-            )
-        print("Calculated impostor scores on training data.")
+        #     loaded_data = self._update_loaded_data(
+        #         loaded_data=loaded_data,
+        #         dataset=train_dataset,
+        #         missing_scores_indices=missing_scores_indices,
+        #         missing_scores=missing_scores,
+        #         n_imp=n_imp,
+        #         imp_gen=imp_gen,
+        #     )
+        #     with open(existing_scores_filename, "w") as f:
+        #         json.dump(loaded_data, f, indent=4)
+        #     print(
+        #         f"Saved missing train scores to {existing_scores_filename} for {len(missing_scores_indices)} rows."
+        #     )
+        # print("Calculated impostor scores on training data.")
 
-        fpr, tpr, thresholds, best_f1_thres = self.plot_decision_threshold_impostor(
-            scores=train_dataset["impostor_score"],
-            labels=train_dataset["same"],
-            title_kwargs=args,
-        )
-        print(
-            f"Plotted decision threshold for impostor detection for n_imp: {n_imp} (Fig 2)."
-        )
+        # fpr, tpr, thresholds, best_f1_thres = self.plot_decision_threshold_impostor(
+        #     scores=train_dataset["impostor_score"],
+        #     labels=train_dataset["same"],
+        #     title_kwargs=args,
+        # )
+        # print(
+        #     f"Plotted decision threshold for impostor detection for n_imp: {n_imp} (Fig 2)."
+        # )
 
-        best_f1_thres = np.round(best_f1_thres, 2)
-        youdens_j_thres = np.round(self._get_opt_imp_threshold(fpr, tpr, thresholds), 2)
-        print(
-            f"Optimal threshold for impostor detection via Youden's J function: {youdens_j_thres:.2f}/ via best F1: {best_f1_thres:.2f}"
-        )
+        # best_f1_thres = np.round(best_f1_thres, 2)
+        # youdens_j_thres = np.round(self._get_opt_imp_threshold(fpr, tpr, thresholds), 2)
+        # print(
+        #     f"Optimal threshold for impostor detection via Youden's J function: {youdens_j_thres:.2f}/ via best F1: {best_f1_thres:.2f}"
+        # )
 
         rows_without_scores, missing_scores_indices = self._helper_missing_scores(
             test_dataset, loaded_data, n_imp, imp_gen=imp_gen
@@ -901,22 +902,13 @@ class VisDetectors:
             print(
                 f"Found {len(rows_without_scores)} rows without impostor scores in test data."
             )
+            missing_scores = []
+            for row in rows_without_scores.itertuples():
+                pair = row.pair
+                score = self._helper_impostor(path2imp, pair, imp_gen, False, n_imp)
+                missing_scores.append(score)
 
-            # work with test dataset
-            with ThreadPoolExecutor() as executor:
-                missing_scores = list(
-                    executor.map(
-                        self._helper_impostor,
-                        [path2imp] * len(test_dataset),
-                        test_dataset["pair"],
-                        [imp_gen] * len(test_dataset),
-                        [False] * len(test_dataset),  # testing mode
-                        [n_imp] * len(test_dataset),  # n_imp
-                    )
-                )
-                test_dataset.loc[missing_scores_indices, "impostor_score"] = (
-                    missing_scores
-                )
+            test_dataset.loc[missing_scores_indices, "impostor_score"] = missing_scores
 
             loaded_data = self._update_loaded_data(
                 loaded_data=loaded_data,
@@ -939,44 +931,58 @@ class VisDetectors:
         precision, recall, pr_thresholds = precision_recall_curve(
             test_dataset["same"], test_dataset["impostor_score"]
         )
+        prec_rec_val = pd.DataFrame(
+            {
+                "precision": precision[:-1],
+                "recall": recall[:-1],
+                "threshold": pr_thresholds,
+            }
+        )
+        prec_rec_val.to_csv(
+            save_path / f"{imp_gen.replace(' ', '_')}_n_imp{n_imp}_fig2_prec_rec.csv",
+            index=False,
+        )
+        print(
+            f"Saved precision-recall values for Figure 2 with {imp_gen} impostor generation and n_imp={n_imp} to {save_path / f'{imp_gen}_fig2_prec_rec.csv'}"
+        )
 
-        for thres_name, thres in zip(
-            ["Youden's J", "best F1"], [youdens_j_thres, best_f1_thres]
-        ):
-            args["threshold"] = thres
-            print(f"Visualizing impostor scores with threshold: {thres_name} = {thres}")
+        # for thres_name, thres in zip(
+        #     ["Youden's J", "best F1"], [youdens_j_thres, best_f1_thres]
+        # ):
+        #     args["threshold"] = thres
+        #     print(f"Visualizing impostor scores with threshold: {thres_name} = {thres}")
 
-            test_dataset["pred_same"] = test_dataset["impostor_score"] >= thres
+        #     test_dataset["pred_same"] = test_dataset["impostor_score"] >= thres
 
-            # 'same' is ground truth, 'pred_same' is prediction
-            y_true = test_dataset["same"]
-            y_pred = test_dataset["pred_same"]
+        #     # 'same' is ground truth, 'pred_same' is prediction
+        #     y_true = test_dataset["same"]
+        #     y_pred = test_dataset["pred_same"]
 
-            cm = confusion_matrix(y_true, y_pred)
-            disp = ConfusionMatrixDisplay(
-                confusion_matrix=cm,
-                display_labels=["Different authors", "Same author"],
-            )
+        #     cm = confusion_matrix(y_true, y_pred)
+        #     disp = ConfusionMatrixDisplay(
+        #         confusion_matrix=cm,
+        #         display_labels=["Different authors", "Same author"],
+        #     )
 
-            disp.plot(cmap=plt.cm.Blues)
-            title = self._format_title(
-                base=f"Confusion Matrix on Test Data with threshold {thres_name}",
-                kwargs=args,
-            )
-            plt.title(title)
-            plt.tight_layout()
-            save_path = (
-                self.savefig_base
-                / "impostor_scores"
-                / self.dataset_name
-                / "koppel_fig2"
-            )
-            filename = self._title2filename(title=title)
-            save_path.mkdir(parents=True, exist_ok=True)
-            for format in ["svg"]:  # "png",
-                print(f"Saving confusion matrix to {save_path / filename}.{format}")
-                plt.savefig(save_path / f"{filename}_{imp_gen}.{format}")
-            plt.close()
+        #     disp.plot(cmap=plt.cm.Blues)
+        #     title = self._format_title(
+        #         base=f"Confusion Matrix on Test Data with threshold {thres_name}",
+        #         kwargs=args,
+        #     )
+        #     plt.title(title)
+        #     plt.tight_layout()
+        #     save_path = (
+        #         self.savefig_base
+        #         / "impostor_scores"
+        #         / self.dataset_name
+        #         / "koppel_fig2"
+        #     )
+        #     filename = self._title2filename(title=title)
+        #     save_path.mkdir(parents=True, exist_ok=True)
+        #     for format in ["svg"]:  # "png",
+        #         print(f"Saving confusion matrix to {save_path / filename}.{format}")
+        #         plt.savefig(save_path / f"{filename}_{imp_gen}.{format}")
+        #     plt.close()
         return precision, recall
 
     #################################################################################
@@ -1041,22 +1047,12 @@ class VisDetectors:
                     upsample=False,
                     real_time_generation=True,  # TODO: turn True, otherwise on-the-fly generation is not possible (currently too much data for too few free api calls)
                 )
-                if imp_gen in ["on-the-fly", "content", "mirror_minds"]:
-                    missing_scores = []
-                    for row in rows_without_scores.itertuples():
-                        pair = row.pair
-                        score = self._helper_impostor(path2imp, pair, imp_gen)
-                        missing_scores.append(score)
-                else:
-                    with ThreadPoolExecutor() as executor:
-                        missing_scores = list(
-                            executor.map(
-                                self._helper_impostor,
-                                [path2imp] * len(rows_without_scores),
-                                rows_without_scores["pair"],
-                                [imp_gen] * len(rows_without_scores),
-                            )
-                        )
+                missing_scores = []
+                for row in rows_without_scores.itertuples():
+                    pair = row.pair
+                    score = self._helper_impostor(path2imp, pair, imp_gen)
+                    missing_scores.append(score)
+
                 train_dataset.loc[missing_scores_indices, "impostor_score"] = (
                     missing_scores
                 )
