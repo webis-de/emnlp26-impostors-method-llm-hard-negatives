@@ -517,6 +517,8 @@ class VisDetectors:
                 PPMdDetector(),
             ],
         ):
+            assert isinstance(test_dataset, list), f"test_dataset must be a list of strings for unmasking but is {type(test_dataset["pair"])}"
+            
             preds = baseline.get_score(test_dataset["pair"])
 
             test_dataset[f"{baseline_name.replace(' ','_')}_score"] = np.array(
