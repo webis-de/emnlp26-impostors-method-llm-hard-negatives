@@ -232,6 +232,8 @@ class VisDetectors:
                     if isinstance(row.pair, np.ndarray)
                     else row.pair
                 )
+                if split not in data:
+                    data[split] = []
 
                 data[split].append(
                     {
