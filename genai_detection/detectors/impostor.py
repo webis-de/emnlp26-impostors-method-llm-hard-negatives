@@ -374,9 +374,14 @@ class ImpostorDetector(ImpostorBase):
                     with open(existing_scores_filename, "r") as f:
                         loaded_data = json.load(f)
                 except json.decoder.JSONDecodeError as e:
-                    print("Try using json5 because of JSONDecodeError:", e)
-                    with open(existing_scores_filename, "r") as f:
+                    print(
+                        "Try using json5 because of JSONDecodeError for file:",
+                        existing_scores_filename,
+                        e,
+                    )
+                    with open(existing_scores_filename, "r", encoding="utf-8") as f:
                         loaded_data = json5.load(f)
+                    print("Successfully loaded json5 file.")
             else:
                 loaded_data = {}
             for j, (disputed, candidate) in enumerate(
