@@ -517,12 +517,15 @@ class VisDetectors:
                 PPMdDetector(),
             ],
         ):
-            assert isinstance(test_dataset, list), f"test_dataset must be a list of strings for unmasking but is {type(test_dataset["pair"])}"
-            
-            preds = baseline.get_score(test_dataset["pair"])
+            pairs = test_dataset["pair"]
+            if baseline_name in ["unmasking", "ppmd"]:
+                pairs = [item for sublist in pairs for item in sublist]
+
+            preds = baseline.get_score(pairs)
+            preds = preds.tolist() if not isinstance(preds, list) else preds
 
             test_dataset[f"{baseline_name.replace(' ','_')}_score"] = np.array(
-                preds.tolist()
+                preds
             ).ravel()
 
             # same author pairs
@@ -863,8 +866,8 @@ if __name__ == "__main__":
     )
     # {reference: {paraphraser_prompt: paraphrase, ...}, ...}
     # TODO: uncomment
-    impostors_dict = vis_det.generate_impostors(imp_gen="naive_llm")
-    print(f"Generated impostors for {len(impostors_dict)} candidates.")
+    # impostors_dict = vis_det.generate_impostors(imp_gen="naive_llm")
+    # print(f"Generated impostors for {len(impostors_dict)} candidates.")
 
     # run impostor approach with pre-generated impostors (loaded automatically from disk in impostor generator)
     vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
