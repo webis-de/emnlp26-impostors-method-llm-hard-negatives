@@ -722,8 +722,8 @@ class VisDetectors:
                 fontsize=10,
             )
 
-        plt.xlabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
-        plt.ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
+        plt.xlabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=10)
+        plt.ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=10)
         diff_n_imp_args = args.copy()
         # remove n_impostors from args for title, bc we compare different n_imp
         diff_n_imp_args.pop("n_impostors", None)
@@ -734,7 +734,7 @@ class VisDetectors:
         plt.legend(
             loc="best", bbox_to_anchor=(1.0, 0.5), borderaxespad=0.0, fontsize=10
         )
-        plt.tight_layout()
+        plt.tight_layout(rect=[0, 0, 0.8, 1])
         save_path = (
             self.savefig_base / "impostor_scores" / self.dataset_name / "koppel_fig2"
         )
