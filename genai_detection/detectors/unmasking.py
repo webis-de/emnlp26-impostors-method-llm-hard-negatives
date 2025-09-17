@@ -162,7 +162,7 @@ class UnmaskingDetector(DetectorBase):
         return scores
 
     @staticmethod
-    def tokenize_char_ngrams(text, n=3, normalize_ws=True):
+    def tokenize_char_ngrams(text: str, n=3, normalize_ws=True):
         """
         Tokenize input text into character n-grams.
 
@@ -171,6 +171,7 @@ class UnmaskingDetector(DetectorBase):
         :param normalize_ws: collapse whitespace before tokenization
         :return: list of n-gram tokens
         """
+        assert isinstance(text, str), f"Input text must be a string but is {type(text)}"
         text = text.strip()
         if normalize_ws:
             text = re.sub(r"\s+", " ", text)
@@ -178,7 +179,7 @@ class UnmaskingDetector(DetectorBase):
         return [text[i : i + n] for i in range(0, len(text) - n + 1)]
 
     @staticmethod
-    def tokenize_word_ngrams(text, n=3, word_tokenizer=None):
+    def tokenize_word_ngrams(text: str, n=3, word_tokenizer=None):
         """
         Tokenize input text into word n-grams.
 
@@ -187,6 +188,9 @@ class UnmaskingDetector(DetectorBase):
         :param word_tokenizer: word tokenizer to use (defaults to :meth:`tokenize_words`)
         :return: list of word n-gram tokens
         """
+        assert isinstance(
+            text, str
+        ), f"Input text of word ngram tokenizer must be a string but is {type(text)}"
         tokens = (
             word_tokenizer(text.strip())
             if word_tokenizer
