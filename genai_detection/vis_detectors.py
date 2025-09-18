@@ -732,7 +732,7 @@ class VisDetectors:
         )
         plt.title(title)
         plt.legend(
-            loc="best", bbox_to_anchor=(1.0, 0.5), borderaxespad=0.0, fontsize=10
+            loc="best", bbox_to_anchor=(1.05, 0.6), borderaxespad=0.0, fontsize=10
         )
         plt.tight_layout(rect=[0, 0, 0.8, 1])
         save_path = (
