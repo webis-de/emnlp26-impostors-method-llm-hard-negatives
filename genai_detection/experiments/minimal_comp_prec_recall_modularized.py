@@ -212,11 +212,15 @@ class VisDetectors:
             )
         data = dict()
         for df, split in zip([train_dataset, test_dataset], ["train", "test"]):
-            data[split] = (
-                []
-                if ("dataset" not in locals() or split not in dataset)
-                else dataset[split]
-            )
+            if "dataset" not in locals() or split not in dataset:
+                data[split] = []
+            else:
+                # if it’s already a list, keep it; otherwise wrap into a list
+                if isinstance(dataset[split], list):
+                    data[split] = dataset[split]
+                else:
+                    data[split] = list(dataset[split])
+
             for row in df.itertuples():
                 text_l, text_r = row.pair
                 gt_label = (
@@ -232,8 +236,6 @@ class VisDetectors:
                     if isinstance(row.pair, np.ndarray)
                     else row.pair
                 )
-                if split not in data:
-                    data[split] = []
 
                 data[split].append(
                     {
