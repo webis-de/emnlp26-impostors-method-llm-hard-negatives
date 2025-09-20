@@ -1542,7 +1542,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--upsample",
         type=bool,
-        default=True,
+        default=False,
         help="Whether texts below 500 words should be skipped or upsampled (default: %(default)s)",
     )
 
