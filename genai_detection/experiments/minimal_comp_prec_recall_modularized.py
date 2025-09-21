@@ -854,7 +854,7 @@ if __name__ == "__main__":
         # "on-the-fly",
         "naive_llm",
         "fixed",
-        # "non_naive_llm",
+        "non_naive_llm",
     ]
     fig = 4
     print(
@@ -870,6 +870,7 @@ if __name__ == "__main__":
     )
     # {reference: {paraphraser_prompt: paraphrase, ...}, ...}
     # TODO: uncomment
+    impostors_dict = vis_det.generate_impostors(imp_gen="non_naive_llm")
     impostors_dict = vis_det.generate_impostors(imp_gen="naive_llm")
     print(f"Generated impostors for {len(impostors_dict)} candidates.")
 
