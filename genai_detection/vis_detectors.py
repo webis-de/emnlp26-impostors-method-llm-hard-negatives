@@ -1397,7 +1397,7 @@ class VisDetectors:
             "on-the-fly": "On-the-Fly",
             "unsupervised_baseline_min-max": "Unsup. Min-Max (B)",
             "unsupervised_baseline_cosine": "Unsup. Cosine (B)",
-            "supervised_baseline": "Sup. SVC (B)",
+            "supervised_baseline": "Sup. SVM (B)",
         }
 
         line_styles = dict(zip(baselines, [":", "--", "-."]))
