@@ -645,7 +645,6 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
         )
         print(f"Train authors: {train_authors}, Test authors: {test_authors}\n\n")
 
-        # TODO: add similarity on summary sbert?
         train_pairs = self.generate_pairs(df=train_df, groupby_cols=groupyby_cols)
         test_pairs = self.generate_pairs(df=test_df, groupby_cols=groupyby_cols)
         print(
@@ -1652,7 +1651,7 @@ def run_artificial_student_essay_dataset():
     output_dir = (
         Path(__file__).resolve().parent.parent
         / CONFIG.PATH2ARTIFICIAL_STUDENT_ESSAYS
-        / "sleep_time_limit"  # TODO: Omit
+        / "sleep_time_limit"
     )
     output_dir.mkdir(parents=True, exist_ok=True)
 

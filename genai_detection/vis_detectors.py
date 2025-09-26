@@ -919,7 +919,7 @@ class VisDetectors:
             top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
             path2imp=path2imp,
             upsample=False,
-            real_time_generation=True,  # TODO: turn True, otherwise on-the-fly generation is not possible (currently too much data for too few free api calls)
+            real_time_generation=True,  # turn True, otherwise on-the-fly generation is not possible (currently too much data for too few free api calls)
         )
         impostor_detector.set_training_mode(training_mode)
         res = impostor_detector._get_score_impl(pair)
@@ -967,7 +967,7 @@ class VisDetectors:
                     top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
                     path2imp=path2imp,
                     upsample=False,
-                    real_time_generation=True,  # TODO: turn True, otherwise on-the-fly generation is not possible (currently too much data for too few free api calls)
+                    real_time_generation=True,  # turn True, otherwise on-the-fly generation is not possible (currently too much data for too few free api calls)
                 )
                 missing_scores = []
                 for row in rows_without_scores.itertuples():
@@ -1235,7 +1235,7 @@ class VisDetectors:
                     f"[ERROR] Failed for baseline {baseline_name}:\n{e}\n{traceback.format_exc()}\nReloading datasets..."
                 )
                 train_dataset, test_dataset = self._load_datasets(balanced=True)
-                # TODO: Test on small data subsets
+                # Test on small data subsets
                 # test_dataset = pd.concat(
                 #     [
                 #         test_dataset.loc[test_dataset["same"]].head(5),

@@ -48,7 +48,6 @@ from genai_detection.detectors.unmasking import UnmaskingDetector
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from genai_detection.config import CONFIG
 
-# TODO: Bigger
 NUM_SAMPLES = 20
 
 
@@ -335,10 +334,9 @@ class VisDetectors:
             top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
             path2imp=path2imp,
             upsample=False,
-            real_time_generation=True,  # TODO: turn True, otherwise on-the-fly generation is not possible (currently too much data for too few free api calls)
+            real_time_generation=True,  # turn True, otherwise on-the-fly generation is not possible (currently too much data for too few free api calls)
         )
         impostor_detector.set_training_mode(training_mode)
-        # TODO
         res = impostor_detector._get_score_impl(pair)
         return [r[0] for r in res] if isinstance(res, list) else res[0]
 
@@ -367,7 +365,7 @@ class VisDetectors:
             top_n=100000,  # cf. pg. 179, Koppel et al. (2014)
             path2imp=path2imp,
             upsample=False,
-            real_time_generation=True,  # TODO: turn True, otherwise on-the-fly generation is not possible (currently too much data for too few free api calls)
+            real_time_generation=True,  # turn True, otherwise on-the-fly generation is not possible (currently too much data for too few free api calls)
         )
         # work with test dataset
         impostor_detector.set_training_mode(
@@ -390,7 +388,6 @@ class VisDetectors:
                     score = self._helper_impostor(path2imp, row["pair"], imp_gen, False)
                     test_dataset.at[idx, f"{imp_gen}_score"] = score
                     missing_scores_indices.remove(idx)
-                    # TODO: tuple as key
                     missing_scores[str(test_dataset.loc[idx, "pair"])] = score
                     print(
                         f"Computed impostor score for row {idx} using imp gen {imp_gen}."

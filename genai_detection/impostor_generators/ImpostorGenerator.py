@@ -427,7 +427,6 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
                 )
                 return {"imposter": "Error during fetching results, check logs."}
         else:  # use precomputed results
-            # TODO for debugging purposes, delete later:
             print("Using precomputed results from path2imp. No real-time generation.")
             if "PUCK" in text:  # Midsummer Night's Dream
                 path2imp = (
@@ -596,7 +595,7 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
         impostors = {}
         # if already computed impostors are available, load them from path2imp
         if path2imp.suffix == ".json" and path2imp.exists():
-            # TODO: read impostors from json dump file: {reference: {paraphraser_prompt: paraphrase, ...}, ...}
+            # read impostors from json dump file: {reference: {paraphraser_prompt: paraphrase, ...}, ...}
             with open(path2imp, "r") as f:
                 loaded_data = json.load(f)
                 for split in loaded_data.keys():

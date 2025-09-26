@@ -39,7 +39,6 @@ class MirrorMindsGenerator(BaseImpostorGenerator):
     ):
         super().__init__(n_impostors=n_impostors)
         torch.cuda.empty_cache()
-        # FIXME: AttributeError: 'tqdm' object has no attribute '_lock'
         self.model_path = snapshot_download(repo_id="google/flan-t5-small")
 
     def generate_impostors(

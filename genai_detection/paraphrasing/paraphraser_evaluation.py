@@ -143,7 +143,7 @@ class ParaphrasingEvaluator:
         self.sbert_model = None
         try:
             self.sbert_model = SentenceTransformer(
-                "sentence-transformers/all-MiniLM-L6-v2"  # , device=device    # TODO: for server?
+                "sentence-transformers/all-MiniLM-L6-v2"
             )  # for cosine similarity
         except Exception as e:
             raise RuntimeError("Failed to load SentenceTransformer model: {e}") from e
@@ -312,7 +312,7 @@ class ParaphrasingEvaluator:
         data = []
         path2metadata = base_dir / "file_metadata.xlsx"
         if dataset_type == "student_essays":
-            if True:  #  TODO: not path2metadata.exists():
+            if not path2metadata.exists():
                 self._create_student_essays_metadata(base_dir)
             return pd.read_excel(path2metadata)
 

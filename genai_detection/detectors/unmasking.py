@@ -240,7 +240,7 @@ class UnmaskingDetector(DetectorBase):
         :param n_tokens: number of tokens to sample from input sequence
         :return: list of sampled tokens
         """
-        # TODO: not proportionally, not full set and then again cf. Generalizing Unmasking for Short Texts, Bevendorff 2019, Chap. 3.2
+        # not proportionally, not full set and then again cf. Generalizing Unmasking for Short Texts, Bevendorff 2019, Chap. 3.2
         try:
             t = [tokens[randint(0, len(tokens) - 1)] for _ in range(n_tokens)]
         except ValueError as e:

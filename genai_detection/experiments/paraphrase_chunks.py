@@ -197,7 +197,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
     file2existing_paraphrases = save_path / "existing_chunk_paraphrases.json"
     dataset = get_dataset(path2dataset)
     # keep only the first 5 examples per category
-    dataset = dataset.groupby("category").head(1)  # TODO: change to 5
+    dataset = dataset.groupby("category").head(1)
 
     n_responses = 1
 

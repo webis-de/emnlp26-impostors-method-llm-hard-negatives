@@ -82,10 +82,10 @@ class UnSupervisedImpostorBaseline(ImpostorBaselineBase):
 
     def get_prediction(self, text: t.Iterable[str]) -> t.List[bool]:
         """
-        Predict if the input text(s) were written by a the same author TODO: machine.
+        Predict if the input text(s) were written by a the same author
 
         :param text: input text or batch of input texts
-        :return: boolean classifications of whether inputs are likely same author TODO: machine-generated
+        :return: boolean classifications of whether inputs are likely same author
         """
         scores = self.get_score(text)
         return [score > self.threshold for score in scores]
