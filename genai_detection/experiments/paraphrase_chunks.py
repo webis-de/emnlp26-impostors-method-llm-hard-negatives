@@ -3,6 +3,7 @@ Experiment paraphrasing: Chunks
 The goal of this experiment is to find out whether paraphrasing paragraphs or chunks (because the layout information used to identify paragraphs was stripped from the arrow datasets) is more effective paraphrasing whole texts in terms of state-of-the-art paraphrasing metrics.
 We will paraphrase chunks and compute scores on chunk-paragraph level.
 The scores will be averaged to get a score for the whole text, which will be compared to the score of the whole text paraphrased.
+We also exvaluate the absolute difference in scores between maximal number of chunks and full-text paraphrasing, aggregated by two-step vs. one-step models.
 """
 
 import argparse
@@ -41,7 +42,6 @@ from genai_detection.paraphrasing.paraphraser_evaluation import ParaphrasingEval
 
 CATEGORIES = [
     "Blog",
-    # "News",
     "Gutenberg",
     "Student Essays",
 ]
@@ -195,7 +195,6 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
     ):
 
         print(f"Processing text {i+1}/{len(dataset)}: {category}")
-        rows = []
         text_key = f"text_{i}"
         if file2existing_paraphrases.exists():
             with open(file2existing_paraphrases, "r") as f:
@@ -244,7 +243,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
                 )
                 continue
             # number cpu cores is 4, so use 4 workers
-            # FIXME: it is possible that we exceed the API rate limit of the paraphraser, if that happens we need to handle it
+            # it is possible that we exceed the API rate limit of the paraphraser, if that happens we need to handle it
             with ThreadPoolExecutor(
                 max_workers=max(1, min(4, len(missing_configs)))
             ) as executor:
@@ -410,7 +409,6 @@ def get_slim_dfs_for_one_text(n_paragraphs_df: list) -> list:  # of dataframes
         # each row is average score over scores of all chunks
         slim_n_paragraphs_df = n_paragraphs_df[i].drop(
             columns=[
-                # "prompt",
                 "original_text",
                 "parameters",
                 "paraphrased_text",
@@ -704,8 +702,6 @@ def plot_model_metrics_per_data_category(
 
 
 if __name__ == "__main__":
-    # TODO: Should work, run this on all paraphrasers. First test with only up to two chunks
-    # cannot test it on 15.08.2025 in the morning, because other script uses all api calls
     parser = argparse.ArgumentParser(
         description="Assess effect of (Non-) Naive impostor generation."
     )
@@ -729,57 +725,61 @@ if __name__ == "__main__":
     if not SAVE_PATH.exists():
         SAVE_PATH.mkdir(parents=True, exist_ok=True)
 
+    # aggregate existing scores
     paraphrase_save_path = SAVE_PATH / "cross_genre" / "paraphrases_per_text"
     paraphrase_save_path.mkdir(parents=True, exist_ok=True)
 
-    diff_df_loaded = pd.read_csv(
-        os.path.join(
-            paraphrase_save_path.parent, "text_paraphrases_evaluation_results.csv"
+    # works on minimal example (15.08.2025)
+    if args.task == "create":
+        # only create paraphrasers and save them
+        print(f"Creating and saving paraphrasers to {paraphrase_save_path}.")
+
+        create_and_save_paraphrasers(
+            path2dataset=args.path2dataset,
+            save_path=paraphrase_save_path,
         )
-    )
-    chunk_difference_df(slim_df=diff_df_loaded, save_dir=paraphrase_save_path.parent)
+        print(
+            f"Paraphrasers created and saved to {paraphrase_save_path}. Next, run the evaluation."
+        )
 
-    # # works on minimal example (15.08.2025)
-    # if args.task == "create":
-    #     # only create paraphrasers and save them
-    #     print(f"Creating and saving paraphrasers to {paraphrase_save_path}.")
+    # works on minimal example (15.08.2025)
+    elif args.task == "evaluate":
+        print(
+            f"Paraphrasers created and saved to {paraphrase_save_path}. Next, run the evaluation."
+        )
 
-    #     create_and_save_paraphrasers(
-    #         path2dataset=args.path2dataset,
-    #         save_path=paraphrase_save_path,
-    #     )
-    #     print(
-    #         f"Paraphrasers created and saved to {paraphrase_save_path}. Next, run the evaluation."
-    #     )
+        results = evaluate_paraphrases(
+            path2dataset=paraphrase_save_path,
+            save_path=SAVE_PATH / "cross_genre",
+        )
+        print(
+            f"Evaluation results saved to {SAVE_PATH / 'cross_genre' / 'text_paraphrases_evaluation_results.csv'}."
+        )
+        assert type(results) is list, "Results should be a list."
+        slim_df = get_slim_dfs_for_one_text(results)
+        assert type(slim_df) is list, "Slim DataFrame should be a list of DataFrames."
+        plot_model_metrics(
+            n_paragraphs_df=slim_df,
+            save_dir=SAVE_PATH / "cross_genre" / "plots",
+            show=False,
+            save=True,
+            data_category="Cross-Genre",
+        )
+        plot_model_metrics_per_data_category(
+            n_paragraphs_df=slim_df,
+            save_dir=SAVE_PATH / "cross_genre" / "plots",
+            show=False,
+            save=True,
+            data_category="Cross-Genre",
+        )
+        print("Plots saved to plots directory:", SAVE_PATH / "cross_genre" / "plots")
 
-    # # works on minimal example (15.08.2025)
-    # elif args.task == "evaluate":
-    #     print(
-    #         f"Paraphrasers created and saved to {paraphrase_save_path}. Next, run the evaluation."
-    #     )
-
-    #     results = evaluate_paraphrases(
-    #         path2dataset=paraphrase_save_path,
-    #         save_path=SAVE_PATH / "cross_genre",
-    #     )
-    #     print(
-    #         f"Evaluation results saved to {SAVE_PATH / 'cross_genre' / 'text_paraphrases_evaluation_results.csv'}."
-    #     )
-    #     assert type(results) is list, "Results should be a list."
-    #     slim_df = get_slim_dfs_for_one_text(results)
-    #     assert type(slim_df) is list, "Slim DataFrame should be a list of DataFrames."
-    #     plot_model_metrics(
-    #         n_paragraphs_df=slim_df,
-    #         save_dir=SAVE_PATH / "cross_genre" / "plots",
-    #         show=False,
-    #         save=True,
-    #         data_category="Cross-Genre",
-    #     )
-    #     plot_model_metrics_per_data_category(
-    #         n_paragraphs_df=slim_df,
-    #         save_dir=SAVE_PATH / "cross_genre" / "plots",
-    #         show=False,
-    #         save=True,
-    #         data_category="Cross-Genre",
-    #     )
-    #     print("Plots saved to plots directory:", SAVE_PATH / "cross_genre" / "plots")
+        # aggregate differences in scores between chunked and full-text paraphrasing
+        diff_df_loaded = pd.read_csv(
+            os.path.join(
+                paraphrase_save_path.parent, "text_paraphrases_evaluation_results.csv"
+            )
+        )
+        chunk_difference_df(
+            slim_df=diff_df_loaded, save_dir=paraphrase_save_path.parent
+        )

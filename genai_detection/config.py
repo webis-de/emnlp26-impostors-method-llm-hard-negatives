@@ -8,7 +8,6 @@ load_dotenv()
 class BaseConfig:
     SERVER = False
     SERPAPI_KEY = os.getenv("SERPAPI_KEY")
-    BLABLADOR_KEY = os.getenv("BLABLADOR_KEY")
     OPENAI_KEY = os.getenv("OPENAI_KEY")
     SAIA_KEY = os.getenv("SAIA_KEY")
     DEEPL_API_KEY = os.getenv("DEEPL_KEY")
@@ -43,8 +42,6 @@ class BaseConfig:
     UNMASKING = "unmasking"
     TEMPERATURE = 0.7
     MAX_LENGTH = 512  # Maximum length of the generated paraphrase
-    BLABLADOR_MODEL = "1 - Ministral 8b - the fast model"
-    BLABLADOR_URL = "https://api.helmholtz-blablador.fz-juelich.de/v1"
     OLLAMA_MODEL = "zephyr:7b"  # "mistral:7b"  # "default:latest"
     OLLAMA_URL = "https://llm.web.webis.de/api"
     SAIA_URL = "https://chat-ai.academiccloud.de/v1"

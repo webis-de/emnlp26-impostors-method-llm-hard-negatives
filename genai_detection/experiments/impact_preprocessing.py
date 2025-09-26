@@ -1,4 +1,4 @@
-# Impact of Preprocessing Steps on Vocabulary Size
+# Impact of Preprocessing Steps on Vocabulary Size (default: unique space-free character 4-grams)
 import json
 import os
 from pathlib import Path

@@ -477,15 +477,7 @@ class VisDetectors:
                     else Path(os.getcwd()).resolve() / CONFIG.PATH2STUDENT_ESSAYS
                 )
             else:
-                path2imp = (
-                    self.savefig_base
-                    # / "impostor_scores"
-                    # / self.dataset_name
-                    # / "modularized"
-                    / "dumps"
-                    / f"impostor_{imp_gen}.json"
-                    # / f"modularized_impostors_{imp_gen}_old.json"  # FIXME TODO
-                )
+                path2imp = self.savefig_base / "dumps" / f"impostor_{imp_gen}.json"
 
             result = self._run_fig_4_worker(imp_gen, test_dataset, path2imp, save_path)
             print("\n\nResult for imp gen:", imp_gen, result)
@@ -817,24 +809,10 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--balanced",
-        type=bool,
-        default=True,
-        help="Whether the number of same and different author pairs from dataset is balanced (default: %(default)s)",
-    )
-
-    parser.add_argument(
         "--upsample",
         type=bool,
         default=True,
         help="Whether texts below 500 words should be skipped or upsampled (default: %(default)s)",
-    )
-
-    parser.add_argument(
-        "--fig2reproduce",
-        type=int,
-        default=2,
-        help="Number of Figure from Koppel et al. (2014) to reproduce (default: %(default)s)",
     )
 
     args = parser.parse_args()
@@ -849,27 +827,19 @@ if __name__ == "__main__":
         upsample=args.upsample,
     )
 
-    # reproduction of Figure 2/ 4 from Koppel et al. (2014)
     our_figure_impostor_options = [
         # "on-the-fly",
         "naive_llm",
         "fixed",
         "non_naive_llm",
     ]
-    fig = 4
-    print(
-        f"Reproducing Figure {fig} from Koppel et al. (2014) on BLOG and STUDENT data."
-    )
 
     vis_det = VisDetectors(
         dataset_name=CONFIG.STUDENT_ESSAYS,
         detectors=[impostor],
     )
-    print(
-        f"impostor Detector initialized for fig {fig} and dataset {CONFIG.STUDENT_ESSAYS}."
-    )
+    print(f"impostor Detector initialized for dataset {CONFIG.STUDENT_ESSAYS}.")
     # {reference: {paraphraser_prompt: paraphrase, ...}, ...}
-    # TODO: uncomment
     impostors_dict = vis_det.generate_impostors(imp_gen="non_naive_llm")
     impostors_dict = vis_det.generate_impostors(imp_gen="naive_llm")
     print(f"Generated impostors for {len(impostors_dict)} candidates.")
@@ -883,17 +853,14 @@ if __name__ == "__main__":
         / vis_det.dataset_name
         / "our_contributions_scores",
     )
-    print(
-        f"Finished reproducing Figure {fig} from Koppel et al. (2014) on STUDENT data."
-    )
+    print(f"Finished on STUDENT data.")
 
     # vis_det = VisDetectors(
     #     dataset_name=CONFIG.BLOG,
     #     detectors=[impostor],
     # )
-    # print(f"impostor Detector initialized for fig {fig} and dataset {CONFIG.BLOG}.")
+    # print(f"impostor Detector initialized for dataset {CONFIG.BLOG}.")
 
-    # # figure 4 with our contributions (LLM based impostors)
     # vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
     #     args=args,
     #     imp_gen_options=our_figure_impostor_options,
@@ -902,4 +869,4 @@ if __name__ == "__main__":
     #     / vis_det.dataset_name
     #     / "our_contributions_scores",
     # )
-    # print(f"Finished reproducing Figure {fig} from Koppel et al. (2014) on BLOG data.")
+    # print(f"Finished on BLOG data.")

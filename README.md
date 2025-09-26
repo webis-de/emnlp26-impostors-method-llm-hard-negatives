@@ -37,7 +37,6 @@ For the paraphrasers used in the impostor generation, you need to set up the fol
 - [DEEPL_KEY](https://www.deepl.com/) (for Translation via DeepL: 500,000 characters/month in free plan)
 - [SAIA_KEY](https://services.kisski.de/services/en/service/?service=2-02-llm-service.json) (for SAIA paraphraser models hosted by GWDG)
 - [OPENAI_KEY](https://llm.web.webis.de/) (for OpenWebUI models hosted by Webis)
-- [BLABLADOR_KEY](https://helmholtz-blablador.fz-juelich.de/) (models hosted by FZ Jülich)
 - [SERPAPI_KEY](https://serpapi.com/users/sign_up) (for Google search API: 250 queries/month in free plan)
 
 ### ⚙️ Set up the project*

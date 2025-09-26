@@ -28,26 +28,6 @@ from genai_detection.config import CONFIG
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.WARN)
 
-# cf. https://sdlaml.pages.jsc.fz-juelich.de</ai/guides/blablador_api_access/ (15.06.2025)
-ModelName = Literal[
-    "1 - Llama3 405 the best general model and big context size",
-    "1 - Ministral 8b - the fast model",
-    "1 - Teuken-7B-instruct-research-v0.4 - The OpenGPT-X model",
-    "10 Mistral-Nemo-Instruct-2407 - Our fast-experimental - with a large context size",
-    # "2 - QwenLong L1 32B - A long context reasoning model from 28.05.2025", # specially trained for reasoning, not available om 16.06.2025
-    "3 - DeepCoder-14B-Preview - the code model from 09.04.2025",
-    "5 - GritLM-7B - For Chat AND Text Embeddings",
-    "alias-code",  # specially trained for code
-    "alias-embeddings",  # specially made for embeddings
-    "alias-fast",  # high throughput
-    "alias-fast-experimental",
-    "alias-llama3-huge",  # most accurate, but slowest?
-    "alias-opengptx",
-    "gpt-3.5-turbo",
-    "text-davinci-003",
-    "text-embedding-ada-002",
-]
-
 
 class TopicSchema(BaseModel):
     topic: str
@@ -1083,7 +1063,6 @@ if __name__ == "__main__":
     paraphrasers = {
         # 'T5_ChatGPT': T5ChatGPTParaphraser(),
         # 'T5_Google_PAWS': T5GooglePAWSParaphraser(),
-        # 'Blablador': BlabladorParaphraser(model_id="1 - Llama3 405 the best general model and big context size"),
         "Ollama": OllamaParaphraser(),
         "SAIA": SAIAParaphraser(),
         # "TopicParaphraser": TopicParaphraser(
@@ -1108,8 +1087,6 @@ if __name__ == "__main__":
         #     language="French",
         # ),
     }
-    # paraphrasers.update({f'Blablador_{name}': BlabladorParaphraser(model_id=name) for name in list(get_args(ModelName))})
-
     # prompts = [
     #         "Paraphrase the following text and output only the paraphrased version:",
     #         "First, extract bullet points capturing the main ideas, then create a text based on these bullet points. Only output the final text (i.e. do not output the bullet points or any additional chain of thoughts):",

@@ -12,7 +12,6 @@ from genai_detection.config import CONFIG
 from genai_detection.paraphrasing.paraphraser import (
     T5ChatGPTParaphraser,
     T5GooglePAWSParaphraser,
-    BlabladorParaphraser,
     BulletPointParaphraser,
     OllamaParaphraser,
     SAIAParaphraser,
@@ -28,6 +27,7 @@ N_RESPONSES = 1
 MAX_LENGTH = 512
 TEMPERATURE = 0.7
 PROMPTS = [
+    # "Paraphrase the text above without changing its meaning. Use different words and vary the sentence structure while maintaining a consistent tone. Your paraphrase should be three times as long than the original. Output only the paraphrased sentence, with NO explanations or extra text.",
     "Paraphrase the given sentence by identifying the main subject, verb, and object. Replace each with synonyms or closely related words, adjusting grammar naturally. Keep the new sentence close in length to the original. Output only the final paraphrased sentence.",
     "Paraphrase the sentence above without changing its meaning. Use different words and vary the sentence structure while keeping the tone consistent. Keep the new sentence similar in length to the original. Output only the paraphrased sentence, with no explanations or extra text.",
 ]
@@ -72,7 +72,7 @@ def load_metadata(path, file_name):
 def evaluate_category(data_category, data_root):
     use_ground_truth = not (
         data_category in ["Blog", "Student Essays"]
-    )  # FIXME: Student Essays has metadata, but it is not used for now (and blog can be derived from CSV file)
+    )  # Student Essays has metadata, but it is not used for now (and blog can be derived from CSV file)
     print(
         f"Evaluating category: {data_category} using ground truth: {use_ground_truth}"
     )

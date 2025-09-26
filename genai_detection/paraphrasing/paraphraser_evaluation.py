@@ -1635,7 +1635,6 @@ if __name__ == "__main__":
     paraphrasers = {
         "T5_ChatGPT": T5ChatGPTParaphraser(),
         # 'T5_Google_PAWS': T5GooglePAWSParaphraser(),
-        # 'Blablador': BlabladorParaphraser(model_id="1 - Llama3 405 the best general model and big context size"),
         "Ollama": OllamaParaphraser(model_id=ollama_model_id),
         "TopicParaphraser": TopicParaphraser(
             text_extractor=OllamaParaphraser(model_id=ollama_model_id),
