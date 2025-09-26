@@ -1,3 +1,17 @@
+# Copyright 2024 Klara M. Gutekunst, Webis
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 from pathlib import Path
 from typing import DefaultDict, Iterable, List
@@ -7,7 +21,7 @@ import torch
 from genai_detection.detectors.detector_base import DetectorBase
 from evaluate import load
 
-# import llmdet.detector as llmdet  # FIXME: Wait until https://github.com/TrustedLLM/LLMDet/issues/14 is resolved
+# import llmdet.detector as llmdet  # issue: https://github.com/TrustedLLM/LLMDet/issues/14
 __all__ = ["PerplexityDetector"]
 
 
@@ -132,7 +146,7 @@ class PerplexityDetector(DetectorBase):
         return predictions, model_names
 
 
-# FIXME: Wait until https://github.com/TrustedLLM/LLMDet/issues/14 is resolved
+# issue: https://github.com/TrustedLLM/LLMDet/issues/14
 # class ProxyPerplexityDetector(PerplexityDetector):
 #     def __init__(self):
 #         """

@@ -1,3 +1,18 @@
+# Copyright 2024 Klara M. Gutekunst, Webis
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 from abc import ABC, abstractmethod
 import datetime
 import json
@@ -141,7 +156,6 @@ class ContentImpostorGenerator(BaseImpostorGenerator):
             raise ValueError("No candidate texts found.")
 
         # compute embeddings
-        # TODO: preprocess text to remove special characters, punctuation, etc.?
         text_embedding = self.model.encode(text, convert_to_tensor=True)
         candidate_embeddings = self.model.encode(
             candidate_texts, convert_to_tensor=True
@@ -771,57 +785,3 @@ class BlogImpostorGenerator(FixedImpostorGenerator):
             path2imp=os.path.join(os.path.abspath(".."), CONFIG.PATH2BLOG),
             real_time_generation=real_time_generation,
         )
-
-
-# Example usage
-if __name__ == "__main__":
-    # Literary impostors
-    # artwork_name = "Frankenstein_Mary_Wollstonecraft_(Godwin)_Shelley.txt"
-    # #"A_Midsummer_Nights_Dream_William_Shakespeare.txt"#"A_Lovers_Complaint_William_Shakespeare.txt"
-    # path2lovers_shakespeare = Path(CONFIG.DATA_BASE_PATH) / "gutenberg" / artwork_name
-    # with open(path2lovers_shakespeare) as f:
-    #     input_text = f.read()
-
-    # generator = GoogleSearchImpostorGenerator(
-    #     api_key=CONFIG.SERPAPI_KEY,
-    #     num_queries=1,
-    #     results_per_query=25,
-    #     max_workers=2,
-    #     n_min_words=3,
-    #     n_max_words=5,
-    # )
-    # impostors = generator.generate_impostors(
-    #     input_text,
-    #     real_time_generation=True,
-    #     path2imp=Path(CONFIG.PATH2GENERIC_ON_FLY_IMP)
-    #     / f"impostor_{artwork_name}_results.csv",
-    # )
-    # print(f"Generated {len(impostors)} impostors for '{artwork_name}':")
-    # for impostor_name, impostor_text in impostors.items():
-    #     print(f"{impostor_name}: {impostor_text[:100]}...")
-    # Blog impostors
-    # split = 'test'  # or 'train'
-    # ds = load_from_disk(CONFIG.PATH2BLOG)[split].to_pandas()
-    # print(f"Loaded {len(ds)} entries from the Blog dataset from {split} split.")
-    # print("ids with negative samples:", ds[ds['same'] == 0].index.tolist())
-    # ids = [164, 394, 2, 3] if split == 'train' else [1, 362]  # example ids to test with
-    # for id in ids:
-    #     input_text_a, input_text_b = ds.loc[id, 'pair'][0], ds.loc[id, 'pair'][1]  # use the first text from the dataset as input text
-    #     same = ds.loc[id, 'same']
-    #     print(input_text_a)
-    #     print('---')
-    #     print(input_text_b)
-    #     print('---')
-
-    #     print(f"Same author: {same}")
-
-    #     # >=10 queries does not work, api error/ maybe local cert issue
-    #     # do not stop bc some fetch errors, results are still saved for rest
-    #     generator = GoogleSearchImpostorGenerator(api_key="CONFIG.SERPAPI_KEY", num_queries=5, results_per_query=25, max_workers=2, n_min_words=3, n_max_words=5)
-    #     impostors_a = generator.generate_impostors(input_text_a, real_time_generation=True, path2imp=Path(CONFIG.PATH2GENERIC_ON_FLY_IMP) / f"impostor_blog_converted_{split}_id{id}left_same{same}_results.csv")
-    #     impostors_b = generator.generate_impostors(input_text_b, real_time_generation=True, path2imp=Path(CONFIG.PATH2GENERIC_ON_FLY_IMP) / f"impostor_blog_converted_{split}_id{id}right_same{same}_results.csv")
-    #     print(f"Generated {len(impostors_a) + len(impostors_b)} impostors for Blog corpus example:")
-
-    # for impostor_name, impostor_text in impostors.items():
-    #     print(f"Impostor {impostor_name}: {impostor_text[:100]}...")  # Print first 100 characters of each impostor
-    print("Impostor generation complete.")

@@ -1,3 +1,17 @@
+# Copyright 2024 Klara M. Gutekunst, Webis
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import argparse
 import json
 import os
@@ -640,8 +654,7 @@ class VisDetectors:
             CONFIG.STUDENT_ESSAYS,
         ], "This method is only implemented for BLOG and Student Essays datasets."
         train_dataset, test_dataset = self._load_datasets(balanced=True)
-        # TODO: Test on small data subsets
-        n_samples_per_class = 20  # 50
+        n_samples_per_class = 20
         train_dataset = pd.concat(
             [
                 train_dataset.loc[train_dataset["same"]].head(n_samples_per_class),
@@ -658,9 +671,9 @@ class VisDetectors:
             ignore_index=False,
         )
         print("Loaded datasets for Figure 2:", self.dataset_name)
-        # could be initially different, bc args are from argparse which are irrespective from calling thsi function with defined dataset_name
+        # could be initially different, bc args are from argparse which are irrespective from calling this function with defined dataset_name
         args["dataset_name"] = self.dataset_name
-        n_imp_options = [50, 500, 1000]  # TODO: 5000]
+        n_imp_options = [50, 500, 1000]  # original: 5000
         precisions, recalls = {}, {}
         path2imp = (
             Path(os.getcwd()).resolve() / CONFIG.PATH2BLOG
@@ -840,60 +853,6 @@ class VisDetectors:
             loaded_data = {}
 
         imp_gen = args.get("impostor_technique", "fixed")
-        # rows_without_scores, missing_scores_indices = self._helper_missing_scores(
-        #     train_dataset, loaded_data, n_imp, imp_gen=imp_gen
-        # )
-
-        # if len(rows_without_scores) > 0:
-        #     print(
-        #         f"Found {len(rows_without_scores)} rows without impostor scores in training data."
-        #     )
-
-        #     with ThreadPoolExecutor() as executor:  # do not nest ProcessPoolExecutor, use ThreadPoolExecutor instead in inner loop
-        #         missing_scores = list(
-        #             executor.map(
-        #                 self._helper_impostor,
-        #                 [path2imp] * len(rows_without_scores),
-        #                 rows_without_scores["pair"],
-        #                 [imp_gen] * len(rows_without_scores),
-        #                 [True] * len(rows_without_scores),  # training mode
-        #                 [n_imp] * len(rows_without_scores),  # n_imp
-        #             )
-        #         )
-        #         train_dataset.loc[missing_scores_indices, "impostor_score"] = (
-        #             missing_scores
-        #         )
-
-        #     loaded_data = self._update_loaded_data(
-        #         loaded_data=loaded_data,
-        #         dataset=train_dataset,
-        #         missing_scores_indices=missing_scores_indices,
-        #         missing_scores=missing_scores,
-        #         n_imp=n_imp,
-        #         imp_gen=imp_gen,
-        #     )
-        #     with open(existing_scores_filename, "w") as f:
-        #         json.dump(loaded_data, f, indent=4)
-        #     print(
-        #         f"Saved missing train scores to {existing_scores_filename} for {len(missing_scores_indices)} rows."
-        #     )
-        # print("Calculated impostor scores on training data.")
-
-        # fpr, tpr, thresholds, best_f1_thres = self.plot_decision_threshold_impostor(
-        #     scores=train_dataset["impostor_score"],
-        #     labels=train_dataset["same"],
-        #     title_kwargs=args,
-        # )
-        # print(
-        #     f"Plotted decision threshold for impostor detection for n_imp: {n_imp} (Fig 2)."
-        # )
-
-        # best_f1_thres = np.round(best_f1_thres, 2)
-        # youdens_j_thres = np.round(self._get_opt_imp_threshold(fpr, tpr, thresholds), 2)
-        # print(
-        #     f"Optimal threshold for impostor detection via Youden's J function: {youdens_j_thres:.2f}/ via best F1: {best_f1_thres:.2f}"
-        # )
-
         rows_without_scores, missing_scores_indices = self._helper_missing_scores(
             test_dataset, loaded_data, n_imp, imp_gen=imp_gen
         )
@@ -946,43 +905,6 @@ class VisDetectors:
             f"Saved precision-recall values for Figure 2 with {imp_gen} impostor generation and n_imp={n_imp} to {save_path / f'{imp_gen}_fig2_prec_rec.csv'}"
         )
 
-        # for thres_name, thres in zip(
-        #     ["Youden's J", "best F1"], [youdens_j_thres, best_f1_thres]
-        # ):
-        #     args["threshold"] = thres
-        #     print(f"Visualizing impostor scores with threshold: {thres_name} = {thres}")
-
-        #     test_dataset["pred_same"] = test_dataset["impostor_score"] >= thres
-
-        #     # 'same' is ground truth, 'pred_same' is prediction
-        #     y_true = test_dataset["same"]
-        #     y_pred = test_dataset["pred_same"]
-
-        #     cm = confusion_matrix(y_true, y_pred)
-        #     disp = ConfusionMatrixDisplay(
-        #         confusion_matrix=cm,
-        #         display_labels=["Different authors", "Same author"],
-        #     )
-
-        #     disp.plot(cmap=plt.cm.Blues)
-        #     title = self._format_title(
-        #         base=f"Confusion Matrix on Test Data with threshold {thres_name}",
-        #         kwargs=args,
-        #     )
-        #     plt.title(title)
-        #     plt.tight_layout()
-        #     save_path = (
-        #         self.savefig_base
-        #         / "impostor_scores"
-        #         / self.dataset_name
-        #         / "koppel_fig2"
-        #     )
-        #     filename = self._title2filename(title=title)
-        #     save_path.mkdir(parents=True, exist_ok=True)
-        #     for format in ["svg"]:  # "png",
-        #         print(f"Saving confusion matrix to {save_path / filename}.{format}")
-        #         plt.savefig(save_path / f"{filename}_{imp_gen}.{format}")
-        #     plt.close()
         return precision, recall
 
     #################################################################################
@@ -1204,7 +1126,6 @@ class VisDetectors:
         pr_save_path.mkdir(parents=True, exist_ok=True)
         train_dataset, test_dataset = self._load_datasets(balanced=True)
 
-        # TODO: Test on small data subsets
         train_dataset = pd.concat(
             [
                 train_dataset.loc[train_dataset["same"]].head(50),
@@ -1583,33 +1504,35 @@ if __name__ == "__main__":
         f"Reproducing Figure {fig} from Koppel et al. (2014) on BLOG and STUDENT data."
     )
 
-    # vis_det = VisDetectors(
-    #     dataset_name=CONFIG.STUDENT_ESSAYS,
-    #     detectors=[impostor],
-    # )
-    # print(
-    #     f"impostor Detector initialized for fig {fig} and dataset {CONFIG.STUDENT_ESSAYS}."
-    # )
-    # if fig == 2:
-    #     vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
-    # elif fig == 4:
-    #     vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
-    #         args=args, save_path=None, imp_gen_options=["fixed", "on-the-fly"]
-    #     )
-    # elif fig == 5:
-    #     # not really figure 5, but figure 4 with our contributions (LLM based impostors)
-    #     vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
-    #         args=args,
-    #         imp_gen_options=our_figure_impostor_options,
-    #         save_path=vis_det.savefig_base
-    #         / "impostor_scores"
-    #         / vis_det.dataset_name
-    #         / "our_contributions_scores",
-    #     )
-    # print(
-    #     f"Finished reproducing Figure {fig} from Koppel et al. (2014) on STUDENT data."
-    # )
+    # STUDENT data
+    vis_det = VisDetectors(
+        dataset_name=CONFIG.STUDENT_ESSAYS,
+        detectors=[impostor],
+    )
+    print(
+        f"impostor Detector initialized for fig {fig} and dataset {CONFIG.STUDENT_ESSAYS}."
+    )
+    if fig == 2:
+        vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
+    elif fig == 4:
+        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
+            args=args, save_path=None, imp_gen_options=["fixed", "on-the-fly"]
+        )
+    elif fig == 5:
+        # not really figure 5, but figure 4 with our contributions (LLM based impostors)
+        vis_det.reproduce_fig4_prec_recall_dif_imp_appr(
+            args=args,
+            imp_gen_options=our_figure_impostor_options,
+            save_path=vis_det.savefig_base
+            / "impostor_scores"
+            / vis_det.dataset_name
+            / "our_contributions_scores",
+        )
+    print(
+        f"Finished reproducing Figure {fig} from Koppel et al. (2014) on STUDENT data."
+    )
 
+    # BLOG data
     vis_det = VisDetectors(
         dataset_name=CONFIG.BLOG,
         detectors=[impostor],

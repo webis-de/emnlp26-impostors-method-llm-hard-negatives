@@ -82,8 +82,8 @@ class ImpostorDetector(ImpostorBase):
         :param tokenizer: custom tokenizer function (must accept exactly one parameter, defaults to space-free character 4-grams cf. Koppel et al. (2014))
         :param shared_vocab_only: restrict analysis to shared vocabulary across pairs of texts (Koppel et al. (2014): all texts in the corpus, i.e. shared)
         :param tfidf_freqs: use tfidf term frequencies (Koppel et al. (2014) use tfidf)
-        :param n_impostors: number of impostors to use for each candidate TODO: allow specification type of LLM impostors; Koppel et al. (2014) use 25 impostors
-        :param threshold: threshold for the minimum similarity score to consider two texts same-author, TODO: not used yet, Koppel et al. (2014) use 0.1
+        :param n_impostors: number of impostors to use for each candidate; Koppel et al. (2014) use 25 impostors
+        :param threshold: threshold for the minimum similarity score to consider two texts same-author, Koppel et al. (2014) use 0.1
         :param impostor_technique: which technique to use to generate impostors. Options are:
             - "llm": use LLMs to generate impostors to control both topic and genre
             - "naive_llm": use a naive LLM approach to generate impostors
@@ -221,17 +221,6 @@ class ImpostorDetector(ImpostorBase):
         The final score is the number of rounds where the candidate text was the most similar to the disputed text.
         The final score for a pair is the average of the scores for both directions (disputed text vs. candidate text and vice versa).
 
-        While Koppel et al. (2014) use (1) a fixed set of impostor documents without realtion to document pair,
-        (2) on-the-fly generated same content impostor via Google search,
-        (3) Blogs to obtain same genre impostors, and Kocher et al. (2015) use (4) a set of impostor documents based on the number of documents written by the author,
-        we define different techniques to generate impostors, which can be specified via the `technique` parameter in the `_get_impostors` method:
-        We currently support:
-        (1) `text_len`: generate impostors of similar length from a predefined dataset (default, see `_get_impostors` method).
-        (2) `llm`: use LLMs to generate impostors, extension of Koppel et al. (2014).
-        (3) `n_docs`: generate impostors based on the number of documents written by the author (TODO: not implemented yet), cf. Kocher et al. (2015).
-
-        TODO: If the score is above a certain threshold, the input text is classified as same-author, which is not implemented yet/ not the purpose of this method.
-
         Koppel et al. (2014) exclude texts shorter than 500 words.
         Kocher et al. (2015) exclude words appearing only once to prevent overfitting to words occuring only once.
         Koppel et al. (2014) select m most similar impostors in terms of min-max similarity as impostor candidates and then,
@@ -337,7 +326,6 @@ class ImpostorDetector(ImpostorBase):
             x_right = self.tokens_to_matrix(
                 tokens_right, path2imp=self.path2imp  # top_tokens,
             )
-            print("Obtained tokens")
 
             store = {
                 "left": {
@@ -357,7 +345,6 @@ class ImpostorDetector(ImpostorBase):
             # for evaluating the impact of text similarity on the scores
             impostors_per_candidate[f"text_pair_{i}"] = {}
 
-            # FIXME: Maybe wrong path? Add resolving parent path
             existing_scores_filename = (
                 Path(__file__).resolve().parent.parent.parent
                 / CONFIG.SAVE_PATH
@@ -508,9 +495,7 @@ class ImpostorDetector(ImpostorBase):
             print(f"Saved generated impostors to {existing_scores_filename}")
 
         # one element = averaged score of X,Y and Y,X pair (score=number of rounds where the candidate was the most similar)
-        # return list(scores_per_pair.values())
         # threshold is in [0,1], hence: normalized by rounds
-        # TODO: Omit second return value if not evaluating the impact of text similarity on the scores
         return [
             v / self.rounds for v in scores_per_pair.values()
         ], impostors_per_candidate
@@ -534,9 +519,7 @@ class ImpostorDetector(ImpostorBase):
         scores = self.get_score(text)
         return [score > self.threshold for score in scores]
 
-    def tokens_to_matrix(
-        self, tokens, path2imp: Optional[str] = None
-    ):  # top_token_list
+    def tokens_to_matrix(self, tokens, path2imp: Optional[str] = None):
         """
         Transform list of tokens into matrix of term tfidf values of the top tokens.
         Koppel et al. (2014) use space-free character 4-grams tfidf values to represent each document as a numerical vector.
@@ -576,15 +559,13 @@ class ImpostorDetector(ImpostorBase):
         train_data = None
         candidate_texts = [" ".join(input_tokens)]
         print(
-            f"Fitting TFIDF vectorizer on input tokens and candidate texts from {path2imp}. Init candidate texts len: {len(candidate_texts)}"
+            f"Fitting TFIDF vectorizer on input tokens or candidate texts from {path2imp}."
         )
         if path2imp and path2imp.exists():
             split = "train" if self._training_mode else "test"
             if path2imp.suffix == ".json":
                 print(f"Loading impostor data from JSON file: {path2imp}")
                 with open(path2imp, "r") as f:
-                    # train_data = pd.json_normalize(json.load(f))
-
                     # dumps have structure {outer_key: {inner_key: value}} -> load as dict and then reshape to long format
                     raw = json.load(f)
                     train_data = pd.DataFrame.from_dict(raw, orient="index")
@@ -600,7 +581,6 @@ class ImpostorDetector(ImpostorBase):
                     ), f"Expected train_data to be a pandas DataFrame, but got {type(train_data)}."
                     if split in train_data:
                         train_data = train_data[split]
-                    print("Num TRAIN DATA:", len(train_data))
             else:
                 train_data = load_from_disk(path2imp)[split].to_pandas()
             assert isinstance(

@@ -1,3 +1,17 @@
+# Copyright 2024 Klara M. Gutekunst, Webis
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from operator import itemgetter
 import re
 from more_itertools import ichunked
@@ -58,15 +72,9 @@ class ImpostorBase(DetectorBase):
                 if " " not in text[i : i + n]
             ]
             # add m-grams with spaces, where m < n
-            # TODO: should be >2 whitespaces to pad be allowed? I don't think so, produces: 'to  ', '  to'
+            # >2 whitespaces in character sequence are not paded, those are excluded. Otherwise, we include: 'to  ', '  to'
             for token in text.split():
                 if (len(token) < n) and ((n - 2) <= len(token)):
-                    # add all n-grams options with spaces
-                    # TODO: results in most common ngrams ('the ', 22), (' the', 22), 'to  ': 10, ' to ': 10, '  to': 10,
-                    # n_grams.extend(
-                    #     " " * i + token + " " * (n - len(token) - i)
-                    #     for i in range(n - len(token) + 1)
-                    # )
                     n_grams.append(token + " " * (n - len(token)))
             return n_grams
 
@@ -144,7 +152,6 @@ class ImpostorBaselineBase(ImpostorBase):
         freqs = Counter(flat_list)
         freqs = Counter({k: v for k, v in freqs.items() if v > 1})
         return list(map(itemgetter(0), freqs.most_common(max_tokens)))
-        return heapq.nlargest(max_tokens, tokens, key=lambda x: freqs[x])
 
     def get_tfidf_vector_for_text(self, text: str):
         """
@@ -156,6 +163,6 @@ class ImpostorBaselineBase(ImpostorBase):
         ngrams = self.tokenize_char_ngrams(text, 4)
         tfidf_matrix = self._vectorizer.fit_transform(
             [" ".join(ngrams)]
-        )  # format (n_samples=1, n_features=self.top_n)
+        )  # format: (n_samples=1, n_features=self.top_n)
 
         return tfidf_matrix.toarray()

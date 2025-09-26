@@ -11,7 +11,6 @@ class BaseConfig:
     OPENAI_KEY = os.getenv("OPENAI_KEY")
     SAIA_KEY = os.getenv("SAIA_KEY")
     DEEPL_API_KEY = os.getenv("DEEPL_KEY")
-    IONOS_KEY = os.getenv("IONOS_KEY")
     DATA_BASE_PATH = "data/datasets"
     PATH2PAN25 = f"{DATA_BASE_PATH}/pan25-genai-identification/pan25-dataset-converted"
     PATH2PAN23 = (
@@ -46,17 +45,6 @@ class BaseConfig:
     OLLAMA_URL = "https://llm.web.webis.de/api"
     SAIA_URL = "https://chat-ai.academiccloud.de/v1"
     SAIA_MODEL = "openai-gpt-oss-120b"
-    IONOS_URL = "https://openai.inference.de-txl.ionos.com/v1"
-    IONOS_MODEL = "meta-llama/Llama-3.3-70B-Instruct"
 
 
-class ServerConfig(BaseConfig):
-    SERVER = True
-    # TODO: Add server-specific configurations here
-    PATH2PAN20 = "TODO"
-    PATH2PAN23 = "/mnt/ceph/storage/data-in-progress/data-research/authorship/pan23-authorship-verification/"
-    PATH2PAN25 = "/mnt/ceph/storage/data-in-progress/data-research/authorship/pan24-genai-authorship-verification/dataset-extended-2025/"
-
-
-# Choose config
-CONFIG = ServerConfig() if os.path.exists("mnt/ceph") else BaseConfig()
+CONFIG = BaseConfig()

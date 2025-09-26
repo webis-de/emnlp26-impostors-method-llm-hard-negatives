@@ -1,3 +1,17 @@
+# Copyright 2024 Klara M. Gutekunst, Webis
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import argparse
 import gc
 from itertools import combinations, product
@@ -29,7 +43,6 @@ import pyreadstat
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
-# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from genai_detection.config import CONFIG
 from genai_detection.paraphrasing.paraphraser import (
     NaiveParaphraser,
@@ -958,6 +971,8 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
 
 
 # === Cross-genre Dataset Loader ===
+
+
 class CrossGenreDatasetLoader(BaseDatasetLoader):
     def __init__(self, path: str = "", name: str = CONFIG.PATH2CROSS_GENRE):
         """
@@ -1671,7 +1686,6 @@ def run_pan23(base_dir: str, save_path: str):
     loader = Pan23DatasetLoader(train_dir=train_dir, test_dir=test_dir)
     dataset = loader.load()
     dataset.save_to_disk(output_dir)
-    # print("PAN23 example:", dataset["train"][0])
 
 
 def run_pan20():
@@ -1687,7 +1701,6 @@ def run_pan20():
     loader = Pan20DatasetLoader(train_dir=train_dir, test_dir=test_dir)
     dataset = loader.load()
     dataset.save_to_disk(output_dir)
-    # print("PAN20 example:", dataset["train"][0])
 
 
 def run_pan25():
@@ -1705,7 +1718,6 @@ def run_pan25():
     loader = Pan25DatasetLoader(human_dir, machine_dir, train_ids_path, test_ids_path)
     dataset = loader.load()
     dataset.save_to_disk(output_dir)
-    # print("PAN25 example:", dataset["train"][0])
 
 
 def run_koppel_webis():
@@ -1719,11 +1731,9 @@ def run_koppel_webis():
     loader = KoppelWebisDatasetLoader(path=base_dir)
     dataset = loader.load()
     dataset.save_to_disk(output_dir)
-    # print("Koppel Webis example:", dataset["train"][0])
 
 
 def run_blog_corpus():
-    # sys.path.append(os.path.abspath(".."))
     base_dir = (
         Path(__file__).resolve().parent.parent / CONFIG.DATA_BASE_PATH / "Blog_corpus/"
     )
@@ -1738,7 +1748,6 @@ def run_blog_corpus():
 
 
 def run_gutenberg_corpus():
-    # sys.path.append(os.path.abspath(".."))
     base_dir = (
         Path(__file__).resolve().parent.parent / CONFIG.DATA_BASE_PATH / "gutenberg/"
     )
@@ -1774,7 +1783,6 @@ if __name__ == "__main__":
         default="data/datasets/pan23-authorship-verification/",
         help="Path where Huggingface dataset should be saved (default: %(default)s)",
     )
-    print("jksfkj %(parser)s")
     args = parser.parse_args()
 
     # run_pan23(base_dir=args.path, save_path=args.out)

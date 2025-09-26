@@ -1,3 +1,17 @@
+# Copyright 2024 Klara M. Gutekunst, Webis
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 from pathlib import Path
 from more_itertools import ichunked
@@ -64,10 +78,10 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
 
     def get_prediction(self, text: t.Iterable[str]) -> t.List[bool]:
         """
-        Predict if the input text(s) were written by a the same author TODO: machine.
+        Predict if the input text(s) were written by a the same author.
 
         :param text: input text or batch of input texts
-        :return: boolean classifications of whether inputs are likely same author TODO: machine-generated
+        :return: boolean classifications of whether inputs are likely same author.
         """
         if isinstance(text, str):
             text = [text]
@@ -75,17 +89,19 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
         scores_per_pair = (
             []
         )  # id is index of pair (i.e, length is half of the input text list)
-        pairs = list(ichunked(vectors, 2)) if type(text[0]) == str else text
+        pairs = list(ichunked(text, 2)) if type(text[0]) == str else text
         for text_pair in pairs:
             vectors = [self.get_tfidf_vector_for_text(t) for t in text_pair]
             assert len(vectors) == 2, "Input text must be a list of pairs of texts."
             scores_per_pair.append(self.model.predict(abs(vectors[0] - vectors[1])))
         return np.array(scores_per_pair)
 
-    def get_trained_linear_svc(self):
+    def get_trained_linear_svc(self, save_model: bool = False) -> LinearSVC:
         """
         Load a pre-trained LinearSVC model for the Supervised Impostor Baseline detector.
         If there is no pretrained model, train one.
+        :param save_model: whether to save the trained model (given we do not want data leakage, this should be False to ensure trained is not trained on test data)
+        :return: trained LinearSVC model
         """
         path2model = (
             Path(__file__).resolve().parents[2] / "models" / "impostor_svc_model.pkl"
@@ -94,7 +110,7 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
             return pickle.load(path2model)
         else:
             path2model.parent.mkdir(parents=True, exist_ok=True)
-            model = LinearSVC()  # probabilty=True)
+            model = LinearSVC()
             # Load training data
             disputed_texts = self.dataset[["disputed_text", "candidate_text", "same"]]
             # sample texts
@@ -124,8 +140,8 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
             y = training_data["same"].astype(int).values
             # Train model
             model.fit(X, y)
-            # TODO: Save model
-            # pickle.dump(model, open(path2model, "wb"))
+            if save_model:
+                pickle.dump(model, open(path2model, "wb"))
             return model
 
 
@@ -152,4 +168,7 @@ if __name__ == "__main__":
     dataset = load_from_disk(
         Path(__file__).resolve().parents[2] / CONFIG.PATH2CROSS_GENRE
     )["train"].to_pandas()[["disputed_text", "candidate_text", "same"]]
-    print(dataset["same"].value_counts())
+    print(
+        "Aggregated number of same/different predictions:",
+        dataset["same"].value_counts(),
+    )

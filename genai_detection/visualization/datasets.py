@@ -1,9 +1,22 @@
-from abc import ABC, abstractmethod
+# Copyright 2024 Klara M. Gutekunst, Webis
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from abc import ABC
 from itertools import chain
 from pathlib import Path
 import os, sys
 from typing import Callable, Optional, Union
-from nltk.stem.snowball import SnowballStemmer
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -12,8 +25,6 @@ from datasets import load_from_disk, concatenate_datasets
 sys.path.append(os.path.abspath(".."))
 from genai_detection.config import CONFIG
 from genai_detection.detectors.impostor import ImpostorDetector
-
-from datasets import Dataset, DatasetDict, ClassLabel, Features, Value
 
 
 class BaseDatasetVisualization(ABC):
