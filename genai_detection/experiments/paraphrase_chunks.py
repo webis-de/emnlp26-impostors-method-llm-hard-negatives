@@ -196,7 +196,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
     assert save_path.exists(), f"Save path {save_path} does not exist."
     file2existing_paraphrases = save_path / "existing_chunk_paraphrases.json"
     dataset = get_dataset(path2dataset)
-    # keep only the first 5 examples per category
+    # keep only the first examples per category
     dataset = dataset.groupby("category").head(1)
 
     n_responses = 1
