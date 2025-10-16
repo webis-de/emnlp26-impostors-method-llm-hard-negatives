@@ -49,8 +49,9 @@ class BaseConfig:
     PROMPT = "Paraphrase the text above without changing its meaning. Use different words and vary the sentence structure while maintaining a consistent tone. Your paraphrase should be three times as long than the original. Output only the paraphrased sentence, with NO explanations or extra text."
 
     MONGO_DATABASE = "impostors"  # initial db (!= collection in db)
-    MONGO_ORIGINAL_TEXT_COLLECTION = "original_text"  # initial db (!= collection in db)
-    MONGO_PARAPHRASE_COLLECTION = "paraphrase"  # initial db (!= collection in db)
+    MONGO_ORIGINAL_TEXT_COLLECTION = "original_text"  # collection (!= db)
+    MONGO_PARAPHRASE_COLLECTION = "paraphrase"  # collection (!= db)
+    MONGO_SCORE_COLLECTION = "score"  # collection (!= db)
     MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME")
     MONGO_PASSWORD = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
     MONGO_HOST = "localhost:27017"
