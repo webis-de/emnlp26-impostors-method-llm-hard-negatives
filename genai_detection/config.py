@@ -45,6 +45,10 @@ class BaseConfig:
     OLLAMA_URL = "https://llm.web.webis.de/api"
     SAIA_URL = "https://chat-ai.academiccloud.de/v1"
     SAIA_MODEL = "openai-gpt-oss-120b"
+    MONGO_INITDB_DATABASE = "impostors"  # initial db (!= collection in db)
+    MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME")
+    MONGO_PASSWORD = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
+    MONGO_HOST = "localhost:27017"
 
 
 CONFIG = BaseConfig()
