@@ -5,7 +5,7 @@ from genai_detection.paraphrasing import paraphraser
 
 def paraphrase(text, llm: str, temperature: float, prompt: str) -> str:
     paraphraser_llm = paraphraser.SAIAParaphraser(model_id=llm)
-    return paraphraser_llm.paraphrase(text, temperature=temperature, prompt=prompt)
+    return paraphraser_llm.paraphrase(text, temperature=temperature, prompt=prompt)[0]
 
 
 # MongoDB setup
