@@ -19,8 +19,7 @@ if (!db.getCollectionNames().includes(collectionName)) {
   print(`Collection '${collectionName}' already exists. Skipping creation.`);
 }
 
-// unique fields
-db[collectionName].createIndex({ text_id: 1 }, { unique: true });   // TODO: do i need this? mongo will create _id automatically
+// unique field besides automatic _id
 db[collectionName].createIndex({ text_hash: 1 }, { unique: true });
 
 // dataset base path from container environment variable
@@ -28,9 +27,6 @@ const datasetBasePath = _getEnv("DATASET_PATH") + "/student_essays/Intro2006/";
 const datasetName = "student_essays";
 print(`${datasetName} dataset base path: ${datasetBasePath}`);
 
-// counter for text_id
-let lastDoc = db[collectionName].find().sort({ text_id: -1 }).limit(1).toArray();
-let textIdCounter = (lastDoc.length > 0) ? lastDoc[0].text_id + 1 : 0;
 const docsToInsert = [];
 
 // list directories under datasetBasePath
@@ -74,9 +70,8 @@ for (let i = 0; i < allDirs.length; i++) {
     const exists = db[collectionName].findOne({ author: authorName, assignment: dirName, text_hash: textHash });
     if (exists) continue;
 
-    // create document
+    // create document, _id will be auto-generated
     const doc = {
-      text_id: textIdCounter++,
       text: textContent,
       author: authorName,
       dataset: datasetName,
