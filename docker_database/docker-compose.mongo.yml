@@ -1,0 +1,19 @@
+version: "3.8"
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: paraphrase-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"         # publish container port to host
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: rootuser
+      MONGO_INITDB_ROOT_PASSWORD: burqyr-hyvGux-6xexmo
+      MONGO_INITDB_DATABASE: original_text   # optional: initial DB created for you
+      DATASET_PATH: /datasets # dataset path inside container, c.f. volume mount below
+    volumes:
+      - mongo-data:/data/db # persistent storage of DB data; data survives container recreation
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro  # directory next to yaml file with JS scripts to run at first init (create db, etc.)
+      - ${DATASET_PATH}:/datasets:ro   # mount local dataset folder
+volumes:
+  mongo-data: # docker maps container's /data/db to this volume
