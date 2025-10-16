@@ -6,4 +6,16 @@ services:
     build: .
     volumes:
       - ./:/src/
-
+  mongodb:
+      image: mongo:8
+      restart: unless-stopped
+      ports:
+        - "27017:27017"         # publish container port to host
+      environment:
+        MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+        MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+        MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
+      volumes:
+        - mongo-data:/data/db # persistent storage of DB data; data survives container recreation
+volumes:
+  mongo-data: # docker maps container's /data/db to this volume
