@@ -873,7 +873,7 @@ class ParaphrasingEvaluator:
             logger.info(f"Paraphrases saved to {save_path}")
             return paraphrases
 
-    def _safe_compute_bertscore(self, paraphrases, references):
+    def _safe_compute_bertscore(self, paraphrases: list, references: list):
         try:
             return self.bertscore.compute(
                 predictions=paraphrases,
@@ -889,12 +889,12 @@ class ParaphrasingEvaluator:
                 "hashcode": "",
             }
 
-    def _safe_compute_rouge(self, paraphrases):
+    def _safe_compute_rouge(self, paraphrases: list, references: list = None):
+        if references is None:
+            references = [self.original_text]
         try:
             return [
-                self.rouge_score.compute(
-                    predictions=[p], references=[self.original_text]
-                )
+                self.rouge_score.compute(predictions=[p], references=references)
                 for p in paraphrases
             ]
         except Exception as e:
