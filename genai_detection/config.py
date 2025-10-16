@@ -45,7 +45,12 @@ class BaseConfig:
     OLLAMA_URL = "https://llm.web.webis.de/api"
     SAIA_URL = "https://chat-ai.academiccloud.de/v1"
     SAIA_MODEL = "openai-gpt-oss-120b"
-    MONGO_INITDB_DATABASE = "impostors"  # initial db (!= collection in db)
+
+    PROMPT = "Paraphrase the text above without changing its meaning. Use different words and vary the sentence structure while maintaining a consistent tone. Your paraphrase should be three times as long than the original. Output only the paraphrased sentence, with NO explanations or extra text."
+
+    MONGO_DATABASE = "impostors"  # initial db (!= collection in db)
+    MONGO_ORIGINAL_TEXT_COLLECTION = "original_text"  # initial db (!= collection in db)
+    MONGO_PARAPHRASE_COLLECTION = "paraphrase"  # initial db (!= collection in db)
     MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME")
     MONGO_PASSWORD = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
     MONGO_HOST = "localhost:27017"

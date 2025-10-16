@@ -7,7 +7,7 @@ from pymongo import MongoClient, errors
 print("Starting initialization: loading original_text dataset...")
 
 # Get database name from environment or default
-db_name = CONFIG.MONGO_INITDB_DATABASE or "impostors"
+db_name = CONFIG.MONGO_DATABASE or "impostors"
 
 # Connect to MongoDB (default host/port for container)
 uri = f"mongodb://{CONFIG.MONGO_USER}:{CONFIG.MONGO_PASSWORD}@{CONFIG.MONGO_HOST}/"
@@ -15,7 +15,7 @@ client = MongoClient(uri)
 db = client[db_name]
 
 # Collection name
-collection_name = "original_text"
+collection_name = CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION or "original_text"
 
 # Create collection if it does not exist
 if collection_name not in db.list_collection_names():
