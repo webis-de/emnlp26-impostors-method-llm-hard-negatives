@@ -155,35 +155,85 @@ Helm uses a packaging format called [charts](https://helm.sh/docs/topics/charts/
 
 We found a [MongoDB helm chart](https://artifacthub.io/packages/helm/bitnami/mongodb) that we customized to our needs via the `values.yaml` in the `helm` directory (e.g., bigger persistent volume size (i.e. 16 GB instead of 8 GB) on Betaweb (i.e. `csi-rbd-retain`, where retain means persistent and the absence of `ssd` means not gammaweb or no GPU), architecture: `standalone` ~~replicaset (i.e. PersistentSet with multiple Pods)~~, with recreation of pods when they fail (i.e.`Recreate`, not keeping old pod until new one is set up because volume is not shared), and without a networkPolicy because that is not done at Webis).
 
-The command to upgrade/install the chart is:
+The command to **upgrade/install the chart (Deployment at webis)** is:
 ```bash
-helm upgrade --install --namespace artificial-authorship-verification --create-namespace mongodb oci://registry-1.docker.io/bitnamicharts/mongodb -f values.yaml
+helm upgrade --install --namespace webisservices --create-namespace artificial-authorship-verification oci://registry-1.docker.io/bitnamicharts/mongodb -f values.yaml --set auth.rootPassword="SecurePassword123!"
 ```
 - `--install`: Install the chart if it is not already installed.
-- `--namespace artificial-authorship-verification`: Specifies the namespace in which to install the chart.
+- `--namespace webisservices`: Specifies the namespace in which to install the chart. Only `webisservices`or `webisstud` is allowed for Webis projects.
 - `--create-namespace`: Creates the namespace if it does not already exist.
   - Webis namespaces have certain logic (refer to other as examples via `kubectl get namespaces`).
-- `mongodb`: Name of the release.
+- `artificial-authorship-verification`: Name of the release.
 - `oci://registry-1.docker.io/bitnamicharts/mongodb`: Location of the chart.
 - `-f values.yaml`: Specifies the values file to use for the installation. It overrides the default values provided by the chart.
+- `--set auth.rootPassword="SecurePassword123!"`: Sets the root password for the MongoDB database. You can change it to a secure password of your choice. _SecurePassword123!_ is just an example; I used a different password.
 
-- helm template --namespace webisservices --create-namespace artificial-authorship-verification oci://registry-1.docker.io/bitnamicharts/mongodb -f values.yaml --set auth.rootPassword="abcd" > "template.k8s.yaml"
+The command to **generate the template file without installing it** is:
+```bash
+helm template --namespace webisservices --create-namespace artificial-authorship-verification oci://registry-1.docker.io/bitnamicharts/mongodb -f values.yaml --set auth.rootPassword="SecurePassword123!" > "template.k8s.yaml"
+```
+- This command generates the Kubernetes YAML template file and saves it as `template.k8s.yaml`.
+- You can then review the file inspecting settings like password, volume size, etc. Different original files are separated by `---` in the YAML file.
+- You can also directly edit the file before applying it to the cluster using `kubectl apply -f template.k8s.yaml`.
 
-- helm upgrade --install --namespace webisservices --create-namespace artificial-authorship-verification oci://registry-1.docker.io/bitnamicharts/mongodb -f values.yaml --set auth.rootPassword="abcd"
-  --> with better password!!! (you cannot change it later without deleting the whole deployment)
+You may find the database at the following address:
+`artificial-authorship-verification-mongodb.webisservices.svc.cluster.local`
 
-- artificial-authorship-verification-mongodb.webisservices.svc.cluster.local
+### Accessing the Database via kubectl mongosh client
+You can access it using the `mongosh` client, to directly interact with the database:
+```bash
+kubectl run --namespace webisservices artificial-authorship-verification-mongodb-client --rm --tty -i --restart='Never' --env="MONGODB_ROOT_PASSWORD=SecurePassword123!" --image registry-1.docker.io/bitnami/mongodb:latest --command -- bash
+```
+- `-rm`: Remove the pod after exiting.
+- `-tty -i`: Interactive terminal.
+- `--restart='Never'`: Do not restart the pod after it exits.
+- `--env="MONGODB_ROOT_PASSWORD=$MONGODB_ROOT_PASSWORD"`: Set the environment variable for the root password.
+- `--image registry-1.docker.io/bitnami/mongodb:latest`: Use the Bitnami MongoDB image.
+- `--command -- bash`: Run the bash shell.
+This will open a bash shell in the pod.
+You first have to log in with:
+```bash
+mongosh admin --host "artificial-authorship-verification-mongodb" --authenticationDatabase admin -u root -p $MONGODB_ROOT_PASSWORD
+```
+- `admin`: The database to connect to.
+- `--host "artificial-authorship-verification-mongodb"`: The host address of the MongoDB database.
+- `--authenticationDatabase admin`: The authentication database.
+- `-u root`: The username.
+- `-p $MONGODB_ROOT_PASSWORD`: The password.
+From there, you can interact with the MongoDB database using `mongosh`:
+- create a database: `use mydatabase`
+- show databases: `show dbs`
+- show collections: `show collections`
+- insert a document: `db.mycollection.insertOne({name: "Klara", age: 25})`
+- find documents: `db.mycollection.find()`
 
-- kubectl run --namespace webisservices artificial-authorship-verification-mongodb-client --rm --tty -i --restart='Never' --env="MONGODB_ROOT_PASSWORD=$MONGODB_ROOT_PASSWORD" --image registry-1.docker.io/bitnami/mongodb:latest --command -- bash
+Otherwise you can connect to it from anywhere on the Kubernetes cluster using the address above.
+You cannot access it from Gammaweb.
+**TODO**: Port forwarding?
 
-anmelden in mongosh 
-- mongosh admin --host "artificial-authorship-verification-mongodb" --authenticationDatabase admin -u root -p $MONGODB_ROOT_PASSWORD
 
-- kubectl edit secret -n webisservices artificial-authorship-verification-mongodb
-  -> echo -n "PASSWORD" | base64 
-  -> base64 version in der Datei
-  -> pod neustarten: `kubectl get pods -n webisservices`, finde podname (ohne client im Namen)  dann `kubectl delete pod <pod-name> -n webisservices`damit PW change übernommen wird
-  -> PW auch in DB auf kubernetes gespeichert, also db.changeUserPassword("username", "newpassword")
-    - username: root
+### Change password of the database
+You need to (1) edit the secret in Kubernetes that stores the password locally and (2) since the password is also stored in the mongoDB, you need to change it there as well.
+For (1):
+```bash
+kubectl edit secret -n webisservices artificial-authorship-verification-mongodb
+```
+1.1. Locally find a new password and convert it to base64: `echo -n "newpassword" | base64``
+1.2. Insert the base64 encoded password in the `data` section under `mongodb-root-password:` that you find when editing the secret.
 
-- run script: kubectl run --namespace webisservices artificial-authorship-verification-mongodb-client --rm --tty -i --restart='Never' --env="MONGODB_ROOT_PASSWORD=PW01010" --image registry.webis.de/code-teaching/theses/artificial-authorship-verification:latest --command -- bash 
+For (2):
+Inside the mongoDB shell (c.f. above), run:
+```bash
+db.changeUserPassword("root", "newpassword")
+```
+- The user is `root`.
+
+You may now need to restart the pod again to make sure everything works with the new password:
+(1) `kubectl get pods -n webisservices`, find the name of you pod (without client in the name), then (2) `kubectl delete pod <pod-name> -n webisservices` so that the pod will restart and the password change is applied.
+
+
+### Populate the database
+You can populate the database with paraphrased texts and their evaluation scores using the scripts provided in the `genai_detection/paraphrasers` directory.
+```bash 
+kubectl run --namespace webisservices artificial-authorship-verification-mongodb-client --rm --tty -i --restart='Never' --env="MONGODB_ROOT_PASSWORD=PW01010" --image registry.webis.de/code-teaching/theses/artificial-authorship-verification:latest --command -- bash 
+```
