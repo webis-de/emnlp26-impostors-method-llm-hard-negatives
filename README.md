@@ -153,7 +153,7 @@ Helm generates YAML template files to deploy the database (instead of manually w
 Helm uses a packaging format called [charts](https://helm.sh/docs/topics/charts/).
 - A chart is used to deploy something. It is a collection of files in a directory. The directory name is the name of the chart. The files describe a related set of Kubernetes resources. The files are laid out in a directory tree. The charts are located in a [chart repository](https://helm.sh/docs/topics/chart_repository/).
 
-We found a [MongoDB helm chart](https://artifacthub.io/packages/helm/bitnami/mongodb) that we customized to our needs via the `values.yaml` in the `helm` directory (e.g., bigger persistent volume size (i.e. 16 GB instead of 8 GB), architecture: replicaset (i.e. PersistentSet with multiple Pods)).
+We found a [MongoDB helm chart](https://artifacthub.io/packages/helm/bitnami/mongodb) that we customized to our needs via the `values.yaml` in the `helm` directory (e.g., bigger persistent volume size (i.e. 16 GB instead of 8 GB) on Betaweb (i.e. `csi-rbd-retain`, where retain means persistent and the absence of `ssd` means not gammaweb or no GPU), architecture: `standalone` ~~replicaset (i.e. PersistentSet with multiple Pods)~~, with recreation of pods when they fail (i.e.`Recreate`, not keeping old pod until new one is set up because volume is not shared), and without a networkPolicy because that is not done at Webis).
 
 The command to upgrade/install the chart is:
 ```bash
@@ -166,3 +166,24 @@ helm upgrade --install --namespace artificial-authorship-verification --create-n
 - `mongodb`: Name of the release.
 - `oci://registry-1.docker.io/bitnamicharts/mongodb`: Location of the chart.
 - `-f values.yaml`: Specifies the values file to use for the installation. It overrides the default values provided by the chart.
+
+- helm template --namespace webisservices --create-namespace artificial-authorship-verification oci://registry-1.docker.io/bitnamicharts/mongodb -f values.yaml --set auth.rootPassword="abcd" > "template.k8s.yaml"
+
+- helm upgrade --install --namespace webisservices --create-namespace artificial-authorship-verification oci://registry-1.docker.io/bitnamicharts/mongodb -f values.yaml --set auth.rootPassword="abcd"
+  --> with better password!!! (you cannot change it later without deleting the whole deployment)
+
+- artificial-authorship-verification-mongodb.webisservices.svc.cluster.local
+
+- kubectl run --namespace webisservices artificial-authorship-verification-mongodb-client --rm --tty -i --restart='Never' --env="MONGODB_ROOT_PASSWORD=$MONGODB_ROOT_PASSWORD" --image registry-1.docker.io/bitnami/mongodb:latest --command -- bash
+
+anmelden in mongosh 
+- mongosh admin --host "artificial-authorship-verification-mongodb" --authenticationDatabase admin -u root -p $MONGODB_ROOT_PASSWORD
+
+- kubectl edit secret -n webisservices artificial-authorship-verification-mongodb
+  -> echo -n "PASSWORD" | base64 
+  -> base64 version in der Datei
+  -> pod neustarten: `kubectl get pods -n webisservices`, finde podname (ohne client im Namen)  dann `kubectl delete pod <pod-name> -n webisservices`damit PW change übernommen wird
+  -> PW auch in DB auf kubernetes gespeichert, also db.changeUserPassword("username", "newpassword")
+    - username: root
+
+- run script: kubectl run --namespace webisservices artificial-authorship-verification-mongodb-client --rm --tty -i --restart='Never' --env="MONGODB_ROOT_PASSWORD=PW01010" --image registry.webis.de/code-teaching/theses/artificial-authorship-verification:latest --command -- bash 
