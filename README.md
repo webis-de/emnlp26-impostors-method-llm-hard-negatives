@@ -131,3 +131,38 @@ Then, you can build and push the image using the following command:
 Instructions followed during the building process are specified in the `Dockerfile` and `docker-compose.yaml`.
 
 View image at registry at [GitLab project](https://git.webis.de/code-research/theses/artificial-authorship-verification/container_registry/1461).
+
+
+## Mongo DB
+The project uses a MongoDB database to store paraphrased texts and their evaluation scores.
+
+The database is located on the Webis Kubernetes cluster.
+
+### Kubernetes
+We used [Kubernetes](https://kubernetes.io/) to deploy the MongoDB database on the Webis cluster.
+- [Pods](https://kubernetes.io/docs/concepts/workloads/pods/) are the smallest deployable units of computing that you can create and manage in Kubernetes.
+A pod is a group of **one or more containers**, with shared storage and network resources, and a specification for how to run the containers.
+- A [container](https://kubernetes.io/docs/concepts/containers/) packages an application along with its runtime dependencies. 
+Containers in a pod access and share data via [volumes](https://kubernetes.io/docs/concepts/storage/volumes/).
+- Volumes can be of different types; enabling filesystem sharing between containers in the same or across different pods, enabling durable storing data (availability even if Pod restarts: **persistent volumes**), limiting data access to read-only, etc.
+A Pod can use a number of volume types simultaneously.
+
+### Initial Setup of the Database
+We used [helm](https://helm.sh/) to set up the MongoDB database on the Kubernetes cluster.
+Helm generates YAML template files to deploy the database (instead of manually writing or copying them).
+Helm uses a packaging format called [charts](https://helm.sh/docs/topics/charts/).
+- A chart is used to deploy something. It is a collection of files in a directory. The directory name is the name of the chart. The files describe a related set of Kubernetes resources. The files are laid out in a directory tree. The charts are located in a [chart repository](https://helm.sh/docs/topics/chart_repository/).
+
+We found a [MongoDB helm chart](https://artifacthub.io/packages/helm/bitnami/mongodb) that we customized to our needs via the `values.yaml` in the `helm` directory (e.g., bigger persistent volume size (i.e. 16 GB instead of 8 GB), architecture: replicaset (i.e. PersistentSet with multiple Pods)).
+
+The command to upgrade/install the chart is:
+```bash
+helm upgrade --install --namespace artificial-authorship-verification --create-namespace mongodb oci://registry-1.docker.io/bitnamicharts/mongodb -f values.yaml
+```
+- `--install`: Install the chart if it is not already installed.
+- `--namespace artificial-authorship-verification`: Specifies the namespace in which to install the chart.
+- `--create-namespace`: Creates the namespace if it does not already exist.
+  - Webis namespaces have certain logic (refer to other as examples via `kubectl get namespaces`).
+- `mongodb`: Name of the release.
+- `oci://registry-1.docker.io/bitnamicharts/mongodb`: Location of the chart.
+- `-f values.yaml`: Specifies the values file to use for the installation. It overrides the default values provided by the chart.
