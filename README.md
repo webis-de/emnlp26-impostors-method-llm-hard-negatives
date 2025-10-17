@@ -218,7 +218,8 @@ For (1):
 ```bash
 kubectl edit secret -n webisservices artificial-authorship-verification-mongodb
 ```
-1.1. Locally find a new password and convert it to base64: `echo -n "newpassword" | base64``
+1.1. Locally find a new password and convert it to base64: `echo -n "newpassword" | base64`
+
 1.2. Insert the base64 encoded password in the `data` section under `mongodb-root-password:` that you find when editing the secret.
 
 For (2):
@@ -235,5 +236,5 @@ You may now need to restart the pod again to make sure everything works with the
 ### Populate the database
 You can populate the database with paraphrased texts and their evaluation scores using the scripts provided in the `genai_detection/paraphrasers` directory.
 ```bash 
-kubectl run --namespace webisservices artificial-authorship-verification-mongodb-client --rm --tty -i --restart='Never' --env="MONGODB_ROOT_PASSWORD=PW01010" --image registry.webis.de/code-teaching/theses/artificial-authorship-verification:latest --command -- bash 
+kubectl run --namespace webisservices artificial-authorship-verification-mongodb-client --rm --tty -i --restart='Never' --env="MONGODB_ROOT_PASSWORD=PW01010" --image registry.webis.de/code-teaching/theses/artificial-authorship-verification:latest --command -- bash -c "python3 /src/genai_detection/mongo_db/collection_orginal_text_student_essays.py"
 ```
