@@ -1,0 +1,3 @@
+persistence:
+  size: 16Gi
+architecture: replicaset
