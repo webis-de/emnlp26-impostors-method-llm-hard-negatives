@@ -247,8 +247,7 @@ There are two options, (1) via terminal or (2) via Pycharm.
 
 (1) Via terminal:
 ```bash
-kubectl port-forward -n webisservices deployment/artificial-authorship-verification-mongodb 2701
-8:27017
+kubectl port-forward -n webisservices deployment/artificial-authorship-verification-mongodb 27018:27017
 ```
 - This will forward the local port `27018` to the remote port `27017` of the MongoDB deployment.
 - You can then access the database locally at `localhost:27018`.
