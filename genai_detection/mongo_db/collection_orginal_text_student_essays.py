@@ -3,6 +3,7 @@ import hashlib
 from pathlib import Path
 from genai_detection.config import CONFIG
 from pymongo import MongoClient, errors
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 print("Starting initialization: loading original_text dataset...")
 
@@ -28,7 +29,9 @@ else:
 db[collection_name].create_index("text_hash", unique=True)
 
 # Dataset base path from environment
-dataset_base_path = Path(CONFIG.PATH2STUDENT_ESSAYS).parent
+dataset_base_path = (PROJECT_ROOT / CONFIG.PATH2STUDENT_ESSAYS).parent
+assert dataset_base_path.exists(), f"Dataset base path does not exist: {dataset_base_path}"
+
 dataset_name = CONFIG.STUDENT_ESSAYS
 print(f"{dataset_name} dataset base path: {dataset_base_path}")
 
