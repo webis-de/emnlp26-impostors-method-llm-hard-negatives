@@ -238,3 +238,23 @@ You can populate the database with paraphrased texts and their evaluation scores
 ```bash 
 kubectl run --namespace webisservices artificial-authorship-verification-mongodb-client --rm --tty -i --restart='Never' --env="MONGODB_ROOT_PASSWORD=PW01010" --image registry.webis.de/code-teaching/theses/artificial-authorship-verification:latest --command -- bash -c "python3 /src/genai_detection/mongo_db/collection_orginal_text_student_essays.py"
 ```
+
+### Part forwarding
+There are two options, (1) via terminal or (2) via Pycharm.
+
+(1) Via terminal:
+```bash
+kubectl port-forward -n webisservices deployment/artificial-authorship-verification-mongodb 2701
+8:27017
+```
+- This will forward the local port `27018` to the remote port `27017` of the MongoDB deployment.
+- You can then access the database locally at `localhost:27018`.
+(2) Via Pycharm:
+2.1 Go to `Database` > `+` > `Data Source` > `MongoDB` tab.
+2.2 Configure Kubernetes (tab on the right side): `Deployment` as Resource Type, `webisservices` as Namespace ~~, `artificial-authorship-verification-mongodb` as Resource Name, `27017` as Port.~~
+2.3 Configure the connection (tab on the left side): `root` as User, your password, change port to forwarded port `2701x` (not x=7 or x=8 if already used), `localhost` as Host.
+
+
+TODO:
+- https://kb.webis.de/k8s-manual/ceph-in-k8s.html#mount-the-main-cephfs-tree-as-hostpath mount code into docker container and work on k8s
+- OR: Local/gammaweb work (VPN)+ ingress zu k8s
