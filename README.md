@@ -263,5 +263,5 @@ kubectl port-forward -n webisservices deployment/artificial-authorship-verificat
 
 
 TODO:
-- https://kb.webis.de/k8s-manual/ceph-in-k8s.html#mount-the-main-cephfs-tree-as-hostpath mount code into docker container and work on k8s
-- OR: Local/gammaweb work (VPN)+ ingress zu k8s
+- ~~https://kb.webis.de/k8s-manual/ceph-in-k8s.html#mount-the-main-cephfs-tree-as-hostpath mount code into docker container and work on k8s~~ local path forwarding works
+- ~~OR: Local/gammaweb work (VPN)+ ingress zu k8s~~ local path forwarding works
