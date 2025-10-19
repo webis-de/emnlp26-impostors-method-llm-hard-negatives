@@ -54,8 +54,8 @@ class BaseConfig:
     MONGO_SCORE_COLLECTION = "score"  # collection (!= db)
     MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME")
     MONGO_PASSWORD = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
-    # MONGO_HOST = "localhost:27017"    # Local
-    MONGO_HOST = "artificial-authorship-verification-mongodb.webisservices.svc.cluster.local:27017" # Kubernetes
+    MONGO_HOST = "localhost:27018"    # Local, but forwarded to server
+    # MONGO_HOST = "artificial-authorship-verification-mongodb.webisservices.svc.cluster.local:27017" # Kubernetes
 
 
 CONFIG = BaseConfig()
