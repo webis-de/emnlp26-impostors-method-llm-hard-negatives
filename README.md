@@ -260,7 +260,8 @@ kubectl port-forward -n webisservices deployment/artificial-authorship-verificat
 
 - Note that, usually [do not use deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) but [stateful sets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) for databases, but it is common practice at Webis.
 2.3 Configure the connection (tab on the left side): `root` as User, your password, change port to forwarded port `2701x` (not x=7 or x=8 if already used), `localhost` as Host.
-
+![General Settings for path forwarding via Pycharm](explanations/pycharm_path_forwarding_mongodb_general.png)
+![Kubernetes Settings for path forwarding via Pycharm](explanations/pycharm_path_forwarding_mongodb_k8s.png)
 
 TODO:
 - ~~https://kb.webis.de/k8s-manual/ceph-in-k8s.html#mount-the-main-cephfs-tree-as-hostpath mount code into docker container and work on k8s~~ local path forwarding works
