@@ -147,13 +147,17 @@ Containers in a pod access and share data via [volumes](https://kubernetes.io/do
 - Volumes can be of different types; enabling filesystem sharing between containers in the same or across different pods, enabling durable storing data (availability even if Pod restarts: **persistent volumes**), limiting data access to read-only, etc.
 A Pod can use a number of volume types simultaneously.
 
+- Find examples of other deployments at Webis without helm:
+  - [Niklas' MMML User Study](https://git.webis.de/code-generic/code-admin-knowledge-base/-/blob/master/services/stable-diffusion/project-multimodal-machine-learning-lab-wise24-user-study/user-study.k8s.yaml)
+
+
 ### Initial Setup of the Database
 We used [helm](https://helm.sh/) to set up the MongoDB database on the Kubernetes cluster.
 Helm generates YAML template files to deploy the database (instead of manually writing or copying them).
 Helm uses a packaging format called [charts](https://helm.sh/docs/topics/charts/).
 - A chart is used to deploy something. It is a collection of files in a directory. The directory name is the name of the chart. The files describe a related set of Kubernetes resources. The files are laid out in a directory tree. The charts are located in a [chart repository](https://helm.sh/docs/topics/chart_repository/).
 
-We found a [MongoDB helm chart](https://artifacthub.io/packages/helm/bitnami/mongodb) that we customized to our needs via the `values.yaml` in the `helm` directory (e.g., bigger persistent volume size (i.e. 16 GB instead of 8 GB) on Betaweb (i.e. `csi-rbd-retain`, where retain means persistent and the absence of `ssd` means not gammaweb or no GPU), architecture: `standalone` ~~replicaset (i.e. PersistentSet with multiple Pods)~~, with recreation of pods when they fail (i.e.`Recreate`, not keeping old pod until new one is set up because volume is not shared), and without a networkPolicy because that is not done at Webis).
+We found a [MongoDB helm chart](https://artifacthub.io/packages/helm/bitnami/mongodb) that we customized to our needs via the `values.yaml` in the `helm` directory (e.g., bigger persistent volume size (i.e. 16 GB instead of 8 GB) on Betaweb (i.e. `csi-rbd-retain`, where [retain means persistent](https://kb.webis.de/k8s-manual/ceph-in-k8s.html#provision-a-cephfs-subvolume) and the absence of `ssd` means not gammaweb or no GPU), architecture: `standalone` ~~replicaset (i.e. PersistentSet with multiple Pods)~~, with recreation of pods when they fail (i.e.`Recreate`, not keeping old pod until new one is set up because volume is not shared), and without a networkPolicy because that is not done at Webis).
 
 The command to **upgrade/install the chart (Deployment at webis)** is:
 ```bash
@@ -172,7 +176,7 @@ The command to **generate the template file without installing it** is:
 ```bash
 helm template --namespace webisservices --create-namespace artificial-authorship-verification oci://registry-1.docker.io/bitnamicharts/mongodb -f values.yaml --set auth.rootPassword="SecurePassword123!" > "template.k8s.yaml"
 ```
-- This command generates the Kubernetes YAML template file and saves it as `template.k8s.yaml`.
+- This command generates the [Kubernetes YAML template file](https://helm.sh/docs/chart_template_guide/debugging/) and saves it as `template.k8s.yaml`.
 - You can then review the file inspecting settings like password, volume size, etc. Different original files are separated by `---` in the YAML file.
 - You can also directly edit the file before applying it to the cluster using `kubectl apply -f template.k8s.yaml`.
 
@@ -209,7 +213,6 @@ From there, you can interact with the MongoDB database using `mongosh`:
 
 Otherwise you can connect to it from anywhere on the Kubernetes cluster using the address above.
 You cannot access it from Gammaweb.
-**TODO**: Port forwarding?
 
 
 ### Change password of the database
@@ -218,7 +221,7 @@ For (1):
 ```bash
 kubectl edit secret -n webisservices artificial-authorship-verification-mongodb
 ```
-1.1. Locally find a new password and convert it to base64: `echo -n "newpassword" | base64`
+1.1. Locally find a new password and [convert it to base64](https://kubernetes.io/docs/tasks/configmap-secret/managing-secret-using-config-file/): `echo -n "newpassword" | base64`
 
 1.2. Insert the base64 encoded password in the `data` section under `mongodb-root-password:` that you find when editing the secret.
 
@@ -252,6 +255,7 @@ kubectl port-forward -n webisservices deployment/artificial-authorship-verificat
 (2) Via Pycharm:
 2.1 Go to `Database` > `+` > `Data Source` > `MongoDB` tab.
 2.2 Configure Kubernetes (tab on the right side): `Deployment` as Resource Type, `webisservices` as Namespace ~~, `artificial-authorship-verification-mongodb` as Resource Name, `27017` as Port.~~
+- Note that, usually [do not use deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) but [stateful sets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) for databases, but it is common practice at Webis.
 2.3 Configure the connection (tab on the left side): `root` as User, your password, change port to forwarded port `2701x` (not x=7 or x=8 if already used), `localhost` as Host.
 
 
