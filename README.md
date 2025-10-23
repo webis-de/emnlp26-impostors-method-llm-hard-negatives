@@ -26,6 +26,10 @@ It replaces tools like `pip`, `virtualenv`, and `setuptools` with a single, stre
 - **Python ≥3.10 and <3.13**
   - Word Mover's Distance (WMD) requires Python <3.13, I use Python 3.11.9
 - **Poetry ≥1.3**
+- **Torch**
+  - MacOS does not work with torch's cpu wheel. Ensure you have `torch = { version = "^2.5.0", source = "pypi" }
+  torchvision = { version = "^0.20.0", source = "pypi" }
+  torchaudio = { version = "^2.5.0", source = "pypi" }` in your `pyproject.toml` to install from PyPI instead of the default source.
 
 Install poetry using the following command for MacOS:
 
