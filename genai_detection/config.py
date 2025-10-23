@@ -11,6 +11,8 @@ class BaseConfig:
     OPENAI_KEY = os.getenv("OPENAI_KEY")
     SAIA_KEY = os.getenv("SAIA_KEY")
     DEEPL_API_KEY = os.getenv("DEEPL_KEY")
+    OPENAI_API_KEY = os.getenv("OPENAI_KEY")
+    OPENAI_PROJECT_ID = os.getenv("OPENAI_PROJECT_ID")
     DATA_BASE_PATH = "data/datasets"
     PATH2PAN25 = f"{DATA_BASE_PATH}/pan25-genai-identification/pan25-dataset-converted"
     PATH2PAN23 = (
@@ -45,6 +47,8 @@ class BaseConfig:
     OLLAMA_URL = "https://llm.web.webis.de/api"
     SAIA_URL = "https://chat-ai.academiccloud.de/v1"
     SAIA_MODEL = "openai-gpt-oss-120b"
+    OPENAI_URL = "https://chat-ai.academiccloud.de/v1"
+    OPENAI_MODEL = "openai-gpt-oss-120b"
 
     PROMPT = "Paraphrase the text above without changing its meaning. Use different words and vary the sentence structure while maintaining a consistent tone. Your paraphrase should be three times as long than the original. Output only the paraphrased sentence, with NO explanations or extra text."
 
