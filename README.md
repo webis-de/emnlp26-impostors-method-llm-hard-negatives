@@ -141,7 +141,7 @@ View image at registry at [GitLab project](https://git.webis.de/code-research/th
 The project uses a MongoDB database to store paraphrased texts and their evaluation scores.
 
 The database is located on the Webis Kubernetes cluster.
-
+![ERD_authorship_mongo_db.svg](explanations/ERD_authorship_mongo_db.svg)
 ### Kubernetes
 We used [Kubernetes](https://kubernetes.io/) to deploy the MongoDB database on the Webis cluster.
 - [Pods](https://kubernetes.io/docs/concepts/workloads/pods/) are the smallest deployable units of computing that you can create and manage in Kubernetes.
