@@ -441,31 +441,52 @@ class T5GooglePAWSParaphraser(NaiveParaphraser):
             res.append(line)
         return res
 
+# Field descriptions dictionary
+FIELD_DESCRIPTIONS = {
+    "text": "The full input text to analyze.",
+    "title": "A short, descriptive title summarizing the text in one phrase or sentence.",
+    "genre": "The literary or content genre of the text (e.g., essay, poem, news article, academic paper, novel, speech, letter, religious text, etc.).",
+    "tone": "The emotional or stylistic tone (e.g., formal, humorous, persuasive, neutral, melancholic, satirical, didactic).",
+    "century": "The century in which the text was likely written (e.g., '18th century', '20th century', '21st century'). Use language, style, and context clues to infer.",
+    "audience": "The intended audience or readership (e.g., general public, scholars, children, political leaders, students, religious followers).",
+    "author": "A concise author profile including likely traits such as gender (if implied), profession, education level, nationality, or perspective (e.g., 'a 19th-century British poet', 'a modern journalist', 'an academic researcher').",
+    "bulletpoints": "A list of concise bullet points summarizing the main ideas or arguments of the text, written in plain language.",
+    "length": "The approximate target length of the generated text, in number of words.",
+}
+
+
 class ExtractInfo(dspy.Signature):
     """Extract structured literary and stylistic information from text."""
+    text: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["text"])
+    title: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["title"])
+    genre: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["genre"])
+    tone: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["tone"])
+    century: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["century"])
+    audience: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["audience"])
+    author: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["author"])
+    bulletpoints: list[str] = dspy.OutputField(desc=FIELD_DESCRIPTIONS["bulletpoints"])
 
-    text: str = dspy.InputField(desc="The full input text to analyze.")
-    title: str = dspy.OutputField(
-        desc="A short, descriptive title summarizing the text in one phrase or sentence."
+class GenerateText(dspy.Signature):
+    """Generate a text based on structured literary and stylistic information."""
+
+    title: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["title"])
+    genre: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["genre"])
+    tone: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["tone"])
+    century: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["century"])
+    audience: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["audience"])
+    author: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["author"])
+    bulletpoints: list[str] = dspy.InputField(desc=FIELD_DESCRIPTIONS["bulletpoints"])
+    length: int = dspy.InputField(desc=FIELD_DESCRIPTIONS["length"])
+    text: str = dspy.OutputField(
+        desc=(
+            "A newly generated text that sounds as if written by the described author. "
+            "It must reflect the specified **title**, **genre**, **tone**, **century**, "
+            "**audience**, and **author profile**. "
+            "The content should elaborate naturally on the given **bulletpoints** and "
+            "have a length approximately matching the provided word count."
+        )
     )
-    genre: str = dspy.OutputField(
-        desc="The literary or content genre of the text (e.g. essay, poem, news article, academic paper, novel, speech, letter, religious text, etc.)."
-    )
-    tone: str = dspy.OutputField(
-        desc="The emotional or stylistic tone (e.g. formal, humorous, persuasive, neutral, melancholic, satirical, didactic)."
-    )
-    century: str = dspy.OutputField(
-        desc="The century in which the text was likely written (e.g. '18th century', '20th century', '21st century'). Use language, style, and context clues to infer."
-    )
-    audience: str = dspy.OutputField(
-        desc="The intended audience or readership (e.g. general public, scholars, children, political leaders, students, religious followers)."
-    )
-    author: str = dspy.OutputField(
-        desc="A concise author profile including likely traits such as gender (if implied), profession, education level, nationality, or perspective (e.g. 'a 19th-century British poet', 'a modern journalist', 'an academic researcher')."
-    )
-    bulletpoints: list[str] = dspy.OutputField(
-        desc="A list of concise bullet points summarizing the main ideas or arguments of the text, written in plain language."
-    )
+
 
 
 class OpenAIParaphraser_dspy(NaiveParaphraser):
@@ -486,7 +507,6 @@ class OpenAIParaphraser_dspy(NaiveParaphraser):
         )
         self.model_id = model_id
         dspy.configure(lm=self.lm)
-        self.module = dspy.Predict(ExtractInfo)
 
 
     def paraphrase(
@@ -497,7 +517,7 @@ class OpenAIParaphraser_dspy(NaiveParaphraser):
         temperature: float = CONFIG.TEMPERATURE,
         n_responses: int = 1,
         response_schema: Optional[dict[str, Any]] = None,
-    ) -> dict[str]:
+    ) -> tuple[dict[str], str, float]:
         """
         Generate paraphrased versions of the input text.
 
@@ -509,64 +529,33 @@ class OpenAIParaphraser_dspy(NaiveParaphraser):
         :param n_responses: The number of paraphrases to generate.
         :return: A list of paraphrased versions of the input text.
         """
-        response = self.module(text=text)# + prompt
-        cost = sum([x['cost'] for x in self.lm.history if
+        extractor = dspy.Predict(ExtractInfo)
+        extracted_info = extractor(text=text).toDict()
+        extracted_info["length"] = len(text.split())
+        cost_after_extractor = sum([x['cost'] for x in self.lm.history if
                     x['cost'] is not None])  # in USD, as calculated by LiteLLM for certain providers
         # https://dspy.ai/tutorials/rag/#keeping-an-eye-on-cost
-        print("ATTENTION. Total cost of the requests so far: ${:.6f}".format(cost))
+        print("ATTENTION. Cost of the extraction requests: ${:.6f}".format(cost_after_extractor))
+
+        generator = dspy.Predict(GenerateText)
+
 
         try:
-            return response.toDict()
+            paraphrase = generator(**extracted_info)
+            # Get cost after generator
+            cost_after_generator = sum(
+                x['cost'] for x in generator.lm.history if x['cost'] is not None
+            )
+
+            # Total cost for both requests
+            total_cost = cost_after_extractor + (cost_after_generator - cost_after_extractor)
+            print(f"Total cost for extractor + generator: ${total_cost:.6f}")
+            return extracted_info, paraphrase.text, total_cost
         except Exception as e:
             print(e)
-            return response
+            return extracted_info, "", cost_after_extractor
 
-        responses = []
-        for i in range(n_responses):
-            # max token differs across models but usually at least 40k tokens, so we crop at less to be safe
-            body = {
-                "model": self.model_id,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "You are a paraphrasing assistant. Output only the final paraphrased text.",
-                    },
-                    {"role": "user", "content": f"{text[:30000]}\n{prompt.strip()}"},
-                ],
-                "temperature": temperature,
-            }
-            try:
-                response = self.client.chat.completions.create(**body)
-            except openai.InternalServerError as e:
-                print(
-                    f"[ERROR] Failed to generate paraphrase with {self.model_id}: {e}. Skipping..."
-                )
-                continue
-            except openai.RateLimitError as e:
-                print(
-                    f"[ERROR] Rate limit exceeded for {self.model_id}: {e}. Sleeping 1 minute and trying again..."
-                )
-                sleep(20)
-                return self.paraphrase(
-                    text=text,
-                    prompt=prompt,
-                    max_length=max_length,
-                    temperature=temperature,
-                    n_responses=n_responses,
-                    response_schema=response_schema,
-                )
 
-            resp = response.choices[0].message.content
-            resp = re.sub("'", " ", resp)  # replace single quotes with double quotes
-            resp = re.sub(r"\s+", " ", resp)  # remove excessive whitespaces
-
-            try:
-                data = json.loads(resp)
-                responses.append(data)
-            except json.JSONDecodeError:
-                responses.append(response.choices[0].message.content)
-
-        return responses
 
 class SAIAParaphraser(NaiveParaphraser):
     """
