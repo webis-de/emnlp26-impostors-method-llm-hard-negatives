@@ -33,6 +33,7 @@ import torch
 import deepl
 import nltk
 from nltk.tokenize import sent_tokenize
+import dspy
 
 nltk.download("punkt_tab")
 
@@ -439,7 +440,114 @@ class T5GooglePAWSParaphraser(NaiveParaphraser):
             )
             res.append(line)
         return res
+class ExtractInfo(dspy.Signature):
+    """Extract structured information from text."""
 
+    text: str = dspy.InputField()
+    title: str = dspy.OutputField()
+    headings: list[str] = dspy.OutputField()
+    entities: list[dict[str, str]] = dspy.OutputField(desc="a list of entities and their metadata")
+
+
+
+class OpenAIParaphraser_dspy(NaiveParaphraser):
+    """
+    SAIA paraphrasing model hosted by GWDG (Gesellschaft für wissenschaftliche Datenverarbeitung mbH Göttingen).
+    SAIA is the Scalable Artificial Intelligence (AI) Accelerator that hosts our AI services.
+
+    For more information, see https://docs.hpc.gwdg.de/services/saia/index.html#api-request (09.08.2025).
+    """
+
+    def __init__(self, model_id: str = CONFIG.OPENAI_MODEL):
+        self.lm = dspy.LM(
+            model_id,
+            api_base=CONFIG.OPENAI_URL,
+            api_key=CONFIG.SAIA_KEY,
+            model_class="chat"
+        )
+        self.model_id = model_id
+        dspy.configure(lm=self.lm)
+        self.module = dspy.Predict(ExtractInfo)
+
+
+    def paraphrase(
+        self,
+        text: str,
+        prompt: str = 'Paraphrase the text above. Respond ONLY with a JSON object in the following format: {"genre":"<genre>","tone":"<tone>","paraphrase":"<paraphrased version of the text>"}',
+        max_length: int = CONFIG.MAX_LENGTH,
+        temperature: float = CONFIG.TEMPERATURE,
+        n_responses: int = 1,
+        response_schema: Optional[dict[str, Any]] = None,
+    ) -> List[str]:
+        """
+        Generate paraphrased versions of the input text.
+
+        :param text: The input text to be paraphrased.
+        :param prompt: The prompt to be used for paraphrasing. This model allows for JSON structured ouput, hence, specify here the prompt to be used for paraphrasing.
+        The prompt is inserted after the text to enforce its importance in the LLM's context when working on long texts.
+        :param max_length: The maximum number of tokens to generate in the paraphrase.
+        :param temperature: Controls the randomness of the output. Lower values make the output more deterministic
+        :param n_responses: The number of paraphrases to generate.
+        :return: A list of paraphrased versions of the input text.
+        """
+        text = "Apple Inc. announced its latest iPhone 14 today." \
+               "The CEO, Tim Cook, highlighted its new features in a press release."
+        response = self.module(text=text)
+        cost = sum([x['cost'] for x in self.lm.history if
+                    x['cost'] is not None])  # in USD, as calculated by LiteLLM for certain providers
+        # https://dspy.ai/tutorials/rag/#keeping-an-eye-on-cost
+        print("ATTENTION. Total cost of the requests so far: ${:.6f}".format(cost))
+
+        print(response.title)
+        print(response.headings)
+        print(response.entities)
+        return response
+        responses = []
+        for i in range(n_responses):
+            # max token differs across models but usually at least 40k tokens, so we crop at less to be safe
+            body = {
+                "model": self.model_id,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You are a paraphrasing assistant. Output only the final paraphrased text.",
+                    },
+                    {"role": "user", "content": f"{text[:30000]}\n{prompt.strip()}"},
+                ],
+                "temperature": temperature,
+            }
+            try:
+                response = self.client.chat.completions.create(**body)
+            except openai.InternalServerError as e:
+                print(
+                    f"[ERROR] Failed to generate paraphrase with {self.model_id}: {e}. Skipping..."
+                )
+                continue
+            except openai.RateLimitError as e:
+                print(
+                    f"[ERROR] Rate limit exceeded for {self.model_id}: {e}. Sleeping 1 minute and trying again..."
+                )
+                sleep(20)
+                return self.paraphrase(
+                    text=text,
+                    prompt=prompt,
+                    max_length=max_length,
+                    temperature=temperature,
+                    n_responses=n_responses,
+                    response_schema=response_schema,
+                )
+
+            resp = response.choices[0].message.content
+            resp = re.sub("'", " ", resp)  # replace single quotes with double quotes
+            resp = re.sub(r"\s+", " ", resp)  # remove excessive whitespaces
+
+            try:
+                data = json.loads(resp)
+                responses.append(data)
+            except json.JSONDecodeError:
+                responses.append(response.choices[0].message.content)
+
+        return responses
 
 class SAIAParaphraser(NaiveParaphraser):
     """
