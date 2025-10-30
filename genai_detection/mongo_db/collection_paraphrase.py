@@ -4,7 +4,7 @@ from genai_detection.paraphrasing import paraphraser
 
 
 def paraphrase(text, llm: str, temperature: float, prompt: str) -> str:
-    paraphraser_llm = paraphraser.SAIAParaphraser(model_id=llm)
+    paraphraser_llm = paraphraser.OpenAIParaphraser_dspy(model_id=llm)
     return paraphraser_llm.paraphrase(text, temperature=temperature, prompt=prompt)[0]
 
 
@@ -14,6 +14,13 @@ client = MongoClient(uri)
 db = client[CONFIG.MONGO_DATABASE or "impostors"]
 original_collection = db[CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION or "original_text"]
 paraphrase_collection_name = CONFIG.MONGO_PARAPHRASE_COLLECTION or "paraphrase"
+
+try:
+    client.admin.command("ping")
+    print("Successfully connected as MongoDB root user!")
+except Exception as e:
+    print("Connection failed:", e, uri)
+    raise e
 
 # Create paraphrase collection if it doesn't exist
 if paraphrase_collection_name not in db.list_collection_names():
@@ -30,7 +37,7 @@ paraphrase_collection = db[paraphrase_collection_name]
 LLM = CONFIG.SAIA_MODEL
 TEMPERATURE = 0.7
 # TODO: delete following line
-max_docs = 2  # for testing, limit to first 5 documents
+max_docs = 1  # for testing, limit to first 5 documents
 for doc in original_collection.find(limit=max_docs):
     text_id = doc["_id"]
     original_text = doc["text"]

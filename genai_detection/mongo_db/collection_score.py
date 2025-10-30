@@ -10,6 +10,13 @@ original_collection = db[CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION or "original_text
 paraphrase_collection = db[CONFIG.MONGO_PARAPHRASE_COLLECTION or "paraphrase"]
 score_collection_name = CONFIG.MONGO_SCORE_COLLECTION or "score"
 
+try:
+    client.admin.command("ping")
+    print("Successfully connected as MongoDB root user!")
+except Exception as e:
+    print("Connection failed:", e)
+    raise e
+
 # Create score collection if it doesn't exist
 if score_collection_name not in db.list_collection_names():
     db.create_collection(score_collection_name)
