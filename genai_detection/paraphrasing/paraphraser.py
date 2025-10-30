@@ -509,6 +509,38 @@ class OpenAIParaphraser_dspy(NaiveParaphraser):
         dspy.configure(lm=self.lm)
 
 
+    def generate_paraphrase(self, extracted_info: dict[str, Any]) -> dspy.Prediction:
+        generator = dspy.Predict(GenerateText)
+        try:
+            print("generating paraphrase with extracted info", extracted_info)
+            extracted_keys = set(extracted_info.keys())
+            field_keys = set(FIELD_DESCRIPTIONS.keys())
+
+            # Remove 'text' from both sets
+            extracted_keys.discard("text")
+            field_keys.discard("text")
+
+            # Assert equality with a detailed message
+            assert extracted_keys == field_keys, (
+                f"Keys differ besides 'text'. "
+                f"Missing in extracted_info: {field_keys - extracted_keys}, "
+                f"Extra in extracted_info: {extracted_keys - field_keys}"
+            )
+
+            print("All keys match except for 'text'.")
+            paraphrase = generator(**extracted_info)#.toDict()
+            print("generated paraphrase", paraphrase)
+            cost_after_generator = sum(
+                x['cost'] for x in self.lm.history if x['cost'] is not None
+            )
+            return paraphrase.text, cost_after_generator
+        except Exception as e:
+            raise(e)
+
+
+
+
+
     def paraphrase(
         self,
         text: str,
@@ -537,19 +569,12 @@ class OpenAIParaphraser_dspy(NaiveParaphraser):
         # https://dspy.ai/tutorials/rag/#keeping-an-eye-on-cost
         print("ATTENTION. Cost of the extraction requests: ${:.6f}".format(cost_after_extractor))
 
-        generator = dspy.Predict(GenerateText)
-
-
         try:
-            paraphrase = generator(**extracted_info)
-            # Get cost after generator
-            cost_after_generator = sum(
-                x['cost'] for x in generator.lm.history if x['cost'] is not None
-            )
+            paraphrase, cost_after_generator = self.generate_paraphrase(extracted_info=extracted_info)
 
             # Total cost for both requests
             total_cost = cost_after_extractor + (cost_after_generator - cost_after_extractor)
-            print(f"Total cost for extractor + generator: ${total_cost:.6f}")
+            print(f"ATTENTION. Total cost for extractor + generator: ${total_cost:.6f}")
             return extracted_info, paraphrase.text, total_cost
         except Exception as e:
             print(e)
