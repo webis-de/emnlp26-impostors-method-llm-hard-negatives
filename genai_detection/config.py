@@ -48,7 +48,7 @@ class BaseConfig:
     SAIA_URL = "https://chat-ai.academiccloud.de/v1"
     SAIA_MODEL = "openai-gpt-oss-120b"
     OPENAI_URL = "https://api.openai.com/v1"
-    OPENAI_MODEL = "openai/gpt-5-nano"
+    OPENAI_MODEL = "openai/gpt-5-nano-2025-08-07"   # specify snapshot for consistency: https://platform.openai.com/docs/models/gpt-5-nano (30.10.2025)
 
     PROMPT = "Paraphrase the text above without changing its meaning. Use different words and vary the sentence structure while maintaining a consistent tone. Your paraphrase should be three times as long than the original. Output only the paraphrased sentence, with NO explanations or extra text."
 
