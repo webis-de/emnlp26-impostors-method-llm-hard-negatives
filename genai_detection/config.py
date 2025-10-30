@@ -42,13 +42,13 @@ class BaseConfig:
     IMPOSTOR = "impostor"
     UNMASKING = "unmasking"
     TEMPERATURE = 0.7
-    MAX_LENGTH = 512  # Maximum length of the generated paraphrase
+    MAX_LENGTH = 2100# 512  # Maximum length of the generated paraphrase
     OLLAMA_MODEL = "zephyr:7b"  # "mistral:7b"  # "default:latest"
     OLLAMA_URL = "https://llm.web.webis.de/api"
     SAIA_URL = "https://chat-ai.academiccloud.de/v1"
     SAIA_MODEL = "openai-gpt-oss-120b"
-    OPENAI_URL = "https://chat-ai.academiccloud.de/v1"
-    OPENAI_MODEL = "openai-gpt-oss-120b"
+    OPENAI_URL = "https://api.openai.com/v1"
+    OPENAI_MODEL = "openai/gpt-5-nano"
 
     PROMPT = "Paraphrase the text above without changing its meaning. Use different words and vary the sentence structure while maintaining a consistent tone. Your paraphrase should be three times as long than the original. Output only the paraphrased sentence, with NO explanations or extra text."
 

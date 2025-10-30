@@ -440,30 +440,49 @@ class T5GooglePAWSParaphraser(NaiveParaphraser):
             )
             res.append(line)
         return res
+
 class ExtractInfo(dspy.Signature):
-    """Extract structured information from text."""
+    """Extract structured literary and stylistic information from text."""
 
-    text: str = dspy.InputField()
-    title: str = dspy.OutputField()
-    headings: list[str] = dspy.OutputField()
-    entities: list[dict[str, str]] = dspy.OutputField(desc="a list of entities and their metadata")
-
+    text: str = dspy.InputField(desc="The full input text to analyze.")
+    title: str = dspy.OutputField(
+        desc="A short, descriptive title summarizing the text in one phrase or sentence."
+    )
+    genre: str = dspy.OutputField(
+        desc="The literary or content genre of the text (e.g. essay, poem, news article, academic paper, novel, speech, letter, religious text, etc.)."
+    )
+    tone: str = dspy.OutputField(
+        desc="The emotional or stylistic tone (e.g. formal, humorous, persuasive, neutral, melancholic, satirical, didactic)."
+    )
+    century: str = dspy.OutputField(
+        desc="The century in which the text was likely written (e.g. '18th century', '20th century', '21st century'). Use language, style, and context clues to infer."
+    )
+    audience: str = dspy.OutputField(
+        desc="The intended audience or readership (e.g. general public, scholars, children, political leaders, students, religious followers)."
+    )
+    author: str = dspy.OutputField(
+        desc="A concise author profile including likely traits such as gender (if implied), profession, education level, nationality, or perspective (e.g. 'a 19th-century British poet', 'a modern journalist', 'an academic researcher')."
+    )
+    bulletpoints: list[str] = dspy.OutputField(
+        desc="A list of concise bullet points summarizing the main ideas or arguments of the text, written in plain language."
+    )
 
 
 class OpenAIParaphraser_dspy(NaiveParaphraser):
     """
-    SAIA paraphrasing model hosted by GWDG (Gesellschaft für wissenschaftliche Datenverarbeitung mbH Göttingen).
-    SAIA is the Scalable Artificial Intelligence (AI) Accelerator that hosts our AI services.
-
-    For more information, see https://docs.hpc.gwdg.de/services/saia/index.html#api-request (09.08.2025).
+    Wrapper for OpenAI's GPT models using dspy.
     """
 
-    def __init__(self, model_id: str = CONFIG.OPENAI_MODEL):
+    def __init__(self, model_id: str = CONFIG.OPENAI_MODEL, temperature: float = CONFIG.TEMPERATURE):
+        is_reasoning_model = any(name in model_id.lower() for name in ["gpt-5", "o1", "o3", "reasoning"])
+
         self.lm = dspy.LM(
             model_id,
             api_base=CONFIG.OPENAI_URL,
-            api_key=CONFIG.SAIA_KEY,
-            model_class="chat"
+            api_key=CONFIG.OPENAI_API_KEY,
+            model_type="chat",
+            temperature=1.0 if is_reasoning_model else temperature,
+            max_tokens=16000 if is_reasoning_model else CONFIG.MAX_LENGTH,
         )
         self.model_id = model_id
         dspy.configure(lm=self.lm)
@@ -478,7 +497,7 @@ class OpenAIParaphraser_dspy(NaiveParaphraser):
         temperature: float = CONFIG.TEMPERATURE,
         n_responses: int = 1,
         response_schema: Optional[dict[str, Any]] = None,
-    ) -> List[str]:
+    ) -> dict[str]:
         """
         Generate paraphrased versions of the input text.
 
@@ -490,18 +509,18 @@ class OpenAIParaphraser_dspy(NaiveParaphraser):
         :param n_responses: The number of paraphrases to generate.
         :return: A list of paraphrased versions of the input text.
         """
-        text = "Apple Inc. announced its latest iPhone 14 today." \
-               "The CEO, Tim Cook, highlighted its new features in a press release."
-        response = self.module(text=text)
+        response = self.module(text=text)# + prompt
         cost = sum([x['cost'] for x in self.lm.history if
                     x['cost'] is not None])  # in USD, as calculated by LiteLLM for certain providers
         # https://dspy.ai/tutorials/rag/#keeping-an-eye-on-cost
         print("ATTENTION. Total cost of the requests so far: ${:.6f}".format(cost))
 
-        print(response.title)
-        print(response.headings)
-        print(response.entities)
-        return response
+        try:
+            return response.toDict()
+        except Exception as e:
+            print(e)
+            return response
+
         responses = []
         for i in range(n_responses):
             # max token differs across models but usually at least 40k tokens, so we crop at less to be safe
