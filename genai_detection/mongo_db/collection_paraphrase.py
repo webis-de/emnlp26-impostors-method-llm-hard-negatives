@@ -25,7 +25,7 @@ max_docs = 2  # for testing, limit to first 5 documents
 openai_cost_est = OpenaiCostEstimator()
 i = 0
 
-save_dir = Path(CONFIG.SAVE_PATH) / "openai_paraphrases"
+save_dir =  Path(__file__).resolve().parent.parent.parent / CONFIG.SAVE_PATH / "openai_paraphrases"
 save_dir.mkdir(parents=True, exist_ok=True)
 
 def save_original_text(i:int, original_text:str):
@@ -76,6 +76,7 @@ for doc in original_collection.find(limit=max_docs):
                 assert len(paraphrased_text.split()) > 0, "paraphrased_text is empty"
             else:
                 print(f"No update performed for {text_id} (may already be up-to-date).")
+            continue
 
 
     # prompt is not used, bc we use dspy
@@ -91,7 +92,7 @@ for doc in original_collection.find(limit=max_docs):
 
     # Build the new document
     paraphrase_doc = {
-        "text_id": text_id,
+        "_id": text_id,
         "length_original_text": len(original_text.split()),
         "length_paraphrased_text": len(paraphrased_text.split()),
         "intermediate_prompt": "bulletpoints dspy",
