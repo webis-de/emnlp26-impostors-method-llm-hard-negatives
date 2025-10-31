@@ -1,8 +1,11 @@
-import os
 from pathlib import Path
-from genai_detection.config import CONFIG
+
 from pymongo import MongoClient
+
+from genai_detection.config import CONFIG
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 
 class ParaphraseMongoDB:
 
@@ -17,10 +20,15 @@ class ParaphraseMongoDB:
             raise e
 
         self.db = self.client[CONFIG.MONGO_DATABASE or "impostors"]
-        self.original_collection = self.db[CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION or "original_text"]
+        self.original_collection = self.db[
+            CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION or "original_text"
+        ]
 
         # Create collections if they don't exist
-        for collection_name in [CONFIG.MONGO_PARAPHRASE_COLLECTION, CONFIG.MONGO_SCORE_COLLECTION]:
+        for collection_name in [
+            CONFIG.MONGO_PARAPHRASE_COLLECTION,
+            CONFIG.MONGO_SCORE_COLLECTION,
+        ]:
             if collection_name not in self.db.list_collection_names():
                 self.db.create_collection(collection_name)
                 print(f"Created collection: {collection_name}")
@@ -32,7 +40,8 @@ class ParaphraseMongoDB:
         self.paraphrase_collection = self.db[CONFIG.MONGO_PARAPHRASE_COLLECTION]
         self.score_collection = self.db[CONFIG.MONGO_SCORE_COLLECTION]
 
-    def update_document(self, collection, text_id: str, update_data: dict) -> int:
+    @staticmethod
+    def update_document(collection, text_id: str, update_data: dict) -> int:
         """
         Update an entry in the specified collection by its text ID.
         If no document with text_id exists, no action is taken.
@@ -43,19 +52,19 @@ class ParaphraseMongoDB:
         :return: The number of documents modified (0 or 1).
         """
         assert isinstance(update_data, dict), "update_data must be a dictionary"
-        assert ("text_id" not in update_data) or (text_id == update_data["text_id"]), "update_data must not contain 'text_id' key or have the same value as text_id parameter"
-        result = collection.update_one(
-            {"_id": text_id},
-            {"$set": update_data}
-        )
+        assert ("text_id" not in update_data) or (
+            text_id == update_data["text_id"]
+        ), "update_data must not contain 'text_id' key or have the same value as text_id parameter"
+        result = collection.update_one({"_id": text_id}, {"$set": update_data})
         return result.modified_count
 
-    def find_document(self, collection, id: str) -> dict | None:
+    @staticmethod
+    def find_document(collection, document_id: str) -> dict | None:
         """
         Find an entry in the specified collection by its text ID.
         :param collection: The MongoDB collection to search.
-        :param text_id: The ID of the text document to find.
+        :param document_id: The ID of the text document to find.
         :return: The found document as a dictionary, or None if not found.
         """
-        document = collection.find_one({"_id": id})
+        document = collection.find_one({"_id": document_id})
         return document
