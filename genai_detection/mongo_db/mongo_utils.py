@@ -57,5 +57,5 @@ class ParaphraseMongoDB:
         :param text_id: The ID of the text document to find.
         :return: The found document as a dictionary, or None if not found.
         """
-        document = collection.find_one({"_id": text_id})
+        document = collection.find_one({"_id": id})
         return document
