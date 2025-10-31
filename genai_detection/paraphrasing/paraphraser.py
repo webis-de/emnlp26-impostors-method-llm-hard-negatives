@@ -575,7 +575,7 @@ class OpenAIParaphraser_dspy(NaiveParaphraser):
             # Total cost for both requests
             total_cost = cost_after_extractor + (cost_after_generator - cost_after_extractor)
             print(f"ATTENTION. Total cost for extractor + generator: ${total_cost:.6f}")
-            return extracted_info, paraphrase.text, total_cost
+            return extracted_info, paraphrase, total_cost
         except Exception as e:
             print(e)
             return extracted_info, "", cost_after_extractor
