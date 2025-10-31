@@ -509,7 +509,7 @@ class OpenAIParaphraser_dspy(NaiveParaphraser):
         dspy.configure(lm=self.lm)
 
 
-    def generate_paraphrase(self, extracted_info: dict[str, Any]) -> dspy.Prediction:
+    def generate_paraphrase(self, extracted_info: dict[str, Any]) -> tuple[Any, float]:
         generator = dspy.Predict(GenerateText)
         try:
             print("generating paraphrase with extracted info", extracted_info)
