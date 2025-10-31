@@ -21,9 +21,8 @@ paraphrase_collection = mongoDB.paraphrase_collection
 paraphraser_llm = paraphraser.OpenAIParaphraser_dspy(model_id=CONFIG.OPENAI_MODEL)
 
 # TODO: delete following line
-max_docs = 2  # for testing, limit to first 5 documents
+max_docs = 3  # for testing, limit to first 5 documents
 openai_cost_est = OpenaiCostEstimator()
-i = 0
 
 save_dir =  Path(__file__).resolve().parent.parent.parent / CONFIG.SAVE_PATH / "openai_paraphrases"
 save_dir.mkdir(parents=True, exist_ok=True)
@@ -43,7 +42,7 @@ def save_paraphrase(i: int, paraphrased_text: str):
     with open(save_dir / paraphrase_filename, "w", encoding="utf-8") as f:
         f.write(paraphrased_text)
 
-for doc in original_collection.find(limit=max_docs):
+for i, doc in enumerate(original_collection.find(limit=max_docs)):
     text_id = doc["_id"]
     original_text = doc["text"]
     existing_paraphrase = mongoDB.find_document(collection=paraphrase_collection, id=text_id)
