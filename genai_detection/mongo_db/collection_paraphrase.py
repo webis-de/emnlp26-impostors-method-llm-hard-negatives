@@ -24,8 +24,28 @@ paraphraser_llm = paraphraser.OpenAIParaphraser_dspy(model_id=CONFIG.OPENAI_MODE
 max_docs = 2  # for testing, limit to first 5 documents
 openai_cost_est = OpenaiCostEstimator()
 i = 0
+
+save_dir = Path(CONFIG.SAVE_PATH) / "openai_paraphrases"
+save_dir.mkdir(parents=True, exist_ok=True)
+
+def save_original_text(i:int, original_text:str):
+    original_text_filename = f"{i}_original_text_{CONFIG.OPENAI_MODEL.replace('/', '_')}.txt"
+    with open(save_dir / original_text_filename, "w", encoding="utf-8") as f:
+        f.write(original_text)
+
+def save_extracted_info(i:int, extracted_info:dict):
+    extr_info_filename = f"{i}_extacted_information_{CONFIG.OPENAI_MODEL.replace('/','_')}.jsonl"
+    with open(save_dir / extr_info_filename, "w", encoding="utf-8") as f:
+        json.dump(extracted_info, f, ensure_ascii=False, indent=4)
+
+def save_paraphrase(i: int, paraphrased_text: str):
+    paraphrase_filename = f"{i}_paraphrase_{CONFIG.OPENAI_MODEL.replace('/', '_')}.txt"
+    with open(save_dir / paraphrase_filename, "w", encoding="utf-8") as f:
+        f.write(paraphrased_text)
+
 for doc in original_collection.find(limit=max_docs):
     text_id = doc["_id"]
+    original_text = doc["text"]
     existing_paraphrase = mongoDB.find_document(collection=paraphrase_collection, id=text_id)
     if existing_paraphrase:
         extracted_info = existing_paraphrase.get("extracted_info", False)
@@ -49,27 +69,22 @@ for doc in original_collection.find(limit=max_docs):
 
             if modified_count > 0:
                 print(f"Updated document {text_id} with new paraphrase.")
+                save_original_text(i=i, original_text=original_text)
+                save_paraphrase(i=i, paraphrased_text=paraphrased_text)
+                assert type(
+                    paraphrased_text) == str, f"paraphrased_text must be a str, but is of type {type(paraphrased_text)}"
+                assert len(paraphrased_text.split()) > 0, "paraphrased_text is empty"
             else:
                 print(f"No update performed for {text_id} (may already be up-to-date).")
 
 
-
-    original_text = doc["text"]
     # prompt is not used, bc we use dspy
     extracted_info, paraphrased_text, total_costs = paraphraser_llm.paraphrase(text=original_text, prompt=CONFIG.PROMPT)
 
     # save results to files for manual inspection
-    save_dir = Path(CONFIG.SAVE_PATH) / "openai_paraphrases"
-    save_dir.mkdir(parents=True, exist_ok=True)
-    extr_info_filename = f"{i}_extacted_information_{CONFIG.OPENAI_MODEL.replace('/','_')}.jsonl"
-    with open(save_dir / extr_info_filename, "w", encoding="utf-8") as f:
-        json.dump(extracted_info, f, ensure_ascii=False, indent=4)
-    paraphrase_filename = f"{i}_paraphrase_{CONFIG.OPENAI_MODEL.replace('/', '_')}.txt"
-    with open(save_dir / paraphrase_filename, "w", encoding="utf-8") as f:
-        f.write(paraphrased_text)
-    original_text_filename = f"{i}_original_text_{CONFIG.OPENAI_MODEL.replace('/', '_')}.txt"
-    with open(save_dir / original_text_filename, "w", encoding="utf-8") as f:
-        f.write(original_text)
+    save_original_text(i=i, original_text=original_text)
+    save_paraphrase(i=i, paraphrased_text=paraphrased_text)
+    save_extracted_info(i=i, extracted_info=extracted_info)
 
     assert type(paraphrased_text) == str, f"paraphrased_text must be a str, but is of type {type(paraphrased_text)}"
     assert len(paraphrased_text.split()) > 0, "paraphrased_text is empty"
