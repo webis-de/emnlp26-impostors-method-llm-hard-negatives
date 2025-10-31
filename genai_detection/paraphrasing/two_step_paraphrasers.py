@@ -80,9 +80,9 @@ class TwoStepParaphraser(Paraphraser):
     """
 
     def __init__(
-            self,
-            model_id: str = CONFIG.OPENAI_MODEL,
-            temperature: float = CONFIG.TEMPERATURE,
+        self,
+        model_id: str = CONFIG.OPENAI_MODEL,
+        temperature: float = CONFIG.TEMPERATURE,
     ):
         """
         Initializes the OpenAI paraphraser model using DSPy.
@@ -103,7 +103,7 @@ class TwoStepParaphraser(Paraphraser):
         dspy.configure(lm=self.lm)
 
     def generate_paraphrase(
-            self, extracted_info: dict[str, Any], verbose: bool = True
+        self, extracted_info: dict[str, Any], verbose: bool = True
     ) -> tuple[str, float]:
         """
         Generate a paraphrase based on the extracted information.
@@ -145,10 +145,10 @@ class TwoStepParaphraser(Paraphraser):
             raise e
 
     def paraphrase(
-            self,
-            text: str,
-            max_length: int = CONFIG.MAX_LENGTH,
-            prompt: Optional[str] = None,
+        self,
+        text: str,
+        max_length: int = CONFIG.MAX_LENGTH,
+        prompt: Optional[str] = None,
     ) -> tuple[dict[str, Any], str, float]:
         """
         Generate paraphrased versions of the input text.
@@ -178,7 +178,7 @@ class TwoStepParaphraser(Paraphraser):
 
             # Total cost for both requests
             total_cost = cost_after_extractor + (
-                    cost_after_generator - cost_after_extractor
+                cost_after_generator - cost_after_extractor
             )
             print(f"ATTENTION. Total cost for extractor + generator: ${total_cost:.6f}")
             return extracted_info, paraphrase, total_cost
@@ -199,10 +199,10 @@ class TranslationParaphraser(Paraphraser):
     """
 
     def __init__(
-            self,
-            text_extractor: Paraphraser,
-            text_generator: Paraphraser,
-            language: str = "French",
+        self,
+        text_extractor: Paraphraser,
+        text_generator: Paraphraser,
+        language: str = "French",
     ):
         """
         Initializes the TranslationParaphraser model.
@@ -222,7 +222,7 @@ class TranslationParaphraser(Paraphraser):
         self.text_generator = text_generator
 
     def paraphrase(
-            self, text: str, prompt: Optional[str], max_length: int = CONFIG.MAX_LENGTH
+        self, text: str, prompt: Optional[str], max_length: int = CONFIG.MAX_LENGTH
     ) -> List[str]:
         print(
             f"[DEBUG] Using TranslationParaphraser with prompt: {self.extractor_prompt}"

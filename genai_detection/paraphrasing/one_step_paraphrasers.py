@@ -118,13 +118,13 @@ class T5ChatGPTParaphraser(OneStepParaphraser):
 
             outputs = self.model.generate(
                 input_ids,
-                repetition_penalty=repetition_penalty,
-                num_return_sequences=n_responses,
-                no_repeat_ngram_size=no_repeat_ngram_size,
-                num_beams=num_beams,
-                num_beam_groups=num_beam_groups,
+                repetition_penalty=10.0,
+                num_return_sequences=5,
+                no_repeat_ngram_size=2,
+                num_beams=5,
+                num_beam_groups=5,
                 max_length=max_length,
-                diversity_penalty=diversity_penalty,
+                diversity_penalty=3.0,
                 trust_remote_code=True,
             )
             if len(results) > 0:
@@ -198,7 +198,7 @@ class T5GooglePAWSParaphraser(OneStepParaphraser):
                 do_sample=True,
                 top_k=120,
                 top_p=0.95,
-                num_return_sequences=n_responses,
+                num_return_sequences=1,
                 trust_remote_code=True,
             )
             if len(results) > 0:
@@ -250,32 +250,21 @@ class SAIAParaphraser(OneStepParaphraser):
         :return: A list of paraphrased versions of the input text.
         """
         responses = []
-        for i in range(n_responses):
-            # max token differs across models but usually at least 40k tokens, so we crop at less to be safe
-            body = {
-                "model": self.model_id,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "You are a paraphrasing assistant. Output only the final paraphrased text.",
-                    },
-                    {"role": "user", "content": f"{text[:30000]}\n{prompt.strip()}"},
-                ],
-                "temperature": temperature,
-            }
-            try:
-                response = self.client.chat.completions.create(**body)
-            except openai.InternalServerError as e:
-                print(
-                    f"[ERROR] Failed to generate paraphrase with {self.model_id}: {e}. Skipping..."
-                )
-                continue
-            except openai.RateLimitError as e:
-                print(
-                    f"[ERROR] Rate limit exceeded for {self.model_id}: {e}. Sleeping 1 minute and trying again..."
-                )
-                return self.paraphrase(text=text, prompt=prompt, max_length=max_length)
 
+        # max token differs across models but usually at least 40k tokens, so we crop at less to be safe
+        body = {
+            "model": self.model_id,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a paraphrasing assistant. Output only the final paraphrased text.",
+                },
+                {"role": "user", "content": f"{text[:30000]}\n{prompt.strip()}"},
+            ],
+            "temperature": CONFIG.SAIA_TEMPERATURE,
+        }
+        try:
+            response = self.client.chat.completions.create(**body)
             resp = response.choices[0].message.content
             resp = re.sub("'", " ", resp)  # replace single quotes with double quotes
             resp = re.sub(r"\s+", " ", resp)  # remove excessive whitespaces
@@ -286,7 +275,12 @@ class SAIAParaphraser(OneStepParaphraser):
             except json.JSONDecodeError:
                 responses.append(response.choices[0].message.content)
 
-        return responses
+            return responses
+        except openai.RateLimitError as e:
+            print(
+                f"[ERROR] Rate limit exceeded for {self.model_id}: {e}. Sleeping 1 minute and trying again..."
+            )
+            return self.paraphrase(text=text, prompt=prompt, max_length=max_length)
 
 
 class OllamaParaphraser(SAIAParaphraser):

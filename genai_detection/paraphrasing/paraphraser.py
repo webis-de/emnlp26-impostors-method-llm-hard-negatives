@@ -32,7 +32,7 @@ class Paraphraser(ABC):
     """
 
     def paraphrase(
-            self, text: str, prompt: str, max_length: int = CONFIG.MAX_LENGTH
+        self, text: str, prompt: str, max_length: int = CONFIG.MAX_LENGTH
     ) -> List[str]:
         """
         Generate a paraphrase of the input text.
@@ -54,6 +54,7 @@ class Paraphraser(ABC):
         """
 
         return [self.paraphrase(text=text, prompt=prompt) for text in texts]
+
 
 #
 # def get_paraphraser_dict() -> Dict[str, Paraphraser]:
