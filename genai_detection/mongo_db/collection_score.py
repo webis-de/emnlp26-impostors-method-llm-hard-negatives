@@ -1,4 +1,5 @@
 from pymongo import MongoClient
+
 from genai_detection.config import CONFIG
 from genai_detection.paraphrasing import paraphraser_evaluation
 
@@ -32,8 +33,9 @@ paraphrase_evaluator = paraphraser_evaluation.ParaphrasingEvaluator(
 
 # Iterate over all paraphrases
 for paraphrase_doc in paraphrase_collection.find():
-    text_id = paraphrase_doc["text_id"]
+    text_id = paraphrase_doc["_id"]
     paraphrase_id = paraphrase_doc["_id"]
+    assert text_id == paraphrase_id, "text_id and paraphrase_id should be the same"
     paraphrased_text = paraphrase_doc["paraphrase"]  # returns a list of str
     # print(
     #     f"Scoring paraphrase ID: {paraphrase_id} for text ID: {text_id}\n{paraphrased_text}\nType {type(paraphrased_text)}"
@@ -58,7 +60,7 @@ for paraphrase_doc in paraphrase_collection.find():
         type(paraphrased_text) is str
     ), f"paraphrased_text is not str: {type(paraphrased_text)}"
     scores = paraphrase_evaluator._build_result_row(
-        paraphraser_name="dumy",
+        paraphraser_name="dummy",
         prompt="prompt",
         paraphrase=paraphrased_text,
         original_split=original_text.split(),
@@ -71,7 +73,7 @@ for paraphrase_doc in paraphrase_collection.find():
             scores.pop(key)
 
     # Insert into score collection
-    score_doc = {"text_id": text_id, "paraphrase_id": paraphrase_id, **scores}
+    score_doc = {"_id": text_id, **scores}
 
     score_collection.insert_one(score_doc)
 
