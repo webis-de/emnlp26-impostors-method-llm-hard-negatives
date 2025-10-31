@@ -32,7 +32,7 @@ class ParaphraseMongoDB:
         self.paraphrase_collection = self.db[CONFIG.MONGO_PARAPHRASE_COLLECTION]
         self.score_collection = self.db[CONFIG.MONGO_SCORE_COLLECTION]
 
-    def update_entry(self, collection, text_id: str, update_data: dict) -> int:
+    def update_document(self, collection, text_id: str, update_data: dict) -> int:
         """
         Update an entry in the specified collection by its text ID.
         If no document with text_id exists, no action is taken.
@@ -49,3 +49,13 @@ class ParaphraseMongoDB:
             {"$set": update_data}
         )
         return result.modified_count
+
+    def find_document(self, collection, id: str) -> dict | None:
+        """
+        Find an entry in the specified collection by its text ID.
+        :param collection: The MongoDB collection to search.
+        :param text_id: The ID of the text document to find.
+        :return: The found document as a dictionary, or None if not found.
+        """
+        document = collection.find_one({"_id": text_id})
+        return document
