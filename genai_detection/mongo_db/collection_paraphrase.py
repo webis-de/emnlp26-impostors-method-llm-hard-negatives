@@ -5,32 +5,15 @@ from pymongo import MongoClient
 from genai_detection.config import CONFIG
 from genai_detection.paraphrasing import paraphraser
 from genai_detection.paraphrasing.openai_utils import OpenaiCostEstimator
+from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 # MongoDB setup
-uri = f"mongodb://{CONFIG.MONGO_USER}:{CONFIG.MONGO_PASSWORD}@{CONFIG.MONGO_HOST}/"
-client = MongoClient(uri)
-db = client[CONFIG.MONGO_DATABASE or "impostors"]
-original_collection = db[CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION or "original_text"]
-paraphrase_collection_name = CONFIG.MONGO_PARAPHRASE_COLLECTION or "paraphrase"
+mongoDB = ParaphraseMongoDB()
+original_collection = mongoDB.original_collection
+paraphrase_collection = mongoDB.paraphrase_collection
+
 # 30.10.25, morning: $7,891.29 balance left on OpenAI account
 # 30.10.25, evening: $7,891.28 balance left on OpenAI account
-try:
-    client.admin.command("ping")
-    print("Successfully connected as MongoDB root user!")
-except Exception as e:
-    print("Connection failed:", e, uri)
-    raise e
-
-# Create paraphrase collection if it doesn't exist
-if paraphrase_collection_name not in db.list_collection_names():
-    db.create_collection(paraphrase_collection_name)
-    print(f"Created collection: {paraphrase_collection_name}")
-else:
-    print(
-        f"Collection '{paraphrase_collection_name}' already exists. Skipping creation."
-    )
-
-paraphrase_collection = db[paraphrase_collection_name]
 
 # Iterate over all documents in original_text
 paraphraser_llm = paraphraser.OpenAIParaphraser_dspy(model_id=CONFIG.OPENAI_MODEL)
@@ -97,15 +80,12 @@ for doc in paraphrase_collection.find({"llm":"openai/gpt-5-nano-2025-08-07"}, li
         "updated_at": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
     }
 
-    # Update *the same document* in place
-    result = paraphrase_collection.update_one(
-        {"_id": text_id},
-        {"$set": update_fields}
-    )
+    # Update the document in place
+    modified_count = mongoDB.update_entry(text_id=text_id, collection=paraphrase_collection, update_data=update_fields)
 
-    if result.modified_count > 0:
-        print(f"✅ Updated document {text_id} with new paraphrase.")
+    if modified_count > 0:
+        print(f"Updated document {text_id} with new paraphrase.")
     else:
-        print(f"⚠️ No update performed for {text_id} (may already be up-to-date).")
+        print(f"No update performed for {text_id} (may already be up-to-date).")
 
 print("Paraphrasing complete.")
