@@ -13,47 +13,29 @@
 # limitations under the License.
 
 
-from abc import ABC, abstractmethod
 import datetime
-import json
 import os
-from pathlib import Path
-import re
+import random
 import sys
-from time import sleep
-from typing import List, Dict, Optional
+from abc import ABC, abstractmethod
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from sentence_transformers import SentenceTransformer, util
-import random
+from pathlib import Path
+from typing import Dict
+
 import numpy as np
 import pandas as pd
-import spacy
 import requests
+import serpapi
+import spacy
 from bs4 import BeautifulSoup
 from datasets import load_from_disk
-from spacy.cli import download
-import serpapi
 from dotenv import load_dotenv
-import torch
-from genai_detection.paraphrasing.paraphraser import (
-    SAIAParaphraser,
-    T5ChatGPTParaphraser,
-    T5GooglePAWSParaphraser,
-    OllamaParaphraser,
-    TopicParaphraser,
-    TaskParaphraser,
-    TitleParaphraser,
-    BulletPointParaphraser,
-    TranslationParaphraser,
-    Paraphraser,
-    NonNaiveParaphraser,
-    NaiveParaphraser,
-    TopicSchema,
-    BulletSchema,
-    TaskSchema,
-    TitleSchema,
-)
+from sentence_transformers import SentenceTransformer, util
+from spacy.cli import download
+
+from genai_detection.paraphrasing.one_step_paraphrasers import *
+from genai_detection.paraphrasing.two_step_paraphrasers import *
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from genai_detection.config import CONFIG
@@ -542,22 +524,7 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
             self.saiai_paraphraser_gpt = SAIAParaphraser(model_id="openai-gpt-oss-120b")
             self.saiai_paraphraser_qwen = SAIAParaphraser(model_id="qwen3-32b")
 
-            self.topic_paraphraser = TopicParaphraser(
-                text_extractor=self.saiai_paraphraser_gpt,
-                text_generator=self.saiai_paraphraser_gpt,
-            )
-            self.task_paraphraser = TaskParaphraser(
-                text_extractor=self.saiai_paraphraser_gpt,
-                text_generator=self.saiai_paraphraser_gpt,
-            )
-            self.title_paraphraser = TitleParaphraser(
-                text_extractor=self.saiai_paraphraser_gpt,
-                text_generator=self.saiai_paraphraser_gpt,
-            )
-            self.bullet_point_paraphraser = BulletPointParaphraser(
-                text_extractor=self.saiai_paraphraser_gpt,
-                text_generator=self.saiai_paraphraser_gpt,
-            )
+            self.two_step_paraphraser = TwoStepParaphraser()
             self.translation_paraphraser = TranslationParaphraser(
                 text_extractor=self.saiai_paraphraser_gpt,
                 text_generator=self.saiai_paraphraser_gpt,
@@ -570,10 +537,7 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
                 self.saiai_paraphraser_mistral,
                 self.saiai_paraphraser_gpt,
                 self.saiai_paraphraser_qwen,  # explanations in the output, separated by </think>
-                self.topic_paraphraser,
-                self.task_paraphraser,
-                self.title_paraphraser,
-                self.bullet_point_paraphraser,
+                self.two_step_paraphraser,
                 self.translation_paraphraser,
             ]
         else:
@@ -624,11 +588,9 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
             p_id = random.randint(0, len(self.prompts) - 1)
             prompt = self.prompts[p_id]
             try:
-                impostor_texts = paraphraser.paraphrase(
-                    text, prompt=prompt, n_responses=1
-                )
+                impostor_texts = paraphraser.paraphrase(text, prompt=prompt)
                 if (
-                    isinstance(paraphraser, NaiveParaphraser)
+                    isinstance(paraphraser, OneStepParaphraser)
                     and paraphraser.model_id == "qwen3-32b"
                 ):
                     # qwen3-32b returns thinking steps and the final answer, separated by </think>
@@ -661,22 +623,7 @@ class NonNaiveLLMImpostorGenerator(LLMImpostorGenerator):
         :param n_impostors: number of impostors to generate
         """
         saia_paraphraser = SAIAParaphraser(model_id="openai-gpt-oss-120b")
-        topic_paraphraser = TopicParaphraser(
-            text_extractor=saia_paraphraser,
-            text_generator=saia_paraphraser,
-        )
-        task_paraphraser = TaskParaphraser(
-            text_extractor=saia_paraphraser,
-            text_generator=saia_paraphraser,
-        )
-        title_paraphraser = TitleParaphraser(
-            text_extractor=saia_paraphraser,
-            text_generator=saia_paraphraser,
-        )
-        bullet_point_paraphraser = BulletPointParaphraser(
-            text_extractor=saia_paraphraser,
-            text_generator=saia_paraphraser,
-        )
+        two_step_paraphraser = TwoStepParaphraser()
         translation_paraphraser = TranslationParaphraser(
             text_extractor=saia_paraphraser,
             text_generator=saia_paraphraser,
@@ -685,10 +632,7 @@ class NonNaiveLLMImpostorGenerator(LLMImpostorGenerator):
         super().__init__(
             n_impostors=n_impostors,
             paraphrasers=[
-                topic_paraphraser,
-                task_paraphraser,
-                title_paraphraser,
-                bullet_point_paraphraser,
+                two_step_paraphraser,
                 translation_paraphraser,
             ],
         )

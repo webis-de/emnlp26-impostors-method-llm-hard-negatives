@@ -1,5 +1,6 @@
 # added to git since no secrets
 import os
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -41,14 +42,14 @@ class BaseConfig:
     ARTIFICIAL_STUDENT_ESSAYS = "artificial_student_essays"
     IMPOSTOR = "impostor"
     UNMASKING = "unmasking"
-    TEMPERATURE = 0.7
-    MAX_LENGTH = 2100# 512  # Maximum length of the generated paraphrase
+    TEMPERATURE = 1.0
+    MAX_LENGTH = 2100  # 512  # Maximum length of the generated paraphrase
     OLLAMA_MODEL = "zephyr:7b"  # "mistral:7b"  # "default:latest"
     OLLAMA_URL = "https://llm.web.webis.de/api"
     SAIA_URL = "https://chat-ai.academiccloud.de/v1"
     SAIA_MODEL = "openai-gpt-oss-120b"
     OPENAI_URL = "https://api.openai.com/v1"
-    OPENAI_MODEL = "openai/gpt-5-nano-2025-08-07"   # specify snapshot for consistency: https://platform.openai.com/docs/models/gpt-5-nano (30.10.2025)
+    OPENAI_MODEL = "openai/gpt-5-nano-2025-08-07"  # specify snapshot for consistency: https://platform.openai.com/docs/models/gpt-5-nano (30.10.2025)
 
     PROMPT = "Paraphrase the text above without changing its meaning. Use different words and vary the sentence structure while maintaining a consistent tone. Your paraphrase should be three times as long than the original. Output only the paraphrased sentence, with NO explanations or extra text."
 
@@ -58,7 +59,7 @@ class BaseConfig:
     MONGO_SCORE_COLLECTION = "score"  # collection (!= db)
     MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME")
     MONGO_PASSWORD = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
-    MONGO_HOST = "localhost:27018"    # Local, but forwarded to server
+    MONGO_HOST = "localhost:27018"  # Local, but forwarded to server
     # MONGO_HOST = "artificial-authorship-verification-mongodb.webisservices.svc.cluster.local:27017" # Kubernetes
 
 

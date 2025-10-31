@@ -22,37 +22,25 @@ We also exvaluate the absolute difference in scores between maximal number of ch
 """
 
 import argparse
-from asyncio import sleep
-import asyncio
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-from functools import partial
-import json
-from pathlib import Path
 import os
-import textwrap
-import sys
-import re
-from typing import DefaultDict, Dict, List
+from pathlib import Path
+from typing import Dict
+
+import matplotlib.pyplot as plt
 import nltk
 import numpy as np
-from tqdm import tqdm
 import pandas as pd
-import matplotlib.pyplot as plt
 import seaborn as sns
-from matplotlib import cm
-from matplotlib.ticker import MaxNLocator
 from datasets import load_from_disk
+from matplotlib.ticker import MaxNLocator
+from tqdm import tqdm
+
 from genai_detection.util import preprocess_text as _preprocess_text
 
 nltk.download("punkt")
-from nltk.tokenize import sent_tokenize, word_tokenize
-from genai_detection.config import CONFIG
-from genai_detection.paraphrasing.paraphraser import (
-    NaiveParaphraser,
-    NonNaiveParaphraser,
-    Paraphraser,
-    get_paraphraser_dict,
-)
+from nltk.tokenize import word_tokenize
+from genai_detection.paraphrasing.one_step_paraphrasers import *
+from genai_detection.paraphrasing.two_step_paraphrasers import *
 from genai_detection.paraphrasing.paraphraser_evaluation import ParaphrasingEvaluator
 
 CATEGORIES = [
@@ -139,12 +127,13 @@ def paraphrase_with_config(
     n_responses: int,
     config: Dict[str, str] = {},
 ) -> List[Dict[str, str]]:
+    # FIXME
     paraphraser = get_paraphraser_dict()[paraphraser_name]
     rows = []
-    if isinstance(paraphraser, NonNaiveParaphraser):
+    if isinstance(paraphraser, TwoStepParaphraser):
         prompt_options = [None]
         temperature_options = np.linspace(0.0, 1.0, num=len(PROMPTS)).tolist()
-    elif isinstance(paraphraser, NaiveParaphraser):
+    elif isinstance(paraphraser, OneStepParaphraser):
         prompt_options = PROMPTS
         temperature_options = [None]
     else:
@@ -157,7 +146,7 @@ def paraphrase_with_config(
                 "prompt": prompt,
                 "n_responses": n_responses,
             }
-            if isinstance(paraphraser, NonNaiveParaphraser) and temperature is not None:
+            if isinstance(paraphraser, TwoStepParaphraser) and temperature is not None:
                 p_config["temperature"] = temperature
 
             try:
@@ -209,7 +198,7 @@ def create_and_save_paraphrasers(path2dataset: str, save_path: Path):
         zip(dataset["disputed_text"], dataset["category"])
     ):
 
-        print(f"Processing text {i+1}/{len(dataset)}: {category}")
+        print(f"Processing text {i + 1}/{len(dataset)}: {category}")
         text_key = f"text_{i}"
         if file2existing_paraphrases.exists():
             with open(file2existing_paraphrases, "r") as f:

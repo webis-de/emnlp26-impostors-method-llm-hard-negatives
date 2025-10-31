@@ -13,14 +13,15 @@
 # limitations under the License.
 
 import os
-from pathlib import Path
 import sys
+import typing as t
+from pathlib import Path
 from typing import Iterable, List
+
 import nltk
 import numpy as np
-import torch
-import typing as t
 import numpy.typing as npt
+import torch
 
 from genai_detection.detectors.detector_base import DetectorBase
 from genai_detection.detectors.impostor import ImpostorDetector
@@ -30,9 +31,7 @@ from genai_detection.paraphrasing.paraphraser import T5ChatGPTParaphraser
 nltk.download("punkt")
 from nltk.tokenize import sent_tokenize, word_tokenize
 
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
-from genai_detection.config import CONFIG
 
 __all__ = ["ImpostorDetector", "PPMdDetector"]
 
@@ -100,9 +99,7 @@ class MajorityDetector(DetectorBase):
                     "Paraphrase the text above and output only the paraphrased version."
                 )
                 paraphrases = [
-                    self.paraphraser.paraphrase(
-                        text=t, prompt=prompt, temperature=0.7, n_responses=1
-                    )[0]
+                    self.paraphraser.paraphrase(text=t, prompt=prompt)[0]
                     for t in text_chunks
                 ]
                 inputs = [

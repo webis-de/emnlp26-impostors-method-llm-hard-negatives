@@ -25,9 +25,9 @@ max_docs = 5  # for testing, limit to first 5 documents
 openai_cost_est = OpenaiCostEstimator()
 
 save_dir = (
-        Path(__file__).resolve().parent.parent.parent
-        / CONFIG.SAVE_PATH
-        / "openai_paraphrases"
+    Path(__file__).resolve().parent.parent.parent
+    / CONFIG.SAVE_PATH
+    / "openai_paraphrases"
 )
 save_dir.mkdir(parents=True, exist_ok=True)
 
@@ -107,7 +107,7 @@ for i, doc in enumerate(original_collection.find(limit=max_docs)):
                 save_original_text(doc_n=i, text=original_text)
                 save_paraphrase(doc_n=i, paraphrase=paraphrased_text)
                 assert (
-                        type(paraphrased_text) == str
+                    type(paraphrased_text) == str
                 ), f"paraphrased_text must be a str, but is of type {type(paraphrased_text)}"
                 assert len(paraphrased_text.split()) > 0, "paraphrased_text is empty"
             else:
@@ -125,7 +125,7 @@ for i, doc in enumerate(original_collection.find(limit=max_docs)):
     save_extracted_info(doc_n=i, extracted_info_dict=extracted_info)
 
     assert (
-            type(paraphrased_text) == str
+        type(paraphrased_text) == str
     ), f"paraphrased_text must be a str, but is of type {type(paraphrased_text)}"
     assert len(paraphrased_text.split()) > 0, "paraphrased_text is empty"
 

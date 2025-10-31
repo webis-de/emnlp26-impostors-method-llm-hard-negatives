@@ -14,20 +14,19 @@
 
 import argparse
 import gc
-from itertools import combinations, product
 import os
-import json
-from pathlib import Path
-from collections import Counter, defaultdict
-from abc import ABC, abstractmethod
 import random
-import re
-import sys
-from time import sleep
-import unicodedata
 import typing as t
-import chardet
+from abc import ABC, abstractmethod
+from collections import Counter, defaultdict
+from itertools import combinations, product
+from pathlib import Path
+from time import sleep
 
+import chardet
+import numpy as np
+import pandas as pd
+import pyreadstat
 from datasets import (
     Dataset,
     DatasetDict,
@@ -37,18 +36,11 @@ from datasets import (
     load_from_disk,
     Sequence,
 )
-import numpy as np
-import pandas as pd
-import pyreadstat
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
-from genai_detection.config import CONFIG
-from genai_detection.paraphrasing.paraphraser import (
-    NaiveParaphraser,
-    NonNaiveParaphraser,
-    get_paraphraser_dict,
-)
+from genai_detection.paraphrasing.one_step_paraphrasers import *
+from genai_detection.paraphrasing.two_step_paraphrasers import *
 from genai_detection.util import preprocess_text as _preprocess_text
 
 random.seed(42)
@@ -56,6 +48,7 @@ random.seed(42)
 # Bevendorff et al. (2019): 700 words (https://www.degruyterbrill.com/document/doi/10.1515/itit-2019-0046/html?casa_token=pbCaF7FgUXoAAAAA:8Vw71FUWE5spAbSsEuGGTdIjjm_o1_eb_inHwU3BR6eSrdVMOYy3--iqvDJwCV7EQ1HWtQBh610)
 # Bevendorff et al. (2025): 3000 characters (https://aclanthology.org/2025.findings-acl.194.pdf)
 MIN_NUM_WORDS = 700  # minimum number of words in a text to be considered valid
+
 
 # === BASE CLASS ===
 
@@ -1054,6 +1047,7 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
                 dataset = pd.concat([dataset, new_rows], ignore_index=True)
 
         dataset = pd.concat([dataset, pd.DataFrame(rows_to_add)], ignore_index=True)
+        # FIXME
         all_paraphrasers_dict = get_paraphraser_dict()
         paraphrasers = {
             k: all_paraphrasers_dict[k]
@@ -1089,11 +1083,11 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
             rows_to_add = []
             for paraphraser_name, paraphraser in paraphrasers.items():
                 try:
-                    if isinstance(paraphraser, NaiveParaphraser):
+                    if isinstance(paraphraser, OneStepParaphraser):
                         paraphrase_config["prompt"] = (
                             "Paraphrase the text above. Do not use direct quotes or new lines. Respond ONLY with the paraphrase."
                         )
-                    elif isinstance(paraphraser, NonNaiveParaphraser):
+                    elif isinstance(paraphraser, TwoStepParaphraser):
                         paraphrase_config["prompt"] = None
                     else:
                         raise ValueError(
@@ -1269,7 +1263,7 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
     def generate_llm_paraphrase_pairs(
         self,
         df: pd.DataFrame,
-        paraphrasers: dict,
+        paraphrasers: dict[str, OneStepParaphraser],
         task_description: dict,
         n: int = 100,
         random_state=42,
@@ -1377,20 +1371,10 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
                 prompt2 = llm_student_prompt(task_description[task2])
                 try:
                     text1 = _preprocess_text(
-                        paraphraser.paraphrase(
-                            text=row["text"],
-                            n_responses=1,
-                            temperature=1,
-                            prompt=prompt1,
-                        )[0]
+                        paraphraser.paraphrase(text=row["text"], prompt=CONFIG.PROMPT)[0]
                     )
                     text2 = _preprocess_text(
-                        paraphraser.paraphrase(
-                            text=row["text"],
-                            n_responses=1,
-                            temperature=1,
-                            prompt=prompt2,
-                        )[0]
+                        paraphraser.paraphrase(text=row["text"], prompt=CONFIG.PROMPT)[0]
                     )
                     sleep(15)  # only 14 requests per minute
                 except Exception as e:
@@ -1428,14 +1412,10 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
             prompt2 = llm_student_prompt(task_description[task2])
             try:
                 text1 = _preprocess_text(
-                    paraphrasers[p1].paraphrase(
-                        text=row["text"], n_responses=1, temperature=1, prompt=prompt1
-                    )[0]
+                    paraphrasers[p1].paraphrase(text=row["text"], prompt=CONFIG.PROMPT)[0]
                 )
                 text2 = _preprocess_text(
-                    paraphrasers[p2].paraphrase(
-                        text=row["text"], n_responses=1, temperature=1, prompt=prompt2
-                    )[0]
+                    paraphrasers[p2].paraphrase(text=row["text"], prompt=CONFIG.PROMPT)[0]
                 )
                 sleep(15)  # only 14 requests per minute
             except Exception as e:

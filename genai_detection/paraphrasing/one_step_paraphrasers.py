@@ -33,7 +33,7 @@ class OneStepParaphraser(Paraphraser):
 
     @staticmethod
     def _sentence_tokenized_chunks(
-            tokenizer, input_text: str, max_tokens: int = CONFIG.MAX_LENGTH
+        tokenizer, input_text: str, max_tokens: int = CONFIG.MAX_LENGTH
     ) -> List[str]:
         sentences = sent_tokenize(input_text)
         chunks = []
@@ -99,7 +99,7 @@ class T5ChatGPTParaphraser(OneStepParaphraser):
         print("Loaded T5ChatGPTParaphraser model")
 
     def paraphrase(
-            self, text: str, prompt: str, max_length=CONFIG.MAX_LENGTH
+        self, text: str, prompt: str, max_length=CONFIG.MAX_LENGTH
     ) -> List[str]:
         print("T5 model")
         chunks = self._sentence_tokenized_chunks(
@@ -172,7 +172,7 @@ class T5GooglePAWSParaphraser(OneStepParaphraser):
         print("Loaded T5GooglePAWSParaphraser model")
 
     def paraphrase(
-            self, text: str, prompt: str, max_length: int = CONFIG.MAX_LENGTH
+        self, text: str, prompt: str, max_length: int = CONFIG.MAX_LENGTH
     ) -> List[str]:
         print("T5 model")
         chunks = self._sentence_tokenized_chunks(
@@ -238,7 +238,7 @@ class SAIAParaphraser(OneStepParaphraser):
         self.model_id = model_id
 
     def paraphrase(
-            self, text: str, prompt: str, max_length: float = CONFIG.MAX_LENGTH
+        self, text: str, prompt: str, max_length: float = CONFIG.MAX_LENGTH
     ) -> List[str]:
         """
         Generate paraphrased versions of the input text.

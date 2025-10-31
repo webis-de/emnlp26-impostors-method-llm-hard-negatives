@@ -59,16 +59,16 @@ class WMDReadyKeyedVectors:
 
 class ParaphrasingEvaluator:
     def __init__(
-            self,
-            paraphrasers: dict,
-            prompts: List[str],
-            original_text: str,
-            n_responses: int = 3,
-            max_length: int = CONFIG.MAX_LENGTH,
-            temperature: float = CONFIG.TEMPERATURE,
-            ground_truth: Optional[dict[str, Any]] = None,
-            data_category: Optional[str] = None,
-            original_file_name: Optional[str] = None,
+        self,
+        paraphrasers: dict,
+        prompts: List[str],
+        original_text: str,
+        n_responses: int = 3,
+        max_length: int = CONFIG.MAX_LENGTH,
+        temperature: float = CONFIG.TEMPERATURE,
+        ground_truth: Optional[dict[str, Any]] = None,
+        data_category: Optional[str] = None,
+        original_file_name: Optional[str] = None,
     ):
         """
         Initializes the ParaphrasingEvaluator with the given paraphrasers and prompts.
@@ -91,15 +91,15 @@ class ParaphrasingEvaluator:
         ), "prompts must be a list of strings."
         self.prompts = prompts
         assert (
-                isinstance(original_text, str) and original_text.strip()
+            isinstance(original_text, str) and original_text.strip()
         ), "original_text must be a non-empty string."
         self.original_text = _preprocess_text(original_text)
         assert (
-                isinstance(n_responses, int) and n_responses > 0
+            isinstance(n_responses, int) and n_responses > 0
         ), "n_responses must be a positive integer."
         self.n_responses = n_responses
         assert (
-                isinstance(max_length, int) and max_length > 0
+            isinstance(max_length, int) and max_length > 0
         ), "max_length must be a positive integer."
         self.max_length = max_length
         self.temperature = temperature
@@ -140,19 +140,19 @@ class ParaphrasingEvaluator:
         self.base_dirs = {
             "blog": Path(__file__).resolve().parents[2] / "data/datasets/Blog_corpus/",
             "gutenberg": Path(__file__).resolve().parents[2]
-                         / "data/datasets/gutenberg/",
+            / "data/datasets/gutenberg/",
             "student_essays": Path(__file__).resolve().parents[2]
-                              / "data/datasets/student_essays/Intro2006/",
+            / "data/datasets/student_essays/Intro2006/",
         }
         self.ground_truth = ground_truth or {}
         self.data_category = data_category or "unknown"
         self.paraphrases_save_base_path = (
-                Path(__file__).resolve().parent.parent.parent
-                / CONFIG.SAVE_PATH
-                / "paraphrasing"
-                / "experiments"
-                / "paraphrase_evaluation"
-                / self.data_category.replace(" ", "_").replace("/", "_")
+            Path(__file__).resolve().parent.parent.parent
+            / CONFIG.SAVE_PATH
+            / "paraphrasing"
+            / "experiments"
+            / "paraphrase_evaluation"
+            / self.data_category.replace(" ", "_").replace("/", "_")
         )
         self.paraphrases_save_base_path.mkdir(parents=True, exist_ok=True)
 
@@ -304,8 +304,8 @@ class ParaphrasingEvaluator:
 
         for file in chain(base_dir.glob("*.txt"), base_dir.glob("*.csv")):
             if (
-                    dataset_type == "gutenberg"
-                    and "Complete_Works_of_William_Shakespeare" in file.name
+                dataset_type == "gutenberg"
+                and "Complete_Works_of_William_Shakespeare" in file.name
             ):
                 continue
 
@@ -353,7 +353,7 @@ class ParaphrasingEvaluator:
         return df
 
     def _evaluate_model_on_data(
-            self, paraphraser_name: str, paraphraser, df: pd.DataFrame
+        self, paraphraser_name: str, paraphraser, df: pd.DataFrame
     ):
         """
         Evaluate a single paraphraser on the given dataset.
@@ -362,12 +362,12 @@ class ParaphrasingEvaluator:
         results_per_text = []
         lengths = {"original": [], "paraphrase": []}
         file_existing_paraphrases = (
-                self.paraphrases_save_base_path
-                / f"generated_paraphrases_subset_{self.data_category.replace(' ', '_')}.json"
+            self.paraphrases_save_base_path
+            / f"generated_paraphrases_subset_{self.data_category.replace(' ', '_')}.json"
         )
         file_existing_extractions = (
-                self.paraphrases_save_base_path
-                / f"extracted_subset_{self.data_category.replace(' ', '_')}.json"
+            self.paraphrases_save_base_path
+            / f"extracted_subset_{self.data_category.replace(' ', '_')}.json"
         )
         if "century" not in df.columns and "date" in df.columns:
             # Blog dataset has 'date' column (eg. 12,May,2004), convert to 'century'
@@ -380,7 +380,7 @@ class ParaphrasingEvaluator:
             )
 
         for row in tqdm(
-                df.itertuples(), total=len(df), desc=f"Evaluating {paraphraser_name}"
+            df.itertuples(), total=len(df), desc=f"Evaluating {paraphraser_name}"
         ):
             text = str(getattr(row, "text", ""))
             filename = str(getattr(row, "filename", "unknown"))
@@ -418,9 +418,9 @@ class ParaphrasingEvaluator:
                     continue
 
             if (
-                    "current" in str(century).lower()
-                    or "present" in str(century).lower()
-                    or "now" in str(century).lower()
+                "current" in str(century).lower()
+                or "present" in str(century).lower()
+                or "now" in str(century).lower()
             ):
                 century = 21
             else:
@@ -474,9 +474,9 @@ class ParaphrasingEvaluator:
                 paraphrases = paraphraser.paraphrase(text=text)
 
                 if (
-                        paraphrases
-                        and isinstance(paraphrases, (list, tuple))
-                        and len(paraphrases) > 0
+                    paraphrases
+                    and isinstance(paraphrases, (list, tuple))
+                    and len(paraphrases) > 0
                 ):
                     # save generated paraphrases to file
                     data_loaded.setdefault(paraphraser_name, {})
@@ -524,12 +524,12 @@ class ParaphrasingEvaluator:
         return results_df, summary, lengths
 
     def plot_metric_radar_per_dataset(
-            self,
-            df_all: pd.DataFrame,
-            metrics: list[str],
-            save_path: Path | None = None,
-            dataset_col: str = "dataset",
-            display_plot: bool = True,
+        self,
+        df_all: pd.DataFrame,
+        metrics: list[str],
+        save_path: Path | None = None,
+        dataset_col: str = "dataset",
+        display_plot: bool = True,
     ):
         metrics = [
             m
@@ -631,10 +631,10 @@ class ParaphrasingEvaluator:
         plt.close()
 
     def evaluate_extractors(
-            self,
-            save_to_disk: bool = True,
-            plot_metrics: bool = True,
-            display_plot: bool = True,
+        self,
+        save_to_disk: bool = True,
+        plot_metrics: bool = True,
+        display_plot: bool = True,
     ):
         """
         Non-naive paraphrasers extract information from the original text, such as bullet points, task, topic, title, tone, genre, time period and register.
@@ -774,18 +774,18 @@ class ParaphrasingEvaluator:
             )
 
     def _save_results(
-            self,
-            results: dict,
-            dataset_type: str,
-            save_base_path: Path,
-            detail_degree: str = "detailed",
+        self,
+        results: dict,
+        dataset_type: str,
+        save_base_path: Path,
+        detail_degree: str = "detailed",
     ):
         if not save_base_path.exists():
             raise FileNotFoundError(f"Save path {save_base_path} does not exist.")
 
         save_path = (
-                save_base_path
-                / f"extractor_eval_results_{dataset_type}_detailDeg_{detail_degree}.csv"
+            save_base_path
+            / f"extractor_eval_results_{dataset_type}_detailDeg_{detail_degree}.csv"
         )
         if not isinstance(results, pd.DataFrame):
             results = pd.DataFrame.from_dict(results, orient="index")
@@ -793,12 +793,12 @@ class ParaphrasingEvaluator:
         logger.info(f"Results saved to {save_path}")
 
     def _load_or_generate_paraphrases(
-            self,
-            paraphraser_name: str,
-            paraphraser,
-            prompt: str,
-            temperature: float,
-            save_path: Path,
+        self,
+        paraphraser_name: str,
+        paraphraser,
+        prompt: str,
+        temperature: float,
+        save_path: Path,
     ) -> List[str]:
         """
         Loads paraphrases from CSV if available; otherwise generates them.
@@ -806,8 +806,8 @@ class ParaphrasingEvaluator:
         """
         data_loaded = dict()
         filename = (
-                save_path
-                / f"generated_paraphrases_subset_{self.data_category.replace(' ', '_')}.json"
+            save_path
+            / f"generated_paraphrases_subset_{self.data_category.replace(' ', '_')}.json"
         )
         if filename.exists():
             with open(filename, "r") as f:
@@ -880,7 +880,7 @@ class ParaphrasingEvaluator:
             ]
 
     def evaluate(
-            self, save_to_disk: bool = True, save_extremest_paraphr_per_score: bool = False
+        self, save_to_disk: bool = True, save_extremest_paraphr_per_score: bool = False
     ):
         """
         Evaluate the paraphrasers using BERTScore, BLEU and ROUGE metrics.
@@ -928,9 +928,9 @@ class ParaphrasingEvaluator:
         # load json object with existing paraphrases if available and append new ones
         paraphrase_file_path = self.paraphrases_save_base_path
         for (paraphraser_name, paraphraser), prompt, temperature, prompt_id in tqdm(
-                test_configurations,
-                desc="Evaluating Paraphrasers",
-                total=len(test_configurations),
+            test_configurations,
+            desc="Evaluating Paraphrasers",
+            total=len(test_configurations),
         ):
             try:
                 paraphrases = self._load_or_generate_paraphrases(
@@ -974,8 +974,8 @@ class ParaphrasingEvaluator:
         df.dropna(axis=1, how="all", inplace=True)
         if save_to_disk:
             save_path = (
-                    self.paraphrases_save_base_path
-                    / f"paraphrasing_results_comparison_temp{self.temperature}_maxLength{self.max_length}_dataset_{self.data_category.replace(' ', '_')}.csv"
+                self.paraphrases_save_base_path
+                / f"paraphrasing_results_comparison_temp{self.temperature}_maxLength{self.max_length}_dataset_{self.data_category.replace(' ', '_')}.csv"
             )
             df.to_csv(save_path, index=False, float_format="%.4f")
             print(f"Results saved to {save_path}")
@@ -1004,22 +1004,22 @@ class ParaphrasingEvaluator:
             )
         if save_extremest_paraphr_per_score:
             extremest_save_path = (
-                    self.paraphrases_save_base_path
-                    / f"extremest_paraphrases_per_metric_temp{self.temperature}_maxLength{self.max_length}_dataset_{self.data_category.replace(' ', '_')}.csv"
+                self.paraphrases_save_base_path
+                / f"extremest_paraphrases_per_metric_temp{self.temperature}_maxLength{self.max_length}_dataset_{self.data_category.replace(' ', '_')}.csv"
             )
             extremest_paraphrases.to_csv(extremest_save_path, index=False)
 
         return df, extremest_paraphrases
 
     def _build_result_row(
-            self,
-            paraphraser_name: str,
-            prompt: str,
-            paraphrase: str,
-            original_split: List[str],
-            bert_scores: dict,
-            rouge_scores: dict,
-            idx: int,
+        self,
+        paraphraser_name: str,
+        prompt: str,
+        paraphrase: str,
+        original_split: List[str],
+        bert_scores: dict,
+        rouge_scores: dict,
+        idx: int,
     ) -> dict:
         """
         Build a result row for the DataFrame.
@@ -1130,11 +1130,11 @@ class ParaphrasingEvaluator:
         ]
 
     def plot_models_metrics(
-            self,
-            df: pd.DataFrame,
-            data_category: Optional[str] = None,
-            group_by: Optional[str] = "model",
-            display_plot: bool = True,
+        self,
+        df: pd.DataFrame,
+        data_category: Optional[str] = None,
+        group_by: Optional[str] = "model",
+        display_plot: bool = True,
     ):
         """
         Plot the performance of models per metric.
@@ -1152,7 +1152,7 @@ class ParaphrasingEvaluator:
         all_labels = self.get_metric_names()
         labels = [metric for metric in all_labels if metric in df.columns]
         assert (
-                group_by in df.columns
+            group_by in df.columns
         ), f"Group by column '{group_by}' not found in DataFrame."
         if group_by == "model" and "Paraphraser" not in df.columns:
             data = df.rename(columns={group_by: "Paraphraser"}, inplace=False)
@@ -1229,8 +1229,8 @@ class ParaphrasingEvaluator:
             save_path.mkdir(parents=True, exist_ok=True)
             for format in ["svg"]:
                 file_name = (
-                        save_path
-                        / f"{data_category.replace(' ', '_')}_paraphrasing_metrics_grouped_by_{group_by}_radar_chart.{format}"
+                    save_path
+                    / f"{data_category.replace(' ', '_')}_paraphrasing_metrics_grouped_by_{group_by}_radar_chart.{format}"
                 )
                 plt.savefig(
                     file_name, bbox_inches="tight", transparent=True, format=format
@@ -1241,11 +1241,11 @@ class ParaphrasingEvaluator:
         plt.close()
 
     def plot_metric_scatter(
-            self,
-            df: pd.DataFrame,
-            data_category: Optional[str] = None,
-            group_by: Optional[str] = "model",
-            display_plot: bool = True,
+        self,
+        df: pd.DataFrame,
+        data_category: Optional[str] = None,
+        group_by: Optional[str] = "model",
+        display_plot: bool = True,
     ):
         """
         Scatter plot of semantic similarity vs syntactic similarity per model.
@@ -1357,8 +1357,8 @@ class ParaphrasingEvaluator:
             save_path.mkdir(parents=True, exist_ok=True)
             for format in ["svg"]:
                 full_path = (
-                        save_path
-                        / f"{data_category.replace(' ', '_')}_sem_syn_scatter_grouped_by_{group_by}.{format}"
+                    save_path
+                    / f"{data_category.replace(' ', '_')}_sem_syn_scatter_grouped_by_{group_by}.{format}"
                 )
                 plt.savefig(
                     full_path, bbox_inches="tight", transparent=True, format=format
@@ -1371,23 +1371,23 @@ class ParaphrasingEvaluator:
 
     def _wrap_label(self, label: str, words_per_line: int = 6) -> str:
         assert (
-                isinstance(words_per_line, int) and words_per_line > 0
+            isinstance(words_per_line, int) and words_per_line > 0
         ), "words_per_line must be a positive integer."
         words = str(label).split()
         return "\n".join(
             [
-                " ".join(words[i: i + words_per_line])
+                " ".join(words[i : i + words_per_line])
                 for i in range(0, len(words), words_per_line)
             ]
         )
 
     def _plot_one_plot_per_metric_distribution(
-            self,
-            data: pd.DataFrame,
-            metric_names: list,
-            group_by: str,
-            data_category: str,
-            display_plot: bool = False,
+        self,
+        data: pd.DataFrame,
+        metric_names: list,
+        group_by: str,
+        data_category: str,
+        display_plot: bool = False,
     ):
         unique_labels = data[group_by].unique()
         palette = sns.color_palette("tab20", n_colors=len(unique_labels))
@@ -1444,10 +1444,10 @@ class ParaphrasingEvaluator:
                 )
                 file_name = f"{safe_category}_{safe_metric}_grouped_by_{group_by}_{scale}_scale.svg"
                 path2dir = (
-                        self.paraphrases_save_base_path
-                        / "metric_distributions"
-                        / "distribution_per_metric"
-                        / f"{scale}_scale"
+                    self.paraphrases_save_base_path
+                    / "metric_distributions"
+                    / "distribution_per_metric"
+                    / f"{scale}_scale"
                 )
                 path2dir.mkdir(parents=True, exist_ok=True)
                 full_path = path2dir / file_name
@@ -1461,11 +1461,11 @@ class ParaphrasingEvaluator:
                 plt.close()
 
     def plot_metric_distributions(
-            self,
-            df: pd.DataFrame,
-            data_category: Optional[str] = None,
-            group_by: Optional[str] = "model",
-            display_plot: bool = True,
+        self,
+        df: pd.DataFrame,
+        data_category: Optional[str] = None,
+        group_by: Optional[str] = "model",
+        display_plot: bool = True,
     ):
         """
         Plot distribution of each metric per model in subplots.
@@ -1488,7 +1488,7 @@ class ParaphrasingEvaluator:
             data = df.copy()
         assert len(metric_names) > 0, "No valid metrics found in DataFrame."
         assert (
-                group_by in data.columns
+            group_by in data.columns
         ), f"Group by column '{group_by}' not found in DataFrame."
 
         n_metrics = len(metric_names)
@@ -1512,7 +1512,7 @@ class ParaphrasingEvaluator:
                 # Find models with only one data point for this metric
                 counts = data.groupby(group_by)[metric].count()
                 assert (
-                        counts != 0
+                    counts != 0
                 ).any(), (
                     f"No data points found for metric '{metric}' in group '{group_by}'."
                 )
