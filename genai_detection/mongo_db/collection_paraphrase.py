@@ -55,7 +55,10 @@ for doc in paraphrase_collection.find({"llm":"openai/gpt-5-nano-2025-08-07"}, li
     # Call the paraphrase function
     # extracted_info, paraphrased_text, total_costs = paraphraser_llm.paraphrase(text=original_text, prompt=CONFIG.PROMPT)
     # TODO: delete; try to debug paraphrase generation based on extracted info
-    paraphrased_text, total_costs = paraphraser_llm.generate_paraphrase(extracted_info=extracted_info)
+    # paraphrased_text, total_costs = paraphraser_llm.generate_paraphrase(extracted_info=extracted_info)
+    paraphrase_filename = f"paraphrase_{CONFIG.OPENAI_MODEL.replace('/', '_')}_{i}.txt"
+    with open(paraphrase_filename, "r", encoding="utf-8") as f:
+        paraphrased_text = f.read()
     print(paraphrased_text)
 
     # save dict as jsonl line
@@ -64,11 +67,11 @@ for doc in paraphrase_collection.find({"llm":"openai/gpt-5-nano-2025-08-07"}, li
     #     extr_info_filename += ".jsonl"
     #     with open(extr_info_filename, "w", encoding="utf-8") as f:
     #         json.dump(paraphrased_text, f, ensure_ascii=False, indent=4)
-    paraphrase_filename = f"paraphrase_{CONFIG.OPENAI_MODEL.replace('/', '_')}_{i}"
-    if type(paraphrased_text) == str:
-        paraphrase_filename += ".txt"
-        with open(paraphrase_filename, "w", encoding="utf-8") as f:
-            f.write(paraphrased_text)
+    # paraphrase_filename = f"paraphrase_{CONFIG.OPENAI_MODEL.replace('/', '_')}_{i}"
+    # if type(paraphrased_text) == str:
+    #     paraphrase_filename += ".txt"
+    #     with open(paraphrase_filename, "w", encoding="utf-8") as f:
+    #         f.write(paraphrased_text)
 
 
     # Build the new document
@@ -87,5 +90,22 @@ for doc in paraphrase_collection.find({"llm":"openai/gpt-5-nano-2025-08-07"}, li
     # Insert into paraphrase collection
     # paraphrase_collection.insert_one(paraphrase_doc)
     print(f"Inserted paraphrase for document ID: {text_id}")
+
+    update_fields = {
+        "paraphrase": paraphrased_text,
+        # "openai_costs": total_costs,
+        "updated_at": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
+    }
+
+    # Update *the same document* in place
+    result = paraphrase_collection.update_one(
+        {"_id": text_id},
+        {"$set": update_fields}
+    )
+
+    if result.modified_count > 0:
+        print(f"✅ Updated document {text_id} with new paraphrase.")
+    else:
+        print(f"⚠️ No update performed for {text_id} (may already be up-to-date).")
 
 print("Paraphrasing complete.")
