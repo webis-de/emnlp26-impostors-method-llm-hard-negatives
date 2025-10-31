@@ -267,6 +267,18 @@ kubectl port-forward -n webisservices deployment/artificial-authorship-verificat
 ![General Settings for path forwarding via Pycharm](explanations/pycharm_path_forwarding_mongodb_general.png)
 ![Kubernetes Settings for path forwarding via Pycharm](explanations/pycharm_path_forwarding_mongodb_k8s.png)
 
-TODO:
-- ~~https://kb.webis.de/k8s-manual/ceph-in-k8s.html#mount-the-main-cephfs-tree-as-hostpath mount code into docker container and work on k8s~~ local path forwarding works
-- ~~OR: Local/gammaweb work (VPN)+ ingress zu k8s~~ local path forwarding works
+# 📝 Impostor Generation*
+## Paraphrases
+We use LLMs to generate paraphrases of texts as impostors.
+We found that prompt engineering and open-source models hosted by Webis and GWDG produce too simple impostors.
+
+### DSPy
+[DSPy](https://dspy.ai/) is a declarative framework for building modular AI software.
+DSPy is short for _Declarative Self-improving Python_.
+When designing AI systems with LLMs, one often has to deal with prompt engineering and choosing the right model or prompting strategy.
+DSPy makes LLMs easily interchangeable and omits the need for prompting according to the LLMs preferences.
+Instead of engineering prompts directly, one uses structured and declarative natural language:
+Every AI component (i.e., component that interacts with LLMs) needs a _signature_ (i.e., input and output parameter specification) and a _module_ (e.g., `Predict`) to invoke the LM based on the signature.
+DSPy expands the signatures into prompts automatically using the input, output fields and the docstring.
+[DSPy](https://arxiv.org/abs/2310.03714) is the second version of DSP, which was developed at Stanford University.
+Find more papers about DSPy [here](https://github.com/stanfordnlp/dspy?tab=readme-ov-file#-citation--reading-more).
