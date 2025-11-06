@@ -131,13 +131,14 @@ for i, doc in enumerate(original_collection.find(limit=max_docs)):
 
     # Build the new document
     paraphrase_doc = {
-        "_id": text_id,
+        # Do not use text_id as _id since a text will be paraphrased multiple times with different settings
+        "text_id": text_id, # ID of the original text document
         "length_original_text": len(original_text.split()),
         "length_paraphrased_text": len(paraphrased_text.split()),
         "intermediate_prompt": "bullet points dspy",
         "prompt": "bullet points dspy",  # CONFIG.PROMPT,
         "llm": CONFIG.OPENAI_MODEL,
-        "temperature": 1.0,  # requirements for reasoning models like gpt-5-nano
+        "temperature": 1.0,  # Requirements for reasoning models like gpt-5-nano
         "paraphrase": paraphrased_text,
         "extracted_info": extracted_info,
         "created_at": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
