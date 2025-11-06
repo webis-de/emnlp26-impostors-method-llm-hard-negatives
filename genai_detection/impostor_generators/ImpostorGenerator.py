@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+# FIXME: make compatible with new mongodb idea
 import datetime
 import os
 import random
@@ -34,6 +34,7 @@ from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer, util
 from spacy.cli import download
 
+from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 from genai_detection.paraphrasing.one_step_paraphrasers import *
 from genai_detection.paraphrasing.two_step_paraphrasers import *
 
@@ -56,7 +57,7 @@ class BaseImpostorGenerator(ABC):
 
     @abstractmethod
     def generate_impostors(
-        self, text: str, path2imp: str = None, real_time_generation: bool = False
+        self, text: str, text_id: str = None, path2imp: str = None, real_time_generation: bool = False
     ) -> dict:
         """Get a dictionary of impostor texts for the given input text.
 
@@ -66,6 +67,7 @@ class BaseImpostorGenerator(ABC):
         Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’.
         Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
 
+        :param text_id: ID in a mongo database containing texts to retrieve impostors from
         :param text: input text to generate impostors for (i.e., the candidate text, NOT the disputed text)
         """
         pass
@@ -113,7 +115,7 @@ class ContentImpostorGenerator(BaseImpostorGenerator):
         self.model = SentenceTransformer(model_name)  # , device=device)
 
     def generate_impostors(
-        self, text: str, path2imp: str = None, real_time_generation: bool = False
+        self, text: str, text_id: str = None, path2imp: str = None, real_time_generation: bool = False
     ) -> Dict[str, str]:
         """
         Generates impostors from a pre-defined dataset.
@@ -345,7 +347,7 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
         return all_results
 
     def generate_impostors(
-        self, text: str, path2imp: str = None, real_time_generation: bool = False
+        self, text: str, text_id: str = None, path2imp: str = None, real_time_generation: bool = False
     ) -> pd.DataFrame:
         """
         Generates impostors for the given input text using Google search results.
@@ -546,17 +548,23 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
             ), "All paraphrasers must be instances of Paraphraser or its subclasses."
             assert len(paraphrasers) > 0, "At least one paraphraser must be provided."
             self.paraphrasers = paraphrasers
-        self.prompts = [
-            "Paraphrase the text above without changing its meaning. Use different words and vary the sentence structure while maintaining a consistent tone. Your paraphrase should be three times as long than the original. Output only the paraphrased sentence, with NO explanations or extra text.",
-            # "Paraphrase the given sentence by identifying the main subject, verb, and object. Replace each with synonyms or closely related words, adjusting grammar naturally. Keep the new sentence close in length to the original. Output only the final paraphrased sentence.",
-            # "Paraphrase the sentence above without changing its meaning. Use different words and vary the sentence structure while keeping the tone consistent. Keep the new sentence similar in length to the original. Output only the paraphrased sentence, with no explanations or extra text.",
-        ]
+        self.prompts = CONFIG.OPENAI_MODEL
+
+        self.mongoDB = ParaphraseMongoDB()
+        # self.original_collection = self.mongoDB.original_collection
+        # self.paraphrase_collection = self.mongoDB.paraphrase_collection
 
     def generate_impostors(
-        self, text: str, path2imp: Path = None, real_time_generation: bool = False
+        self, text: str, text_id: str = None, path2imp: str = None, real_time_generation: bool = False
     ) -> Dict[str, str]:
         # returns a dictionary of impostor texts with n_impostors impostors
         impostors = {}
+        if text_id is not None:
+            paraphrases = self.mongoDB.find_paraphrases(document_id=text_id)
+            # TODO
+            if len(paraphrases) < num_impostors:
+                # generate more paraphrases if not enough are available in the database
+
         # if already computed impostors are available, load them from path2imp
         if path2imp.suffix == ".json" and path2imp.exists():
             # read impostors from json dump file: {reference: {paraphraser_prompt: paraphrase, ...}, ...}
@@ -679,7 +687,7 @@ class FixedImpostorGenerator(BaseImpostorGenerator):
         super().__init__(n_impostors=n_impostors, split=split)
 
     def generate_impostors(
-        self, text: str, path2imp: Path = None, real_time_generation: bool = False
+        self, text: str, text_id: str = None, path2imp: str = None, real_time_generation: bool = False
     ) -> Dict[str, str]:
         """
         Generates impostors from a pre-defined dataset.
@@ -716,7 +724,7 @@ class BlogImpostorGenerator(FixedImpostorGenerator):
         super().__init__(n_impostors=n_impostors, split=split)
 
     def generate_impostors(
-        self, text: str, path2imp: str = None, real_time_generation: bool = False
+        self, text: str, text_id: str = None, path2imp: str = None, real_time_generation: bool = False
     ) -> List[str]:
         """Generates impostors from the Blog dataset.
         :param text: input text to generate impostors for (not used in this implementation)
@@ -727,4 +735,5 @@ class BlogImpostorGenerator(FixedImpostorGenerator):
             text=text,
             path2imp=os.path.join(os.path.abspath(".."), CONFIG.PATH2BLOG),
             real_time_generation=real_time_generation,
+            text_id=text_id,
         )
