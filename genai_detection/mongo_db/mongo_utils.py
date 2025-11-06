@@ -68,3 +68,14 @@ class ParaphraseMongoDB:
         """
         document = collection.find_one({"_id": document_id})
         return document
+
+    def find_paraphrases(self, document_id: str) -> dict | None:
+        """
+        Find an entry in the specified collection by its text ID.
+        :param document_id: The ID of the original document. Paraphrases have different _id.
+        :return: The found document as a cursor, or None if not found.
+
+        https://www.mongodb.com/docs/manual/reference/method/db.collection.find/ (06.11.2025)
+        """
+        documents = self.paraphrase_collection.find({"text_id": document_id})
+        return documents
