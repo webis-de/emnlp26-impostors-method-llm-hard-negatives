@@ -282,3 +282,7 @@ Every AI component (i.e., component that interacts with LLMs) needs a _signature
 DSPy expands the signatures into prompts automatically using the input, output fields and the docstring.
 [DSPy](https://arxiv.org/abs/2310.03714) is the second version of DSP, which was developed at Stanford University.
 Find more papers about DSPy [here](https://github.com/stanfordnlp/dspy?tab=readme-ov-file#-citation--reading-more).
+
+### Openai
+Remember checking [billing](https://platform.openai.com/settings/organization/billing/overview) and [API usage]
+(https://platform.openai.com/settings/organization/usage).
