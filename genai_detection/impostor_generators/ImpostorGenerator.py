@@ -771,10 +771,11 @@ class BlogImpostorGenerator(FixedImpostorGenerator):
 
 
 if __name__ == "__main__":
-    llm_paraphraser = LLMImpostorGenerator(n_impostors=3)
+    llm_paraphraser = LLMImpostorGenerator(n_impostors=4)
     imps = llm_paraphraser.generate_impostors(text_id="68f50029edacdf3d5c0279eb", text=None)
     for i, imp in enumerate(imps):
         # $7,886.76 07.11.25, 10.04 Uhr
         # $7,886.75 07.11.25, 10.49 Uhr
+        # $7,886.71 07.11.25, 12.49 Uhr
         # FIXME: number of impostors does not work properly, too many and too short paraphrases
         print("imp number ", i, "of length ", len(imp.split()))

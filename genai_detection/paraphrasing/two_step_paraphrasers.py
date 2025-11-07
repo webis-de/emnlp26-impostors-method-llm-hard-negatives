@@ -49,7 +49,7 @@ class ExtractInfo(dspy.Signature):
 
 
 class GenerateText(dspy.Signature):
-    """Generate n_paraphrase many alternative versions of the text based on structured literary and stylistic information."""
+    """Generate n_paraphrase complete alternative versions of the text, each unifying all bullet points within one coherent composition and reflecting the defined style and structure."""
 
     title: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["title"])
     genre: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["genre"])
@@ -62,7 +62,7 @@ class GenerateText(dspy.Signature):
     n_paraphrases: int = dspy.InputField(
         desc=(
             "The number of distinct alternative texts (paraphrases) to generate. "
-            "Each paraphrase should express the same ideas and follow the same stylistic parameters, "
+            "Each paraphrase should include *all* bullet points and follow the same stylistic parameters, "
             "but differ in wording, phrasing, or narrative structure. "
             "This number determines how many elements will appear in the output JSON list."
         )
@@ -71,10 +71,9 @@ class GenerateText(dspy.Signature):
         # valid JSON syntax that Python can parse automatically.
         desc=(
             "A **JSON-formatted list** of several distinct texts, each written in the style of the specified author. "
-            "Every text should reflect the specified **title**, **genre**, **tone**, **century**, "
+            "Every text should include **all** bullet points and reflect the specified **title**, **genre**, **tone**, **century**, "
             "**audience**, and **author profile**. "
-            "The content should elaborate naturally on the given **bulletpoints** and "
-            "have a length approximately matching the provided word count."
+            "The text length should approximately match the provided word count."
             "Each list element should be a complete, self-contained text string."
             "Example output format: "
             '["Text version 1...", "Text version 2...", ...]'
@@ -151,6 +150,7 @@ class TwoStepParaphraser(Paraphraser):
 
             # Remove 'text' from both sets
             extracted_keys.discard("text")
+            extracted_keys.discard("n_paraphrases")
             field_keys.discard("text")
 
             # Assert equality with a detailed message
