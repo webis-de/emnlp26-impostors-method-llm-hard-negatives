@@ -14,11 +14,13 @@
 
 import logging
 from abc import ABC
-from typing import List
+from datetime import datetime
+from typing import Optional
 
 import nltk
 
 from genai_detection.config import CONFIG
+from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 nltk.download("punkt_tab")
 
@@ -30,11 +32,18 @@ class Paraphraser(ABC):
     """
     Abstract base class for paraphrasing models.
     """
+    def __init__(self, n_paraphrases: int, model_id: str = CONFIG.OPENAI_MODEL):
+        self.n_paraphrases = n_paraphrases
+        self.mongoDB = ParaphraseMongoDB()
+        self.original_collection = self.mongoDB.original_collection
+        self.paraphrase_collection = self.mongoDB.paraphrase_collection
+        self.model_id = model_id
 
     def paraphrase(
         self, text: str, prompt: str, max_length: int = CONFIG.MAX_LENGTH
-    ) -> List[str]:
+    ) -> str:
         """
+        Generate a paraphrase of the input text.
         Generate a paraphrase of the input text.
 
         :param text: The input text to be paraphrased.
@@ -44,16 +53,40 @@ class Paraphraser(ABC):
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
-    def paraphrase_batch(self, texts: list[str], prompt: str = None) -> list[list[str]]:
+    def save_paraphrase_in_mongodb(self, original_text_id:str, original_text:str, paraphrased_text:str, extracted_info:Optional[dict], total_costs:Optional[float],temperature:float=1.0, prompt:str="bullet points dspy") -> None:
         """
-        Generate paraphrases for a batch of input texts.
-
-        :param texts: A list of input texts to be paraphrased.
-        :param prompt: The prompt to be used for paraphrasing. If None, a default prompt will be used.
-        :return: A list of paraphrased versions of the input texts.
+        Save the paraphrase to the MongoDB database.
+        :param original_text_id:
+        :param original_text:
+        :param paraphrased_text:
+        :param extracted_info:
+        :param total_costs:
+        :return:
         """
+        assert (
+            type(paraphrased_text) == str
+        ), f"paraphrased_text must be a str, but is of type {type(paraphrased_text)}"
+        assert len(paraphrased_text.split()) > 0, "paraphrased_text is empty"
 
-        return [self.paraphrase(text=text, prompt=prompt) for text in texts]
+        # Build the new document
+        paraphrase_doc = {
+            # Do not use text_id as _id since a text will be paraphrased multiple times with different settings
+            "text_id": original_text_id,  # ID of the original text document
+            "length_original_text": len(original_text.split()),
+            "length_paraphrased_text": len(paraphrased_text.split()),
+            "intermediate_prompt": "bullet points dspy",
+            "prompt": prompt,
+            "llm": self.model_id,
+            "temperature": temperature,
+            "paraphrase": paraphrased_text,
+            "extracted_info": extracted_info,
+            "created_at": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
+            "openai_costs": total_costs,
+        }
+
+        # Insert into document into paraphrase collection
+        self.paraphrase_collection.insert_one(paraphrase_doc)
+        print(f"Inserted paraphrase for document ID: {original_text_id}")
 
 
 #

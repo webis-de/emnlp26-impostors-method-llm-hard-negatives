@@ -21,6 +21,7 @@ from genai_detection.config import CONFIG
 from genai_detection.paraphrasing.one_step_paraphrasers import OneStepParaphraser
 from genai_detection.paraphrasing.paraphraser import Paraphraser
 
+# FIXME: number of impostors does not work properly, too many and too short paraphrases
 # Field descriptions dictionary
 FIELD_DESCRIPTIONS = {
     "title": "A short, descriptive title summarizing the text in one phrase or sentence.",
@@ -48,7 +49,7 @@ class ExtractInfo(dspy.Signature):
 
 
 class GenerateText(dspy.Signature):
-    """Generate a text based on structured literary and stylistic information."""
+    """Generate n_paraphrase many alternative versions of the text based on structured literary and stylistic information."""
 
     title: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["title"])
     genre: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["genre"])
@@ -58,16 +59,27 @@ class GenerateText(dspy.Signature):
     author: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["author"])
     bulletpoints: list[str] = dspy.InputField(desc=FIELD_DESCRIPTIONS["bulletpoints"])
     length: int = dspy.InputField(desc=FIELD_DESCRIPTIONS["length"])
-    text: str = dspy.OutputField(
+    n_paraphrases: int = dspy.InputField(
         desc=(
-            "A newly generated text that sounds as if written by the described author. "
-            "It must reflect the specified **title**, **genre**, **tone**, **century**, "
+            "The number of distinct alternative texts (paraphrases) to generate. "
+            "Each paraphrase should express the same ideas and follow the same stylistic parameters, "
+            "but differ in wording, phrasing, or narrative structure. "
+            "This number determines how many elements will appear in the output JSON list."
+        )
+    )
+    texts: list[str] = dspy.OutputField(
+        # valid JSON syntax that Python can parse automatically.
+        desc=(
+            "A **JSON-formatted list** of several distinct texts, each written in the style of the specified author. "
+            "Every text should reflect the specified **title**, **genre**, **tone**, **century**, "
             "**audience**, and **author profile**. "
             "The content should elaborate naturally on the given **bulletpoints** and "
             "have a length approximately matching the provided word count."
+            "Each list element should be a complete, self-contained text string."
+            "Example output format: "
+            '["Text version 1...", "Text version 2...", ...]'
         )
     )
-
 
 class TwoStepParaphraser(Paraphraser):
     """
@@ -83,12 +95,15 @@ class TwoStepParaphraser(Paraphraser):
         self,
         model_id: str = CONFIG.OPENAI_MODEL,
         temperature: float = CONFIG.TEMPERATURE,
+        n_paraphrases: int = 50,
     ):
         """
         Initializes the OpenAI paraphraser model using DSPy.
         :param model_id: Name of the OpenAI model to use.
         :param temperature: Temperature for the model. Needs to be 1.0 for reasoning models like GPT-5.
+        :param n_paraphrases: Number of paraphrases to generate.
         """
+        super().__init__(n_paraphrases, model_id)
         is_reasoning_model = any(name in model_id.lower() for name in ["gpt-5"])
 
         self.lm = dspy.LM(
@@ -101,18 +116,29 @@ class TwoStepParaphraser(Paraphraser):
         )
         self.model_id = model_id
         dspy.configure(lm=self.lm)
+        self.n_paraphrases = n_paraphrases
+
+    def set_n_paraphrases(self, n_paraphrases: int):
+        """
+        Sets the number of paraphrases to generate.
+        :param n_paraphrases: Number of paraphrases to generate.
+        :return: -
+        """
+        self.n_paraphrases = n_paraphrases
 
     def generate_paraphrase(
         self, extracted_info: dict[str, Any], verbose: bool = True
-    ) -> tuple[str, float]:
+    ) -> tuple[list[str], float]:
         """
-        Generate a paraphrase based on the extracted information.
+        Generate a paraphrase(s) based on the extracted information.
+        By default, this method will generate 50 paraphrases.
         :param verbose: Whether to print debug information.
         :param extracted_info: Dictionary containing the extracted information.
-        :return: A tuple containing the generated paraphrase (as string) and the cost after generation.
+        :return: A tuple containing the generated paraphrase(s) (as a list of one or more strings) and the cost after generation.
         """
         # Module: Predict, signature: GenerateText
         generator = dspy.Predict(GenerateText)
+
         if verbose:
             cfg = generator.get_config()
             print("Config:", cfg)
@@ -133,14 +159,15 @@ class TwoStepParaphraser(Paraphraser):
                 f"Missing in extracted_info: {field_keys - extracted_keys}, "
                 f"Extra in extracted_info: {extracted_keys - field_keys}"
             )
+            extracted_info["n_paraphrases"] = self.n_paraphrases
 
             paraphrase = generator(**extracted_info)
             if verbose:
-                print("generated paraphrase", paraphrase)
+                print(f"generated paraphrase{'s:' if self.n_paraphrases > 1 else ':'}", paraphrase)
             cost_after_generator = sum(
                 x["cost"] for x in self.lm.history if x["cost"] is not None
             )
-            return paraphrase.text, cost_after_generator
+            return paraphrase.texts, cost_after_generator
         except Exception as e:
             raise e
 
@@ -149,14 +176,14 @@ class TwoStepParaphraser(Paraphraser):
         text: str,
         max_length: int = CONFIG.MAX_LENGTH,
         prompt: Optional[str] = None,
-    ) -> tuple[dict[str, Any], str, float]:
+    ) -> tuple[dict[str, Any], List[str], float]:
         """
         Generate paraphrased versions of the input text.
 
         :param text: The input text to be paraphrased.
         :param prompt: Is not used, as DSPy handles prompts internally.
         :param max_length: The maximum number of tokens to generate in the paraphrase.
-        :return: A tuple containing the extracted information, the generated paraphrase and the total cost.
+        :return: A tuple containing the extracted information, the generated paraphrase(s) (as a list) and the total cost (for generating all paraphrases).
         """
         extractor = dspy.Predict(ExtractInfo)
         extracted_info = extractor(text=text).toDict()
@@ -172,8 +199,9 @@ class TwoStepParaphraser(Paraphraser):
         )
 
         try:
-            paraphrase, cost_after_generator = self.generate_paraphrase(
-                extracted_info=extracted_info
+            # Paraphrase: List of one or more strings
+            paraphrases, cost_after_generator = self.generate_paraphrase(
+                extracted_info=extracted_info, verbose=False
             )
 
             # Total cost for both requests
@@ -181,7 +209,7 @@ class TwoStepParaphraser(Paraphraser):
                 cost_after_generator - cost_after_extractor
             )
             print(f"ATTENTION. Total cost for extractor + generator: ${total_cost:.6f}")
-            return extracted_info, paraphrase, total_cost
+            return extracted_info, paraphrases, total_cost
         except Exception as e:
             print(e)
             return extracted_info, "", cost_after_extractor
@@ -213,7 +241,8 @@ class TranslationParaphraser(Paraphraser):
         assert isinstance(text_extractor, OneStepParaphraser) and isinstance(
             text_generator, OneStepParaphraser
         ), "Both text_extractor and text_generator must be instances of NaiveParaphraser or its subclasses."
-        super().__init__(text_extractor=text_extractor, text_generator=text_generator)
+        self.text_generator = text_generator
+        self.text_extractor = text_extractor
         self.language = language
         self.extractor_prompt = f"Translate the text above into {self.language}. Do not use direct quotes or newlines. Output only the translated text, without any additional commentary or formatting."
         self.generator_prompt = f"Translate the text above from {self.language} into English. Do not use direct quotes or newlines. Output only the translated text, without any additional commentary or formatting."

@@ -551,75 +551,106 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
         self.prompts = CONFIG.OPENAI_MODEL
 
         self.mongoDB = ParaphraseMongoDB()
-        # self.original_collection = self.mongoDB.original_collection
-        # self.paraphrase_collection = self.mongoDB.paraphrase_collection
 
     def generate_impostors(
-        self, text: str, text_id: str = None, path2imp: str = None, real_time_generation: bool = False
-    ) -> Dict[str, str]:
-        # returns a dictionary of impostor texts with n_impostors impostors
-        impostors = {}
+        self, text: Optional[str], text_id: Optional[str], path2imp: str = None, real_time_generation: bool = False
+    ) -> List[str]:
+        assert text or text_id, "Either text or text_id must be provided."
+        # Get text from mongodb if missing
+        if not text:
+            # Should only contain one element because _id is the primary key
+            text = self.mongoDB.find_document(collection=self.mongoDB.original_collection, document_id=text_id)[0]["text"]
+            assert (text is not None) and type(text)==str and len(text) > 0, f"Text ID {text_id} not found."
+        # Save text in mongoDB if not yet present
+        if text and text_id:
+            existing = self.mongoDB.find_document(collection=self.mongoDB.original_collection, document_id=text_id)
+            if existing is None:
+                raise Exception(f"Document ID {text_id} not found.")
+                self.mongoDB.insert_document(collection=self.mongoDB.original_collection, insert_data={"text": text})
+
+        # returns a list of impostor texts with n_impostors impostors
+        extracted_info = {}
+        n_imp_to_generate = self.n_impostors
+        impostors = []
         if text_id is not None:
-            paraphrases = self.mongoDB.find_paraphrases(document_id=text_id)
-            # TODO
-            if len(paraphrases) < num_impostors:
-                # generate more paraphrases if not enough are available in the database
+            cursor = self.mongoDB.find_paraphrases(document_id=text_id)
+            docs = list(cursor)  # materialize once, safe if the number is small
 
-        # if already computed impostors are available, load them from path2imp
-        if path2imp.suffix == ".json" and path2imp.exists():
-            # read impostors from json dump file: {reference: {paraphraser_prompt: paraphrase, ...}, ...}
-            with open(path2imp, "r") as f:
-                loaded_data = json.load(f)
-                for split in loaded_data.keys():
-                    if split == text:  # dump file contains no test/train/val splits
-                        print(
-                            f"IMPOSTOR GENERATOR: Loaded precomputed {len(loaded_data[split])} impostors from file {path2imp}."
-                        )
-                        impostors = loaded_data[split]
-                    if text in loaded_data[split]:
-                        print(
-                            f"IMPOSTOR GENERATOR: Loaded precomputed {len(loaded_data[split][text].keys())} impostors from file {path2imp}."
-                        )
-                        impostors = loaded_data[split][text]
-            if len(impostors) >= self.n_impostors:
-                # ensure we return enough impostors
-                return dict(list(impostors.items())[: self.n_impostors])
+            impostors = [doc["paraphrase"] for doc in docs if "paraphrase" in doc]
+            extracted_info = next(
+                (doc["extracted_info"] for doc in docs if "extracted_info" in doc), {}
+            )
 
-        random.shuffle(self.paraphrasers)
-        n_imp_to_generate = self.n_impostors - len(impostors)
+            n_imp_to_generate -= len(impostors)
+            if n_imp_to_generate <= 0:
+                return impostors[: self.n_impostors]
+
         print(
-            f"{len(impostors)} precomputed impostors found in {path2imp}. Generating {n_imp_to_generate} impostors for text {text[:100]}..."
+            f"{len(impostors)} precomputed impostors found in mongoDB. Generating {n_imp_to_generate} impostors for text {text[:100]}..."
         )
-        for i in range(n_imp_to_generate):
-            # randomly select a paraphraser and a prompt
-            paraphraser = self.paraphrasers[i % len(self.paraphrasers)]
-            p_id = random.randint(0, len(self.prompts) - 1)
-            prompt = self.prompts[p_id]
-            try:
-                impostor_texts = paraphraser.paraphrase(text, prompt=prompt)
-                if (
-                    isinstance(paraphraser, OneStepParaphraser)
-                    and paraphraser.model_id == "qwen3-32b"
-                ):
-                    # qwen3-32b returns thinking steps and the final answer, separated by </think>
-                    impostor_texts = [
-                        item.split("</think>")[-1] for item in impostor_texts
-                    ]
+        self.two_step_paraphraser.set_n_paraphrases(n_paraphrases=n_imp_to_generate)
+        if not extracted_info:
+            extracted_info, new_impostors, total_cost = self.two_step_paraphraser.paraphrase(text=text)
+        else:
+            print("Using already extracted information stored in mongoDB for paraphrase generation.")
+            new_impostors, total_cost = (
+                self.two_step_paraphraser.generate_paraphrase(verbose=False, extracted_info=extracted_info)
+            )
+        assert isinstance(
+            extracted_info, dict
+        ), f"The extracted_info must be a dictionary but is of type {type(extracted_info)}."
+        assert isinstance(
+            new_impostors, (list, str)
+        ), f"The new_impostors must be a list or a single string but is of type {type(new_impostors)}."
+        assert isinstance(
+            total_cost, float
+        ), f"The total_cost of a paraphrase must be of type float but is of type {type(total_cost)}."
+        if isinstance(new_impostors, str):
+            new_impostors = [new_impostors]
 
-                for imp in impostor_texts:
-                    if (
-                        imp and (len(imp.split()) / len(text.split())) >= 0.6
-                    ):  # only non-empty + valid length filter
-                        # read json requires no " or { }
-                        imp = imp.replace("{", "(").replace("}", ")").replace('"', "'")
-                        key = f"impostor_{i}_prompt{p_id}_{paraphraser.model_id}"
-                        j = i
-                        while key in list(impostors.keys()):
-                            j += 1
-                            key = f"impostor_{j}_prompt{p_id}_{paraphraser.model_id}"
-                        impostors[key] = imp
-            except Exception as e:
-                print(f"Error generating impostor with {paraphraser}: {e}")
+        # Save new paraphrases in MongoDB
+        for imp in new_impostors:
+            self.two_step_paraphraser.save_paraphrase_in_mongodb(
+                original_text=text,
+                original_text_id=text_id,
+                paraphrased_text=imp,
+                extracted_info=extracted_info,
+                total_costs=total_cost / len(new_impostors),
+                temperature=1.0,  # Temperature requirements for reasoning models like gpt-5-nano
+            )
+        if impostors:
+            new_impostors.extend(impostors)
+        return new_impostors
+        # for i in range(n_imp_to_generate):
+        #     # randomly select a paraphraser and a prompt
+        #     paraphraser = self.paraphrasers[i % len(self.paraphrasers)]
+        #     p_id = random.randint(0, len(self.prompts) - 1)
+        #     prompt = self.prompts[p_id]
+        #     try:
+        #         impostor_texts = paraphraser.paraphrase(text, prompt=prompt)
+        #         if (
+        #             isinstance(paraphraser, OneStepParaphraser)
+        #             and paraphraser.model_id == "qwen3-32b"
+        #         ):
+        #             # qwen3-32b returns thinking steps and the final answer, separated by </think>
+        #             impostor_texts = [
+        #                 item.split("</think>")[-1] for item in impostor_texts
+        #             ]
+        #
+        #         for imp in impostor_texts:
+        #             if (
+        #                 imp and (len(imp.split()) / len(text.split())) >= 0.6
+        #             ):  # only non-empty + valid length filter
+        #                 # read json requires no " or { }
+        #                 imp = imp.replace("{", "(").replace("}", ")").replace('"', "'")
+        #                 key = f"impostor_{i}_prompt{p_id}_{paraphraser.model_id}"
+        #                 j = i
+        #                 while key in list(impostors.keys()):
+        #                     j += 1
+        #                     key = f"impostor_{j}_prompt{p_id}_{paraphraser.model_id}"
+        #                 impostors[key] = imp
+        #     except Exception as e:
+        #         print(f"Error generating impostor with {paraphraser}: {e}")
 
         return impostors
 
@@ -737,3 +768,13 @@ class BlogImpostorGenerator(FixedImpostorGenerator):
             real_time_generation=real_time_generation,
             text_id=text_id,
         )
+
+
+if __name__ == "__main__":
+    llm_paraphraser = LLMImpostorGenerator(n_impostors=3)
+    imps = llm_paraphraser.generate_impostors(text_id="68f50029edacdf3d5c0279eb", text=None)
+    for i, imp in enumerate(imps):
+        # $7,886.76 07.11.25, 10.04 Uhr
+        # $7,886.75 07.11.25, 10.49 Uhr
+        # FIXME: number of impostors does not work properly, too many and too short paraphrases
+        print("imp number ", i, "of length ", len(imp.split()))

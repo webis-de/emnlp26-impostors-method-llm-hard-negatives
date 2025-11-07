@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from bson import ObjectId
 from pymongo import MongoClient
 
 from genai_detection.config import CONFIG
@@ -41,10 +42,10 @@ class ParaphraseMongoDB:
         self.score_collection = self.db[CONFIG.MONGO_SCORE_COLLECTION]
 
     @staticmethod
-    def update_document(collection, text_id: str, update_data: dict) -> int:
+    def update_document(collection, _id: str, update_data: dict) -> int:
         """
-        Update an entry in the specified collection by its text ID.
-        If no document with text_id exists, no action is taken.
+        Update an entry in the specified collection by its ID.
+        If no document with _id exists, no action is taken.
         If update_data contains fields that already exist, they will be overwritten, if fields are non-existent, they will be created.
         :param collection: The MongoDB collection to update.
         :param text_id: The ID of the text document to update.
@@ -52,24 +53,32 @@ class ParaphraseMongoDB:
         :return: The number of documents modified (0 or 1).
         """
         assert isinstance(update_data, dict), "update_data must be a dictionary"
-        assert ("text_id" not in update_data) or (
-            text_id == update_data["text_id"]
-        ), "update_data must not contain 'text_id' key or have the same value as text_id parameter"
-        result = collection.update_one({"_id": text_id}, {"$set": update_data})
+        result = collection.update_one({"_id": _id}, {"$set": update_data})
         return result.modified_count
 
     @staticmethod
-    def find_document(collection, document_id: str) -> dict | None:
+    def insert_document(collection, insert_data: dict):
+        """
+        Insert an entry in the specified collection.
+        :param collection: The MongoDB collection to insert.
+        :param insert_data: A dictionary with the data to insert.
+        :return: -
+        """
+        assert isinstance(insert_data, dict), f"insert_data must be a dictionary, but is {type(insert_data)}."
+        collection.insert_one(insert_data)
+
+    @staticmethod
+    def find_document(collection, document_id: str):
         """
         Find an entry in the specified collection by its text ID.
         :param collection: The MongoDB collection to search.
         :param document_id: The ID of the text document to find.
-        :return: The found document as a dictionary, or None if not found.
+        :return: The found document as a cursor object, or None if not found.
         """
-        document = collection.find_one({"_id": document_id})
+        document = collection.find({"_id": ObjectId(document_id)})
         return document
 
-    def find_paraphrases(self, document_id: str) -> dict | None:
+    def find_paraphrases(self, document_id: str):
         """
         Find an entry in the specified collection by its text ID.
         :param document_id: The ID of the original document. Paraphrases have different _id.

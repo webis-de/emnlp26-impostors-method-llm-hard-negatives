@@ -71,20 +71,21 @@ def save_paraphrase(doc_n: int, paraphrase: str):
 
 
 for i, doc in enumerate(original_collection.find(limit=max_docs)):
-    text_id = doc["_id"]
+    original_text_id = doc["_id"]
     original_text = doc["text"]
-    existing_paraphrase = mongoDB.find_document(
-        collection=paraphrase_collection, document_id=text_id
+    cursor = mongoDB.find_paraphrases(
+        document_id=original_text_id
     )
-    if existing_paraphrase:
-        extracted_info = existing_paraphrase.get("extracted_info", {})
+    existing_paraphrases = list(cursor)
+    for doc in existing_paraphrases:
+        extracted_info = doc["extracted_info"] if "extracted_info" else {}
         # skip the document if already has a paraphrase
-        if existing_paraphrase.get("paraphrase", False):
-            print(f"Skipping document ID: {text_id} as it already has a paraphrase.")
+        if doc.get("paraphrase", False):
+            print(f"Skipping document ID: {original_text_id} as it already has a paraphrase.")
             continue
         elif extracted_info:  # != {}
             print(
-                f"Generate paraphrase based on extracted data from document with document ID: {text_id}."
+                f"Generate paraphrase based on extracted data from document with document ID: {original_text_id}."
             )
             paraphrased_text, total_costs = paraphraser_llm.generate_paraphrase(
                 extracted_info=extracted_info
@@ -97,13 +98,13 @@ for i, doc in enumerate(original_collection.find(limit=max_docs)):
 
             # Update the document in place
             modified_count = mongoDB.update_document(
-                text_id=text_id,
+                _id=doc["_id"],
                 collection=paraphrase_collection,
                 update_data=update_fields,
             )
 
             if modified_count > 0:
-                print(f"Updated document {text_id} with new paraphrase.")
+                print(f"Updated document {original_text_id} with new paraphrase.")
                 save_original_text(doc_n=i, text=original_text)
                 save_paraphrase(doc_n=i, paraphrase=paraphrased_text)
                 assert (
@@ -111,42 +112,43 @@ for i, doc in enumerate(original_collection.find(limit=max_docs)):
                 ), f"paraphrased_text must be a str, but is of type {type(paraphrased_text)}"
                 assert len(paraphrased_text.split()) > 0, "paraphrased_text is empty"
             else:
-                print(f"No update performed for {text_id} (may already be up-to-date).")
+                print(f"No update performed for {original_text_id} (may already be up-to-date).")
             continue
 
     # prompt is not used, bc we use dspy
-    extracted_info, paraphrased_text, total_costs = paraphraser_llm.paraphrase(
+    extracted_info, paraphrased_texts, total_costs = paraphraser_llm.paraphrase(
         text=original_text
     )
 
     # save results to files for manual inspection
     save_original_text(doc_n=i, text=original_text)
-    save_paraphrase(doc_n=i, paraphrase=paraphrased_text)
     save_extracted_info(doc_n=i, extracted_info_dict=extracted_info)
+    for paraphrased_text in paraphrased_texts:
+        save_paraphrase(doc_n=i, paraphrase=paraphrased_text)
 
-    assert (
-        type(paraphrased_text) == str
-    ), f"paraphrased_text must be a str, but is of type {type(paraphrased_text)}"
-    assert len(paraphrased_text.split()) > 0, "paraphrased_text is empty"
+        assert (
+            type(paraphrased_text) == str
+        ), f"paraphrased_text must be a str, but is of type {type(paraphrased_text)}"
+        assert len(paraphrased_text.split()) > 0, "paraphrased_text is empty"
 
-    # Build the new document
-    paraphrase_doc = {
-        # Do not use text_id as _id since a text will be paraphrased multiple times with different settings
-        "text_id": text_id, # ID of the original text document
-        "length_original_text": len(original_text.split()),
-        "length_paraphrased_text": len(paraphrased_text.split()),
-        "intermediate_prompt": "bullet points dspy",
-        "prompt": "bullet points dspy",  # CONFIG.PROMPT,
-        "llm": CONFIG.OPENAI_MODEL,
-        "temperature": 1.0,  # Requirements for reasoning models like gpt-5-nano
-        "paraphrase": paraphrased_text,
-        "extracted_info": extracted_info,
-        "created_at": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
-        "openai_costs": total_costs,
-    }
+        # Build the new document
+        paraphrase_doc = {
+            # Do not use text_id as _id since a text will be paraphrased multiple times with different settings
+            "text_id": original_text_id, # ID of the original text document
+            "length_original_text": len(original_text.split()),
+            "length_paraphrased_text": len(paraphrased_text.split()),
+            "intermediate_prompt": "bullet points dspy",
+            "prompt": "bullet points dspy",  # CONFIG.PROMPT,
+            "llm": CONFIG.OPENAI_MODEL,
+            "temperature": 1.0,  # Requirements for reasoning models like gpt-5-nano
+            "paraphrase": paraphrased_text,
+            "extracted_info": extracted_info,
+            "created_at": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
+            "openai_costs": total_costs,
+        }
 
-    # Insert into document into paraphrase collection
-    paraphrase_collection.insert_one(paraphrase_doc)
-    print(f"Inserted paraphrase for document ID: {text_id}")
+        # Insert into document into paraphrase collection
+        paraphrase_collection.insert_one(paraphrase_doc)
+    print(f"Inserted paraphrase(s) for document ID: {original_text_id}")
 
 print(f"Paraphrasing complete. Inserted/Updated {max_docs} documents.")
