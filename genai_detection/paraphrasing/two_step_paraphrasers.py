@@ -21,7 +21,6 @@ from genai_detection.config import CONFIG
 from genai_detection.paraphrasing.one_step_paraphrasers import OneStepParaphraser
 from genai_detection.paraphrasing.paraphraser import Paraphraser
 
-# FIXME: number of impostors does not work properly, too many and too short paraphrases
 # Field descriptions dictionary
 FIELD_DESCRIPTIONS = {
     "title": "A short, descriptive title summarizing the text in one phrase or sentence.",

@@ -1,8 +1,9 @@
 import json
-from datetime import datetime
 from pathlib import Path
+from typing import List
 
 from genai_detection.config import CONFIG
+from genai_detection.impostor_generators.ImpostorGenerator import LLMImpostorGenerator
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 from genai_detection.paraphrasing import two_step_paraphrasers
 from genai_detection.paraphrasing.openai_utils import OpenaiCostEstimator
@@ -69,86 +70,49 @@ def save_paraphrase(doc_n: int, paraphrase: str):
     with open(save_dir / paraphrase_filename, "w", encoding="utf-8") as f:
         f.write(paraphrase)
 
+def save_overview_file(original_text:str, paraphrases:List[str], extracted_info_dict:dict, doc_id: str) -> None:
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    paraphrase_filename = (
+        f"{doc_id}_overview_{CONFIG.OPENAI_MODEL.replace('/', '_')}.txt"
+    )
+    file_path = save_dir / paraphrase_filename
+
+    with open(file_path, "w", encoding="utf-8") as f:
+        # Original text
+        f.write(f"{'-'*100}\nORIGINAL TEXT\n{'-'*100}\n")
+        f.write(original_text.strip() + "\n\n")
+
+        # Extracted info
+        f.write(f"{'-'*100}\nEXTRACTED INFO\n{'-'*100}\n")
+        for key, value in extracted_info_dict.items():
+            f.write(f"{key}: {value}\n")
+        f.write("\n")
+
+        # Paraphrases
+        for i, paraphrase in enumerate(paraphrases, start=1):
+            f.write(f"{'-'*100}\nPARAPHRASE {i}\n{'-'*100}\n")
+            f.write(paraphrase.strip() + "\n\n")
+
+    print(f"Overview file saved at: {file_path}")
+
 
 for i, doc in enumerate(original_collection.find(limit=max_docs)):
     original_text_id = doc["_id"]
     original_text = doc["text"]
-    cursor = mongoDB.find_paraphrases(
-        document_id=original_text_id
-    )
-    existing_paraphrases = list(cursor)
-    for doc in existing_paraphrases:
-        extracted_info = doc["extracted_info"] if "extracted_info" else {}
-        # skip the document if already has a paraphrase
-        if doc.get("paraphrase", False):
-            print(f"Skipping document ID: {original_text_id} as it already has a paraphrase.")
-            continue
-        elif extracted_info:  # != {}
-            print(
-                f"Generate paraphrase based on extracted data from document with document ID: {original_text_id}."
-            )
-            paraphrased_text, total_costs = paraphraser_llm.generate_paraphrase(
-                extracted_info=extracted_info
-            )
-            update_fields = {
-                "paraphrase": paraphrased_text,
-                "openai_costs": total_costs,
-                "updated_at": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
-            }
 
-            # Update the document in place
-            modified_count = mongoDB.update_document(
-                _id=doc["_id"],
-                collection=paraphrase_collection,
-                update_data=update_fields,
-            )
-
-            if modified_count > 0:
-                print(f"Updated document {original_text_id} with new paraphrase.")
-                save_original_text(doc_n=i, text=original_text)
-                save_paraphrase(doc_n=i, paraphrase=paraphrased_text)
-                assert (
-                    type(paraphrased_text) == str
-                ), f"paraphrased_text must be a str, but is of type {type(paraphrased_text)}"
-                assert len(paraphrased_text.split()) > 0, "paraphrased_text is empty"
-            else:
-                print(f"No update performed for {original_text_id} (may already be up-to-date).")
-            continue
-
-    # prompt is not used, bc we use dspy
-    extracted_info, paraphrased_texts, total_costs = paraphraser_llm.paraphrase(
-        text=original_text
+    llm_paraphraser = LLMImpostorGenerator(n_impostors=2)
+    paraphrased_texts = llm_paraphraser.generate_impostors(
+        text_id=original_text_id, text=None
     )
 
     # save results to files for manual inspection
-    save_original_text(doc_n=i, text=original_text)
-    save_extracted_info(doc_n=i, extracted_info_dict=extracted_info)
-    for paraphrased_text in paraphrased_texts:
-        save_paraphrase(doc_n=i, paraphrase=paraphrased_text)
-
-        assert (
-            type(paraphrased_text) == str
-        ), f"paraphrased_text must be a str, but is of type {type(paraphrased_text)}"
-        assert len(paraphrased_text.split()) > 0, "paraphrased_text is empty"
-
-        # Build the new document
-        paraphrase_doc = {
-            # Do not use text_id as _id since a text will be paraphrased multiple times with different settings
-            "text_id": original_text_id, # ID of the original text document
-            "length_original_text": len(original_text.split()),
-            "length_paraphrased_text": len(paraphrased_text.split()),
-            "intermediate_prompt": "bullet points dspy",
-            "prompt": "bullet points dspy",  # CONFIG.PROMPT,
-            "llm": CONFIG.OPENAI_MODEL,
-            "temperature": 1.0,  # Requirements for reasoning models like gpt-5-nano
-            "paraphrase": paraphrased_text,
-            "extracted_info": extracted_info,
-            "created_at": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
-            "openai_costs": total_costs,
-        }
-
-        # Insert into document into paraphrase collection
-        paraphrase_collection.insert_one(paraphrase_doc)
-    print(f"Inserted paraphrase(s) for document ID: {original_text_id}")
+    cursor = mongoDB.find_paraphrases(document_id=original_text_id)
+    docs = list(cursor)  # materialize once, safe if the number is small
+    extracted_info = next(
+        (doc["extracted_info"] for doc in docs if "extracted_info" in doc), {}
+    )
+    save_overview_file(original_text=original_text, paraphrases=paraphrased_texts,
+                       extracted_info_dict=extracted_info, doc_id=f"{original_text_id}_{i}")
 
 print(f"Paraphrasing complete. Inserted/Updated {max_docs} documents.")
