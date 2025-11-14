@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List
 
 from genai_detection.config import CONFIG
-from genai_detection.impostor_generators.ImpostorGenerator import LLMImpostorGenerator
+from genai_detection.impostor_generators.two_step_impostor_generator import TwoStepImpostorGenerator
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 from genai_detection.paraphrasing import two_step_paraphrasers
 from genai_detection.paraphrasing.openai_utils import OpenaiCostEstimator
@@ -22,7 +22,7 @@ paraphrase_collection = mongoDB.paraphrase_collection
 paraphraser_llm = two_step_paraphrasers.TwoStepParaphraser(model_id=CONFIG.OPENAI_MODEL)
 
 # TODO: delete following line
-max_docs = 5  # for testing, limit to first 5 documents
+max_docs = 1  # for testing, limit to first 5 documents
 openai_cost_est = OpenaiCostEstimator()
 
 save_dir = (
@@ -100,8 +100,9 @@ def save_overview_file(original_text:str, paraphrases:List[str], extracted_info_
 for i, doc in enumerate(original_collection.find(limit=max_docs)):
     original_text_id = doc["_id"]
     original_text = doc["text"]
+    print(f"Original text id: {original_text_id}")
 
-    llm_paraphraser = LLMImpostorGenerator(n_impostors=2)
+    llm_paraphraser = TwoStepImpostorGenerator(n_impostors=5)
     paraphrased_texts = llm_paraphraser.generate_impostors(
         text_id=original_text_id, text=None
     )
