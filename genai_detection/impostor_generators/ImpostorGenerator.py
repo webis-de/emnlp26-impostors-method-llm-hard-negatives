@@ -594,7 +594,7 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
         else:
             print("Using already extracted information stored in mongoDB for paraphrase generation.")
             new_impostors, total_cost = (
-                self.two_step_paraphraser.generate_paraphrase(verbose=False, extracted_info=extracted_info)
+                self.two_step_paraphraser.generate_one_paraphrase_based_on_extracted_information(verbose=False, extracted_info=extracted_info)
             )
         assert isinstance(
             extracted_info, dict

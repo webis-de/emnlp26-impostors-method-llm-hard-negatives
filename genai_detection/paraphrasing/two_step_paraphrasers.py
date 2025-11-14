@@ -23,13 +23,14 @@ from genai_detection.paraphrasing.paraphraser import Paraphraser
 
 # Field descriptions dictionary
 FIELD_DESCRIPTIONS = {
-    "title": "A short, descriptive title summarizing the text in one phrase or sentence.",
+    "heading": "A brief header or heading suitable for the text, capturing its main subject or theme in a clear and concise way.",
     "genre": "The literary or content genre of the text (e.g., essay, poem, news article, academic paper, novel, speech, letter, religious text, etc.).",
     "tone": "The emotional or stylistic tone (e.g., formal, humorous, persuasive, neutral, melancholic, satirical, didactic).",
+    "register_style": "The social level of language used in the text (e.g., casual, colloquial, academic, bureaucratic, poetic, technical).",
     "century": "The century in which the text was likely written (e.g., '18th century', '20th century', '21st century'). Use language, style, and context clues to infer.",
     "audience": "The intended audience or readership (e.g., general public, scholars, children, political leaders, students, religious followers).",
-    "author": "A concise author profile including likely traits such as gender (if implied), profession, education level, nationality, or perspective (e.g., 'a 19th-century British poet', 'a modern journalist', 'an academic researcher').",
-    "bulletpoints": "A list of concise bullet points summarizing the main ideas or arguments of the text, written in plain language.",
+    "author": "A concise author profile including likely traits such as gender (if implied), profession, education level, nationality, or perspective (e.g., 'a 19th-century British poet', 'a modern journalist', 'an academic researcher'), using idiosyncrasies in the text (e.g., spelling or grammar errors) to guide the inference.",
+    "bulletpoints": "A list of concise bullet points summarizing the main ideas or arguments of the text, written in plain language, focusing on meaning rather than wording.",
     "length": "The approximate target length of the generated text, in number of words.",
 }
 
@@ -38,44 +39,34 @@ class ExtractInfo(dspy.Signature):
     """Extract structured literary and stylistic information from text."""
 
     text: str = dspy.InputField(desc="The full input text to analyze.")
-    title: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["title"])
+    heading: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["heading"])
     genre: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["genre"])
     tone: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["tone"])
+    register_style: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["register_style"])
     century: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["century"])
     audience: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["audience"])
     author: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["author"])
     bulletpoints: list[str] = dspy.OutputField(desc=FIELD_DESCRIPTIONS["bulletpoints"])
 
-
+# We found that instructing the LLM to generate more than one paraphrase at a time reduces the length of the paraphrase drastically and therefore, omit n_paraphrases
 class GenerateText(dspy.Signature):
-    """Generate n_paraphrase complete alternative versions of the text, each unifying all bullet points within one coherent composition and reflecting the defined style and structure."""
+    """Generate one complete alternative version of the text, unifying all bullet points into a coherent composition and reflecting the defined style and structure."""
 
-    title: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["title"])
+    heading: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["heading"])
     genre: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["genre"])
     tone: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["tone"])
+    register_style: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["register_style"])
     century: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["century"])
     audience: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["audience"])
     author: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["author"])
     bulletpoints: list[str] = dspy.InputField(desc=FIELD_DESCRIPTIONS["bulletpoints"])
     length: int = dspy.InputField(desc=FIELD_DESCRIPTIONS["length"])
-    n_paraphrases: int = dspy.InputField(
+    text: str = dspy.OutputField(
         desc=(
-            "The number of distinct alternative texts (paraphrases) to generate. "
-            "Each paraphrase should include *all* bullet points and follow the same stylistic parameters, "
-            "but differ in wording, phrasing, or narrative structure. "
-            "This number determines how many elements will appear in the output JSON list."
-        )
-    )
-    texts: list[str] = dspy.OutputField(
-        # valid JSON syntax that Python can parse automatically.
-        desc=(
-            "A **JSON-formatted list** of several distinct texts, each written in the style of the specified author. "
-            "Every text should include **all** bullet points and reflect the specified **title**, **genre**, **tone**, **century**, "
-            "**audience**, and **author profile**. "
-            "The text length should approximately match the provided word count."
-            "Each list element should be a complete, self-contained text string."
-            "Example output format: "
-            '["Text version 1...", "Text version 2...", ...]'
+            "A single, complete paraphrased text written in the style defined by the provided parameters. "
+            "The text must integrate **all** bullet points into one coherent composition, follow the specified "
+            "**heading**, **genre**, **tone**, **register**, **century**, **audience**, and **author profile**, and "
+            "approximately match the requested word length."
         )
     )
 
@@ -108,8 +99,9 @@ class TwoStepParaphraser(Paraphraser):
             model_id,
             api_base=CONFIG.OPENAI_URL,
             api_key=CONFIG.OPENAI_API_KEY,
-            model_type="chat",
-            temperature=1.0 if is_reasoning_model else temperature,
+            model_type="chat",  # better for structured output such as extracted information
+            cache=False, # to avoid reusing the same response
+            temperature=1.0 if is_reasoning_model else temperature, # TODO: change to non-reasoning for less deterministic results?
             max_tokens=16000 if is_reasoning_model else CONFIG.MAX_LENGTH,
         )
         self.model_id = model_id
@@ -124,15 +116,15 @@ class TwoStepParaphraser(Paraphraser):
         """
         self.n_paraphrases = n_paraphrases
 
-    def generate_paraphrase(
+    def generate_one_paraphrase_based_on_extracted_information(
         self, extracted_info: dict[str, Any], verbose: bool = True
-    ) -> tuple[list[str], float]:
+    ) -> tuple[str, float]:
         """
-        Generate a paraphrase(s) based on the extracted information.
-        By default, this method will generate 50 paraphrases.
+        Generate a paraphrase based on the extracted information.
+        This method will generate one paraphrase.
         :param verbose: Whether to print debug information.
         :param extracted_info: Dictionary containing the extracted information.
-        :return: A tuple containing the generated paraphrase(s) (as a list of one or more strings) and the cost after generation.
+        :return: A tuple containing the generated paraphrase (as one string) and the costs after generation.
         """
         # Module: Predict, signature: GenerateText
         generator = dspy.Predict(GenerateText)
@@ -149,7 +141,6 @@ class TwoStepParaphraser(Paraphraser):
 
             # Remove 'text' from both sets
             extracted_keys.discard("text")
-            extracted_keys.discard("n_paraphrases")
             field_keys.discard("text")
 
             # Assert equality with a detailed message
@@ -158,15 +149,14 @@ class TwoStepParaphraser(Paraphraser):
                 f"Missing in extracted_info: {field_keys - extracted_keys}, "
                 f"Extra in extracted_info: {extracted_keys - field_keys}"
             )
-            extracted_info["n_paraphrases"] = self.n_paraphrases
 
             paraphrase = generator(**extracted_info)
             if verbose:
-                print(f"generated paraphrase{'s:' if self.n_paraphrases > 1 else ':'}", paraphrase)
+                print(f"generated paraphrase:", paraphrase)
             cost_after_generator = sum(
                 x["cost"] for x in self.lm.history if x["cost"] is not None
             )
-            return paraphrase.texts, cost_after_generator
+            return paraphrase.text, cost_after_generator
         except Exception as e:
             raise e
 
@@ -198,17 +188,26 @@ class TwoStepParaphraser(Paraphraser):
         )
 
         try:
-            # Paraphrase: List of one or more strings
-            paraphrases, cost_after_generator = self.generate_paraphrase(
-                extracted_info=extracted_info, verbose=False
-            )
+            # Paraphrase: One string
+            paraphrases, costs = [], []
+            summing = True
+            for i in range(self.n_paraphrases):
+                paraphrase, cost_after_generator = self.generate_one_paraphrase_based_on_extracted_information(
+                    extracted_info=extracted_info, verbose=False
+                )
+                paraphrases.append(paraphrase)
+                costs.append(cost_after_generator)
+                # TODO: loop to generate multiple paraphrases, look for temperature
+
+                # Detect cost accumulation (monotonically increasing across iterations)
+                if (len(costs) > 1) and not (costs[-1] > costs[-2]):
+                    summing = False
+            cost_after_generator = sum(costs) if not summing else costs[-1]
+            print("The costs are summed up: ", summing)
 
             # Total cost for both requests
-            total_cost = cost_after_extractor + (
-                cost_after_generator - cost_after_extractor
-            )
-            print(f"ATTENTION. Total cost for extractor + generator: ${total_cost:.6f}")
-            return extracted_info, paraphrases, total_cost
+            print(f"ATTENTION. Total cost for extractor + generator: ${cost_after_generator:.6f}")
+            return extracted_info, paraphrases, cost_after_generator
         except Exception as e:
             print(e)
             return extracted_info, "", cost_after_extractor
