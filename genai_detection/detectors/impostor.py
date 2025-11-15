@@ -180,8 +180,6 @@ class ImpostorDetector(ImpostorBase):
             if hasattr(
                 self.impostor_generator, "generate_impostors_by_text_id"
             ) and callable(self.impostor_generator.generate_impostors_by_text_id):
-                print("Success: Generating impostors by text ID")
-
                 impostors_of_left = (
                     self.impostor_generator.generate_impostors_by_text_id(
                         text_id=pair["left"]["id"]
@@ -255,6 +253,7 @@ class ImpostorDetector(ImpostorBase):
             document2insert["scores_over_different_rounds"] = self.scorer.score_pair(pair=pair, vectorizer=feature_extractor.vectorizer)
             self.mongoDB.insert_document(collection=self.mongoDB.impostor_output_collection, insert_data=document2insert)
             final_scores.append(document2insert["scores_over_different_rounds"])
+            print(f"Finished computing score for texts with ID {pair['left']['id']} and ID {pair['right']['id']}.")
 
         # one element = averaged score of X,Y and Y,X pair (score=number of rounds where the candidate was the most similar)
         # threshold is in [0,1], hence: normalized by rounds
@@ -272,7 +271,7 @@ class ImpostorDetector(ImpostorBase):
 
 
 if __name__ == "__main__":
-    doc_pairs = ["68f50029edacdf3d5c0279e8", "68f50029edacdf3d5c0279ea"]
+    doc_pairs = ["68f50029edacdf3d5c0279e8", "68f50029edacdf3d5c0279ea"]#, "68f50029edacdf3d5c0279eb", "68f50029edacdf3d5c0279d9"]
     imp = ImpostorDetector(impostor_technique="two_step_llm", n_impostors=4)
     res = imp.get_score(text=doc_pairs, normalize=True)
     print(res)
