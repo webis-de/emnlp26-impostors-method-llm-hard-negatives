@@ -176,7 +176,7 @@ class ImpostorDetector(ImpostorBase):
         final_scores = []
         for pair in self.pair_processor.preprocess_pairs(text_list=text):
             # --- 1) Generate impostors & validate ----------------------------------------
-            # Impostors are generated based on original, not processed (i.e., upsampled), text, to keep semantic content
+            # Impostors are generated based on the original, not processed (i.e., upsampled), text, to keep semantic content
             # Hence, impostors will be as short as original text
             # Check if the impostor generator supports "generate_impostors_by_text_id"
             if hasattr(
@@ -280,7 +280,8 @@ class ImpostorDetector(ImpostorBase):
 
 
 if __name__ == "__main__":
-    doc_pairs = ["68f50029edacdf3d5c0279ea", "68f50029edacdf3d5c0279e8"]#, "68f50029edacdf3d5c0279eb", "68f50029edacdf3d5c0279d9"]
-    imp = ImpostorDetector(impostor_technique="two_step_llm", n_impostors=4)
+    # ..ea: Ass4 and author TDH426, ...e8: Ass4 and author ASR497
+    doc_pairs = ["68f50029edacdf3d5c0279dd", "68f50029edacdf3d5c0279e8"]#, "68f50029edacdf3d5c0279eb", "68f50029edacdf3d5c0279d9"]
+    imp = ImpostorDetector(impostor_technique="two_step_llm", n_impostors=50)
     res = imp.get_score(text=doc_pairs, normalize=True)
     print(res)
