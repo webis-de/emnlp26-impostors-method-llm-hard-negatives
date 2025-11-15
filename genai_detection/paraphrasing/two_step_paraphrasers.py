@@ -114,6 +114,23 @@ class TwoStepParaphraser(Paraphraser):
         """
         self.n_paraphrases = n_paraphrases
 
+    def generate_multiple_paraphrase_based_on_extracted_information(
+        self, extracted_info: dict[str, Any], verbose: bool = True
+    ) -> tuple[List[str], float]:
+        paraphrases, total_cost = [], []
+        for i in range(self.n_paraphrases):
+            try:
+                new_impostor, cost = (
+                    self.generate_one_paraphrase_based_on_extracted_information(
+                        verbose=verbose, extracted_info=extracted_info
+                    )
+                )
+                paraphrases.append(new_impostor)
+                total_cost += cost
+            except Exception as e:
+                print(e)
+        return paraphrases, total_cost
+
     def generate_one_paraphrase_based_on_extracted_information(
         self, extracted_info: dict[str, Any], verbose: bool = True
     ) -> tuple[str, float]:
@@ -184,10 +201,9 @@ class TwoStepParaphraser(Paraphraser):
                 cost_after_extractor
             )
         )
-
+        # Paraphrase: One string
+        paraphrases, costs = [], []
         try:
-            # Paraphrase: One string
-            paraphrases, costs = [], []
             summing = True
             for i in range(self.n_paraphrases):
                 paraphrase, cost_after_generator = self.generate_one_paraphrase_based_on_extracted_information(
@@ -205,7 +221,6 @@ class TwoStepParaphraser(Paraphraser):
 
             # Total cost for both requests
             print(f"ATTENTION. Total cost for extractor + generator: ${cost_after_generator:.6f}")
-            return extracted_info, paraphrases, cost_after_generator
         except Exception as e:
             print(e)
-            return extracted_info, "", cost_after_extractor
+        return extracted_info, paraphrases, cost_after_extractor

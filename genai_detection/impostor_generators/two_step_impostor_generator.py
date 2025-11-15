@@ -61,9 +61,8 @@ class TwoStepImpostorGenerator(NonNaiveLLMImpostorGenerator):
             extracted_info, new_impostors, total_cost = self.two_step_paraphraser.paraphrase(text=text)
         else:
             print("Using already extracted information stored in mongoDB for paraphrase generation.")
-            new_impostors, total_cost = (
-                self.two_step_paraphraser.generate_one_paraphrase_based_on_extracted_information(verbose=False, extracted_info=extracted_info)
-            )
+            new_impostors, total_cost = self.two_step_paraphraser.generate_multiple_paraphrase_based_on_extracted_information(verbose=False, extracted_info=extracted_info)
+
         assert isinstance(
             extracted_info, dict
         ), f"The extracted_info must be a dictionary but is of type {type(extracted_info)}."
