@@ -55,13 +55,13 @@ class Paraphraser(ABC):
 
     def save_paraphrase_in_mongodb(self, original_text_id:str, original_text:str, paraphrased_text:str, extracted_info:Optional[dict], total_costs:Optional[float],temperature:float=1.0, prompt:str="bullet points dspy") -> None:
         """
-        Save the paraphrase to the MongoDB database.
-        :param original_text_id:
-        :param original_text:
-        :param paraphrased_text:
-        :param extracted_info:
-        :param total_costs:
-        :return:
+        Save the paraphrase to the MongoDB database collection called "paraphrase".
+        :param original_text_id: The id of the original text in the original_text collection.
+        :param original_text: The original text as a string.
+        :param paraphrased_text: The paraphrased text as a string.
+        :param extracted_info: A dictionary containing the extracted information from the paraphrase.
+        :param total_costs: The total cost of the paraphrase (including extracted information and paraphrase generation).
+        :return:-
         """
         assert (
             type(paraphrased_text) == str

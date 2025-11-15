@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 
 from bson import ObjectId
 from pymongo import MongoClient
@@ -77,6 +78,36 @@ class ParaphraseMongoDB:
         """
         document = collection.find({"_id": ObjectId(document_id)})
         return document
+
+    def get_text_or_id_from_orginal_collection(self, text: Optional[str], text_id: Optional[str]):
+        """
+        Returns text and text_id from a document in the original collection.
+        :param text: input text to generate impostors for (i.e., the candidate text)
+        :param text_id: ID in a mongo database containing texts to retrieve impostors from.
+        :return: A tuple containing text and text_id (can be none if not yet in collection).
+        """
+        assert text or text_id, "Either text or text_id must be provided."
+        # Get text from mongodb if missing
+        if not text:
+            # Should only contain one element because _id is the primary key
+            text = self.find_document(
+                collection=self.original_collection, document_id=text_id
+            )[0]["text"]
+            assert (
+                (text is not None) and type(text) == str and len(text) > 0
+            ), f"Text ID {text_id} not found."
+        # Save text in mongoDB if not yet present
+        if text and text_id:
+            existing = self.find_document(
+                collection=self.original_collection, document_id=text_id
+            )
+            if existing is None:
+                raise Exception(f"Document ID {text_id} not found.")
+                self.mongoDB.insert_document(
+                    collection=self.original_collection,
+                    insert_data={"text": text},
+                )
+        return text, text_id
 
     def find_paraphrases(self, document_id: str):
         """

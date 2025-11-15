@@ -14,14 +14,25 @@
 from typing import Optional, List
 
 from genai_detection.impostor_generators.ImpostorGenerator import NonNaiveLLMImpostorGenerator
+from genai_detection.paraphrasing.two_step_paraphrasers import TwoStepParaphraser
 
 
 class TwoStepImpostorGenerator(NonNaiveLLMImpostorGenerator):
+    def __init__(self, n_impostors: int):
+        """
+        Naive LLM-based impostor generator that uses no naive paraphrasers (i.e. only two-step paraphrasers).
+        :param n_impostors: number of impostors to generate
+        """
+        super().__init__(
+            n_impostors=n_impostors,
+        )
+        self.two_step_paraphraser = TwoStepParaphraser()
 
     def generate_impostors(
         self, text: Optional[str], text_id: Optional[str]
     ) -> List[str]:
-        text, text_id = self._get_text_or_id(text, text_id)
+        # look at base class
+        # text, text_id = self.mongoDB.get_text_or_id_from_orginal_collection(text, text_id)
 
         # returns a list of impostor texts with n_impostors impostors
         extracted_info = {}
@@ -38,6 +49,7 @@ class TwoStepImpostorGenerator(NonNaiveLLMImpostorGenerator):
 
             n_imp_to_generate -= len(impostors)
             if n_imp_to_generate <= 0:
+                print("Number of impostors in mongodb collection: {}".format(len(impostors)))
                 return impostors[: self.n_impostors]
 
         print(

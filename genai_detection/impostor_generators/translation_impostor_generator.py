@@ -15,7 +15,7 @@ from typing import Optional, List
 
 from genai_detection.impostor_generators.ImpostorGenerator import NonNaiveLLMImpostorGenerator
 from genai_detection.paraphrasing.one_step_paraphrasers import SAIAParaphraser
-from genai_detection.paraphrasing.two_step_paraphrasers import TranslationParaphraser
+from genai_detection.paraphrasing.translation_paraphraser import TranslationParaphraser
 
 
 class TranslationImpostorGenerator(NonNaiveLLMImpostorGenerator):

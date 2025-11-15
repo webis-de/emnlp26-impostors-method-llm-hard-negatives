@@ -34,6 +34,7 @@ from genai_detection.impostor_generators.ImpostorGenerator import (
 
 
 class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
+
     def __init__(
         self,
         api_key: str,
@@ -42,6 +43,7 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
         max_workers: int = 2,
         n_min_words: int = 3,
         n_max_words: int = 5,
+        real_time_generation: bool = False,
     ):
         """
         n_impostors <= num_queries * results_per_query
@@ -59,6 +61,7 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
         :param max_workers: maximum number of threads to use for parallel fetching (default: 2)
         :param n_min_words: minimum number of words in a query (default: 3)
         :param n_max_words: maximum number of words in a query (default: 5)
+        :param real_time_generation: whether to use real time generation (default: False)
         """
         super().__init__(n_impostors=num_queries * results_per_query)
         self.api_key = api_key
@@ -67,6 +70,7 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
         self.max_workers = max_workers
         self.n_min_words = n_min_words
         self.n_max_words = n_max_words
+        self.real_time_generation = real_time_generation
         assert (
             self.n_min_words < self.n_max_words
         ), "n_min_words must be less than n_max_words"
@@ -225,7 +229,7 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
         return all_results
 
     def generate_impostors(
-        self, text: str, real_time_generation: bool = False
+        self, text: str
     ) -> pd.DataFrame:
         """
         Generates impostors for the given input text using Google search results.
@@ -239,8 +243,7 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
 
         While Koppel et al. (2014) randomly choose n imposters among the top m imposter, we use all of them.
 
-        :param text: Input text to generate impostors for
-        :param real_time_generation: If True, generates queries and fetches results in real-time. If False, uses precomputed results from the specified path.
+        :param text: Input text to generate impostors for.
 
         :return: DataFrame containing search results with columns: 'query', 'title', 'url', 'snippet' (i.e. short content summary of search result), and 'position' (i.e. number of result in the search results)
 
@@ -250,7 +253,7 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
         """
         if not isinstance(text, str) or not text.strip():
             raise ValueError("Input text must be a non-empty string.")
-        if real_time_generation:
+        if self.real_time_generation:
             print("Generating impostors in real-time.")
             medium_frequency_words = self.get_medium_frequency_words(text)
             queries = self._generate_queries_based_on_candidate_words(

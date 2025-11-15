@@ -1,29 +1,36 @@
-from collections import Counter, defaultdict
-import json5
-from more_itertools import ichunked
+import heapq
 import itertools
 import json
-from datasets import load_from_disk
 import os
-from pathlib import Path
-from random import choices, sample
+import pathlib
 import re
 import sys
-from typing import Iterable, List, Literal, Optional
-import heapq
-from nltk.stem.snowball import SnowballStemmer
-import pandas as pd
 import typing as t
-from collections import Counter
+from collections import defaultdict, Counter
+from random import choices, sample
+from typing import Iterable, List, Literal, Optional
 
 import numpy as np
-from nltk import ngrams
 import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
 import torch
+from datasets import load_from_disk
+from more_itertools import ichunked
+from nltk.stem.snowball import SnowballStemmer
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 from genai_detection.detectors.impostor_base import ImpostorBase
-from genai_detection.impostor_generators import ImpostorGenerator, MirrorMinds_generator
+from genai_detection.impostor_generators import MirrorMinds_generator
+from genai_detection.impostor_generators.content_impostor_generator import ContentImpostorGenerator
+from genai_detection.impostor_generators.fixed_impostor_generator import (
+    FixedImpostorGenerator,
+    BlogImpostorGenerator,
+)
+from genai_detection.impostor_generators.google_search_impostor_generator import GoogleSearchImpostorGenerator
+from genai_detection.impostor_generators.naive_impostor_generator import NaiveImpostorGenerator
+from genai_detection.impostor_generators.text_length_impostor_generator import TextLenImpostorGenerator
+from genai_detection.impostor_generators.translation_impostor_generator import TranslationImpostorGenerator
+from genai_detection.impostor_generators.two_step_impostor_generator import TwoStepImpostorGenerator
+from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from genai_detection.config import CONFIG
@@ -35,11 +42,12 @@ class ImpostorDetector(ImpostorBase):
     """
     The Impostor method extends the ngram-unmasking method.
     It uses saves the most similar author to the disputed text for each of multiple random feature selection rounds,
-    where the disputed text is compared not only to the candidate text, but alos to a set of impostor texts.
+    where the disputed text is compared not only to the candidate text, but also to a set of impostor texts.
     The final prediction is made based on of how often an author is predicted after each feature-elimination step.
 
-    The input is a list of texts where text ``i`` and text ``i+1`` belong to a pair.
-    The output for one document pair is a score for the disputed text and the candidate text (i.e. author).
+    The input is a list of texts where the text ``i`` and the text ``i+1`` belong to a pair.
+    The output for one document pair is a score (indicating the same authorship) for the disputed text and the candidate
+    text (i.e., author).
 
     References:
     ===========
@@ -51,50 +59,57 @@ class ImpostorDetector(ImpostorBase):
 
     def __init__(
         self,
-        rounds=100,
-        top_n=100000,
-        portion_delete=0.5,
+        rounds:int=100,
+        top_n:int=100000,
+        portion_delete:float=0.5,
         tokenizer=None,
-        shared_vocab_only=True,
-        tfidf_freqs=True,
-        n_impostors=25,
-        threshold=0.1,
+        shared_vocab_only:bool=True,
+        tfidf_freqs:bool=True,
+        n_impostors:int=25,
+        threshold:float=0.1,
         impostor_technique: Literal[
-            "llm",
+            "translation",
             "text_len",
             "on-the-fly",
             "blogs",
             "fixed",
             "content",
             "naive_llm",
-            "non_naive_llm",
+            "two_step_llm",
             "mirror_minds",
-        ] = "llm",
+        ] = "two_step_llm",
         path2imp: str = CONFIG.PATH2BLOG,  # PATH2GENERIC_ON_FLY_IMP,  # path to impostor file, where fixed impostors are saved or where to save generated impostors
         real_time_generation: bool = False,  # whether to generate impostors in real-time or use pre-generated ones
         min_n_tokens: int = 500,  # minimum number of tokens to consider input sequence valid, defaults to 500
         upsample: bool = True,  # whether to upsample short texts (default: True, i.e. upsample) or skip them
     ):
         """
-        :param rounds: number of random feature selection rounds, Koppel et al. (2014) use 100
-        :param top_n: number of top space-free character 4-grams to consider, Koppel et al. (2014) use 100,000
-        :param portion_delete: portion of features to eliminate in each round (reset in each round); Koppel et al. (2014) use 50% of features
-        :param tokenizer: custom tokenizer function (must accept exactly one parameter, defaults to space-free character 4-grams cf. Koppel et al. (2014))
-        :param shared_vocab_only: restrict analysis to shared vocabulary across pairs of texts (Koppel et al. (2014): all texts in the corpus, i.e. shared)
-        :param tfidf_freqs: use tfidf term frequencies (Koppel et al. (2014) use tfidf)
-        :param n_impostors: number of impostors to use for each candidate; Koppel et al. (2014) use 25 impostors
-        :param threshold: threshold for the minimum similarity score to consider two texts same-author, Koppel et al. (2014) use 0.1
-        :param impostor_technique: which technique to use to generate impostors. Options are:
-            - "llm": use LLMs to generate impostors to control both topic and genre
+        :param rounds: Number of random feature selection rounds, Koppel et al. (2014) use 100
+        :param top_n: Number of top space-free character 4-grams to consider, Koppel et al. (2014) use 100,000
+        :param portion_delete: Portion of features to eliminate in each round (reset in each round); Koppel et al. (
+        2014) use 50% of features
+        :param tokenizer: Custom tokenizer function (must accept exactly one parameter, defaults to space-free
+        character 4-grams cf. Koppel et al. (2014))
+        :param shared_vocab_only: Restrict analysis to shared vocabulary across pairs of texts (Koppel et al. (2014): all texts in the corpus, i.e. shared)
+        :param tfidf_freqs: Use tfidf term frequencies (Koppel et al. (2014) use tfidf)
+        :param n_impostors: Number of impostors to use for each candidate; Koppel et al. (2014) use 25 impostors
+        :param threshold: Threshold for the minimum similarity score to consider two texts same-author, Koppel et al. (2014) use 0.1
+        :param impostor_technique: Technique to use to generate impostors. Options are:
+            - "translation": use LLMs to generate impostors (i.e., English to x and x to English)
             - "naive_llm": use a naive LLM approach to generate impostors
+            - "two_step_llm": use two-step LLM approach to generate impostors (i.e., first extracting information and then, generating paraphrases based on these information)
             - "text_len": generate impostors of similar length from a predefined dataset (our baseline w/o reference, default)
             - "fixed": use a fixed set of impostors (Koppel et. A. (2014), not implemented yet), impostors are not related to the input text
             - "on-the-fly": generate same-topic impostors on-the-fly (Koppel et al. (2014), not implemented yet)
             - "blogs": use blogs to obtain same genre impostors (Koppel et al. (2014), not implemented yet)
-        :param path2imp: path to the impostor file, where fixed impostors are saved or where to save generated impostors
-        :param real_time_generation: whether to generate impostors in real-time or use pre-generated ones (default: False, i.e. use pre-generated impostors)
-        :param min_n_tokens: minimum number of tokens to consider input sequence valid, defaults to 500 (Bevendorff et al. (2019): 500 words)
-        :param upsample: whether to upsample short texts (default: True, i.e. upsample acc. to Bevendorff (2019)) or skip them (Bevendorff et al. (2019)/ Koppel et al (2014) at 500 words)
+        :param path2imp: Path to the impostor directory, where fixed impostors are saved or where to save newly
+        generated impostors
+        :param real_time_generation: Whether to generate impostors in real-time or use pre-generated ones (default:
+        False, i.e. use pre-generated impostors)
+        :param min_n_tokens: Minimum number of tokens to consider input sequence valid, defaults to 500 (Bevendorff
+        et al. (2019): 500 words)
+        :param upsample: Whether to upsample short texts (default: True, i.e. upsample acc. to Bevendorff (2019)) or
+        skip them (Bevendorff et al. (2019)/ Koppel et al (2014) at 500 words)
         """
 
         self.rounds = rounds
@@ -111,53 +126,60 @@ class ImpostorDetector(ImpostorBase):
         self.upsample = upsample
         self.impostor_technique = impostor_technique
         self._training_mode = True  # set to True if you are in training mode, False for validation of model
+        self.mongoDB = ParaphraseMongoDB()
 
-        if impostor_technique == "llm":
-            self.impostor_generator = ImpostorGenerator.LLMImpostorGenerator(
+        if impostor_technique == "two_step_llm":
+            self.impostor_generator = TwoStepImpostorGenerator(
                 n_impostors=self.n_impostors
             )
         elif impostor_technique == "naive_llm":
-            self.impostor_generator = ImpostorGenerator.NaiveLLMImpostorGenerator(
+            self.impostor_generator = NaiveImpostorGenerator(
                 n_impostors=self.n_impostors
             )
-        elif impostor_technique == "non_naive_llm":
-            self.impostor_generator = ImpostorGenerator.NonNaiveLLMImpostorGenerator(
+        elif impostor_technique == "translation":
+            self.impostor_generator = TranslationImpostorGenerator(
                 n_impostors=self.n_impostors
             )
         elif impostor_technique == "fixed":
-            self.impostor_generator = ImpostorGenerator.FixedImpostorGenerator(
+            self.impostor_generator = FixedImpostorGenerator(
                 n_impostors=self.n_impostors,
                 split="test" if self._training_mode else "train",
+                path2imp=self.path2imp,
             )
         elif impostor_technique == "on-the-fly":
-            self.impostor_generator = ImpostorGenerator.GoogleSearchImpostorGenerator(
+            self.impostor_generator = GoogleSearchImpostorGenerator(
                 api_key=CONFIG.SERPAPI_KEY,
                 num_queries=max(
                     1, int(self.n_impostors / 25)
                 ),  # 25 responses per query
+                real_time_generation=real_time_generation
             )
         elif impostor_technique == "blogs":
-            self.impostor_generator = ImpostorGenerator.BlogImpostorGenerator(
+            self.impostor_generator = BlogImpostorGenerator(
                 n_impostors=self.n_impostors,
-                split="test" if self._training_mode else "train",
+                split="test" if self._training_mode else "train"
             )
         elif impostor_technique == "content":
-            self.impostor_generator = ImpostorGenerator.ContentImpostorGenerator(
-                n_impostors=self.n_impostors
+            self.impostor_generator = ContentImpostorGenerator(
+                n_impostors=self.n_impostors,
+                path2imp=path2imp
             )
         elif impostor_technique == "mirror_minds":
             self.impostor_generator = MirrorMinds_generator.MirrorMindsGenerator(
                 n_impostors=self.n_impostors
             )
-        else:
-            self.impostor_generator = ImpostorGenerator.TextLenImpostorGenerator(
-                n_impostors=self.n_impostors
+        elif impostor_technique == "text_len":
+            self.impostor_generator = TextLenImpostorGenerator(
+                n_impostors=self.n_impostors,
+                path2imp=path2imp
             )
+        else:
+            raise NotImplementedError
 
     def set_treshold(self, threshold: float):
         """
         Set the threshold for the minimum similarity score to consider two texts same-author.
-        :param threshold: threshold value
+        :param threshold: Threshold value
         """
         if not (0 <= threshold <= 1):
             raise ValueError("Threshold must be in [0, 1].")
@@ -173,12 +195,13 @@ class ImpostorDetector(ImpostorBase):
         """
         self._training_mode = training_mode
         if self.impostor_technique == "fixed":
-            self.impostor_generator = ImpostorGenerator.FixedImpostorGenerator(
+            self.impostor_generator = FixedImpostorGenerator(
                 n_impostors=self.n_impostors,
                 split="test" if self._training_mode else "train",
+                path2imp=self.path2imp,
             )
         elif self.impostor_technique == "blogs":
-            self.impostor_generator = ImpostorGenerator.BlogImpostorGenerator(
+            self.impostor_generator = BlogImpostorGenerator(
                 n_impostors=self.n_impostors,
                 split="test" if self._training_mode else "train",
             )
@@ -186,13 +209,13 @@ class ImpostorDetector(ImpostorBase):
     @staticmethod
     def bootstrap_tokens(tokens, n_tokens: int = 500):
         """
-         Samples `n_tokens` from the input token sequence using bootstrapping. If the desired number of tokens
+        Samples `n_tokens` from the input token sequence using bootstrapping. If the desired number of tokens
         exceeds the size of the input sequence, sampling continues with replacement. This strategy reflects
         the procedure outlined in Bevendorff et al. (2019).
 
-        :param tokens: sequence of tokens
-        :param n_tokens: number of tokens to sample from input sequence, defaults to 500
-        :return: list of sampled tokens
+        :param tokens: Sequence of tokens
+        :param n_tokens: Number of tokens to sample from input sequence, defaults to 500
+        :return: List of sampled tokens
 
         References:
         ===========
@@ -226,7 +249,7 @@ class ImpostorDetector(ImpostorBase):
         Koppel et al. (2014) select m most similar impostors in terms of min-max similarity as impostor candidates and then,
         randomly select n actual impostors among potential impostors (because it has proven superior to using the top n impostors).
         They claim the approach is not sensitive to the choice of m and n.
-        Koppel et al. (2014) compare using min-max and cosine simialrity.
+        Koppel et al. (2014) compare using min-max and cosine similarity.
 
         References:
         ===========
@@ -247,17 +270,28 @@ class ImpostorDetector(ImpostorBase):
 
         scores_per_pair = defaultdict(
             int
-        )  # id is index of pair (i.e, length is half of the input text list)
-        # for evaluating the impact of text similarity on the scores
-        impostors_per_candidate = {}
+        )  # id is the index of the pair (i.e., length is half of the input text list)
+
         for i, t in enumerate(ichunked(text, 2)):
             t = list(t)  # generator object is not subscriptable, so convert to list
             assert len(t) == 2, "Input text must be a list of pairs of texts."
-            text_left, text_right = t[0], t[1]
+            if not len(t[0]) + len(t[1]) > 500: # text input is only text_id in mongodb
+                text_left, text_id_left = self.mongoDB.get_text_or_id_from_orginal_collection(text=None, text_id=t[0])
+                text_right, text_id_right = (
+                    self.mongoDB.get_text_or_id_from_orginal_collection(
+                        text=None, text_id=t[1]
+                    )
+                )
+            else:
+                text_left, text_right = t[0], t[1]
+                # TODO: what do i do than?
+                text_id_left = 0
+                text_id_right = 1
             len_ws_token_left = len(self.tokenize_whitespace(text_left))
             len_ws_token_right = len(self.tokenize_whitespace(text_right))
 
-            # check text length, if too short, i.e. less than 500 `words` (acc. to Koppel et al. (2014) -> invalid; acc. to Bevendorff (2019) -> upsample)
+            # check text length, if too short, i.e., less than 500 `words` (acc. to Koppel et al. (2014) -> invalid;
+            # acc. to Bevendorff (2019) -> upsample)
             if (
                 len_ws_token_left + len_ws_token_right < 2 * self.min_n_tokens
             ) and not self.upsample:  # skip
@@ -309,196 +343,142 @@ class ImpostorDetector(ImpostorBase):
                 continue
 
             # frequencies as Counter (subclass of defaultdict(int))
-            freqs_left = Counter(tokens_left)
-            freqs_right = Counter(tokens_right)
+            # freqs_left = Counter(tokens_left)
+            # freqs_right = Counter(tokens_right)
 
             # Kocher et al. (2015) exclude words appearing only once
-            freqs_left = Counter({k: v for k, v in freqs_left.items() if v > 1})
-            freqs_right = Counter({k: v for k, v in freqs_right.items() if v > 1})
+            # freqs_left = Counter({k: v for k, v in freqs_left.items() if v > 1})
+            # freqs_right = Counter({k: v for k, v in freqs_right.items() if v > 1})
 
-            # TFIDF vectorizer fit on training corpus
-            assert (
-                tokens_left is not None and tokens_right is not None
-            ), "Tokens must not be None."
-            x_left = self.tokens_to_matrix(
-                tokens_left, path2imp=self.path2imp  # top_tokens,
+            # TODO: generate candidate set first for proper tfidf representation
+            # --- 1) Generate impostors & validate ----------------------------------------
+            # Check if the impostor generator supports "generate_impostors_by_text_id"
+            if hasattr(
+                self.impostor_generator, "generate_impostors_by_text_id"
+            ) and callable(self.impostor_generator.generate_impostors_by_text_id):
+                print("Success: Generating impostors by text ID")
+
+                impostors_of_left = (
+                    self.impostor_generator.generate_impostors_by_text_id(
+                        text_id=text_id_left
+                    )
+                )
+                impostors_of_right = (
+                    self.impostor_generator.generate_impostors_by_text_id(
+                        text_id=text_id_right
+                    )
+                )
+
+            else:
+                impostors_of_left = self.impostor_generator.generate_impostors(
+                    text=text_left
+                )
+                impostors_of_right = self.impostor_generator.generate_impostors(
+                    text_right
+                )
+            if not isinstance(impostors_of_left, list) or len(impostors_of_left) < 2:
+                raise ValueError(
+                    "Left impostor generator must return a list with at least 2 impostors."
+                )
+            if not isinstance(impostors_of_right, list) or len(impostors_of_right) < 2:
+                raise ValueError(
+                    "Right impostor generator must return a list with at least 2 impostors."
+                )
+            # --- 2) Build corpus for TFIDF -----------------------------------------------
+            def preprocess_for_tfidf(text: str) -> str:
+                tokens = self.tokenizer(self.preprocess_text(text))
+                return " ".join(tokens)
+
+            corpus = [text_left, text_right] + impostors_of_left + impostors_of_right
+
+            # char_wb: n-grams only from text inside word boundaries; n-grams at the edges of words are padded with space.
+            # https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfVectorizer.html (14.11.2025)
+            # min_df: Kocher et al. (2015) exclude words appearing only once
+            vectorizer = TfidfVectorizer(ngram_range=(4, 4), analyzer="char_wb", min_df=2)
+            X = vectorizer.fit_transform(corpus)
+
+            def dense_vector(row):
+                """Helper to convert sparse TF-IDF row to dense list."""
+                return row.toarray().flatten().tolist()
+            # --- 3) Slice TF-IDF vectors cleanly -----------------------------------------
+
+            idx_left = 0
+            idx_right = 1
+            idx_left_impostors_start = 2
+            idx_left_impostors_end = 2 + len(impostors_of_left)
+            idx_right_impostors_start = idx_left_impostors_end
+            idx_right_impostors_end = idx_right_impostors_start + len(
+                impostors_of_right
             )
-            x_right = self.tokens_to_matrix(
-                tokens_right, path2imp=self.path2imp  # top_tokens,
-            )
+
+            left_tfidf = dense_vector(X[idx_left])
+            right_tfidf = dense_vector(X[idx_right])
+
+            left_impostors_tfidf = [
+                dense_vector(X[i])
+                for i in range(idx_left_impostors_start, idx_left_impostors_end)
+            ]
+
+            right_impostors_tfidf = [
+                dense_vector(X[i])
+                for i in range(idx_right_impostors_start, idx_right_impostors_end)
+            ]
+
+            # --- 4) Final store structure ------------------------------------------------
 
             store = {
                 "left": {
-                    "tfidf": x_left,
+                    "tfidf": left_tfidf,
                     "tokens": tokens_left,
                     "text": text_left,
                     "author": "unknown",
+                    "impostors": impostors_of_left,
+                    "impostors_tfidf": left_impostors_tfidf,
                 },
                 "right": {
-                    "tfidf": x_right,
+                    "tfidf": right_tfidf,
                     "tokens": tokens_right,
                     "text": text_right,
                     "author": "unknown",
+                    "impostors": impostors_of_right,
+                    "impostors_tfidf": right_impostors_tfidf,
                 },
             }
 
-            # for evaluating the impact of text similarity on the scores
-            impostors_per_candidate[f"text_pair_{i}"] = {}
-
-            existing_scores_filename = (
-                Path(__file__).resolve().parent.parent.parent
-                / CONFIG.SAVE_PATH
-                / "dumps"
-            )
-            existing_scores_filename.mkdir(parents=True, exist_ok=True)
-            existing_scores_filename = (
-                existing_scores_filename / f"impostor_{self.impostor_technique}.json"
-            )
-
-            # two iterations, generating impostors for each candidate once
-            if existing_scores_filename.exists():
-                try:
-                    with open(existing_scores_filename, "r") as f:
-                        loaded_data = json.load(f)
-                except json.decoder.JSONDecodeError as e:
-                    print(
-                        "Try using json5 because of JSONDecodeError for file:",
-                        existing_scores_filename,
-                        e,
-                    )
-                    with open(existing_scores_filename, "r", encoding="utf-8") as f:
-                        loaded_data = json5.load(f)
-                    print("Successfully loaded json5 file.")
-            else:
-                loaded_data = {}
             for j, (disputed, candidate) in enumerate(
                 itertools.permutations(list(store.keys()), 2)
             ):
                 scores_over_different_rounds = 0
-                # get impostors for the candidate text, NOT the disputed text
-                if store[candidate]["text"] not in loaded_data:
-                    print(
-                        f"Generating new impostors...\nBecause data not key in loaded_data: {store[candidate]['text'] not in loaded_data}. Path to dump {existing_scores_filename}."
-                    )
-                    new_impostors = self.impostor_generator.generate_impostors(
-                        text=store[candidate]["text"],
-                        real_time_generation=self.real_time_generation,
-                        path2imp=self.path2imp,
-                    )
-                    impostor_candidates = new_impostors
-                else:
-                    # load previously generated impostors
-                    old_impostor_candidates = loaded_data[store[candidate]["text"]]
-                    print(
-                        f"Loaded {len(old_impostor_candidates)}/{self.n_impostors} existing impostors for candidate text."
-                    )
-                    impostor_candidates = dict(
-                        old_impostor_candidates
-                    )  # copy to avoid mutating in place
-
-                    # add missing impostors if not enough
-                    new_impostors = {}
-                    if self.n_impostors > len(impostor_candidates):
-                        print(
-                            f"Generating new impostors because not enough existing ones (i.e. {self.n_impostors - len(impostor_candidates)} missing)."
-                        )
-                        new_impostors = self.impostor_generator.generate_impostors(
-                            text=store[candidate]["text"],
-                            real_time_generation=self.real_time_generation,
-                            path2imp=self.path2imp,
-                        )
-                        # merge dicts (old + new)
-                        impostor_candidates.update(new_impostors)
-
-                # if we have too many, keep only self.n_impostors (favoring new ones)
-                if len(impostor_candidates) > self.n_impostors:
-                    new_keys = list(new_impostors.keys())
-                    if new_keys:
-                        # prioritize new impostors
-                        prioritized_keys = new_keys + [
-                            k for k in impostor_candidates if k not in new_keys
-                        ]
-                    else:
-                        # fallback: keep arbitrary first N
-                        prioritized_keys = list(impostor_candidates.keys())
-
-                    impostor_candidates = {
-                        k: impostor_candidates[k]
-                        for k in prioritized_keys[: self.n_impostors]
-                    }
-
-                impostors_per_candidate[f"text_pair_{i}"][j] = {
-                    "reference_text": store[candidate]["text"],
-                    "other_text": store[disputed]["text"],
-                    "paraphrases": impostor_candidates,
-                }
-                # add generated impostors
-                loaded_data[store[candidate]["text"]] = impostor_candidates
-
-                assert all(
-                    isinstance(imp_texts, str)
-                    for imp_texts in impostor_candidates.values()
-                ), f"Impostor candidates for imp gen {self.impostor_technique} must be strings, but got: {[type(t) for t in impostor_candidates.values()]}"
-
-                tmp_store = {
-                    impostor_name: {
-                        "tfidf": self.tokens_to_matrix(
-                            self.tokenizer(impostor_text),
-                            # top_tokens,
-                            path2imp=self.path2imp,
-                        ),
-                        "text": impostor_text,
-                        "tokens": self.tokenizer(impostor_text),
-                    }
-                    for impostor_name, impostor_text in impostor_candidates.items()
-                }
-                tmp_store[candidate] = store[candidate]  # add actual candidate
-
                 # for different rounds, randomly delete a portion of features (reset in each round)
                 assert (
-                    self._vectorizer_vocab is not None
+                    vectorizer.vocabulary_ is not None
                 ), "TFIDF Vectorizer vocabulary is not set. Please ensure that the vectorizer is fitted before calling _get_score_impl."
                 for _ in range(self.rounds):
                     # feature selection: randomly delete a portion of features
                     rand_feat_to_keep_ids = sample(
-                        range(len(self._vectorizer_vocab)),
-                        int(len(self._vectorizer_vocab) * (1 - self.portion_delete)),
+                        range(len(vectorizer.vocabulary_)),
+                        int(len(vectorizer.vocabulary_) * (1 - self.portion_delete)),
                     )
-                    assert not any(
-                        [tmp_store[c]["tfidf"] is None for c in tmp_store.keys()]
-                    ), "Temporary store must not coontain empty TFIDF representations (imposter _get_score_impl)."
-                    scores = {
-                        c: self.minmax_similarity(
-                            store[disputed]["tfidf"][
-                                :, rand_feat_to_keep_ids
-                            ],  # disputed text
-                            tmp_store[c]["tfidf"][:, rand_feat_to_keep_ids],
-                        )
-                        for c in list(tmp_store.keys())
-                    }
+                    reduced_disputed_tfidf = np.array(store[disputed]["tfidf"])[rand_feat_to_keep_ids]
+                    impostor_scores = [self.minmax_similarity(reduced_disputed_tfidf,  # disputed text
+                            np.array(imp_tfidf)[rand_feat_to_keep_ids],
+                        ) for imp_tfidf in store[candidate]["impostors_tfidf"]]
+
                     # increase score if the most similar candidate is the actual candidate
-                    assert (
-                        type(scores) is dict
-                    ), "Scores must be a dictionary (imposter _get_score_impl)."
-                    assert not any(
-                        isinstance(v, str) for v in scores.values()
-                    ), "Scores must not contain strings (imposter _get_score_impl)."
-                    max_similar_candidate = max(scores, key=scores.get)
-                    scores_over_different_rounds += max_similar_candidate == candidate
+                    max_similar_imp_val = max(impostor_scores)
+                    disputed_candidate_sim_val = self.minmax_similarity(reduced_disputed_tfidf,  # disputed text
+                            np.array(store[candidate]["tfidf"])[rand_feat_to_keep_ids],
+                        )
+                    scores_over_different_rounds += (disputed_candidate_sim_val > max_similar_imp_val)
                 # average after second loop
                 scores_per_pair[i] += scores_over_different_rounds
-                scores_per_pair[i] /= j + 1
+                scores_per_pair[i] /= (j + 1)
 
-        # dump generated impostors for later analysis
-        with open(existing_scores_filename, "w") as f:
-            json.dump(loaded_data, f, indent=2)
-            print(f"Saved generated impostors to {existing_scores_filename}")
+        # TODO: save score to mongodb collection
 
         # one element = averaged score of X,Y and Y,X pair (score=number of rounds where the candidate was the most similar)
         # threshold is in [0,1], hence: normalized by rounds
-        return [
-            v / self.rounds for v in scores_per_pair.values()
-        ], impostors_per_candidate
+        return [v / self.rounds for v in scores_per_pair.values()]
 
     def normalize_text(self, text):
         """
@@ -519,9 +499,9 @@ class ImpostorDetector(ImpostorBase):
         scores = self.get_score(text)
         return [score > self.threshold for score in scores]
 
-    def tokens_to_matrix(self, tokens, path2imp: Optional[str] = None):
+    def tokens_to_matrix(self, tokens:List[str], path2imp: Optional[pathlib.Path] = None):
         """
-        Transform list of tokens into matrix of term tfidf values of the top tokens.
+        Transform a list of tokens into a matrix of term-tfidf-values of the top tokens.
         Koppel et al. (2014) use space-free character 4-grams tfidf values to represent each document as a numerical vector.
 
         References:
@@ -529,7 +509,7 @@ class ImpostorDetector(ImpostorBase):
         Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’.
 
         :param tokens: list of input tokens (e.g., space-free character 4-grams)
-        :param top_token_list: list of top tokens to include in the matrix
+        :param path2imp: Path to impostors.
         :return: Numpy array of term tfidf values, `shape = (len(tokens), len(top_token_list))`
         """
         if not hasattr(self, "_vectorizer") or not hasattr(
@@ -555,9 +535,10 @@ class ImpostorDetector(ImpostorBase):
 
         return tfidf_matrix.toarray()
 
-    def _update_vectorizer_if_necessary(self, path2imp, input_tokens):  # top_token_list
+    def _update_vectorizer_if_necessary(self, path2imp:pathlib.Path, input_tokens):  # top_token_list
         train_data = None
         candidate_texts = [" ".join(input_tokens)]
+        # TODO: Fit on complete set of candidates and disputed document
         print(
             f"Fitting TFIDF vectorizer on input tokens or candidate texts from {path2imp}."
         )
@@ -639,10 +620,17 @@ class ImpostorDetector(ImpostorBase):
         ===========
         Kocher, Mirco, and Jacques Savoy. ‘UniNE at CLEF 2015: Author Identification’, 2015.
 
-        :param text: input text
-        :param normalize_ws: collapse whitespace before tokenization
-        :return: list of tokens
+        :param text: Input text
+        :param normalize_ws: Collapse whitespace before tokenization
+        :return: List of tokens
         """
         if normalize_ws:
             text = re.sub(r"\s+", " ", text)
         return text.split()
+
+
+if __name__ == "__main__":
+    doc_pairs = ["68f50029edacdf3d5c0279e8", "68f50029edacdf3d5c0279ea"]
+    imp = ImpostorDetector(impostor_technique="two_step_llm", n_impostors=4)
+    res = imp.get_score(text=doc_pairs, normalize=True)
+    print(res)

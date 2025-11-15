@@ -17,9 +17,9 @@ from genai_detection.config import CONFIG
 from genai_detection.impostor_generators.ImpostorGenerator import LLMImpostorGenerator
 from genai_detection.paraphrasing.one_step_paraphrasers import SAIAParaphraser
 from genai_detection.paraphrasing.paraphraser import Paraphraser
+from genai_detection.paraphrasing.translation_paraphraser import TranslationParaphraser
 from genai_detection.paraphrasing.two_step_paraphrasers import (
-    TwoStepParaphraser,
-    TranslationParaphraser,
+    TwoStepParaphraser
 )
 
 
