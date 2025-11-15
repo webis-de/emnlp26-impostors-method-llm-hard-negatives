@@ -117,7 +117,7 @@ class TwoStepParaphraser(Paraphraser):
     def generate_multiple_paraphrase_based_on_extracted_information(
         self, extracted_info: dict[str, Any], verbose: bool = True
     ) -> tuple[List[str], float]:
-        paraphrases, total_cost = [], []
+        paraphrases, total_cost = [], 0
         for i in range(self.n_paraphrases):
             try:
                 new_impostor, cost = (
