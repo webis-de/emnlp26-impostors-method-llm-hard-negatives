@@ -108,7 +108,6 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
         )
         return self.generate_impostors(text=text, text_id=text_id)
 
-
     # def generate_impostors():
     # for i in range(n_imp_to_generate):
     #     # randomly select a paraphraser and a prompt
@@ -157,10 +156,15 @@ class NonNaiveLLMImpostorGenerator(LLMImpostorGenerator):
 
 if __name__ == "__main__":
     llm_paraphraser = LLMImpostorGenerator(n_impostors=4)
-    imps = llm_paraphraser.generate_impostors(text_id="68f50029edacdf3d5c0279eb", text=None)
-    for i, imp in enumerate(imps):
-        # $7,886.76 07.11.25, 10.04 Uhr
-        # $7,886.75 07.11.25, 10.49 Uhr
-        # $7,886.71 07.11.25, 12.49 Uhr
-        # FIXME: number of impostors does not work properly, too many and too short paraphrases
-        print("imp number ", i, "of length ", len(imp.split()))
+    for i in range(3):
+        text, text_id = llm_paraphraser.mongoDB.get_text_or_id_from_orginal_collection(
+            text=None, text_id="68f50029edacdf3d5c0279ea"
+        )
+        print(text[:200])
+    # imps = llm_paraphraser.generate_impostors(text_id="68f50029edacdf3d5c0279eb", text=None)
+    # for i, imp in enumerate(imps):
+    #     # $7,886.76 07.11.25, 10.04 Uhr
+    #     # $7,886.75 07.11.25, 10.49 Uhr
+    #     # $7,886.71 07.11.25, 12.49 Uhr
+    #     # FIXME: number of impostors does not work properly, too many and too short paraphrases
+    #     print("imp number ", i, "of length ", len(imp.split()))

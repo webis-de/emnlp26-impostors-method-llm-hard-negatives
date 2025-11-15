@@ -65,6 +65,14 @@ class Preprocessor:
         stemmer = SnowballStemmer("english")
         return " ".join(stemmer.stem(w) for w in text.lower().split())
 
+    def upsample_to_min_n_tokens(self, text:str, min_n_tokens:int, upsample:bool):
+        whitespace_tokens = self.tokenize_whitespace(text)
+        if (len(whitespace_tokens) < min_n_tokens) and upsample:
+            return " ".join(
+                self.bootstrap_tokens(whitespace_tokens, n_tokens=min_n_tokens)
+            )
+        return text
+
 class PairPreprocessor:
     def __init__(self, mongoDB, tokenizer, min_n_tokens:int=500, upsample:bool=False):
         self.mongoDB = mongoDB
@@ -113,23 +121,14 @@ class PairPreprocessor:
 
         # Case: too short AND upsample disabled → skip
         if total_len < 2 * self.min_n_tokens and not self.upsample:
-            return None, None, True   # skip
+            return text_left, text_right, True   # skip
 
         # Remove empty cases
         if len(w_left) == 0 or len(w_right) == 0:
-            return None, None, True   # skip
+            return text_left, text_right, True   # skip
 
-        # Upsample left
-        if len(w_left) < self.min_n_tokens:
-            text_left = " ".join(
-                self.text_preprocessor.bootstrap_tokens(w_left, n_tokens=self.min_n_tokens)
-            )
-
-        # Upsample right
-        if len(w_right) < self.min_n_tokens:
-            text_right = " ".join(
-                self.text_preprocessor.bootstrap_tokens(w_right, n_tokens=self.min_n_tokens)
-            )
+        text_left = self.text_preprocessor.upsample_to_min_n_tokens(text=text_left, min_n_tokens=self.min_n_tokens, upsample=self.upsample)
+        text_right = self.text_preprocessor.upsample_to_min_n_tokens(text=text_right, min_n_tokens=self.min_n_tokens, upsample=self.upsample)
 
         return text_left, text_right, False   # do not skip
 
@@ -160,11 +159,12 @@ class PairPreprocessor:
 
         processed = []
         for t in ichunked(text_list, 2):
-            left, right, id_left, id_right = self.obtain_texts_and_idx_from_pair(t)
+            original_left, original_right, id_left, id_right = self.obtain_texts_and_idx_from_pair(t)
 
-            # upsample if set
-            left, right, skip = self.ensure_min_lengths(left, right)
+            # upsample if set to True (i.e., different to the original texts)
+            left, right, skip = self.ensure_min_lengths(original_left, original_right)
             if skip:
+                print("Skipping texts", id_left, "and", id_right, ", because they are not long enough.")
                 continue
 
             left_tokens, right_tokens = self.preprocess_and_tokenize(left, right)
@@ -172,14 +172,15 @@ class PairPreprocessor:
 
             # Skip empty after matching
             if len(left_tokens) == 0 or len(right_tokens) == 0:
+                print("Skipping texts", id_left, "and", id_right, ", because their token lists are empty.")
                 continue
 
             processed.append({
                 "left": {
-                    "text": left, "tokens": left_tokens, "id": id_left,
+                    "processed_text": left, "tokens": left_tokens, "id": id_left, "original_text": original_left
                },
                 "right": {
-                    "text": right, "tokens": right_tokens,"id": id_right,
+                    "processed_text": right, "tokens": right_tokens,"id": id_right, "original_text": original_right
                 }
             })
 

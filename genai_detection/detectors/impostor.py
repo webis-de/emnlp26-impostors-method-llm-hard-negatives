@@ -62,7 +62,7 @@ class ImpostorDetector(ImpostorBase):
         path2imp: str = CONFIG.PATH2BLOG,  # PATH2GENERIC_ON_FLY_IMP,  # path to impostor file, where fixed impostors are saved or where to save generated impostors
         real_time_generation: bool = False,  # whether to generate impostors in real-time or use pre-generated ones
         min_n_tokens: int = 500,  # minimum number of tokens to consider input sequence valid, defaults to 500
-        upsample: bool = True,  # whether to upsample short texts (default: True, i.e. upsample) or skip them
+        upsample: bool = True,  # whether to upsample short texts (default: True, i.e., upsample) or skip them
     ):
         """
         :param rounds: Number of random feature selection rounds, Koppel et al. (2014) use 100
@@ -114,7 +114,7 @@ class ImpostorDetector(ImpostorBase):
             impostor_technique=impostor_technique, n_impostors=self.n_impostors, path2imp=self.path2imp, real_time_generation=self.real_time_generation,
         )
         self.text_preprocessor = Preprocessor()
-        self.pair_processor = PairPreprocessor(mongoDB=self.mongoDB, tokenizer=self.tokenizer, min_n_tokens=self.min_n_tokens)
+        self.pair_processor = PairPreprocessor(mongoDB=self.mongoDB, tokenizer=self.tokenizer, min_n_tokens=self.min_n_tokens, upsample=self.upsample)
         self.scorer = Scorer(rounds=self.rounds, portion_delete=self.portion_delete, similarity_fn=self.minmax_similarity)
 
     def set_treshold(self, threshold: float):
@@ -176,6 +176,8 @@ class ImpostorDetector(ImpostorBase):
         final_scores = []
         for pair in self.pair_processor.preprocess_pairs(text_list=text):
             # --- 1) Generate impostors & validate ----------------------------------------
+            # Impostors are generated based on original, not processed (i.e., upsampled), text, to keep semantic content
+            # Hence, impostors will be as short as original text
             # Check if the impostor generator supports "generate_impostors_by_text_id"
             if hasattr(
                 self.impostor_generator, "generate_impostors_by_text_id"
@@ -193,28 +195,38 @@ class ImpostorDetector(ImpostorBase):
 
             else:
                 impostors_of_left = self.impostor_generator.generate_impostors(
-                    text=pair["left"]["text"]
+                    text=pair["left"]["original_text"]
                 )
                 impostors_of_right = self.impostor_generator.generate_impostors(
-                    pair["right"]["text"]
+                    pair["right"]["original_text"]
                 )
             if not isinstance(impostors_of_left, list) or len(impostors_of_left) < 2:
                 raise ValueError(
                     "Left impostor generator must return a list with at least 2 impostors."
                 )
+            pair["left"]["impostors"] = impostors_of_left
+            pair["left"]["processed_impostors"] = [self.text_preprocessor.upsample_to_min_n_tokens(text=imp, min_n_tokens=self.min_n_tokens, upsample=self.upsample) for imp in impostors_of_left]
             if not isinstance(impostors_of_right, list) or len(impostors_of_right) < 2:
                 raise ValueError(
                     "Right impostor generator must return a list with at least 2 impostors."
                 )
+            pair["right"]["impostors"] = impostors_of_right
+            pair["right"]["processed_impostors"] = [
+                self.text_preprocessor.upsample_to_min_n_tokens(
+                    text=imp, min_n_tokens=self.min_n_tokens, upsample=self.upsample
+                )
+                for imp in impostors_of_right
+            ]
             # --- 2) Build corpus for TFIDF -----------------------------------------------
-            corpus = [pair["left"]["text"], pair["right"]["text"]] + impostors_of_left + impostors_of_right
+            # Compute TFIDF based on the processed text, which is upsampled if upsample is set to true and the original (preprocessed) text otherwise
+            corpus = [pair["left"]["processed_text"], pair["right"]["processed_text"]] +  pair["left"]["processed_impostors"] +  pair["right"]["processed_impostors"]
 
             feature_extractor = TfidfFeatureExtractor()
             X = feature_extractor.fit_transform(corpus)
 
             # --- 3) Slice TF-IDF vectors cleanly -----------------------------------------
             def dense_vector(row):
-                """Helper to convert sparse TF-IDF row to dense list."""
+                """Helper to convert sparse TF-IDF row to a dense list."""
                 return row.toarray().flatten().tolist()
 
             idx_left = 0
@@ -240,10 +252,7 @@ class ImpostorDetector(ImpostorBase):
             ]
 
             # --- 4) Final store structure ------------------------------------------------
-
-            pair["left"]["impostors"] = impostors_of_left
             pair["left"]["impostors_tfidf"] = left_impostors_tfidf
-            pair["right"]["impostors"] = impostors_of_right
             pair["right"]["impostors_tfidf"] = right_impostors_tfidf
             document2insert = {
                 f"{old_key}_{new_key}": pair[old_key][new_key]
@@ -271,7 +280,7 @@ class ImpostorDetector(ImpostorBase):
 
 
 if __name__ == "__main__":
-    doc_pairs = ["68f50029edacdf3d5c0279e8", "68f50029edacdf3d5c0279ea"]#, "68f50029edacdf3d5c0279eb", "68f50029edacdf3d5c0279d9"]
+    doc_pairs = ["68f50029edacdf3d5c0279ea", "68f50029edacdf3d5c0279e8"]#, "68f50029edacdf3d5c0279eb", "68f50029edacdf3d5c0279d9"]
     imp = ImpostorDetector(impostor_technique="two_step_llm", n_impostors=4)
     res = imp.get_score(text=doc_pairs, normalize=True)
     print(res)
