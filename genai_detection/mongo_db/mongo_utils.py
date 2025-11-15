@@ -30,6 +30,7 @@ class ParaphraseMongoDB:
         for collection_name in [
             CONFIG.MONGO_PARAPHRASE_COLLECTION,
             CONFIG.MONGO_SCORE_COLLECTION,
+            CONFIG.MONGO_IMPOSTOR_OUTPUT_COLLECTION,
         ]:
             if collection_name not in self.db.list_collection_names():
                 self.db.create_collection(collection_name)
@@ -40,7 +41,8 @@ class ParaphraseMongoDB:
                 )
 
         self.paraphrase_collection = self.db[CONFIG.MONGO_PARAPHRASE_COLLECTION]
-        self.score_collection = self.db[CONFIG.MONGO_SCORE_COLLECTION]
+        self.score_collection = self.db[CONFIG.MONGO_SCORE_COLLECTION]  # paraphrase scores
+        self.impostor_output_collection = self.db[CONFIG.MONGO_IMPOSTOR_OUTPUT_COLLECTION]
 
     @staticmethod
     def update_document(collection, _id: str, update_data: dict) -> int:
@@ -69,7 +71,7 @@ class ParaphraseMongoDB:
         collection.insert_one(insert_data)
 
     @staticmethod
-    def find_document(collection, document_id: str):
+    def find_document_by_id(collection, document_id: str):
         """
         Find an entry in the specified collection by its text ID.
         :param collection: The MongoDB collection to search.
@@ -77,6 +79,18 @@ class ParaphraseMongoDB:
         :return: The found document as a cursor object, or None if not found.
         """
         document = collection.find({"_id": ObjectId(document_id)})
+        return document
+
+    @staticmethod
+    def find_document_by_non_id_field(collection, document_field_name: str, document_value:str):
+        """
+        Find an entry in the specified collection by its value of a non-id field.
+        :param collection: The MongoDB collection to search.
+        :param document_value: The value of a non-id field.
+        :param document_field_name: The name of the non-id field.
+        :return: The found document as a cursor object, or None if not found.
+        """
+        document = collection.find({document_field_name: document_value})
         return document
 
     def get_text_or_id_from_orginal_collection(self, text: Optional[str], text_id: Optional[str]):
@@ -90,15 +104,18 @@ class ParaphraseMongoDB:
         # Get text from mongodb if missing
         if not text:
             # Should only contain one element because _id is the primary key
-            text = self.find_document(
+            text = self.find_document_by_id(
                 collection=self.original_collection, document_id=text_id
             )[0]["text"]
             assert (
                 (text is not None) and type(text) == str and len(text) > 0
             ), f"Text ID {text_id} not found."
+
+        if not text_id:
+            text_id = self.find_document_by_non_id_field(collection=self.original_collection, document_field_name="text", document_value=text)[0]["_id"]
         # Save text in mongoDB if not yet present
         if text and text_id:
-            existing = self.find_document(
+            existing = self.find_document_by_id(
                 collection=self.original_collection, document_id=text_id
             )
             if existing is None:

@@ -1,0 +1,186 @@
+import re
+from random import sample, choices
+from typing import List, Iterable
+
+from bson import ObjectId
+from more_itertools import ichunked
+from nltk import SnowballStemmer
+
+from genai_detection.detectors.detector_base import DetectorBase
+
+
+class Preprocessor:
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def bootstrap_tokens(tokens: List[str], n_tokens: int = 500):
+        """
+        Samples `n_tokens` from the input token sequence using bootstrapping. If the desired number of tokens
+        exceeds the size of the input sequence, sampling continues with replacement. This strategy reflects
+        the procedure outlined in Bevendorff et al. (2019).
+
+        :param tokens: Sequence of tokens
+        :param n_tokens: Number of tokens to sample from input sequence, defaults to 500
+        :return: List of sampled tokens
+
+        References:
+        ===========
+        Janek Bevendorff, Benno Stein, Matthias Hagen, and Martin Potthast. 2019. Generalizing Unmasking for Short Texts. In Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies, Volume 1 (Long and Short Papers), pages 654–659, Minneapolis, Minnesota. Association for Computational Linguistics.
+        """
+        if not tokens:
+            raise ValueError("Cannot bootstrap tokens from an empty sequence.")
+        tokens = list(tokens)  # mutable copy
+        sampled = sample(tokens, min(n_tokens, len(tokens)))  # without replacement
+        remaining = max(0, n_tokens - len(tokens))
+        sampled.extend(choices(tokens, k=remaining))  # with replacement
+
+        return sampled
+
+    @staticmethod
+    def tokenize_whitespace(text: str, normalize_ws: bool = True):
+        """
+        Tokenize input text by any whitespace character (including \n \r \t \f and spaces).
+        Kocher et al. (2015) use isolated words without stemming but with punctuation symbols.
+
+        References:
+        ===========
+        Kocher, Mirco, and Jacques Savoy. ‘UniNE at CLEF 2015: Author Identification’, 2015.
+
+        :param text: Input text
+        :param normalize_ws: Collapse whitespace before tokenization
+        :return: List of tokens
+        """
+        if normalize_ws:
+            text = re.sub(r"\s+", " ", text)
+        return text.split()
+
+    @staticmethod
+    def normalize_text(text:str):
+        """
+        Normalize input text by lowercasing and stemming.
+        Koppel et al. (2014) do (explicitly) not normalize text pairs, but without normalization, the results are terrible.
+        Kocher et al. (2015) use isolated words without stemming but with punctuation symbols.
+        """
+        stemmer = SnowballStemmer("english")
+        return " ".join(stemmer.stem(w) for w in text.lower().split())
+
+class PairPreprocessor:
+    def __init__(self, mongoDB, tokenizer, min_n_tokens:int=500, upsample:bool=False):
+        self.mongoDB = mongoDB
+        self.text_preprocessor = Preprocessor()
+        self.tokenizer = tokenizer
+        self.min_n_tokens = min_n_tokens
+        self.upsample = upsample
+        self.detector_base = DetectorBase()
+
+    # -----------------------------------------------------------
+    # 1. Validate & turn input into iterable
+    # -----------------------------------------------------------
+    def turn_input_iterable(self, text):
+        assert isinstance(text, Iterable), \
+            f"Input text must be iterable. But got: {type(text)}"
+        return list(text)
+
+    # -----------------------------------------------------------
+    # 2. Convert IDs to text or other way around
+    # -----------------------------------------------------------
+    def obtain_texts_and_idx_from_pair(self, texts):
+        texts = list(texts)
+        assert len(texts) == 2, "Input must contain exactly two text entries."
+
+        def resolve(value:str):
+            try:
+                ObjectId(value)
+                return self.mongoDB.get_text_or_id_from_orginal_collection(
+                    text_id=value, text=None
+                )
+            except Exception as e:
+                return self.mongoDB.get_text_or_id_from_orginal_collection(text=value, text_id=None)
+
+        left_text, left_id = resolve(texts[0])
+        right_text, right_id = resolve(texts[1])
+
+        return left_text, right_text, left_id, right_id
+
+    # -----------------------------------------------------------
+    # 3. Validate lengths and optionally upsample
+    # -----------------------------------------------------------
+    def ensure_min_lengths(self, text_left:str, text_right:str):
+        w_left = self.text_preprocessor.tokenize_whitespace(text_left)
+        w_right = self.text_preprocessor.tokenize_whitespace(text_right)
+        total_len = len(w_left) + len(w_right)
+
+        # Case: too short AND upsample disabled → skip
+        if total_len < 2 * self.min_n_tokens and not self.upsample:
+            return None, None, True   # skip
+
+        # Remove empty cases
+        if len(w_left) == 0 or len(w_right) == 0:
+            return None, None, True   # skip
+
+        # Upsample left
+        if len(w_left) < self.min_n_tokens:
+            text_left = " ".join(
+                self.text_preprocessor.bootstrap_tokens(w_left, n_tokens=self.min_n_tokens)
+            )
+
+        # Upsample right
+        if len(w_right) < self.min_n_tokens:
+            text_right = " ".join(
+                self.text_preprocessor.bootstrap_tokens(w_right, n_tokens=self.min_n_tokens)
+            )
+
+        return text_left, text_right, False   # do not skip
+
+    # -----------------------------------------------------------
+    # 4. Preprocess + tokenize
+    # -----------------------------------------------------------
+    def preprocess_and_tokenize(self, left:str, right:str):
+        left_tokens = self.tokenizer(self.detector_base.preprocess_text(left))
+        right_tokens = self.tokenizer(self.detector_base.preprocess_text(right))
+        return left_tokens, right_tokens
+
+    # -----------------------------------------------------------
+    # 5. Make left/right have same token length
+    # -----------------------------------------------------------
+    def match_lengths(self, left_toks, right_toks):
+        max_allowed = min(len(left_toks), len(right_toks))
+        if len(left_toks) > max_allowed:
+            left_toks[:] = left_toks[:max_allowed]
+        if len(right_toks) > max_allowed:
+            right_toks[:] = right_toks[:max_allowed]
+        return left_toks, right_toks
+
+    # -----------------------------------------------------------
+    # PUBLIC MAIN ENTRY POINT
+    # -----------------------------------------------------------
+    def preprocess_pairs(self, text_list:Iterable[str]):
+        text_list = self.turn_input_iterable(text_list)
+
+        processed = []
+        for t in ichunked(text_list, 2):
+            left, right, id_left, id_right = self.obtain_texts_and_idx_from_pair(t)
+
+            # upsample if set
+            left, right, skip = self.ensure_min_lengths(left, right)
+            if skip:
+                continue
+
+            left_tokens, right_tokens = self.preprocess_and_tokenize(left, right)
+            left_tokens, right_tokens = self.match_lengths(left_tokens, right_tokens)
+
+            # Skip empty after matching
+            if len(left_tokens) == 0 or len(right_tokens) == 0:
+                continue
+
+            processed.append({
+                "left": {
+                    "text": left, "tokens": left_tokens, "id": id_left,
+               },
+                "right": {
+                    "text": right, "tokens": right_tokens,"id": id_right,
+                }
+            })
+
+        return processed

@@ -1,35 +1,16 @@
-import heapq
-import itertools
-import json
 import os
-import pathlib
-import re
 import sys
 import typing as t
-from collections import defaultdict, Counter
-from random import choices, sample
-from typing import Iterable, List, Literal, Optional
+from typing import Iterable, List, Literal
 
 import numpy as np
-import pandas as pd
 import torch
-from datasets import load_from_disk
-from more_itertools import ichunked
-from nltk.stem.snowball import SnowballStemmer
-from sklearn.feature_extraction.text import TfidfVectorizer
 
+from genai_detection.detectors.components.feature_extractor import TfidfFeatureExtractor
+from genai_detection.detectors.components.impostor_factory import create_impostor_generator
+from genai_detection.detectors.components.preprocessing import Preprocessor, PairPreprocessor
+from genai_detection.detectors.components.scorer import Scorer
 from genai_detection.detectors.impostor_base import ImpostorBase
-from genai_detection.impostor_generators import MirrorMinds_generator
-from genai_detection.impostor_generators.content_impostor_generator import ContentImpostorGenerator
-from genai_detection.impostor_generators.fixed_impostor_generator import (
-    FixedImpostorGenerator,
-    BlogImpostorGenerator,
-)
-from genai_detection.impostor_generators.google_search_impostor_generator import GoogleSearchImpostorGenerator
-from genai_detection.impostor_generators.naive_impostor_generator import NaiveImpostorGenerator
-from genai_detection.impostor_generators.text_length_impostor_generator import TextLenImpostorGenerator
-from genai_detection.impostor_generators.translation_impostor_generator import TranslationImpostorGenerator
-from genai_detection.impostor_generators.two_step_impostor_generator import TwoStepImpostorGenerator
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -111,6 +92,7 @@ class ImpostorDetector(ImpostorBase):
         :param upsample: Whether to upsample short texts (default: True, i.e. upsample acc. to Bevendorff (2019)) or
         skip them (Bevendorff et al. (2019)/ Koppel et al (2014) at 500 words)
         """
+        super().__init__()
 
         self.rounds = rounds
         self.top_n = top_n
@@ -128,53 +110,12 @@ class ImpostorDetector(ImpostorBase):
         self._training_mode = True  # set to True if you are in training mode, False for validation of model
         self.mongoDB = ParaphraseMongoDB()
 
-        if impostor_technique == "two_step_llm":
-            self.impostor_generator = TwoStepImpostorGenerator(
-                n_impostors=self.n_impostors
-            )
-        elif impostor_technique == "naive_llm":
-            self.impostor_generator = NaiveImpostorGenerator(
-                n_impostors=self.n_impostors
-            )
-        elif impostor_technique == "translation":
-            self.impostor_generator = TranslationImpostorGenerator(
-                n_impostors=self.n_impostors
-            )
-        elif impostor_technique == "fixed":
-            self.impostor_generator = FixedImpostorGenerator(
-                n_impostors=self.n_impostors,
-                split="test" if self._training_mode else "train",
-                path2imp=self.path2imp,
-            )
-        elif impostor_technique == "on-the-fly":
-            self.impostor_generator = GoogleSearchImpostorGenerator(
-                api_key=CONFIG.SERPAPI_KEY,
-                num_queries=max(
-                    1, int(self.n_impostors / 25)
-                ),  # 25 responses per query
-                real_time_generation=real_time_generation
-            )
-        elif impostor_technique == "blogs":
-            self.impostor_generator = BlogImpostorGenerator(
-                n_impostors=self.n_impostors,
-                split="test" if self._training_mode else "train"
-            )
-        elif impostor_technique == "content":
-            self.impostor_generator = ContentImpostorGenerator(
-                n_impostors=self.n_impostors,
-                path2imp=path2imp
-            )
-        elif impostor_technique == "mirror_minds":
-            self.impostor_generator = MirrorMinds_generator.MirrorMindsGenerator(
-                n_impostors=self.n_impostors
-            )
-        elif impostor_technique == "text_len":
-            self.impostor_generator = TextLenImpostorGenerator(
-                n_impostors=self.n_impostors,
-                path2imp=path2imp
-            )
-        else:
-            raise NotImplementedError
+        self.impostor_generator = create_impostor_generator(
+            impostor_technique=impostor_technique, n_impostors=self.n_impostors, path2imp=self.path2imp, real_time_generation=self.real_time_generation,
+        )
+        self.text_preprocessor = Preprocessor()
+        self.pair_processor = PairPreprocessor(mongoDB=self.mongoDB, tokenizer=self.tokenizer, min_n_tokens=self.min_n_tokens)
+        self.scorer = Scorer(rounds=self.rounds, portion_delete=self.portion_delete, similarity_fn=self.minmax_similarity)
 
     def set_treshold(self, threshold: float):
         """
@@ -194,41 +135,12 @@ class ImpostorDetector(ImpostorBase):
         :param training_mode: True if in training mode, False otherwise.
         """
         self._training_mode = training_mode
-        if self.impostor_technique == "fixed":
-            self.impostor_generator = FixedImpostorGenerator(
-                n_impostors=self.n_impostors,
-                split="test" if self._training_mode else "train",
-                path2imp=self.path2imp,
-            )
-        elif self.impostor_technique == "blogs":
-            self.impostor_generator = BlogImpostorGenerator(
-                n_impostors=self.n_impostors,
-                split="test" if self._training_mode else "train",
-            )
-
-    @staticmethod
-    def bootstrap_tokens(tokens, n_tokens: int = 500):
-        """
-        Samples `n_tokens` from the input token sequence using bootstrapping. If the desired number of tokens
-        exceeds the size of the input sequence, sampling continues with replacement. This strategy reflects
-        the procedure outlined in Bevendorff et al. (2019).
-
-        :param tokens: Sequence of tokens
-        :param n_tokens: Number of tokens to sample from input sequence, defaults to 500
-        :return: List of sampled tokens
-
-        References:
-        ===========
-        Janek Bevendorff, Benno Stein, Matthias Hagen, and Martin Potthast. 2019. Generalizing Unmasking for Short Texts. In Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies, Volume 1 (Long and Short Papers), pages 654–659, Minneapolis, Minnesota. Association for Computational Linguistics.
-        """
-        if not tokens:
-            raise ValueError("Cannot bootstrap tokens from an empty sequence.")
-        tokens = list(tokens)  # mutable copy
-        sampled = sample(tokens, min(n_tokens, len(tokens)))  # without replacement
-        remaining = max(0, n_tokens - len(tokens))
-        sampled.extend(choices(tokens, k=remaining))  # with replacement
-
-        return sampled
+        self.impostor_generator = create_impostor_generator(
+            impostor_technique=self.impostor_technique,
+            n_impostors=self.n_impostors,
+            split="test" if self._training_mode else "train",
+            path2imp=self.path2imp
+        )
 
     def _get_score_impl(
         self, text: Iterable[str]
@@ -261,96 +173,8 @@ class ImpostorDetector(ImpostorBase):
         :param text: input text or batch of input texts
         :return: score indicating whether the input text is machine-generated, i.e. close 1 means machine-generated, close 0 means human-written
         """
-        assert isinstance(
-            text, Iterable
-        ), "Input text must be iterable. But got: {}".format(
-            type(text), text[0:10] if isinstance(text, (str, list)) else text
-        )
-        text = list(text)  # convert to tuple to list
-
-        scores_per_pair = defaultdict(
-            int
-        )  # id is the index of the pair (i.e., length is half of the input text list)
-
-        for i, t in enumerate(ichunked(text, 2)):
-            t = list(t)  # generator object is not subscriptable, so convert to list
-            assert len(t) == 2, "Input text must be a list of pairs of texts."
-            if not len(t[0]) + len(t[1]) > 500: # text input is only text_id in mongodb
-                text_left, text_id_left = self.mongoDB.get_text_or_id_from_orginal_collection(text=None, text_id=t[0])
-                text_right, text_id_right = (
-                    self.mongoDB.get_text_or_id_from_orginal_collection(
-                        text=None, text_id=t[1]
-                    )
-                )
-            else:
-                text_left, text_right = t[0], t[1]
-                # TODO: what do i do than?
-                text_id_left = 0
-                text_id_right = 1
-            len_ws_token_left = len(self.tokenize_whitespace(text_left))
-            len_ws_token_right = len(self.tokenize_whitespace(text_right))
-
-            # check text length, if too short, i.e., less than 500 `words` (acc. to Koppel et al. (2014) -> invalid;
-            # acc. to Bevendorff (2019) -> upsample)
-            if (
-                len_ws_token_left + len_ws_token_right < 2 * self.min_n_tokens
-            ) and not self.upsample:  # skip
-                print(
-                    f"Skipping text pair: Left: {text_left}, Right: {text_right} (too short, {len_ws_token_left + len_ws_token_right} tokens < {2 * self.min_n_tokens})"
-                )
-                continue
-            if len_ws_token_left == 0 or len_ws_token_right == 0:
-                print(
-                    f"Skipping empty text pair: Left: {text_left}, Right: {text_right}"
-                )
-                continue  # skip empty texts
-
-            # upsample short texts to the minimum number of tokens
-            if len_ws_token_left < self.min_n_tokens:
-                text_left = " ".join(
-                    self.bootstrap_tokens(
-                        self.tokenize_whitespace(text_left), n_tokens=self.min_n_tokens
-                    )
-                )
-            if len_ws_token_right < self.min_n_tokens:
-                text_right = " ".join(
-                    self.bootstrap_tokens(
-                        self.tokenize_whitespace(text_right), n_tokens=self.min_n_tokens
-                    )
-                )
-
-            # Control situation via preprocessing: remove genre artifacts, remove html tags (e.g., <nl>), etc.
-            # Koppel et al. (2014) do not normalize text pairs.
-            # preprocess_text omits all layout/ structural information to keep only style
-            # Koppel et al. (2014) use documents of length 500 words exactly -> we DON'T crop at min_n_tokens to keep more information
-            tokens_left = self.tokenizer(self.preprocess_text(text_left))
-            tokens_right = self.tokenizer(self.preprocess_text(text_right))
-
-            # ensure both texts have same length (control confounder text length): min length of both
-            max_len_allowed = min(len(tokens_left), len(tokens_right))
-            for tokens in [tokens_left, tokens_right]:
-                if len(tokens) > max_len_allowed:
-                    tokens[:] = tokens[
-                        :max_len_allowed
-                    ]  # inplace crop, changes also other references to the same list
-
-            if len(tokens_left) == 0 or len(tokens_right) == 0:
-                print(
-                    "Skipping empty text pair: Left: {}, Right: {}".format(
-                        text_left, text_right
-                    )
-                )
-                continue
-
-            # frequencies as Counter (subclass of defaultdict(int))
-            # freqs_left = Counter(tokens_left)
-            # freqs_right = Counter(tokens_right)
-
-            # Kocher et al. (2015) exclude words appearing only once
-            # freqs_left = Counter({k: v for k, v in freqs_left.items() if v > 1})
-            # freqs_right = Counter({k: v for k, v in freqs_right.items() if v > 1})
-
-            # TODO: generate candidate set first for proper tfidf representation
+        final_scores = []
+        for pair in self.pair_processor.preprocess_pairs(text_list=text):
             # --- 1) Generate impostors & validate ----------------------------------------
             # Check if the impostor generator supports "generate_impostors_by_text_id"
             if hasattr(
@@ -360,21 +184,21 @@ class ImpostorDetector(ImpostorBase):
 
                 impostors_of_left = (
                     self.impostor_generator.generate_impostors_by_text_id(
-                        text_id=text_id_left
+                        text_id=pair["left"]["id"]
                     )
                 )
                 impostors_of_right = (
                     self.impostor_generator.generate_impostors_by_text_id(
-                        text_id=text_id_right
+                        text_id=pair["right"]["id"]
                     )
                 )
 
             else:
                 impostors_of_left = self.impostor_generator.generate_impostors(
-                    text=text_left
+                    text=pair["left"]["text"]
                 )
                 impostors_of_right = self.impostor_generator.generate_impostors(
-                    text_right
+                    pair["right"]["text"]
                 )
             if not isinstance(impostors_of_left, list) or len(impostors_of_left) < 2:
                 raise ValueError(
@@ -385,22 +209,15 @@ class ImpostorDetector(ImpostorBase):
                     "Right impostor generator must return a list with at least 2 impostors."
                 )
             # --- 2) Build corpus for TFIDF -----------------------------------------------
-            def preprocess_for_tfidf(text: str) -> str:
-                tokens = self.tokenizer(self.preprocess_text(text))
-                return " ".join(tokens)
+            corpus = [pair["left"]["text"], pair["right"]["text"]] + impostors_of_left + impostors_of_right
 
-            corpus = [text_left, text_right] + impostors_of_left + impostors_of_right
+            feature_extractor = TfidfFeatureExtractor()
+            X = feature_extractor.fit_transform(corpus)
 
-            # char_wb: n-grams only from text inside word boundaries; n-grams at the edges of words are padded with space.
-            # https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfVectorizer.html (14.11.2025)
-            # min_df: Kocher et al. (2015) exclude words appearing only once
-            vectorizer = TfidfVectorizer(ngram_range=(4, 4), analyzer="char_wb", min_df=2)
-            X = vectorizer.fit_transform(corpus)
-
+            # --- 3) Slice TF-IDF vectors cleanly -----------------------------------------
             def dense_vector(row):
                 """Helper to convert sparse TF-IDF row to dense list."""
                 return row.toarray().flatten().tolist()
-            # --- 3) Slice TF-IDF vectors cleanly -----------------------------------------
 
             idx_left = 0
             idx_right = 1
@@ -411,8 +228,8 @@ class ImpostorDetector(ImpostorBase):
                 impostors_of_right
             )
 
-            left_tfidf = dense_vector(X[idx_left])
-            right_tfidf = dense_vector(X[idx_right])
+            pair["left"]["tfidf"] = dense_vector(X[idx_left])
+            pair["right"]["tfidf"] = dense_vector(X[idx_right])
 
             left_impostors_tfidf = [
                 dense_vector(X[i])
@@ -426,207 +243,32 @@ class ImpostorDetector(ImpostorBase):
 
             # --- 4) Final store structure ------------------------------------------------
 
-            store = {
-                "left": {
-                    "tfidf": left_tfidf,
-                    "tokens": tokens_left,
-                    "text": text_left,
-                    "author": "unknown",
-                    "impostors": impostors_of_left,
-                    "impostors_tfidf": left_impostors_tfidf,
-                },
-                "right": {
-                    "tfidf": right_tfidf,
-                    "tokens": tokens_right,
-                    "text": text_right,
-                    "author": "unknown",
-                    "impostors": impostors_of_right,
-                    "impostors_tfidf": right_impostors_tfidf,
-                },
+            pair["left"]["impostors"] = impostors_of_left
+            pair["left"]["impostors_tfidf"] = left_impostors_tfidf
+            pair["right"]["impostors"] = impostors_of_right
+            pair["right"]["impostors_tfidf"] = right_impostors_tfidf
+            document2insert = {
+                f"{old_key}_{new_key}": pair[old_key][new_key]
+                for old_key in ["left", "right"]
+                for new_key in pair[old_key]
             }
-
-            for j, (disputed, candidate) in enumerate(
-                itertools.permutations(list(store.keys()), 2)
-            ):
-                scores_over_different_rounds = 0
-                # for different rounds, randomly delete a portion of features (reset in each round)
-                assert (
-                    vectorizer.vocabulary_ is not None
-                ), "TFIDF Vectorizer vocabulary is not set. Please ensure that the vectorizer is fitted before calling _get_score_impl."
-                for _ in range(self.rounds):
-                    # feature selection: randomly delete a portion of features
-                    rand_feat_to_keep_ids = sample(
-                        range(len(vectorizer.vocabulary_)),
-                        int(len(vectorizer.vocabulary_) * (1 - self.portion_delete)),
-                    )
-                    reduced_disputed_tfidf = np.array(store[disputed]["tfidf"])[rand_feat_to_keep_ids]
-                    impostor_scores = [self.minmax_similarity(reduced_disputed_tfidf,  # disputed text
-                            np.array(imp_tfidf)[rand_feat_to_keep_ids],
-                        ) for imp_tfidf in store[candidate]["impostors_tfidf"]]
-
-                    # increase score if the most similar candidate is the actual candidate
-                    max_similar_imp_val = max(impostor_scores)
-                    disputed_candidate_sim_val = self.minmax_similarity(reduced_disputed_tfidf,  # disputed text
-                            np.array(store[candidate]["tfidf"])[rand_feat_to_keep_ids],
-                        )
-                    scores_over_different_rounds += (disputed_candidate_sim_val > max_similar_imp_val)
-                # average after second loop
-                scores_per_pair[i] += scores_over_different_rounds
-                scores_per_pair[i] /= (j + 1)
-
-        # TODO: save score to mongodb collection
+            document2insert["scores_over_different_rounds"] = self.scorer.score_pair(pair=pair, vectorizer=feature_extractor.vectorizer)
+            self.mongoDB.insert_document(collection=self.mongoDB.impostor_output_collection, insert_data=document2insert)
+            final_scores.append(document2insert["scores_over_different_rounds"])
 
         # one element = averaged score of X,Y and Y,X pair (score=number of rounds where the candidate was the most similar)
         # threshold is in [0,1], hence: normalized by rounds
-        return [v / self.rounds for v in scores_per_pair.values()]
-
-    def normalize_text(self, text):
-        """
-        Normalize input text by lowercasing and stemming.
-        Koppel et al. (2014) do (explicitly) not normalize text pairs, but without normalization, the results are terrible.
-        Kocher et al. (2015) use isolated words without stemming but with punctuation symbols.
-        """
-        stemmer = SnowballStemmer("english")
-        return " ".join(stemmer.stem(w) for w in text.lower().split())
+        return [v / self.rounds for v in final_scores]
 
     def get_prediction(self, text: Iterable[str]) -> List[bool]:
         """
-        Predict if the input text(s) were written by a the same author
+        Predict if the input texts were written by the same author
 
         :param text: input text or batch of input texts
-        :return: boolean classifications of whether inputs are likely same author
+        :return: boolean classifications of whether inputs are likely the same author
         """
         scores = self.get_score(text)
         return [score > self.threshold for score in scores]
-
-    def tokens_to_matrix(self, tokens:List[str], path2imp: Optional[pathlib.Path] = None):
-        """
-        Transform a list of tokens into a matrix of term-tfidf-values of the top tokens.
-        Koppel et al. (2014) use space-free character 4-grams tfidf values to represent each document as a numerical vector.
-
-        References:
-        ===========
-        Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’.
-
-        :param tokens: list of input tokens (e.g., space-free character 4-grams)
-        :param path2imp: Path to impostors.
-        :return: Numpy array of term tfidf values, `shape = (len(tokens), len(top_token_list))`
-        """
-        if not hasattr(self, "_vectorizer") or not hasattr(
-            self._vectorizer, "vocabulary_"
-        ):
-            self._update_vectorizer_if_necessary(
-                path2imp=path2imp,
-                input_tokens=tokens,
-            )
-        try:
-            tfidf_matrix = self._vectorizer.transform([" ".join(tokens)])
-        except Exception as e:
-            print(f"Error transforming tokens to matrix: {e}.")
-            # avoid fitting a new vectorizer every time (costly)
-            self._update_vectorizer_if_necessary(
-                path2imp=path2imp,
-                input_tokens=tokens,
-            )
-        try:
-            tfidf_matrix = self._vectorizer.transform([" ".join(tokens)])
-        except Exception as e:
-            raise Exception("SECOND Error transforming tokens to matrix: {}".format(e))
-
-        return tfidf_matrix.toarray()
-
-    def _update_vectorizer_if_necessary(self, path2imp:pathlib.Path, input_tokens):  # top_token_list
-        train_data = None
-        candidate_texts = [" ".join(input_tokens)]
-        # TODO: Fit on complete set of candidates and disputed document
-        print(
-            f"Fitting TFIDF vectorizer on input tokens or candidate texts from {path2imp}."
-        )
-        if path2imp and path2imp.exists():
-            split = "train" if self._training_mode else "test"
-            if path2imp.suffix == ".json":
-                print(f"Loading impostor data from JSON file: {path2imp}")
-                with open(path2imp, "r") as f:
-                    # dumps have structure {outer_key: {inner_key: value}} -> load as dict and then reshape to long format
-                    raw = json.load(f)
-                    train_data = pd.DataFrame.from_dict(raw, orient="index")
-                    train_data = train_data.reset_index().melt(
-                        id_vars="index", var_name="inner_key", value_name="value"
-                    )
-                    train_data = train_data.dropna(subset=["value"])  # drop missing
-                    train_data["pair"] = train_data.apply(
-                        lambda row: [row["index"], row["value"]], axis=1
-                    )
-                    assert isinstance(
-                        train_data, pd.DataFrame
-                    ), f"Expected train_data to be a pandas DataFrame, but got {type(train_data)}."
-                    if split in train_data:
-                        train_data = train_data[split]
-            else:
-                train_data = load_from_disk(path2imp)[split].to_pandas()
-            assert isinstance(
-                train_data, pd.DataFrame
-            ), f"Expected train_data to be a pandas DataFrame, but got {type(train_data)}."
-            if not train_data is None and not train_data.empty:
-                candidate_texts = []
-                for _, row in train_data.iterrows():
-                    entry = row.to_dict()
-                    assert isinstance(
-                        entry, dict
-                    ), f"Each entry in the dataset must be a dictionary (tokens_to_matrix). But is {type(entry)}/entry:{entry}/row:{row}."
-                    pair = entry.get("pair", [])
-                    candidate_texts.extend(pair)
-        else:
-            print(
-                f"Warning: path2imp {path2imp} does not exist. Using only input tokens for vectorizer fitting."
-            )
-        assert isinstance(
-            candidate_texts, list
-        ), f"Candidate texts must be a list, but got {type(candidate_texts)}."
-        assert len(candidate_texts) > 0, f"No candidate texts found in {path2imp}."
-        tokens = [
-            token
-            for t in candidate_texts
-            for token in self.tokenizer(self.preprocess_text(t))
-        ]
-        freqs = Counter(tokens)
-        freqs = Counter({k: v for k, v in freqs.items() if v > 1})
-        self._vectorizer_vocab = heapq.nlargest(
-            self.top_n, list(freqs.keys()), key=lambda x: freqs[x]
-        )
-        self._vectorizer = TfidfVectorizer(
-            vocabulary=self._vectorizer_vocab,
-            input="content",
-            dtype=np.float32,
-            lowercase=False,  # do not lowercase all, treat tokens as case-sensitive
-        )
-
-        self._vectorizer = self._vectorizer.fit(candidate_texts)
-        if (
-            not hasattr(self._vectorizer, "vocabulary_")
-            or self._vectorizer.vocabulary_ is None
-        ):
-            raise RuntimeError("Vectorizer fitting failed: vocabulary is empty.")
-
-        return self._vectorizer
-
-    @staticmethod
-    def tokenize_whitespace(text: str, normalize_ws: bool = True):
-        """
-        Tokenize input text by any whitespace character (including \n \r \t \f and spaces).
-        Kocher et al. (2015) use isolated words without stemming but with punctuation symbols.
-
-        References:
-        ===========
-        Kocher, Mirco, and Jacques Savoy. ‘UniNE at CLEF 2015: Author Identification’, 2015.
-
-        :param text: Input text
-        :param normalize_ws: Collapse whitespace before tokenization
-        :return: List of tokens
-        """
-        if normalize_ws:
-            text = re.sub(r"\s+", " ", text)
-        return text.split()
 
 
 if __name__ == "__main__":
