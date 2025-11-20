@@ -14,6 +14,7 @@ class BaseConfig:
     DEEPL_API_KEY = os.getenv("DEEPL_KEY")
     OPENAI_API_KEY = os.getenv("OPENAI_KEY")
     OPENAI_PROJECT_ID = os.getenv("OPENAI_PROJECT_ID")
+    CHATNOIR_KEY = os.getenv("CHATNOIR_KEY")
     DATA_BASE_PATH = "data/datasets"
     PATH2PAN25 = f"{DATA_BASE_PATH}/pan25-genai-identification/pan25-dataset-converted"
     PATH2PAN23 = (
