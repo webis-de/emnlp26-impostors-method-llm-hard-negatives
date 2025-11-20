@@ -17,116 +17,141 @@ class ParaphraseScoresVisualizer():
                            "visualization")
         self.save_dir_path.mkdir(parents=True, exist_ok=True)
 
-    def scores_per_original_document(self, original_document_id:str):
+    def scores_per_original_documents(self, text_ids: list[str]):
         """
-        Fetch paraphrase documents for a given original document ID,
-        convert them to a DataFrame, and display distributions of numeric features.
-        :param original_document_id: ID of the original document in the original collection.
+        Fetch paraphrase score documents for multiple original document IDs.
+        Create histograms per feature and a combined scatter plot with colors by text_id.
         """
-        # get scores for paraphrases for original document ID
-        cursor = self.mongoDB.find_document_by_non_id_field(collection=self.paraphrase_score_collection,
-                                                            document_field_name="text_id",
-                                                            document_value=original_document_id)
-        # Convert cursor to list of dicts
-        paraphrase_docs = list(cursor)
 
-        if not paraphrase_docs:
-            print(
-                f"No paraphrases found for original document ID: {original_document_id}"
+        all_frames = []  # collect each group separately
+        color_map = {}  # store assigned colors for legend
+
+        # --- Fetch and store data for each text_id ---
+        for idx, text_id in enumerate(text_ids):
+            cursor = self.mongoDB.find_document_by_non_id_field(
+                collection=self.paraphrase_score_collection,
+                document_field_name="text_id",
+                document_value=text_id,
             )
-            return None  # or return empty DataFrame
+            docs = list(cursor)
+            if not docs:
+                print(f"No paraphrases found for text_id: {text_id}")
+                continue
 
-        # Convert to DataFrame
-        df = pd.DataFrame(paraphrase_docs)
+            df = pd.DataFrame(docs)
+            df["text_id"] = text_id  # tag it
+            all_frames.append(df)
 
-        # Optionally remove non-numeric columns before describing
-        numeric_df = df.select_dtypes(include="number")
+        if not all_frames:
+            print("No paraphrase data found.")
+            return None
+
+        # --- Combined DataFrame ---
+        df_all = pd.concat(all_frames, ignore_index=True)
+        numeric_df = df_all.select_dtypes(include="number")
 
         if numeric_df.empty:
-            print("No numeric features found in the documents.")
-            return df
+            print("No numeric features found across all documents.")
+            return df_all
 
-        # Display distribution of numeric features
-        print(
-            f"Distribution of numeric features for original document ID {original_document_id}:"
-        )
-        print(numeric_df.describe())
-
-        # Plot each numeric feature
-        for column in numeric_df.columns:
+        # ---------- HISTOGRAMS ----------
+        for col in numeric_df.columns:
             plt.figure(figsize=(8, 5))
-            plt.hist(numeric_df[column], bins=20, color="skyblue", edgecolor="black")
-            plt.title(
-                f"{column} distribution for original document {original_document_id}"
-            )
-            plt.xlabel(column)
+            for text_id in text_ids:
+                df_sub = df_all[df_all["text_id"] == text_id]
+                if df_sub.empty:
+                    continue
+                plt.hist(
+                    df_sub[col],
+                    bins=20,
+                    alpha=0.5,
+                    label=f"{text_id}",
+                    edgecolor="black",
+                )
+
+            plt.title(f"Distribution of {col}")
+            plt.xlabel(col)
             plt.ylabel("Frequency")
+            plt.legend()
 
-            # Create speaking filename
-            safe_column_name = column.replace(" ", "_").lower()
-            filename = (
-                self.save_dir_path / f"{original_document_id}_{safe_column_name}.svg"
-            )
-
+            safe_col = col.replace(" ", "_").lower()
+            filename = self.save_dir_path / f"multi_{safe_col}.svg"
             plt.tight_layout()
-            plt.savefig(filename)
-            plt.close()  # Close figure to free memory
-        if "sem_sim_avg" in numeric_df.columns and "syn_sim_avg" in numeric_df.columns:
-            fig = plt.figure(figsize=(12, 6))
-            main_ax = fig.add_axes(
-                [0.1, 0.1, 0.6, 0.85]
-            )  # [left, bottom, width, height]
-            main_ax.scatter(
-                numeric_df["sem_sim_avg"],
-                numeric_df["syn_sim_avg"],
-                c="blue",
-                alpha=0.6,
-                edgecolor="k",
-            )
-            main_ax.set_title(
-                f"Semantic vs. Syntactic Similarity for original document {original_document_id}"
-            )
-            main_ax.set_xlabel("Average Semantic similarity")
-            main_ax.set_ylabel("Average Syntactic similarity")
-
-            # Inset with full range
-            inset_size = 0.25
-            inset_ax = fig.add_axes([0.73, 0.1, inset_size, inset_size])
-
-            # Scatter points in small axes
-            inset_ax.scatter(
-                numeric_df["sem_sim_avg"],
-                numeric_df["syn_sim_avg"],
-                c="red",
-                alpha=0.6,
-                edgecolor="k",
-                s=10,  # smaller points for inset
-            )
-            inset_ax.set_xlim(0, 1)
-            inset_ax.set_ylim(0, 1)
-            inset_ax.set_title("Full range")
-            inset_ax.grid(True)
-            inset_ax.set_xticks([0, 0.5, 1])
-            inset_ax.set_yticks([0, 0.5, 1])
-            inset_ax.tick_params(axis="both", which="major", labelsize=8)
-
-            # Optional: style inset border
-            for spine in inset_ax.spines.values():
-                spine.set_edgecolor("gray")
-
-            # Create speaking filename
-            filename = (
-                self.save_dir_path / f"{original_document_id}_sem_vs_syn_scatter.svg"
-            )
-
             plt.savefig(filename)
             plt.close()
 
-        print(f"Plots saved to {self.save_dir_path}")
+        # ---------- SCATTER PLOT (sem vs syn) ----------
+        if "sem_sim_avg" in numeric_df.columns and "syn_sim_avg" in numeric_df.columns:
 
-        return df  # return full DataFrame for further use
+            fig = plt.figure(figsize=(12, 6))
+
+            # Main plot placement (thinner to make space for inset on right)
+            main_ax = fig.add_axes([0.08, 0.1, 0.62, 0.8])
+
+            # Assign unique colors automatically
+            cmap = plt.get_cmap("tab20b", len(text_ids))
+
+            for idx, text_id in enumerate(text_ids):
+                df_sub = df_all[df_all["text_id"] == text_id]
+                if df_sub.empty:
+                    continue
+
+                color = cmap(idx % cmap.N) 
+                color_map[text_id] = color
+
+                main_ax.scatter(
+                    df_sub["sem_sim_avg"],
+                    df_sub["syn_sim_avg"],
+                    c=[color_map[text_id]],
+                    alpha=0.7,
+                    edgecolor="k",
+                    label=f"{text_id}",
+                )
+
+            main_ax.set_title("Semantic vs. Syntactic Similarity")
+            main_ax.set_xlabel(r"$\overline{\mathrm{Semantic\ similarity}}$")
+            main_ax.set_ylabel(r"$\overline{\mathrm{Syntactic\ similarity}}$")
+            main_ax.legend(title="text_id")
+
+            # ---- Inset plot outside main plot ----
+            inset_size = 0.25
+            inset_left = 0.73
+            inset_bottom = 0.55
+            inset_ax = fig.add_axes([inset_left, inset_bottom, inset_size, inset_size])
+
+            for idx, text_id in enumerate(text_ids):
+                df_sub = df_all[df_all["text_id"] == text_id]
+                if df_sub.empty:
+                    continue
+
+                inset_ax.scatter(
+                    df_sub["sem_sim_avg"],
+                    df_sub["syn_sim_avg"],
+                    c=[color_map[text_id]],
+                    alpha=0.7,
+                    edgecolor="k",
+                    s=10,
+                )
+
+            inset_ax.set_xlim(0, 1)
+            inset_ax.set_ylim(0, 1)
+            inset_ax.set_title("Full range", fontsize=8)
+            inset_ax.grid(True)
+            inset_ax.set_xticks([0, 0.5, 1])
+            inset_ax.set_yticks([0, 0.5, 1])
+            inset_ax.tick_params(axis="both", labelsize=8)
+
+            for spine in inset_ax.spines.values():
+                spine.set_edgecolor("gray")
+
+            filename = self.save_dir_path / "multi_sem_vs_syn_scatter.svg"
+            plt.savefig(filename)
+            plt.close()
+
+        print(f"Plots saved to: {self.save_dir_path}")
+        return df_all
 
 
 if __name__ == "__main__":
     visualizer = ParaphraseScoresVisualizer()
-    visualizer.scores_per_original_document(original_document_id="68f50029edacdf3d5c0279e8")
+    visualizer.scores_per_original_documents(text_ids=["68f50029edacdf3d5c0279e8", "68f50029edacdf3d5c0279d9"])
