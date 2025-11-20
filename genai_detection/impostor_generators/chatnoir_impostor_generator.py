@@ -189,7 +189,6 @@ class ChatNoirSearchImpostorGenerator(BaseImpostorGenerator):
                   "search_method": "default"
               }
 
-
             response = requests.get(base_url, params=params)
             response.raise_for_status()
             return response.json()
@@ -209,7 +208,7 @@ class ChatNoirSearchImpostorGenerator(BaseImpostorGenerator):
                 executor.submit(self.fetch_results, query): query for query in queries
             }
             for future in as_completed(futures):
-                all_results.extend(future.result())
+                all_results.extend(future.result()["results"])
         return all_results
 
     def generate_impostors(
@@ -222,14 +221,14 @@ class ChatNoirSearchImpostorGenerator(BaseImpostorGenerator):
         1. Extract medium-frequency words from the input text.
         2. Formulate search queries using random combinations of those words.
         3. Use the ChatNoir to retrieve search result snippets.
-        4. Save the results to a CSV file.
+        4. Save the results to the mongoDB database collection for queried impostors.
         5. Format results into a dictionary with keys as query and position, and values as the full text (or snippets) of the search result.
 
         While Koppel et al. (2014) randomly choose n imposters among the top m imposter, we use all of them.
 
         :param text: Input text to generate impostors for.
 
-        :return: DataFrame containing search results with columns: 'query', 'title', 'url', 'snippet' (i.e. short content summary of search result), and 'position' (i.e. number of result in the search results)
+        :return: DataFrame containing search results with columns: 'query', 'title', 'url', 'snippet' (i.e., short content summary of search result), and 'position' (i.e. number of result in the search results)
 
         References:
         ===========
@@ -237,46 +236,36 @@ class ChatNoirSearchImpostorGenerator(BaseImpostorGenerator):
         """
         if not isinstance(text, str) or not text.strip():
             raise ValueError("Input text must be a non-empty string.")
-        if self.real_time_generation:
-            print("Generating impostors in real-time.")
-            medium_frequency_words = self.get_medium_frequency_words(text)
-            queries = self._generate_queries_based_on_candidate_words(
-                medium_frequency_words
+
+        medium_frequency_words = self.get_medium_frequency_words(text)
+        queries = self._generate_queries_based_on_candidate_words(
+            medium_frequency_words
+        )
+        try:
+            result_df = pd.DataFrame(self._parallel_fetch(queries))
+            result_df.drop_duplicates(subset="target_uri", inplace=True)
+
+            result_df.drop(axis="columns", columns=["warc_id", "score", "cache_uri", "target_hostname", "crawl_date", "page_rank", "spam_rank", "content_type"], inplace=True, errors="ignore")
+            result_df = result_df[result_df["lang"] == "en"]
+            print(f"Found {len(result_df)} results.")
+            result_df.to_csv('out.csv', index=False)
+            print(result_df.head())
+
+            if result_df.empty:
+                print("Warning: No results fetched. CSV not saved.")
+                return result_df
+            # TODO: use mongo collection instead
+
+        except Exception as e:
+            print(
+                f"Error during fetching results (probabily no more free API calls): {e}"
             )
-            try:
-                result_df = pd.DataFrame(self._parallel_fetch(queries))
-                result_df.drop_duplicates(subset="url", inplace=True)
+            return {"imposter": "Error during fetching results, check logs."}
 
-                if result_df.empty:
-                    print("Warning: No results fetched. CSV not saved.")
-                    return result_df
-                # TODO: use mongo collection instead
-
-            except Exception as e:
-                print(
-                    f"Error during fetching results (probabily no more free API calls): {e}"
-                )
-                return {"imposter": "Error during fetching results, check logs."}
-
-
-        # aggregate results' texts, preferably using full_text, if empty use snippet and return a list of texts
-        impostor_texts = {
-            f"{re.sub(' ', '_', string=row['query'])}_{row['position']}": row[
-                "full_text"
-            ]
-            for _, row in result_df.iterrows()
-            if pd.notnull(row.get("full_text"))
-        }
-
-        # full_text is missing but snippet is present
-        for _, row in result_df.iterrows():
-            if pd.isna(row.get("full_text")) and pd.notnull(row.get("snippet")):
-                key = f"{re.sub(' ', '_', row['query'])}_{row['position']}"
-                impostor_texts[key] = row["snippet"]
-
-        return impostor_texts
+        return result_df
 
 
 if __name__ == "__main__":
     chat_noir_retriver = ChatNoirSearchImpostorGenerator(api_key=CONFIG.CHATNOIR_KEY)
-    print(chat_noir_retriver.fetch_results(query="cats"))
+    # print(chat_noir_retriver.fetch_results(query="cats"))
+    print(chat_noir_retriver.generate_impostors(text="cats dogs animals"))
