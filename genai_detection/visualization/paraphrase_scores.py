@@ -96,7 +96,7 @@ class ParaphraseScoresVisualizer():
                 if df_sub.empty:
                     continue
 
-                color = cmap(idx % cmap.N) 
+                color = cmap(idx % cmap.N)
                 color_map[text_id] = color
 
                 main_ax.scatter(
@@ -109,14 +109,14 @@ class ParaphraseScoresVisualizer():
                 )
 
             main_ax.set_title("Semantic vs. Syntactic Similarity")
-            main_ax.set_xlabel(r"$\overline{\mathrm{Semantic\ similarity}}$")
-            main_ax.set_ylabel(r"$\overline{\mathrm{Syntactic\ similarity}}$")
+            main_ax.set_xlabel(r"Average Semantic Similarity")
+            main_ax.set_ylabel(r"Average Syntactic Similarity")
             main_ax.legend(title="text_id")
 
             # ---- Inset plot outside main plot ----
             inset_size = 0.25
             inset_left = 0.73
-            inset_bottom = 0.55
+            inset_bottom = 0.1
             inset_ax = fig.add_axes([inset_left, inset_bottom, inset_size, inset_size])
 
             for idx, text_id in enumerate(text_ids):
