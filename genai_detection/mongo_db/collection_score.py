@@ -1,31 +1,11 @@
-from pymongo import MongoClient
-
-from genai_detection.config import CONFIG
+from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 from genai_detection.paraphrasing import paraphraser_evaluation
 
 # MongoDB setup
-uri = f"mongodb://{CONFIG.MONGO_USER}:{CONFIG.MONGO_PASSWORD}@{CONFIG.MONGO_HOST}/"
-client = MongoClient(uri)
-db = client[CONFIG.MONGO_DATABASE or "impostors"]
-original_collection = db[CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION or "original_text"]
-paraphrase_collection = db[CONFIG.MONGO_PARAPHRASE_COLLECTION or "paraphrase"]
-score_collection_name = CONFIG.MONGO_SCORE_COLLECTION or "score"
-
-try:
-    client.admin.command("ping")
-    print("Successfully connected as MongoDB root user!")
-except Exception as e:
-    print("Connection failed:", e)
-    raise e
-
-# Create score collection if it doesn't exist
-if score_collection_name not in db.list_collection_names():
-    db.create_collection(score_collection_name)
-    print(f"Created collection: {score_collection_name}")
-else:
-    print(f"Collection '{score_collection_name}' already exists. Skipping creation.")
-
-score_collection = db[score_collection_name]
+mongoDB = ParaphraseMongoDB()
+original_collection = mongoDB.original_collection
+paraphrase_collection = mongoDB.paraphrase_collection
+paraphrase_score_collection = mongoDB.paraphrase_score_collection
 
 paraphrase_evaluator = paraphraser_evaluation.ParaphrasingEvaluator(
     paraphrasers={}, prompts=[], original_text="dummy"
@@ -41,12 +21,13 @@ for paraphrase_doc in paraphrase_collection.find():
     # )
 
     # Fetch corresponding original text
-    original_doc = original_collection.find_one({"_id": text_id})
-    if not original_doc:
+    cursor = mongoDB.find_document_by_id(collection=original_collection, document_id=text_id)
+    original_docs = list(cursor)
+    if not original_docs:
         print(f"Original text with _id={text_id} not found. Skipping.")
         continue
 
-    original_text = original_doc["text"]
+    original_text = original_docs[0]["text"]
 
     # Compute scores
     bert_scores = paraphrase_evaluator._safe_compute_bertscore(
@@ -75,6 +56,6 @@ for paraphrase_doc in paraphrase_collection.find():
     # Do not use text_id or paraphrase_id as _id since a text will be paraphrased multiple times with different settings
     score_doc = {"text_id": text_id, "paraphrase_id": paraphrase_id, **scores}
 
-    score_collection.insert_one(score_doc)
+    paraphrase_score_collection.insert_one(score_doc)
 
 print("Scoring complete.")

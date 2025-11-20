@@ -56,7 +56,7 @@ class BaseConfig:
     MONGO_DATABASE = "impostors"  # initial db (!= collection in db)
     MONGO_ORIGINAL_TEXT_COLLECTION = "original_text"  # collection (!= db)
     MONGO_PARAPHRASE_COLLECTION = "paraphrase"  # collection (!= db)
-    MONGO_SCORE_COLLECTION = "score"  # collection (!= db)
+    MONGO_PARAPHRASE_SCORE_COLLECTION = "paraphrase_score"  # collection (!= db)
     MONGO_IMPOSTOR_OUTPUT_COLLECTION = "impostors_output" # collection (!= db)
     MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME")
     MONGO_PASSWORD = os.getenv("MONGO_INITDB_ROOT_PASSWORD")

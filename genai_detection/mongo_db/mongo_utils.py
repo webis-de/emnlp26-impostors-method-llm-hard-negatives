@@ -29,7 +29,7 @@ class ParaphraseMongoDB:
         # Create collections if they don't exist
         for collection_name in [
             CONFIG.MONGO_PARAPHRASE_COLLECTION,
-            CONFIG.MONGO_SCORE_COLLECTION,
+            CONFIG.MONGO_PARAPHRASE_SCORE_COLLECTION,
             CONFIG.MONGO_IMPOSTOR_OUTPUT_COLLECTION,
         ]:
             if collection_name not in self.db.list_collection_names():
@@ -41,7 +41,7 @@ class ParaphraseMongoDB:
                 )
 
         self.paraphrase_collection = self.db[CONFIG.MONGO_PARAPHRASE_COLLECTION]
-        self.score_collection = self.db[CONFIG.MONGO_SCORE_COLLECTION]  # paraphrase scores
+        self.paraphrase_score_collection = self.db[CONFIG.MONGO_PARAPHRASE_SCORE_COLLECTION]  # paraphrase scores
         self.impostor_output_collection = self.db[CONFIG.MONGO_IMPOSTOR_OUTPUT_COLLECTION]
 
     @staticmethod
