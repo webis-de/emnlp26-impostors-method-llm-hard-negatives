@@ -12,13 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import sys
 from abc import ABC
 from itertools import chain
 from pathlib import Path
-import os, sys
 from typing import Callable, Optional, Union
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from datasets import load_from_disk, concatenate_datasets
 
@@ -32,7 +34,7 @@ class BaseDatasetVisualization(ABC):
         self, name: str, savefig_base: Union[str, os.PathLike] = CONFIG.SAVE_PATH
     ):
         """
-        Initializes dataset visualiztion for specific dataset.
+        Initializes dataset visualization for specific dataset.
 
         :param name (str): Name of the dataset to load.
         """
