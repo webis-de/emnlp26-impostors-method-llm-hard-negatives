@@ -153,5 +153,6 @@ class ParaphraseScoresVisualizer():
 
 
 if __name__ == "__main__":
+    # run collection_score.py file before running this to compute all paraphrases scores
     visualizer = ParaphraseScoresVisualizer()
-    visualizer.scores_per_original_documents(text_ids=["68f50029edacdf3d5c0279e8", "68f50029edacdf3d5c0279d9"])
+    visualizer.scores_per_original_documents(text_ids=["68f50029edacdf3d5c0279dd", "68f50029edacdf3d5c027d4f"])
