@@ -31,6 +31,7 @@ class ParaphraseMongoDB:
             CONFIG.MONGO_PARAPHRASE_COLLECTION,
             CONFIG.MONGO_PARAPHRASE_SCORE_COLLECTION,
             CONFIG.MONGO_IMPOSTOR_OUTPUT_COLLECTION,
+            CONFIG.MONGO_ON_THE_FLY_COLLECTION,
         ]:
             if collection_name not in self.db.list_collection_names():
                 self.db.create_collection(collection_name)
@@ -40,9 +41,11 @@ class ParaphraseMongoDB:
                     f"Collection '{collection_name}' already exists. Skipping creation."
                 )
 
-        self.paraphrase_collection = self.db[CONFIG.MONGO_PARAPHRASE_COLLECTION]
+        self.paraphrase_collection = self.db[CONFIG.MONGO_PARAPHRASE_COLLECTION]    # llm paraphrases
+        self.on_the_fly_collection = self.db[CONFIG.MONGO_ON_THE_FLY_COLLECTION] # on-the-fly impostors
         self.paraphrase_score_collection = self.db[CONFIG.MONGO_PARAPHRASE_SCORE_COLLECTION]  # paraphrase scores
-        self.impostor_output_collection = self.db[CONFIG.MONGO_IMPOSTOR_OUTPUT_COLLECTION]
+        self.impostor_output_collection = self.db[CONFIG.MONGO_IMPOSTOR_OUTPUT_COLLECTION]  # output of impostor
+        # approach
 
     @staticmethod
     def update_document(collection, _id: str, update_data: dict) -> int:
