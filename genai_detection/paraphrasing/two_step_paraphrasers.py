@@ -211,9 +211,9 @@ class TwoStepParaphraser(Paraphraser):
                 )
                 paraphrases.append(paraphrase)
                 costs.append(cost_after_generator)
-                # TODO: loop to generate multiple paraphrases, look for temperature
 
                 # Detect cost accumulation (monotonically increasing across iterations)
+                #TODO
                 if (len(costs) > 1) and not (costs[-1] > costs[-2]):
                     summing = False
             cost_after_generator = sum(costs) if not summing else costs[-1]

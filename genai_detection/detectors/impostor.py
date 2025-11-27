@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 import typing as t
@@ -17,6 +18,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")
 from genai_detection.config import CONFIG
 
 __all__ = ["ImpostorDetector"]
+
+logger = logging.getLogger(__name__)
+logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 
 class ImpostorDetector(ImpostorBase):
@@ -187,29 +191,37 @@ class ImpostorDetector(ImpostorBase):
                         text_id=pair["left"]["id"]
                     )
                 )
+                logging.info(
+                    f"Obtained impostors by text ID for left text with text ID {pair['left']['id']}."
+                )
                 impostors_of_right = (
                     self.impostor_generator.generate_impostors_by_text_id(
                         text_id=pair["right"]["id"]
                     )
                 )
+                logging.info(f"Obtained impostors by text ID for right text with text ID {pair['right']['id']}.")
 
             else:
                 impostors_of_left = self.impostor_generator.generate_impostors(
                     text=pair["left"]["original_text"]
                 )
+                logging.info(f"Obtained impostors by text for left text.")
                 impostors_of_right = self.impostor_generator.generate_impostors(
-                    pair["right"]["original_text"]
+                    text=pair["right"]["original_text"]
+                )
+                logging.info(f"Obtained impostors by text for right text.")
+            if not isinstance(impostors_of_right, list) or len(impostors_of_right) < 2:
+                raise ValueError(
+                    f"Right impostor generator must return a list with at least 2 impostors. Is list {isinstance(impostors_of_right, list)} with {len(impostors_of_right)} impostors."
                 )
             if not isinstance(impostors_of_left, list) or len(impostors_of_left) < 2:
                 raise ValueError(
-                    "Left impostor generator must return a list with at least 2 impostors."
+                    f"Left impostor generator must return a list with at least 2 impostors. Is list {isinstance(impostors_of_left, list)} with {len(impostors_of_left)} impostors."
                 )
             pair["left"]["impostors"] = impostors_of_left
             pair["left"]["processed_impostors"] = [self.text_preprocessor.upsample_to_min_n_tokens(text=imp, min_n_tokens=self.min_n_tokens, upsample=self.upsample) for imp in impostors_of_left]
-            if not isinstance(impostors_of_right, list) or len(impostors_of_right) < 2:
-                raise ValueError(
-                    "Right impostor generator must return a list with at least 2 impostors."
-                )
+            logging.info(f"Processed left impostors.")
+
             pair["right"]["impostors"] = impostors_of_right
             pair["right"]["processed_impostors"] = [
                 self.text_preprocessor.upsample_to_min_n_tokens(
@@ -217,12 +229,14 @@ class ImpostorDetector(ImpostorBase):
                 )
                 for imp in impostors_of_right
             ]
+            logging.info(f"Processed right impostors.")
             # --- 2) Build corpus for TFIDF -----------------------------------------------
             # Compute TFIDF based on the processed text, which is upsampled if upsample is set to true and the original (preprocessed) text otherwise
             corpus = [pair["left"]["processed_text"], pair["right"]["processed_text"]] +  pair["left"]["processed_impostors"] +  pair["right"]["processed_impostors"]
 
             feature_extractor = TfidfFeatureExtractor()
             X = feature_extractor.fit_transform(corpus)
+            logging.info(f"Feature extractor (i.e., TFIDF) fit-transform done.")
 
             # --- 3) Slice TF-IDF vectors cleanly -----------------------------------------
             def dense_vector(row):
@@ -250,19 +264,27 @@ class ImpostorDetector(ImpostorBase):
                 dense_vector(X[i])
                 for i in range(idx_right_impostors_start, idx_right_impostors_end)
             ]
-
-            # --- 4) Final store structure ------------------------------------------------
             pair["left"]["impostors_tfidf"] = left_impostors_tfidf
             pair["right"]["impostors_tfidf"] = right_impostors_tfidf
+            logging.info("Obtained TFIDF vector for candidate and disputed text, as well as impostors.")
+
+            # --- 4) Final store structure ------------------------------------------------
+            # TFIDF is too big to be saved (BSON error during mongodb upload)
             document2insert = {
                 f"{old_key}_{new_key}": pair[old_key][new_key]
                 for old_key in ["left", "right"]
                 for new_key in pair[old_key]
+                if new_key != "impostors_tfidf"
             }
             document2insert["scores_over_different_rounds"] = self.scorer.score_pair(pair=pair, vectorizer=feature_extractor.vectorizer)
-            self.mongoDB.insert_document(collection=self.mongoDB.impostor_output_collection, insert_data=document2insert)
+            logging.info(f"Obtained final score of {document2insert['scores_over_different_rounds']} for text input pair.")
+            try:
+                self.mongoDB.insert_document(collection=self.mongoDB.impostor_output_collection, insert_data=document2insert)
+            except Exception as e:
+                logging.error(f"Failed to insert document: {document2insert}\n\n{e}")
+            logging.info(f"Inserted score into MongoDB collection {CONFIG.MONGO_IMPOSTOR_OUTPUT_COLLECTION}.")
             final_scores.append(document2insert["scores_over_different_rounds"])
-            print(f"Finished computing score for texts with ID {pair['left']['id']} and ID {pair['right']['id']}.")
+            logging.info(f"Finished computing score for texts with ID {pair['left']['id']} and ID {pair['right']['id']}.")
 
         # one element = averaged score of X,Y and Y,X pair (score=number of rounds where the candidate was the most similar)
         # threshold is in [0,1], hence: normalized by rounds
@@ -280,8 +302,21 @@ class ImpostorDetector(ImpostorBase):
 
 
 if __name__ == "__main__":
-    # ..ea: Ass4 and author TDH426, ...e8: Ass4 and author ASR497
-    doc_pairs = ["68f50029edacdf3d5c0279dd", "68f50029edacdf3d5c0279e8"]#, "68f50029edacdf3d5c0279eb", "68f50029edacdf3d5c0279d9"]
-    imp = ImpostorDetector(impostor_technique="two_step_llm", n_impostors=50)
+    # generating 1 x 50 impostors takes around 40 minutes using openai.
+    # ..dd: Ass4 and author TDH426, ..4f: Ass3 and author TDH426, ...e8: Ass4 and author ASR497
+    doc_pairs = ["68f50029edacdf3d5c0279dd", "68f50029edacdf3d5c027d4f"]#, "68f50029edacdf3d5c0279e8"]#,
+    # "68f50029edacdf3d5c0279eb",
+    # "68f50029edacdf3d5c0279d9"]
+
+    # "translation",
+    # "text_len",
+    # "on-the-fly",
+    # "blogs",
+    # "fixed",
+    # "content",
+    # "naive_llm",
+    # "two_step_llm",
+    # "mirror_minds",
+    imp = ImpostorDetector(impostor_technique="on-the-fly", n_impostors=50)
     res = imp.get_score(text=doc_pairs, normalize=True)
-    print(res)
+    logging.info(res)
