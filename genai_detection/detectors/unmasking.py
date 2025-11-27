@@ -11,15 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from collections import defaultdict
-from more_itertools import ichunked
-from random import randint
+import logging
 import re
-from typing import Iterable, List
 import warnings
+from collections import defaultdict
+from random import randint
+from typing import Iterable, List
 
 import numpy as np
+from more_itertools import ichunked
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.model_selection import cross_validate
 from sklearn.svm import LinearSVC
@@ -28,6 +28,9 @@ from sklearn.utils import shuffle
 from genai_detection.detectors.detector_base import DetectorBase
 
 __all__ = ["UnmaskingDetector"]
+
+logger = logging.getLogger(__name__)
+logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 warnings.simplefilter("ignore", category=ConvergenceWarning)
 
@@ -113,7 +116,7 @@ class UnmaskingDetector(DetectorBase):
             tokens_left = self.tokenizer(self.preprocess_text(t[0]))
             tokens_right = self.tokenizer(self.preprocess_text(t[1]))
             if len(tokens_left) == 0 or len(tokens_right) == 0:
-                print(
+                logging.info(
                     "Skipping empty text pair: Left: {}, Right: {}".format(t[0], t[1])
                 )
                 continue

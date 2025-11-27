@@ -11,19 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import os
-from pathlib import Path
-from typing import DefaultDict, Iterable, List
+import logging
 import typing as t
+from typing import DefaultDict, Iterable, List
+
 import numpy as np
 import torch
-from genai_detection.detectors.detector_base import DetectorBase
 from evaluate import load
+
+from genai_detection.detectors.detector_base import DetectorBase
 
 # import llmdet.detector as llmdet  # issue: https://github.com/TrustedLLM/LLMDet/issues/14
 __all__ = ["PerplexityDetector"]
 
+logger = logging.getLogger(__name__)
+logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class PerplexityDetector(DetectorBase):
     def __init__(self):
@@ -121,7 +123,7 @@ class PerplexityDetector(DetectorBase):
         predictions = []
         for row in score_matrix:
             min_score = np.min(row)
-            print(f"Min score: {min_score}, Threshold: {threshold}")
+            logging.info(f"Min score: {min_score}, Threshold: {threshold}")
             one_hot = [0] * len(model_names)
             # https://thegradient.pub/understanding-evaluation-metrics-for-language-models/ (09.07.2025):
             # score PPL(P,Q)=2^H(P,Q) and cross entropy of distrib. Q, P: H(P,Q) = -sum(P(x) * log(Q(x))) for all x in P = H(P) + KL-Divergence(P||Q)
@@ -179,7 +181,7 @@ if __name__ == "__main__":
     # detector = ProxyPerplexityDetector()
     text = ["This is a test sentence.", "Another example of text to analyze."]
     scores = detector.get_score(text)
-    print("Scores:", scores)
+    logging.info("Scores: %s", scores)
     predictions, model_names = detector.get_prediction(text)
-    print("Predictions:", predictions)
-    print("Model Names:", model_names)
+    logging.info("Predictions: %s", predictions)
+    logging.info("Model Names: %s", model_names)

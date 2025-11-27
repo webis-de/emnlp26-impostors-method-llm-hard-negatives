@@ -11,23 +11,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import typing as t
-import types
-import re
-import html
-import unicodedata
-
-import torch
-import numpy as np
-import sys
+import logging
 import os
+import sys
+import types
+import typing as t
+
+import numpy as np
 import numpy.typing as npt
+import torch
 
 sys.path.append(os.path.abspath(".."))
 from genai_detection.util import preprocess_text as _preprocess_text
 
 __all__ = ["DetectorBase"]
+
+logger = logging.getLogger(__name__)
+logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 
 class DetectorBase:
@@ -91,7 +91,7 @@ class DetectorBase:
             )
             return scores[0] if return_single else scores
         except Exception as e:
-            print(f"Error in {self.__class__.__name__}.get_score: {e}")
+            logging.warning(f"Error in {self.__class__.__name__}.get_score: {e}")
 
     def _predict_impl(
         self, text: t.Iterable[str]

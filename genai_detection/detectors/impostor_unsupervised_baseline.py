@@ -11,15 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
+import typing as t
 
-from more_itertools import ichunked
 import numpy as np
-
-from sklearn.feature_extraction.text import TfidfVectorizer
 import torch
+from more_itertools import ichunked
+
 from genai_detection.config import CONFIG
 from genai_detection.detectors.impostor_base import ImpostorBaselineBase
-import typing as t
+
+logger = logging.getLogger(__name__)
+logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 
 class UnSupervisedImpostorBaseline(ImpostorBaselineBase):
@@ -102,5 +105,5 @@ if __name__ == "__main__":
     ]
     scores = detector.get_score(sample_texts)
     predictions = detector.get_prediction(sample_texts)
-    print("Scores:", scores)
-    print("Predictions:", predictions)
+    logging.info("Scores: %s", scores)
+    logging.info("Predictions: %s", predictions)

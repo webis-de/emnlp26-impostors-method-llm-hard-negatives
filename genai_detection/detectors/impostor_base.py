@@ -11,22 +11,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from operator import itemgetter
+import logging
 import re
-from more_itertools import ichunked
+from collections import Counter
+from operator import itemgetter
+from pathlib import Path
+
 import numpy as np
+import pandas as pd
+from datasets import load_from_disk
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+
 from genai_detection.config import CONFIG
 from genai_detection.detectors.detector_base import DetectorBase
-from collections import Counter, defaultdict
-from datasets import load_from_disk
-import heapq
-from pathlib import Path
-import re
-import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
 
+logger = logging.getLogger(__name__)
+logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class ImpostorBase(DetectorBase):
     def __init__(self):
@@ -60,7 +61,7 @@ class ImpostorBase(DetectorBase):
         try:
             text = text.strip()
         except AttributeError as e:
-            print(f"Input text is not a string. Text: {text}...\nError: {e}")
+            logging.warning(f"Input text is not a string. Text: {text}...\nError: {e}")
             raise e
         if normalize_ws:
             text = re.sub(r"\s+", " ", text)
@@ -127,7 +128,7 @@ class ImpostorBaselineBase(ImpostorBase):
         self.dataset[["disputed_text", "candidate_text"]] = pd.DataFrame(
             self.dataset["pair"].tolist(), index=self.dataset.index
         )
-        print("Obtained dataset.")
+        logging.info("Obtained dataset.")
         self._vectorizer = TfidfVectorizer(
             vocabulary=self.get_top_tokens(), input="content", dtype=np.float32
         ).fit(
@@ -136,7 +137,7 @@ class ImpostorBaselineBase(ImpostorBase):
                 for t in self.dataset["disputed_text"].tolist()
             ]
         )
-        print("Fitted vectorizer.")
+        logging.info("Fitted vectorizer.")
 
     def get_top_tokens(self, max_tokens: int = 100000):
         """
@@ -145,7 +146,7 @@ class ImpostorBaselineBase(ImpostorBase):
         :param max_tokens: The maximum number of tokens to return.
         :return: A list of the top tokens.
         """
-        print(self.dataset.columns)
+        logging.info("%s", self.dataset.columns)
         all_texts = self.dataset["disputed_text"].tolist()
         tokens = [self.tokenize_char_ngrams(text, 4) for text in all_texts]
         flat_list = [item for sublist in tokens for item in sublist]
