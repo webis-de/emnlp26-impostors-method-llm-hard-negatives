@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import logging
 import os
 import sys
 from abc import ABC
@@ -28,6 +28,8 @@ sys.path.append(os.path.abspath(".."))
 from genai_detection.config import CONFIG
 from genai_detection.detectors.impostor import ImpostorDetector
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class BaseDatasetVisualization(ABC):
     def __init__(
@@ -155,7 +157,7 @@ class BaseDatasetVisualization(ABC):
         plt.savefig(save_path / f"{self.name}_text_length_histogram.png")
         plt.show()
         if not verbose:
-            print(f"Average length (characters) per text: {np.mean(lengths):.2f}")
+            logging.info(f"Average length (characters) per text: {np.mean(lengths):.2f}")
 
     def plot_avg_text_length_per_author(self, dataset=None, unit="characters"):
         """

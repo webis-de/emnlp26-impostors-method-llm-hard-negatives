@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 from typing import Dict
 
 import torch
@@ -18,6 +19,8 @@ from sentence_transformers import util, SentenceTransformer
 
 from genai_detection.impostor_generators.ImpostorGenerator import NonLLMImpostorGenerator
 
+logger = logging.getLogger(__name__)
+logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class ContentImpostorGenerator(NonLLMImpostorGenerator):
     def __init__(
@@ -39,7 +42,7 @@ class ContentImpostorGenerator(NonLLMImpostorGenerator):
             if torch.cuda.is_available()
             else ("mps" if torch.backends.mps.is_available() else "cpu")
         )
-        print(f"Using device: {device}")
+        logging.info(f"Using device: {device}")
         self.model = SentenceTransformer(model_name)  # , device=device)
 
     def generate_impostors(

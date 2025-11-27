@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import logging
 # FIXME: make compatible with new mongodb idea
 import os
 import sys
@@ -28,6 +28,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class BaseImpostorGenerator(ABC):
     """Abstract base class for generating impostors."""
@@ -114,8 +116,6 @@ class LLMImpostorGenerator(MongoDBSavedGenerator):
     ):
         super().__init__(n_impostors)
 
-
-
     # def generate_impostors():
     # for i in range(n_imp_to_generate):
     #     # randomly select a paraphraser and a prompt
@@ -146,7 +146,7 @@ class LLMImpostorGenerator(MongoDBSavedGenerator):
     #                     key = f"impostor_{j}_prompt{p_id}_{paraphraser.model_id}"
     #                 impostors[key] = imp
     #     except Exception as e:
-    #         print(f"Error generating impostor with {paraphraser}: {e}")
+    #         logging.warning(f"Error generating impostor with {paraphraser}: {e}")
 
     # return impostors
 
@@ -168,11 +168,11 @@ if __name__ == "__main__":
         text, text_id = llm_paraphraser.mongoDB.get_text_or_id_from_orginal_collection(
             text=None, text_id="68f50029edacdf3d5c0279ea"
         )
-        print(text[:200])
+        logging.info("%s", text[:200])
     # imps = llm_paraphraser.generate_impostors(text_id="68f50029edacdf3d5c0279eb", text=None)
     # for i, imp in enumerate(imps):
     #     # $7,886.76 07.11.25, 10.04 Uhr
     #     # $7,886.75 07.11.25, 10.49 Uhr
     #     # $7,886.71 07.11.25, 12.49 Uhr
     #     # FIXME: number of impostors does not work properly, too many and too short paraphrases
-    #     print("imp number ", i, "of length ", len(imp.split()))
+    #     logging.info(f"imp number {i} of length {len(imp.split())}")

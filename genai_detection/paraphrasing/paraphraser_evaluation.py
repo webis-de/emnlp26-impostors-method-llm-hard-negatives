@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import difflib
-import logging
 import os
 from collections import defaultdict
 from itertools import chain, cycle, zip_longest
@@ -39,7 +38,7 @@ from genai_detection.util import preprocess_text as _preprocess_text
 
 nltk.download("wordnet")  # necessary for METEOR score
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.WARN)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 
 # FIXME: Restructure code to get extracted information from mongoDB instead of re-extracting it here.
@@ -125,7 +124,7 @@ class ParaphrasingEvaluator:
         except Exception as e:
             raise RuntimeError("Failed to load SentenceTransformer model: {e}") from e
         # https://pypi.org/project/word-mover-distance/ Word Mover's Distance (WMD)
-        print("Loading pre-trained word vectors for WMD...")
+        logging.info("Loading pre-trained word vectors for WMD...")
         tries = 0
         self.pretr_word_model = None
         while not self.pretr_word_model and tries < 10:
@@ -134,7 +133,7 @@ class ParaphrasingEvaluator:
                     gensim.downloader.load("glove-twitter-25")
                 )
             except Exception as e:
-                print("Failed to load gensim glove-twitter-25. Retrying...")
+                logging.warning(f"Failed to load gensim glove-twitter-25. Retrying...\n{e}")
                 tries += 1
         self.wmd_model = model.WordEmbedding(model=self.pretr_word_model)
         self.base_dirs = {
@@ -550,7 +549,7 @@ class ParaphrasingEvaluator:
             )
             csv_out = save_path / "extraction_metrics_mean_std_median_per_dataset.csv"
             mean_std_df.to_csv(csv_out)
-            print(f"Saved mean/std values as CSV file to {csv_out}")
+            logging.info(f"Saved mean/std values as CSV file to {csv_out}")
 
         # Compute angle of each axis
         angles = np.linspace(0, 2 * np.pi, len(metrics), endpoint=False).tolist()
@@ -622,10 +621,10 @@ class ParaphrasingEvaluator:
             for format in ["svg"]:
                 out = save_path / f"radar_extraction_quality_per_dataset.{format}"
                 fig.savefig(out, bbox_inches="tight", transparent=True, format=format)
-                print(f"Saved radar plot to {out}")
+                logging.info(f"Saved radar plot to {out}")
 
         else:
-            print("No save path provided, plot not saved.")
+            logging.info("No save path provided, plot not saved.")
         if display_plot:
             plt.show()
         plt.close()
@@ -668,7 +667,7 @@ class ParaphrasingEvaluator:
             df = df.head(min(5, len(df)))  # subset: keep for evaluation
 
             logger.info(f"Dataset snapshot:\n{df.head()}")
-            print(f"Dataset snapshot:\n{df.head()}")
+            logging.info(f"Dataset snapshot:\n{df.head()}")
 
             aggregate_results = defaultdict(
                 lambda: {
@@ -687,7 +686,7 @@ class ParaphrasingEvaluator:
                 detailed_result_df, summary_df, lengths = self._evaluate_model_on_data(
                     paraphraser_name, paraphraser, df
                 )
-                print(
+                logging.info(
                     f"[DEBUG] Detailed results for {paraphraser_name}:\n{detailed_result_df.head()}"
                 )
 
@@ -746,11 +745,11 @@ class ParaphrasingEvaluator:
                     save_base_path,
                     detail_degree="aggregated",
                 )
-                print("Saved results to ", save_base_path)
+                logging.info("Saved results to ", save_base_path)
 
         if plot_metrics:
             dfs = {}
-            print("Read results from disk for plotting from ", save_base_path)
+            logging.info("Read results from disk for plotting from ", save_base_path)
             for dataset in self.base_dirs.keys():
                 df = pd.read_csv(
                     save_base_path
@@ -818,7 +817,7 @@ class ParaphrasingEvaluator:
             paraphrases = data_loaded[paraphraser_name][self.original_text][prompt][
                 temperature
             ]
-            print(
+            logging.info(
                 f"Loaded paraphrases for {paraphraser_name} with prompt '{prompt}' and temperature {temperature} from JSON."
             )
             return paraphrases
@@ -918,7 +917,7 @@ class ParaphrasingEvaluator:
                         ((paraphraser_name, paraphraser), None, next(temp_cycle), 0)
                     )
 
-        print(
+        logging.info(
             f"[DEBUG] Total configurations to evaluate: {len(test_configurations)}, {test_configurations}"
         )
         logger.info(
@@ -964,7 +963,7 @@ class ParaphrasingEvaluator:
                     )
 
             except Exception as e:
-                print(
+                logging.info(
                     f"[ERROR] Scoring failed for '{paraphraser_name}' with prompt '{prompt}' for category '{self.data_category}' and paraphrases '{paraphrases}': {e}"
                 )
                 continue
@@ -978,7 +977,7 @@ class ParaphrasingEvaluator:
                 / f"paraphrasing_results_comparison_temp{self.temperature}_maxLength{self.max_length}_dataset_{self.data_category.replace(' ', '_')}.csv"
             )
             df.to_csv(save_path, index=False, float_format="%.4f")
-            print(f"Results saved to {save_path}")
+            logging.info(f"Results saved to {save_path}")
 
         # Save the worst and best paraphrase per score
         extremest_paraphrases = pd.DataFrame()
@@ -1235,7 +1234,7 @@ class ParaphrasingEvaluator:
                 plt.savefig(
                     file_name, bbox_inches="tight", transparent=True, format=format
                 )
-                print(f"Plot saved to {file_name}")
+                logging.info(f"Plot saved to {file_name}")
         if display_plot:
             plt.show()
         plt.close()
@@ -1363,7 +1362,7 @@ class ParaphrasingEvaluator:
                 plt.savefig(
                     full_path, bbox_inches="tight", transparent=True, format=format
                 )
-                print(f"Plot saved to {full_path}")
+                logging.info(f"Plot saved to {full_path}")
 
         if display_plot:
             plt.show()
@@ -1454,7 +1453,7 @@ class ParaphrasingEvaluator:
                 plt.savefig(
                     full_path, bbox_inches="tight", transparent=True, format="svg"
                 )
-                print(f"Plot saved to {full_path}")
+                logging.info(f"Plot saved to {full_path}")
 
                 if display_plot:
                     plt.show()
@@ -1601,7 +1600,7 @@ class ParaphrasingEvaluator:
                     plt.savefig(
                         full_path, bbox_inches="tight", transparent=True, format=format
                     )
-                    print(f"Plot saved to {full_path}")
+                    logging.info(f"Plot saved to {full_path}")
 
             if display_plot:
                 plt.show()
@@ -1642,8 +1641,8 @@ if __name__ == "__main__":
         max_length=max_length,
         temperature=temperature,
     )
-    print("Starting evaluation of paraphrasers...")
+    logging.info("Starting evaluation of paraphrasers...")
     evaluator.evaluate_extractors(save_to_disk=True)
-    print("Evaluation complete.")
+    logging.info("Evaluation complete.")
     # paraphrase_evaluator = ParaphrasingEvaluator(paraphrasers=paraphrasers, prompts=prompts, original_text=original_text, n_responses=n_responses, max_length=max_length, temperature=temperature)
     # paraphrase_evaluator.evaluate()

@@ -1,5 +1,10 @@
+import logging
+
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 from genai_detection.paraphrasing import paraphraser_evaluation
+
+logger = logging.getLogger(__name__)
+logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 # MongoDB setup
 mongoDB = ParaphraseMongoDB()
@@ -16,7 +21,7 @@ for paraphrase_doc in paraphrase_collection.find():
     text_id = paraphrase_doc["text_id"]
     paraphrase_id = paraphrase_doc["_id"]
     paraphrased_text = paraphrase_doc["paraphrase"]  # returns a list of str
-    # print(
+    # logging.info(
     #     f"Scoring paraphrase ID: {paraphrase_id} for text ID: {text_id}\n{paraphrased_text}\nType {type(paraphrased_text)}"
     # )
 
@@ -24,7 +29,7 @@ for paraphrase_doc in paraphrase_collection.find():
     cursor = mongoDB.find_document_by_id(collection=original_collection, document_id=text_id)
     original_docs = list(cursor)
     if not original_docs:
-        print(f"Original text with _id={text_id} not found. Skipping.")
+        logging.info(f"Original text with _id={text_id} not found. Skipping.")
         continue
 
     original_text = original_docs[0]["text"]
@@ -58,4 +63,4 @@ for paraphrase_doc in paraphrase_collection.find():
 
     paraphrase_score_collection.insert_one(score_doc)
 
-print("Scoring complete.")
+logging.info("Scoring complete.")

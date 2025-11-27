@@ -11,22 +11,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import logging
 import os
+import time
 from pathlib import Path
 from typing import List
-from llm_question_generator.question_generator import QuestionGenerator
-from llm_question_generator.parser import apply_extraction
-from llm_question_generator.question_config import QuestionGeneratorConfig
-from llm_response_generator.response_generator import ResponseGenerator
-from llm_response_generator.response_config import ResponseGeneratorConfig
+
 import pandas as pd
 import torch
-import time
 from huggingface_hub import snapshot_download
-from genai_detection.impostor_generators.ImpostorGenerator import BaseImpostorGenerator
-from genai_detection.config import CONFIG
+from llm_question_generator.parser import apply_extraction
+from llm_question_generator.question_config import QuestionGeneratorConfig
+from llm_question_generator.question_generator import QuestionGenerator
+from llm_response_generator.response_config import ResponseGeneratorConfig
+from llm_response_generator.response_generator import ResponseGenerator
 
+from genai_detection.impostor_generators.ImpostorGenerator import BaseImpostorGenerator
+
+logger = logging.getLogger(__name__)
+logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class MirrorMindsGenerator(BaseImpostorGenerator):
     """
@@ -93,14 +96,14 @@ class MirrorMindsGenerator(BaseImpostorGenerator):
                 if pd.notna(val) and not (isinstance(val, float)):
                     impostor_texts[f"impostor_{i}_mirror_minds"] = val
             else:
-                print(f"ERROR: No valid response generated. Original was: {text[:200]}")
+                logging.warning(f"ERROR: No valid response generated. Original was: {text[:200]}")
                 impostor_texts[f"impostor_{i}_mirror_minds"] = (
                     "ERROR: No valid response generated."
                 )
 
-        # print(f"Total script runtime: {time.time() - start_time:.2f} seconds")
-        # print("Generated questions and responses saved successfully.")
-        # print(df)
+        # logging.info(f"Total script runtime: {time.time() - start_time:.2f} seconds")
+        # logging.info("Generated questions and responses saved successfully.")
+        # logging.info("%s", df)
         os.remove(tmp_path / "sample_essays.pkl")
         os.remove(tmp_path / "generated_questions.pkl")
         os.remove(tmp_path / "generated_responses.pkl")
@@ -114,4 +117,4 @@ if __name__ == "__main__":
     file_name = "cnn_040725"  # Dalai Lama
     original_text = open(path2datasets / f"{file_name}.txt").read()
     impostor_text = generator.generate_impostors(original_text)
-    print("Impostor Text:", impostor_text)
+    logging.info("Impostor Text: %s", impostor_text)

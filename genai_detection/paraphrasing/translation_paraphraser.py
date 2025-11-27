@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 from typing import Optional, List
 
 import deepl
@@ -19,6 +20,8 @@ from genai_detection.config import CONFIG
 from genai_detection.paraphrasing.one_step_paraphrasers import OneStepParaphraser
 from genai_detection.paraphrasing.paraphraser import Paraphraser
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class TranslationParaphraser(Paraphraser):
     """
@@ -58,7 +61,7 @@ class TranslationParaphraser(Paraphraser):
     def paraphrase(
         self, text: str, prompt: Optional[str], max_length: int = CONFIG.MAX_LENGTH
     ) -> List[str]:
-        print(
+        logging.info(
             f"[DEBUG] Using TranslationParaphraser with prompt: {self.extractor_prompt}"
         )
         paraphrased_texts = []
@@ -74,13 +77,13 @@ class TranslationParaphraser(Paraphraser):
             )
             paraphrased_texts.append(res.text)
         except Exception as e:
-            print(f"[ERROR] Failed to translate text using DeepL: {e}")
+            logging.warning(f"[ERROR] Failed to translate text using DeepL: {e}")
 
         translation = self.text_extractor.paraphrase(
             text=text, prompt=self.extractor_prompt, max_length=max_length
         )
         while not translation:
-            print(
+            logging.info(
                 f"[WARNING] No translation returned. Retrying with the same text and prompt: {self.extractor_prompt}"
             )
             translation = self.text_extractor.paraphrase(

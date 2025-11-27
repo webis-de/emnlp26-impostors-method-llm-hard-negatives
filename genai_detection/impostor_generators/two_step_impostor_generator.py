@@ -11,11 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 from typing import Optional, List
 
 from genai_detection.impostor_generators.ImpostorGenerator import NonNaiveLLMImpostorGenerator
 from genai_detection.paraphrasing.two_step_paraphrasers import TwoStepParaphraser
 
+logger = logging.getLogger(__name__)
+logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class TwoStepImpostorGenerator(NonNaiveLLMImpostorGenerator):
     def __init__(self, n_impostors: int):
@@ -49,17 +52,17 @@ class TwoStepImpostorGenerator(NonNaiveLLMImpostorGenerator):
 
             n_imp_to_generate -= len(impostors)
             if n_imp_to_generate <= 0:
-                print("Number of impostors in mongodb collection: {} for text with ID: {}. No need to generate more impostors, just returning {} impostors.".format(len(impostors), text_id, self.n_impostors))
+                logging.info("Number of impostors in mongodb collection: {} for text with ID: {}. No need to generate more impostors, just returning {} impostors.".format(len(impostors), text_id, self.n_impostors))
                 return impostors[: self.n_impostors]
 
-        print(
+        logging.info(
             f"{len(impostors)} precomputed impostors found in mongoDB. Generating {n_imp_to_generate} impostors for text {text[:100]}..."
         )
         self.two_step_paraphraser.set_n_paraphrases(n_paraphrases=n_imp_to_generate)
         if not extracted_info:
             extracted_info, new_impostors, total_cost = self.two_step_paraphraser.paraphrase(text=text)
         else:
-            print("Using already extracted information stored in mongoDB for paraphrase generation.")
+            logging.info("Using already extracted information stored in mongoDB for paraphrase generation.")
             new_impostors, total_cost = self.two_step_paraphraser.generate_multiple_paraphrase_based_on_extracted_information(verbose=False, extracted_info=extracted_info)
 
         assert isinstance(

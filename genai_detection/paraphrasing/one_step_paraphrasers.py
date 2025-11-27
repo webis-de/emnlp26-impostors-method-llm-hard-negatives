@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+import logging
 import re
 from typing import List
 
@@ -24,6 +25,8 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from genai_detection.config import CONFIG
 from genai_detection.paraphrasing.paraphraser import Paraphraser
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class OneStepParaphraser(Paraphraser):
     """
@@ -90,18 +93,18 @@ class T5ChatGPTParaphraser(OneStepParaphraser):
             self.device = torch.device("cuda")  # NVIDIA GPU
         else:
             self.device = torch.device("cpu")
-        print("Using T5ChatGPTParaphraser")
+        logging.info("Using T5ChatGPTParaphraser")
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
-        print("Loaded T5ChatGPTParaphraser tokenizer")
+        logging.info("Loaded T5ChatGPTParaphraser tokenizer")
         self.model = AutoModelForSeq2SeqLM.from_pretrained(
             self.model_id, device_map=None  # force CPU load
         ).to(self.device)
-        print("Loaded T5ChatGPTParaphraser model")
+        logging.info("Loaded T5ChatGPTParaphraser model")
 
     def paraphrase(
         self, text: str, prompt: str, max_length=CONFIG.MAX_LENGTH
     ) -> List[str]:
-        print("T5 model")
+        logging.info("T5 model")
         chunks = self._sentence_tokenized_chunks(
             input_text=text, max_tokens=max_length, tokenizer=self.tokenizer
         )
@@ -158,23 +161,23 @@ class T5GooglePAWSParaphraser(OneStepParaphraser):
             self.device = torch.device("cuda")  # NVIDIA GPU
         else:
             self.device = torch.device("cpu")
-        print("Using T5GooglePAWSParaphraser")
+        logging.info("Using T5GooglePAWSParaphraser")
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
-        print("Loaded T5GooglePAWSParaphraser tokenizer")
+        logging.info("Loaded T5GooglePAWSParaphraser tokenizer")
         try:
             self.model = AutoModelForSeq2SeqLM.from_pretrained(self.model_id).to(
                 self.device
             )
         except Exception as e:
-            print(f"[ERROR] Failed to load T5GooglePAWSParaphraser model: {e}")
+            logging.warning(f"[ERROR] Failed to load T5GooglePAWSParaphraser model: {e}")
             self.model = None
 
-        print("Loaded T5GooglePAWSParaphraser model")
+        logging.info("Loaded T5GooglePAWSParaphraser model")
 
     def paraphrase(
         self, text: str, prompt: str, max_length: int = CONFIG.MAX_LENGTH
     ) -> List[str]:
-        print("T5 model")
+        logging.info("T5 model")
         chunks = self._sentence_tokenized_chunks(
             input_text=text, max_tokens=max_length, tokenizer=self.tokenizer
         )
@@ -206,8 +209,8 @@ class T5GooglePAWSParaphraser(OneStepParaphraser):
                     results = torch.cat([results, outputs], dim=1)
 
                 except Exception as e:
-                    print(e)
-                    print("failed text chunk:", results, outputs)
+                    logging.warning(e)
+                    logging.warning("failed text chunk: %s %s", results, outputs)
             else:
                 results = outputs
 
@@ -277,7 +280,7 @@ class SAIAParaphraser(OneStepParaphraser):
 
             return responses
         except openai.RateLimitError as e:
-            print(
+            logging.warning(
                 f"[ERROR] Rate limit exceeded for {self.model_id}: {e}. Sleeping 1 minute and trying again..."
             )
             return self.paraphrase(text=text, prompt=prompt, max_length=max_length)

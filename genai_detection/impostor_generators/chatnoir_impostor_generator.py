@@ -333,5 +333,5 @@ class ChatNoirSearchImpostorGenerator(MongoDBSavedGenerator):
 
 if __name__ == "__main__":
     chat_noir_retriver = ChatNoirSearchImpostorGenerator(api_key=CONFIG.CHATNOIR_KEY)
-    # print(chat_noir_retriver.fetch_results(query="cats"))
-    logging.info(len(chat_noir_retriver.generate_impostors(text="cats dogs animals", text_id=None))                )
+    # logging.info("%s", chat_noir_retriver.fetch_results(query="cats"))
+    logging.info("%d", len(chat_noir_retriver.generate_impostors(text="cats dogs animals", text_id=None))                )

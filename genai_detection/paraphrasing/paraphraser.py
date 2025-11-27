@@ -25,7 +25,7 @@ from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 nltk.download("punkt_tab")
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.WARN)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 
 class Paraphraser(ABC):
@@ -86,7 +86,7 @@ class Paraphraser(ABC):
 
         # Insert into document into paraphrase collection
         self.paraphrase_collection.insert_one(paraphrase_doc)
-        print(f"Inserted paraphrase for document ID: {original_text_id}")
+        logging.info(f"Inserted paraphrase for document ID: {original_text_id}")
 
 
 #

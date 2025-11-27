@@ -14,16 +14,19 @@
 
 import argparse
 import json
+import logging
 import os
-from pathlib import Path
-import re
 import sys
 import traceback
+from concurrent.futures import ProcessPoolExecutor
+from pathlib import Path
 from typing import Literal, Optional
-from datasets import load_from_disk
-from matplotlib import pyplot as plt
+
 import numpy as np
 import pandas as pd
+import seaborn as sns
+from datasets import load_from_disk
+from matplotlib import pyplot as plt
 from sklearn.metrics import (
     ConfusionMatrixDisplay,
     confusion_matrix,
@@ -32,8 +35,7 @@ from sklearn.metrics import (
     roc_curve,
     accuracy_score,
 )
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-import seaborn as sns
+
 from genai_detection.detectors.detector_base import DetectorBase
 from genai_detection.detectors.impostor import ImpostorDetector
 from genai_detection.detectors.impostor_supervised_baseline import (
@@ -46,6 +48,9 @@ from genai_detection.detectors.unmasking import UnmaskingDetector
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from genai_detection.config import CONFIG
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 
 class VisDetectors:
@@ -138,7 +143,7 @@ class VisDetectors:
 
         :param balanced: Whether the number of same and different author pairs from dataset should be balanced (i.e. sampling strategy).
         """
-        print(f"Visualizing detectors on dataset: {self.dataset_name}")
+        logging.info(f"Visualizing detectors on dataset: {self.dataset_name}")
         train_dataset, test_dataset = self._load_datasets(balanced=balanced)
         for detector in self.detectors:
             if isinstance(detector, ImpostorDetector):
@@ -202,7 +207,7 @@ class VisDetectors:
             return thresholds_valid[optimal_idx]
         else:
             # fallback: No valid data
-            print(
+            logging.info(
                 "Warning: No valid TPR/FPR data available. Defaulting to threshold = 0.5"
             )
             return 0.5  # or np.nan, depending on your use case
@@ -226,7 +231,7 @@ class VisDetectors:
             train_dataset["impostor_score"] = list(
                 executor.map(impostor_detector.get_score, train_dataset["pair"])
             )
-        print("Calculated impostor scores on training data.")
+        logging.info("Calculated impostor scores on training data.")
 
         # find threshold that best separates impostors from non-impostors in the training set (targets are in the 'same' column)
         args = {
@@ -245,7 +250,7 @@ class VisDetectors:
 
         best_f1_thres = np.round(best_f1_thres, 2)
         youdens_j_thres = np.round(self._get_opt_imp_threshold(fpr, tpr, thresholds), 2)
-        print(
+        logging.info(
             f"Optimal threshold for impostor detection via Youden's J function: {youdens_j_thres:.2f}/ via best F1: {best_f1_thres:.2f}"
         )
 
@@ -262,7 +267,7 @@ class VisDetectors:
             ["Youden's J", "best F1"], [youdens_j_thres, best_f1_thres]
         ):
             args["threshold"] = thres
-            print(f"Visualizing impostor scores with threshold: {thres_name} = {thres}")
+            logging.info(f"Visualizing impostor scores with threshold: {thres_name} = {thres}")
 
             test_dataset["pred_same"] = test_dataset["impostor_score"] >= thres
 
@@ -286,7 +291,7 @@ class VisDetectors:
             filename = self._title2filename(title=title)
             save_path.mkdir(parents=True, exist_ok=True)
             for format in ["svg"]:  # "png",
-                print(f"Saving confusion matrix to {save_path / filename}.{format}")
+                logging.info(f"Saving confusion matrix to {save_path / filename}.{format}")
                 plt.savefig(save_path / f"{filename}.{format}")
             plt.close()
 
@@ -417,11 +422,11 @@ class VisDetectors:
                 scores.tolist()
             ).ravel()  # each entry in scores is a one-element list
             if len(scores) != len(labels):
-                print(
+                logging.info(
                     f"Warning: Length of scores ({len(scores)}) does not match length of labels ({len(labels)})."
                 )
-                print("scores:", scores)
-                print("labels:", labels)
+                logging.info("scores:", scores)
+                logging.info("labels:", labels)
         except Exception as e:
             raise ValueError(f"Failed to concatenate (vis_detectors) scores: {e}.")
 
@@ -631,7 +636,7 @@ class VisDetectors:
     def _run_fig_2_worker(
         self, n_imp, train_dataset, test_dataset, path2imp, args: dict
     ):
-        print(f"Using {n_imp} impostors from {path2imp}")
+        logging.info(f"Using {n_imp} impostors from {path2imp}")
         try:
             updated_args = args.copy()
             updated_args["n_impostors"] = n_imp
@@ -640,7 +645,7 @@ class VisDetectors:
             )
             return {"n_imp": n_imp, "precision": precs, "recall": recs}
         except Exception as e:
-            print(f"[ERROR] Failed for n_imp = {n_imp}:\n{traceback.format_exc()}\n{e}")
+            logging.warning(f"[ERROR] Failed for n_imp = {n_imp}:\n{traceback.format_exc()}\n{e}")
             return None
 
     # ugly, but only for reproduction of Figure 2 from Koppel et al. (2014)
@@ -670,7 +675,7 @@ class VisDetectors:
             ],
             ignore_index=False,
         )
-        print("Loaded datasets for Figure 2:", self.dataset_name)
+        logging.info("Loaded datasets for Figure 2: %s", self.dataset_name)
         # could be initially different, bc args are from argparse which are irrespective from calling this function with defined dataset_name
         args["dataset_name"] = self.dataset_name
         n_imp_options = [50, 500, 1000]  # original: 5000
@@ -681,19 +686,19 @@ class VisDetectors:
             else Path(os.getcwd()).resolve() / CONFIG.PATH2STUDENT_ESSAYS
         )
         # Parallel does not work, bc tfidf vectorizer isn't correctly initialized in ImpostorDetector
-        print("Start sequential computation for different n_impostors.")
+        logging.info("Start sequential computation for different n_impostors.")
         for n_imp in n_imp_options:
             result = self._run_fig_2_worker(
                 n_imp, train_dataset, test_dataset, path2imp, args
             )
             if result:
-                print(
+                logging.info(
                     f"Computed precision and recall for n_imp = {n_imp}: prec: {result['precision']}, recall: {result['recall']}"
                 )
                 precisions[result["n_imp"]] = result["precision"]
                 recalls[result["n_imp"]] = result["recall"]
             else:
-                print(
+                logging.info(
                     f"[ERROR] Failed to compute precision and recall for n_imp = {n_imp}"
                 )
 
@@ -759,7 +764,7 @@ class VisDetectors:
                 imp_gen = args.get("impostor_technique", "fixed")
                 figure_name = f"roc_prec_recall_curve_{imp_gen}_r{args['rounds']}_top{args['top_n']}_dif_n_imp.{format}"
             plt.savefig(save_path / figure_name)
-            print(f"Saved figure to {save_path / figure_name}")
+            logging.info(f"Saved figure to {save_path / figure_name}")
         plt.close(fig)
 
     def _get_missing_scores_indices(
@@ -858,7 +863,7 @@ class VisDetectors:
         )
 
         if len(rows_without_scores) > 0:
-            print(
+            logging.info(
                 f"Found {len(rows_without_scores)} rows without impostor scores in test data."
             )
             missing_scores = []
@@ -879,7 +884,7 @@ class VisDetectors:
             )
             with open(existing_scores_filename, "w") as f:
                 json.dump(loaded_data, f, indent=4)
-            print(
+            logging.info(
                 f"Saved missing test scores to {existing_scores_filename} for {len(missing_scores_indices)} rows."
             )
 
@@ -901,7 +906,7 @@ class VisDetectors:
             save_path / f"{imp_gen.replace(' ', '_')}_n_imp{n_imp}_fig2_prec_rec.csv",
             index=False,
         )
-        print(
+        logging.info(
             f"Saved precision-recall values for Figure 2 with {imp_gen} impostor generation and n_imp={n_imp} to {save_path / f'{imp_gen}_fig2_prec_rec.csv'}"
         )
 
@@ -927,7 +932,7 @@ class VisDetectors:
 
     def _run_fig_4_worker(self, imp_gen, train_dataset, test_dataset, path2imp):
         try:
-            print(
+            logging.info(
                 f"Using {imp_gen} impostor generation with path to imposters: {path2imp}"
             )
             save_path = (
@@ -957,7 +962,7 @@ class VisDetectors:
             )
 
             if len(rows_without_scores) > 0:
-                print(
+                logging.info(
                     f"Found {len(rows_without_scores)} rows without impostor scores in training data."
                 )
                 impostor_detector = ImpostorDetector(
@@ -990,7 +995,7 @@ class VisDetectors:
                 with open(existing_scores_filename, "w") as f:
                     json.dump(loaded_data, f, indent=4)
 
-                print(
+                logging.info(
                     f"Saved missing train scores to {existing_scores_filename} for {len(missing_scores_indices)} rows."
                 )
 
@@ -1013,7 +1018,7 @@ class VisDetectors:
             youdens_j_thres = np.round(
                 self._get_opt_imp_threshold(fpr, tpr, thresholds), 2
             )
-            print(
+            logging.info(
                 f"Optimal threshold for impostor detection via Youden's J function: {youdens_j_thres:.2f}/ via best F1: {best_f1_thres:.2f}"
             )
 
@@ -1027,7 +1032,7 @@ class VisDetectors:
             )
 
             if len(rows_without_scores) > 0:
-                print(
+                logging.info(
                     f"Found {len(rows_without_scores)} rows without impostor scores in test data."
                 )
                 with ProcessPoolExecutor() as executor:
@@ -1057,7 +1062,7 @@ class VisDetectors:
                 )
                 with open(existing_scores_filename, "w") as f:
                     json.dump(loaded_data, f, indent=4)
-                print(
+                logging.info(
                     f"Saved missing test scores to {existing_scores_filename} for {len(missing_scores_indices)} rows."
                 )
 
@@ -1096,7 +1101,7 @@ class VisDetectors:
                 "different_pr_thresholds": different_pr_thresholds,
             }
         except Exception as e:
-            print(f"[ERROR] Failed for imp_gen = {imp_gen}:\n{traceback.format_exc()}")
+            logging.warning(f"[ERROR] Failed for imp_gen = {imp_gen}:\n{traceback.format_exc()}")
             return None
 
     # ugly, but only for reproduction of Figure 4 a, b from Koppel et al. (2014)
@@ -1109,7 +1114,7 @@ class VisDetectors:
         """
         Visualizes the impostor detection results via Precision-Recall curves for different impostor generation techniques (cf. Figures 4 a, b from Koppel et al. (2014)).
         """
-        print(
+        logging.info(
             "Reproducing Figure 4 with different impostor generation techniques:",
             imp_gen_options,
         )
@@ -1156,7 +1161,7 @@ class VisDetectors:
             if self.dataset_name == CONFIG.BLOG
             else Path(os.getcwd()).resolve() / CONFIG.PATH2STUDENT_ESSAYS
         )
-        print(
+        logging.info(
             "Start sequential computation (else OOM) for different impostor generation techniques."
         )
         for imp_gen in imp_gen_options:
@@ -1211,7 +1216,7 @@ class VisDetectors:
                 pr_thresholds=result["different_pr_thresholds"],
                 portion="different",
             )
-            print(
+            logging.info(
                 f"Computed and saved precision and recall for {result['imp_gen']} impostor generation. "
             )
 
@@ -1231,7 +1236,7 @@ class VisDetectors:
                 preds = baseline.get_score(test_dataset["pair"])
                 # get_prediction(test_dataset["pair"])
             except Exception as e:
-                print(
+                logging.info(
                     f"[ERROR] Failed for baseline {baseline_name}:\n{e}\n{traceback.format_exc()}\nReloading datasets..."
                 )
                 train_dataset, test_dataset = self._load_datasets(balanced=True)
@@ -1264,14 +1269,11 @@ class VisDetectors:
                 pr_thresholds=pr_thresholds,
                 portion="same",
             )
-            print(
-                "Number of same author pairs:", len(test_dataset[test_dataset["same"]])
+            logging.info(
+                "Number of same author pairs: %d", len(test_dataset[test_dataset["same"]])
             )
-            print(
-                "Number of same author precisions/recalls:",
-                len(precision),
-                "/",
-                len(recall),
+            logging.info(
+                f"Number of same author precisions/recalls: {len(precision)}/{len(recall)}"
             )
             same_author_precisions[baseline_name.replace(" ", "_")] = precision[:-1]
             same_author_recalls[baseline_name.replace(" ", "_")] = recall[:-1]
@@ -1291,15 +1293,12 @@ class VisDetectors:
                 pr_thresholds=pr_thresholds,
                 portion="different",
             )
-            print(
-                "Number of different author pairs:",
+            logging.info(
+                "Number of different author pairs: %d",
                 len(test_dataset[~test_dataset["same"]]),
             )
-            print(
-                "Number of different author precisions/recalls:",
-                len(precision),
-                "/",
-                len(recall),
+            logging.info(
+                f"Number of different author precisions/recalls: {len(precision)}/{len(recall)}"
             )
             different_author_precisions[baseline_name.replace(" ", "_")] = precision[
                 :-1
@@ -1309,8 +1308,8 @@ class VisDetectors:
         # Precision-Recall Curve: 	Imbalanced
         # scores: non-thresholded measure of decisions, relative ranking of predictions
         # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.precision_recall_curve.html (05.06.2025)
-        print(
-            "DEBUG Plotting Precision-Recall Curves for different impostor generation techniques:",
+        logging.info(
+            "DEBUG Plotting Precision-Recall Curves for different impostor generation techniques: %s",
             same_author_precisions.keys(),
         )
         label_translations = {
@@ -1329,7 +1328,7 @@ class VisDetectors:
                 (different_author_precisions, different_author_recalls),
             ],
         ):
-            print(f"Plotting Precision-Recall Curve for {kind} pairs")
+            logging.info(f"Plotting Precision-Recall Curve for {kind} pairs")
             precisions, recalls = data
             fig = plt.figure()
             for imp_gen, precision in precisions.items():
@@ -1379,7 +1378,7 @@ class VisDetectors:
         pr_thresholds: list,
         portion: str = "same",
     ):
-        print("Saving precision and recall values for", appr_name, portion)
+        logging.info("Saving precision and recall values for %s %s", appr_name, portion)
         assert (
             len(precision_vals) == len(recall_vals) == len(pr_thresholds)
         ), "Precision, recall, and thresholds must have the same length."
@@ -1475,7 +1474,7 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    print("Arguments for impostor detector:", args)
+    logging.info("Arguments for impostor detector: %s", args)
 
     impostor = ImpostorDetector(
         impostor_technique="fixed",
@@ -1500,7 +1499,7 @@ if __name__ == "__main__":
         5,  # not really figure 5, but figure 4 with our contributions (LLM based impostors)
     ], "Only Figures 2 and 4 can be reproduced from Koppel et al. (2014)."
     args = vars(args)  # namespace to dict conversion
-    print(
+    logging.info(
         f"Reproducing Figure {fig} from Koppel et al. (2014) on BLOG and STUDENT data."
     )
 
@@ -1509,7 +1508,7 @@ if __name__ == "__main__":
         dataset_name=CONFIG.STUDENT_ESSAYS,
         detectors=[impostor],
     )
-    print(
+    logging.info(
         f"impostor Detector initialized for fig {fig} and dataset {CONFIG.STUDENT_ESSAYS}."
     )
     if fig == 2:
@@ -1528,7 +1527,7 @@ if __name__ == "__main__":
             / vis_det.dataset_name
             / "our_contributions_scores",
         )
-    print(
+    logging.info(
         f"Finished reproducing Figure {fig} from Koppel et al. (2014) on STUDENT data."
     )
 
@@ -1537,7 +1536,7 @@ if __name__ == "__main__":
         dataset_name=CONFIG.BLOG,
         detectors=[impostor],
     )
-    print(f"impostor Detector initialized for fig {fig} and dataset {CONFIG.BLOG}.")
+    logging.info(f"impostor Detector initialized for fig {fig} and dataset {CONFIG.BLOG}.")
 
     if fig == 2:
         vis_det.reproduce_fig2_prec_recall_dif_n_imp(args=args)
@@ -1555,4 +1554,4 @@ if __name__ == "__main__":
             / vis_det.dataset_name
             / "our_contributions_scores",
         )
-    print(f"Finished reproducing Figure {fig} from Koppel et al. (2014) on BLOG data.")
+    logging.info(f"Finished reproducing Figure {fig} from Koppel et al. (2014) on BLOG data.")

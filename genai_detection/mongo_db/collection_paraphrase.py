@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 from typing import List
 
@@ -7,6 +8,9 @@ from genai_detection.impostor_generators.two_step_impostor_generator import TwoS
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 from genai_detection.paraphrasing import two_step_paraphrasers
 from genai_detection.paraphrasing.openai_utils import OpenaiCostEstimator
+
+logger = logging.getLogger(__name__)
+logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 # MongoDB setup
 mongoDB = ParaphraseMongoDB()
@@ -94,13 +98,13 @@ def save_overview_file(original_text:str, paraphrases:List[str], extracted_info_
             f.write(f"{'-'*100}\nPARAPHRASE {i}\n{'-'*100}\n")
             f.write(paraphrase.strip() + "\n\n")
 
-    print(f"Overview file saved at: {file_path}")
+    logging.info(f"Overview file saved at: {file_path}")
 
 
 for i, doc in enumerate(original_collection.find(limit=max_docs)):
     original_text_id = doc["_id"]
     original_text = doc["text"]
-    print(f"Original text id: {original_text_id}")
+    logging.info(f"Original text id: {original_text_id}")
 
     llm_paraphraser = TwoStepImpostorGenerator(n_impostors=5)
     paraphrased_texts = llm_paraphraser.generate_impostors(
@@ -116,4 +120,4 @@ for i, doc in enumerate(original_collection.find(limit=max_docs)):
     save_overview_file(original_text=original_text, paraphrases=paraphrased_texts,
                        extracted_info_dict=extracted_info, doc_id=f"{original_text_id}_{i}")
 
-print(f"Paraphrasing complete. Inserted/Updated {max_docs} documents.")
+logging.info(f"Paraphrasing complete. Inserted/Updated {max_docs} documents.")

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import datetime
+import logging
 import random
 import re
 from collections import Counter
@@ -32,6 +33,8 @@ from genai_detection.impostor_generators.ImpostorGenerator import (
     BaseImpostorGenerator,
 )
 
+logger = logging.getLogger(__name__)
+logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
 
@@ -77,7 +80,7 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
         try:
             self.nlp = spacy.load("en_core_web_sm")
         except OSError:
-            print(
+            logging.warning(
                 "Spacy model 'en_core_web_sm' not found. Downloading it now. This may take a while."
             )
             download("en_core_web_sm")
@@ -172,7 +175,7 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
             cleaned_text = re.sub(r"\s+", " ", full_text)
             return cleaned_text.strip()
         except Exception as e:
-            print(f"Error fetching from URL {url}: {e}")
+            logging.warning(f"Error fetching from URL {url}: {e}")
             return ""
 
     def fetch_results(self, query: str) -> List[Dict]:
@@ -210,7 +213,7 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
                 for res in results.get("organic_results", [])
             ]
         except Exception as e:
-            print(f"Error fetching results for '{query}': {e}")
+            logging.warning(f"Error fetching results for '{query}': {e}")
             return []
 
     def _parallel_fetch(self, queries: List[str]) -> List[Dict]:
@@ -254,7 +257,7 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
         if not isinstance(text, str) or not text.strip():
             raise ValueError("Input text must be a non-empty string.")
         if self.real_time_generation:
-            print("Generating impostors in real-time.")
+            logging.info("Generating impostors in real-time.")
             medium_frequency_words = self.get_medium_frequency_words(text)
             queries = self._generate_queries_based_on_candidate_words(
                 medium_frequency_words
@@ -264,7 +267,7 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
                 result_df.drop_duplicates(subset="url", inplace=True)
 
                 if result_df.empty:
-                    print("Warning: No results fetched. CSV not saved.")
+                    logging.info("Warning: No results fetched. CSV not saved.")
                     return result_df
                 # TODO: use mongo collection instead
                 if path2imp is None:
@@ -286,12 +289,12 @@ class GoogleSearchImpostorGenerator(BaseImpostorGenerator):
                 path2imp.parent.mkdir(parents=True, exist_ok=True)
                 result_df.to_csv(path2imp, index=False)
             except Exception as e:
-                print(
+                logging.warning(
                     f"Error during fetching results (probabily no more free API calls): {e}"
                 )
                 return {"imposter": "Error during fetching results, check logs."}
         else:  # use precomputed results
-            print("Using precomputed results from path2imp. No real-time generation.")
+            logging.info("Using precomputed results from path2imp. No real-time generation.")
             if "PUCK" in text:  # Midsummer Night's Dream
                 path2imp = (
                     path2imp

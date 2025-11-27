@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -8,6 +9,8 @@ from genai_detection.config import CONFIG
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class ParaphraseMongoDB:
 
@@ -16,9 +19,9 @@ class ParaphraseMongoDB:
         self.client = MongoClient(uri)
         try:
             self.client.admin.command("ping")
-            print("Successfully connected as MongoDB root user!")
+            logging.info("Successfully connected as MongoDB root user!")
         except Exception as e:
-            print("Connection failed:", e)
+            logging.warning("Connection failed: %s", e)
             raise e
 
         self.db = self.client[CONFIG.MONGO_DATABASE or "impostors"]
@@ -35,9 +38,9 @@ class ParaphraseMongoDB:
         ]:
             if collection_name not in self.db.list_collection_names():
                 self.db.create_collection(collection_name)
-                print(f"Created collection: {collection_name}")
+                logging.info(f"Created collection: {collection_name}")
             else:
-                print(
+                logging.info(
                     f"Collection '{collection_name}' already exists. Skipping creation."
                 )
 

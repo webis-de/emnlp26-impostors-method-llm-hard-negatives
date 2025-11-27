@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import pandas as pd
@@ -6,6 +7,8 @@ from matplotlib import pyplot as plt
 from genai_detection.config import CONFIG
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class ParaphraseScoresVisualizer():
     def __init__(self):
@@ -35,7 +38,7 @@ class ParaphraseScoresVisualizer():
             )
             docs = list(cursor)
             if not docs:
-                print(f"No paraphrases found for text_id: {text_id}")
+                logging.info(f"No paraphrases found for text_id: {text_id}")
                 continue
 
             df = pd.DataFrame(docs)
@@ -43,7 +46,7 @@ class ParaphraseScoresVisualizer():
             all_frames.append(df)
 
         if not all_frames:
-            print("No paraphrase data found.")
+            logging.info("No paraphrase data found.")
             return None
 
         # --- Combined DataFrame ---
@@ -51,7 +54,7 @@ class ParaphraseScoresVisualizer():
         numeric_df = df_all.select_dtypes(include="number")
 
         if numeric_df.empty:
-            print("No numeric features found across all documents.")
+            logging.info("No numeric features found across all documents.")
             return df_all
 
         # ---------- HISTOGRAMS ----------
@@ -148,7 +151,7 @@ class ParaphraseScoresVisualizer():
             plt.savefig(filename)
             plt.close()
 
-        print(f"Plots saved to: {self.save_dir_path}")
+        logging.info(f"Plots saved to: {self.save_dir_path}")
         return df_all
 
 

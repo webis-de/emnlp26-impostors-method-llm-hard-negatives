@@ -43,6 +43,9 @@ from genai_detection.paraphrasing.one_step_paraphrasers import *
 from genai_detection.paraphrasing.two_step_paraphrasers import *
 from genai_detection.util import preprocess_text as _preprocess_text
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
+
 random.seed(42)
 # Koppel et al. (2004): 500 words
 # Bevendorff et al. (2019): 700 words (https://www.degruyterbrill.com/document/doi/10.1515/itit-2019-0046/html?casa_token=pbCaF7FgUXoAAAAA:8Vw71FUWE5spAbSsEuGGTdIjjm_o1_eb_inHwU3BR6eSrdVMOYy3--iqvDJwCV7EQ1HWtQBh610)
@@ -116,7 +119,7 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
 
     def load(self) -> Dataset:
         df = pd.read_csv(self.path)
-        print("Initial number of entries:", len(df))
+        logging.info("Initial number of entries: %d", len(df))
         df["text"] = df["text"].apply(lambda x: self.preprocess(x))
         df = df[
             df["text"].apply(lambda x: len(x.split()) >= MIN_NUM_WORDS)
@@ -125,7 +128,7 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
         df["year"] = pd.to_datetime(
             df["date"], format="mixed", dayfirst=True, errors="coerce"
         ).dt.year
-        print("number of entries after filtering:", len(df))
+        logging.info("number of entries after filtering: %d", len(df))
 
         topics = df["topic"].unique().tolist()
         random.shuffle(topics)
@@ -421,13 +424,13 @@ class Pan25DatasetLoader(BaseDatasetLoader):
             self.human_dir, "human", is_human=True
         ) + self._read_txts_from_dir(self.machine_dir, "machine", is_human=False)
 
-        print("Label counts:", Counter(d["label"] for d in data))
-        print("Model counts:", Counter(d["model"] for d in data))
+        logging.info("Label counts: %s", Counter(d["label"] for d in data))
+        logging.info("Model counts: %s", Counter(d["model"] for d in data))
 
         train_data = [d for d in data if d["id"] in train_ids]
         test_data = [d for d in data if d["id"] in test_ids]
 
-        print(
+        logging.info(
             f"Split into {len(train_data)} training and {len(test_data)} test records."
         )
         features = Features(
@@ -477,16 +480,16 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
         for col in groupby_cols:
             num_nans = df[col].isna().sum()
             if num_nans > 0:
-                print(f"Column '{col}' has {num_nans} NaN values.")
-                print(f"Rows with NaN in '{col}':\n{df[df[col].isna()]}\n")
+                logging.info(f"Column '{col}' has {num_nans} NaN values.")
+                logging.info(f"Rows with NaN in '{col}':\n{df[df[col].isna()]}\n")
 
         grouped = df.groupby(groupby_cols)
-        # print(f"\nTotal groups: {len(grouped)}")
-        # print(f"Groups: {list(grouped.groups.keys())}\n\n")
+        # logging.info(f"\nTotal groups: {len(grouped)}")
+        # logging.info(f"Groups: {list(grouped.groups.keys())}\n\n")
         pairs = []
 
         for group_values, group in grouped:
-            print(f"Processing group: {group_values}, size: {len(group)}")
+            logging.info(f"Processing group: {group_values}, size: {len(group)}")
             data = group.to_dict(orient="records")
 
             # Group texts by author
@@ -636,15 +639,17 @@ class GutenbergDatasetLoader(BaseDatasetLoader):
             .sample(frac=1, random_state=42)
             .reset_index(drop=True)
         )
-        print(f"Train authors: {train_authors}, Test authors: {test_authors}\n\n")
+        logging.info(f"Train authors: {train_authors}, Test authors: {test_authors}\n\n")
 
         train_pairs = self.generate_pairs(df=train_df, groupby_cols=groupyby_cols)
         test_pairs = self.generate_pairs(df=test_df, groupby_cols=groupyby_cols)
-        print(
+        logging.info(
             f"Generated {len(train_pairs)} training pairs and {len(test_pairs)} test pairs."
         )
-        # print("training pairs:", [train_pairs[i]['authors'] for i in range(len(train_pairs))]if train_pairs else "No training pairs generated.")
-        # print("test pairs:", [test_pairs[i]['authors'] for i in range(len(test_pairs))] if test_pairs else "No test pairs generated.")
+        # logging.info("training pairs: %s", [train_pairs[i]['authors'] for i in range(len(train_pairs))]if train_pairs
+        # else "No training pairs generated.")
+        # logging.info("test pairs: %s", [test_pairs[i]['authors'] for i in range(len(test_pairs))] if test_pairs else
+        # "No test pairs generated.")
 
         features = Features(
             {
@@ -682,7 +687,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         """
         # build student essays dataset
         df = self._load_student_essays(min_num_words=min_num_words)
-        print("obtained student essays dataset with", len(df), "entries.")
+        logging.info(f"obtained student essays dataset with {len(df)} entries.")
 
         # metadata dataframe
         author_metadata = self._load_student_metadata()
@@ -695,7 +700,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         #     index=False,
         # )
         # keep NaNs, no answer is also an answer group
-        print("obtained author metadata with", len(author_metadata), "entries.")
+        logging.info(f"obtained author metadata with {len(author_metadata)} entries.")
 
         df = df.join(
             author_metadata.set_index("author_id"),
@@ -703,7 +708,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             how="left",
             rsuffix="_meta",
         )
-        print("joined student essays with metadata.")
+        logging.info("joined student essays with metadata.")
 
         # construct pairs
         groupby_cols = [
@@ -743,11 +748,11 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             .sample(frac=1, random_state=42)
             .reset_index(drop=True)
         )
-        print(f"Train tasks: {train_tasks}, Test tasks: {test_tasks}\n\n")
+        logging.info(f"Train tasks: {train_tasks}, Test tasks: {test_tasks}\n\n")
 
         train_pairs = self.generate_pairs(df=train_df, groupby_cols=groupby_cols)
         test_pairs = self.generate_pairs(df=test_df, groupby_cols=groupby_cols)
-        print(
+        logging.info(
             f"Generated {len(train_pairs)} training pairs and {len(test_pairs)} test pairs."
         )
 
@@ -846,8 +851,8 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         for col in groupby_cols:
             num_nans = df[col].isna().sum()
             if num_nans > 0:
-                print(f"Column '{col}' has {num_nans} NaN values.")
-                # print(f"Rows with NaN in '{col}':\n{df[df[col].isna()]}\n")
+                logging.info(f"Column '{col}' has {num_nans} NaN values.")
+                # logging.info(f"Rows with NaN in '{col}':\n{df[df[col].isna()]}\n")
         pairs = []
 
         # each author appears <=1 time per task: same-author pairs have to be generated across tasks
@@ -862,7 +867,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             author_groups.setdefault(item["author_id"], []).append(item)
         for author, texts in author_groups.items():
             if len(texts) < 2:
-                # print(f"Skipping author {author} with only {len(texts)} text(s).")
+                # logging.info(f"Skipping author {author} with only {len(texts)} text(s).")
                 continue
 
             selected = random.sample(texts, min(n_pairs * 2, len(texts)))
@@ -880,7 +885,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
                         }
                     )
         pairs.extend(same_author_pairs)
-        print(f"Generated {len(same_author_pairs)} same-author pairs.")
+        logging.info(f"Generated {len(same_author_pairs)} same-author pairs.")
 
         # Prepare cross-task (cf. Koppel et al. (2014)) different-author pairs
         # ----------------
@@ -925,7 +930,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         diff_author_pairs = diff_author_pairs[:n_diff_pairs_target]
 
         pairs.extend(diff_author_pairs)
-        print(f"Generated {len(diff_author_pairs)} different-author pairs.\n")
+        logging.info(f"Generated {len(diff_author_pairs)} different-author pairs.\n")
 
         return pairs
 
@@ -1014,7 +1019,7 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
             positive_sample = all_positive_samples.sample(
                 n=min(n_samples, len(all_positive_samples)), random_state=seed
             )
-            print(
+            logging.info(
                 f"Obtained {len(positive_sample)} positive samples for {data_category}."
             )
             all_negative_samples = complete_df[~complete_df["same"]]
@@ -1099,7 +1104,7 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
                     if not paraphrase:
                         continue
                 except Exception as e:
-                    print(f"[ERROR] Failed to paraphrase with {paraphraser_name}: {e}")
+                    logging.info(f"[ERROR] Failed to paraphrase with {paraphraser_name}: {e}")
                     continue
                 rows_to_add.append(
                     {
@@ -1132,7 +1137,7 @@ class CrossGenreDatasetLoader(BaseDatasetLoader):
         random.shuffle(dataset)
         train_data = dataset[: int(len(dataset) * train_split_portion)]
         test_data = dataset[int(len(dataset) * train_split_portion) :]
-        print(f"Total dataset size: {len(train_data)} records.")
+        logging.info(f"Total dataset size: {len(train_data)} records.")
 
         # Create DatasetDict
         return DatasetDict(
@@ -1184,7 +1189,7 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
         )
 
         for row1, row2 in same_author_samples:
-            print(row1)
+            logging.info("%s", row1)
             pairs.append(
                 {
                     "candidate_assignment": row1["task"],
@@ -1338,7 +1343,7 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
                     )
                     sleep(10)  # only 14 requests per minute
                 except Exception as e:
-                    print(f"[ERROR] {paraphraser_name} failed: {e}")
+                    logging.info(f"[ERROR] {paraphraser_name} failed: {e}")
                     continue
 
                 pairs.append(
@@ -1378,7 +1383,7 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
                     )
                     sleep(15)  # only 14 requests per minute
                 except Exception as e:
-                    print(f"[ERROR] {paraphraser_name} failed: {e}")
+                    logging.warning(f"[ERROR] {paraphraser_name} failed: {e}")
                     continue
 
                 pairs.append(
@@ -1419,7 +1424,7 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
                 )
                 sleep(15)  # only 14 requests per minute
             except Exception as e:
-                print(f"[ERROR] LLM diff failed ({p1},{p2}): {e}")
+                logging.info(f"[ERROR] LLM diff failed ({p1},{p2}): {e}")
                 continue
 
             pairs.append(
@@ -1569,12 +1574,12 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
             if k in all_paraphrasers_dict
         }
 
-        print("Generating existing pairs from student essays dataset...")
+        logging.info("Generating existing pairs from student essays dataset...")
         existing_pairs = self.generate_existing_pairs(
             complete_df, n_samples, random_state=seed
         )
-        print(f"Generated {len(existing_pairs)} existing pairs from student essays.")
-        print("Generating artifical pairs from student essays dataset...")
+        logging.info(f"Generated {len(existing_pairs)} existing pairs from student essays.")
+        logging.info("Generating artifical pairs from student essays dataset...")
 
         artificial_pairs = self.generate_llm_paraphrase_pairs(
             complete_df,
@@ -1583,7 +1588,7 @@ class ArtificialStudentEssayDatasetLoader(CrossGenreDatasetLoader):
             n=n_samples,
             random_state=seed,
         )
-        print(f"Generated {len(artificial_pairs)} artificial pairs.")
+        logging.info(f"Generated {len(artificial_pairs)} artificial pairs.")
 
         dataset = pd.concat([existing_pairs, artificial_pairs], ignore_index=True)
         features = Features(

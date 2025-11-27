@@ -11,13 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import logging
 from typing import Optional, List, Any
 
 import dspy
 
 from genai_detection.config import CONFIG
 from genai_detection.paraphrasing.paraphraser import Paraphraser
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 # Field descriptions dictionary
 FIELD_DESCRIPTIONS = {
@@ -128,7 +131,7 @@ class TwoStepParaphraser(Paraphraser):
                 paraphrases.append(new_impostor)
                 total_cost += cost
             except Exception as e:
-                print(e)
+                logging.warning(e)
         return paraphrases, total_cost
 
     def generate_one_paraphrase_based_on_extracted_information(
@@ -146,10 +149,10 @@ class TwoStepParaphraser(Paraphraser):
 
         if verbose:
             cfg = generator.get_config()
-            print("Config:", cfg)
+            logging.info("Config: %s", cfg)
             sig = generator.signature
-            print("Signature:", sig)
-            print("generating paraphrase with extracted info", extracted_info)
+            logging.info("Signature: %s", sig)
+            logging.info("generating paraphrase with extracted info %s", extracted_info)
         try:
             extracted_keys = set(extracted_info.keys())
             field_keys = set(FIELD_DESCRIPTIONS.keys())
@@ -167,7 +170,7 @@ class TwoStepParaphraser(Paraphraser):
 
             paraphrase = generator(**extracted_info)
             if verbose:
-                print(f"generated paraphrase:", paraphrase)
+                logging.info(f"generated paraphrase: %s", paraphrase)
             cost_after_generator = sum(
                 x["cost"] for x in self.lm.history if x["cost"] is not None
             )
@@ -196,7 +199,7 @@ class TwoStepParaphraser(Paraphraser):
             [x["cost"] for x in self.lm.history if x["cost"] is not None]
         )  # in USD, as calculated by LiteLLM for certain providers
         # https://dspy.ai/tutorials/rag/#keeping-an-eye-on-cost
-        print(
+        logging.info(
             "ATTENTION. Cost of the extraction requests: ${:.6f}".format(
                 cost_after_extractor
             )
@@ -217,10 +220,10 @@ class TwoStepParaphraser(Paraphraser):
                 if (len(costs) > 1) and not (costs[-1] > costs[-2]):
                     summing = False
             cost_after_generator = sum(costs) if not summing else costs[-1]
-            print("The costs are summed up: ", summing)
+            logging.info("The costs are summed up: %s", summing)
 
             # Total cost for both requests
-            print(f"ATTENTION. Total cost for extractor + generator: ${cost_after_generator:.6f}")
+            logging.info(f"ATTENTION. Total cost for extractor + generator: ${cost_after_generator:.6f}")
         except Exception as e:
-            print(e)
+            logging.warning(e)
         return extracted_info, paraphrases, cost_after_extractor
