@@ -11,21 +11,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import os
+import logging
+import pickle
+import typing as t
 from pathlib import Path
-from more_itertools import ichunked
-import numpy as np
-from datasets import load_from_disk
-import pandas as pd
 
+import numpy as np
+import pandas as pd
 import torch
+from datasets import load_from_disk
+from more_itertools import ichunked
+from sklearn.svm import LinearSVC
+
 from genai_detection.config import CONFIG
 from genai_detection.detectors.impostor_base import ImpostorBaselineBase
-import typing as t
-from sklearn.svm import LinearSVC
-import pickle
 
+logger = logging.getLogger(__name__)
+logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class SupervisedImpostorBaseline(ImpostorBaselineBase):
     """
@@ -65,8 +67,8 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
 
         scores_per_pair = (
             []
-        )  # id is index of pair (i.e, length is half of the input text list)
-        pairs = list(ichunked(vectors, 2)) if type(text[0]) == str else text
+        )  # id is the index of the pair (i.e., length is half of the input text list)
+        pairs = list(ichunked(text, 2)) if type(text[0]) == str else text
         for text_pair in pairs:
             vectors = [self.get_tfidf_vector_for_text(t) for t in text_pair]
             assert len(vectors) == 2, "Input text must be a list of pairs of texts."
@@ -151,24 +153,23 @@ if __name__ == "__main__":
     dataset = load_from_disk(
         Path(__file__).resolve().parents[2] / CONFIG.PATH2CROSS_GENRE
     )["test"].to_pandas()[["disputed_text", "candidate_text", "same"]]
-    print("TWCHCVH", dataset.iloc[0])
+    logging.info("Attention", dataset.iloc[0])
     sample_texts = [
         [dataset.iloc[i]["disputed_text"], dataset.iloc[i]["candidate_text"]]
         for i in range(len(dataset))
     ]
-    print("Number of texts: ", len(sample_texts))
+    logging.info("Number of texts: %d", len(sample_texts))
     sample_texts = [item for sublist in sample_texts for item in sublist]
     scores = detector.get_score(sample_texts)
     predictions = detector.get_prediction(sample_texts)
-    print("Scores:", scores)
-    print("Predictions:", predictions)
-    print("Ground Truth: ", dataset["same"])
+    logging.info("Scores: %s", scores)
+    logging.info("Predictions: %s", predictions)
+    logging.info("Ground Truth: %s", dataset["same"])
 
     # debug
     dataset = load_from_disk(
         Path(__file__).resolve().parents[2] / CONFIG.PATH2CROSS_GENRE
     )["train"].to_pandas()[["disputed_text", "candidate_text", "same"]]
-    print(
-        "Aggregated number of same/different predictions:",
-        dataset["same"].value_counts(),
+    logging.info(
+        f"Aggregated number of same/different predictions: {dataset['same'].value_counts()}"
     )
