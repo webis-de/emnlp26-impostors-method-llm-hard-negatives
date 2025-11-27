@@ -87,8 +87,7 @@ class NonLLMImpostorGenerator(BaseImpostorGenerator):
             raise ValueError("Dataset split is empty.")
         return ds
 
-
-class LLMImpostorGenerator(BaseImpostorGenerator):
+class MongoDBSavedGenerator(BaseImpostorGenerator):
     def __init__(
         self, n_impostors: int
     ):
@@ -107,6 +106,15 @@ class LLMImpostorGenerator(BaseImpostorGenerator):
             text=None, text_id=text_id
         )
         return self.generate_impostors(text=text, text_id=text_id)
+
+
+class LLMImpostorGenerator(MongoDBSavedGenerator):
+    def __init__(
+        self, n_impostors: int
+    ):
+        super().__init__(n_impostors)
+
+
 
     # def generate_impostors():
     # for i in range(n_imp_to_generate):
