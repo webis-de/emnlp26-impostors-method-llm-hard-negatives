@@ -11,12 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 from typing import Optional, List
 
 from genai_detection.impostor_generators.ImpostorGenerator import NonNaiveLLMImpostorGenerator
 from genai_detection.paraphrasing.one_step_paraphrasers import SAIAParaphraser
 from genai_detection.paraphrasing.translation_paraphraser import TranslationParaphraser
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class TranslationImpostorGenerator(NonNaiveLLMImpostorGenerator):
     def __init__(self, n_impostors: int, language: str = "French", model_id: Optional[str] = "openai-gpt-oss-120b"):
@@ -31,7 +34,32 @@ class TranslationImpostorGenerator(NonNaiveLLMImpostorGenerator):
     def generate_impostors(
             self, text: Optional[str], text_id: Optional[str]
     )-> List[str]:
-        text, text_id = self._get_text_or_id(text, text_id)
         # TODO: Update translation generator logic
-        paraphrases = [self.translation_paraphraser.paraphrase(text=text, text_id=text_id) for i in range(self.n_impostors)]
-        return paraphrases
+        impostors, _ = self.obtain_existing_paraphrases(
+            collection=self.mongoDB.translation_collection,
+            search_args={"text_id": text_id, "language":self.translation_paraphraser.language},
+        )
+
+        n_imp_to_generate = self.n_impostors - len(impostors)
+        if n_imp_to_generate <= 0:
+            logging.info(
+                "Number of impostors in mongodb collection: {} for text with ID: {}. No need to generate more impostors, just returning {} impostors.".format(
+                    len(impostors), text_id, self.n_impostors
+                )
+            )
+            return impostors[: self.n_impostors]
+
+        new_impostors = [self.translation_paraphraser.paraphrase(text=text) for i in range(n_imp_to_generate)]
+        # Save new paraphrases in MongoDB
+        for imp in new_impostors:
+            self.translation_paraphraser.save_paraphrase_in_mongodb(
+                original_text=text,
+                original_text_id=text_id,
+                paraphrased_text=imp,
+                extracted_info={"language": self.translation_paraphraser.language},
+                total_costs=0,
+                temperature=1.0,  # Temperature requirements for reasoning models like gpt-5-nano
+            )
+        if impostors:
+            new_impostors.extend(impostors)
+        return new_impostors

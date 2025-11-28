@@ -300,7 +300,7 @@ class SearchImpostorGeneratorBase(MongoDBSavedGenerator):
                 )
             )
             return impostors[: self.n_impostors]
-        self.n_impostors = n_imp_to_generate
+        # self.n_impostors = n_imp_to_generate  # no good idea, the call after will generate to few
 
         medium_frequency_words = self.get_medium_frequency_words(text)
         queries = self._generate_queries_based_on_candidate_words(

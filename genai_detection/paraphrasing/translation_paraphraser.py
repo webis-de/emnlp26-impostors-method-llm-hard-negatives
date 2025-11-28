@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Optional, List
+from typing import Optional
 
 import deepl
 
@@ -39,13 +39,14 @@ class TranslationParaphraser(Paraphraser):
         text_extractor: Paraphraser,
         text_generator: Paraphraser,
         language: str = "French",
+            n_paraphrases: int=1,   # not used
     ):
         """
         Initializes the TranslationParaphraser model.
         :param text_extractor: A model or function to translate to foreign languages.
         :param text_generator: A model or function to translate from foreign languages.
         """
-        self.model_id = "translation"
+        super().__init__(n_paraphrases=n_paraphrases, model_id=text_generator.model_id)
         assert isinstance(text_extractor, OneStepParaphraser) and isinstance(
             text_generator, OneStepParaphraser
         ), "Both text_extractor and text_generator must be instances of NaiveParaphraser or its subclasses."
@@ -55,16 +56,16 @@ class TranslationParaphraser(Paraphraser):
         self.extractor_prompt = f"Translate the text above into {self.language}. Do not use direct quotes or newlines. Output only the translated text, without any additional commentary or formatting."
         self.generator_prompt = f"Translate the text above from {self.language} into English. Do not use direct quotes or newlines. Output only the translated text, without any additional commentary or formatting."
         self.deepl_client = deepl.DeepLClient(CONFIG.DEEPL_API_KEY)
-        self.text_extractor = text_extractor
-        self.text_generator = text_generator
+
+        # overwrite paraphase collection (initialized in super().__init__())
+        self.paraphrase_collection = self.mongoDB.translation_collection
 
     def paraphrase(
-        self, text: str, prompt: Optional[str], max_length: int = CONFIG.MAX_LENGTH
-    ) -> List[str]:
+        self, text: str, prompt: Optional[str]=None, max_length: int = CONFIG.MAX_LENGTH
+    ) -> str:
         logging.info(
             f"[DEBUG] Using TranslationParaphraser with prompt: {self.extractor_prompt}"
         )
-        paraphrased_texts = []
         try:
             translation = self.deepl_client.translate_text(text, target_lang="FR")
             language = (
@@ -75,7 +76,7 @@ class TranslationParaphraser(Paraphraser):
             res = self.deepl_client.translate_text(
                 translation.text, target_lang=language
             )
-            paraphrased_texts.append(res.text)
+            return res.text
         except Exception as e:
             logging.warning(f"[ERROR] Failed to translate text using DeepL: {e}")
 
@@ -89,10 +90,7 @@ class TranslationParaphraser(Paraphraser):
             translation = self.text_extractor.paraphrase(
                 text=text, prompt=self.extractor_prompt, max_length=max_length
             )
-        paraphrased_texts.extend(
-            self.text_generator.paraphrase(
+        return self.text_generator.paraphrase(
                 text=translation[0], prompt=self.generator_prompt
             )
-        )
 
-        return paraphrased_texts

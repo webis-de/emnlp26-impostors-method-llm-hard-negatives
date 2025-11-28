@@ -67,7 +67,6 @@ class ImpostorDetector(ImpostorBase):
             "mirror_minds",
         ] = "two_step_llm",
         path2imp: str = CONFIG.PATH2BLOG,  # PATH2GENERIC_ON_FLY_IMP,  # path to impostor file, where fixed impostors are saved or where to save generated impostors
-        real_time_generation: bool = False,  # whether to generate impostors in real-time or use pre-generated ones
         min_n_tokens: int = 500,  # minimum number of tokens to consider input sequence valid, defaults to 500
         upsample: bool = True,  # whether to upsample short texts (default: True, i.e., upsample) or skip them
     ):
@@ -93,8 +92,6 @@ class ImpostorDetector(ImpostorBase):
             - "blogs": use blogs to obtain same genre impostors (Koppel et al. (2014), not implemented yet)
         :param path2imp: Path to the impostor directory, where fixed impostors are saved or where to save newly
         generated impostors
-        :param real_time_generation: Whether to generate impostors in real-time or use pre-generated ones (default:
-        False, i.e. use pre-generated impostors)
         :param min_n_tokens: Minimum number of tokens to consider input sequence valid, defaults to 500 (Bevendorff
         et al. (2019): 500 words)
         :param upsample: Whether to upsample short texts (default: True, i.e. upsample acc. to Bevendorff (2019)) or
@@ -111,7 +108,6 @@ class ImpostorDetector(ImpostorBase):
         self.tokenizer = tokenizer or self.tokenize_char_ngrams
         self.threshold = threshold
         self.path2imp = path2imp
-        self.real_time_generation = real_time_generation
         self.min_n_tokens = min_n_tokens
         self.upsample = upsample
         self.impostor_technique = impostor_technique
@@ -119,7 +115,7 @@ class ImpostorDetector(ImpostorBase):
         self.mongoDB = ParaphraseMongoDB()
 
         self.impostor_generator = create_impostor_generator(
-            impostor_technique=impostor_technique, n_impostors=self.n_impostors, path2imp=self.path2imp, real_time_generation=self.real_time_generation,
+            impostor_technique=impostor_technique, n_impostors=self.n_impostors, path2imp=self.path2imp,
         )
         self.text_preprocessor = Preprocessor()
         self.pair_processor = PairPreprocessor(mongoDB=self.mongoDB, tokenizer=self.tokenizer, min_n_tokens=self.min_n_tokens, upsample=self.upsample)
@@ -328,6 +324,6 @@ if __name__ == "__main__":
     # "naive_llm",
     # "two_step_llm",
     # "mirror_minds",
-    imp = ImpostorDetector(impostor_technique="on-the-fly", n_impostors=2)
+    imp = ImpostorDetector(impostor_technique="translation", n_impostors=2)
     res = imp.get_score(text=doc_pairs, normalize=True)
     logging.info(res)
