@@ -87,8 +87,7 @@ class ParaphraseMongoDB:
         document = collection.find({"_id": ObjectId(document_id)})
         return document
 
-    @staticmethod
-    def find_document_by_non_id_field(collection, document_field_name: str, document_value:str):
+    def find_document_by_non_id_field(self, collection, document_field_name: str, document_value:str):
         """
         Find an entry in the specified collection by its value of a non-id field.
         :param collection: The MongoDB collection to search.
@@ -96,7 +95,22 @@ class ParaphraseMongoDB:
         :param document_field_name: The name of the non-id field.
         :return: The found document as a cursor object, or None if not found.
         """
-        document = collection.find({document_field_name: document_value})
+        # document = collection.find({document_field_name: document_value})
+        return self.find_document_by_multiple_fields(
+            collection=collection, search_args={document_field_name: document_value}
+        )
+
+    @staticmethod
+    def find_document_by_multiple_fields(
+        collection, search_args:dict
+    ):
+        """
+        Find an entry in the specified collection by its value of a non-id field.
+        :param collection: The MongoDB collection to search.
+        :param search_args: The names of the non-id fields and their values of a non-id fields in a dictionary.
+        :return: The found document as a cursor object, or None if not found.
+        """
+        document = collection.find({**search_args})
         return document
 
     def get_text_or_id_from_orginal_collection(self, text: Optional[str], text_id: Optional[str]):
