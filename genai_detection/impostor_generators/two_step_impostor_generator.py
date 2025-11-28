@@ -38,28 +38,29 @@ class TwoStepImpostorGenerator(NonNaiveLLMImpostorGenerator):
         # text, text_id = self.mongoDB.get_text_or_id_from_orginal_collection(text, text_id)
 
         # returns a list of impostor texts with n_impostors impostors
-        extracted_info = {}
+        # extracted_info = {}
         n_imp_to_generate = self.n_impostors
-        impostors = []
-        if text_id is not None:
-            cursor = self.mongoDB.find_paraphrases(document_id=text_id)
-            docs = list(cursor)  # materialize once, safe if the number is small
+        # impostors = []
+        # if text_id is not None:
+        #     cursor = self.mongoDB.find_paraphrases(document_id=text_id)
+        #     docs = list(cursor)  # materialize once, safe if the number is small
+        #
+        #     impostors = [doc["paraphrase"] for doc in docs if "paraphrase" in doc]
+        #     extracted_info = next(
+        #         (doc["extracted_info"] for doc in docs if "extracted_info" in doc), {}
+        #     )
+        impostors, extracted_info = self.obtain_existing_paraphrases(collection=self.mongoDB.paraphrase_collection, search_args={"text_id": text_id})
 
-            impostors = [doc["paraphrase"] for doc in docs if "paraphrase" in doc]
-            extracted_info = next(
-                (doc["extracted_info"] for doc in docs if "extracted_info" in doc), {}
-            )
-
-            n_imp_to_generate -= len(impostors)
-            if n_imp_to_generate <= 0:
-                logging.info("Number of impostors in mongodb collection: {} for text with ID: {}. No need to generate more impostors, just returning {} impostors.".format(len(impostors), text_id, self.n_impostors))
-                return impostors[: self.n_impostors]
+        n_imp_to_generate -= len(impostors)
+        if n_imp_to_generate <= 0:
+            logging.info("Number of impostors in mongodb collection: {} for text with ID: {}. No need to generate more impostors, just returning {} impostors.".format(len(impostors), text_id, self.n_impostors))
+            return impostors[: self.n_impostors]
 
         logging.info(
             f"{len(impostors)} precomputed impostors found in mongoDB. Generating {n_imp_to_generate} impostors for text {text[:100]}..."
         )
         self.two_step_paraphraser.set_n_paraphrases(n_paraphrases=n_imp_to_generate)
-        if not extracted_info:
+        if not extracted_info or extracted_info == {}:
             extracted_info, new_impostors, total_cost = self.two_step_paraphraser.paraphrase(text=text)
         else:
             logging.info("Using already extracted information stored in mongoDB for paraphrase generation.")

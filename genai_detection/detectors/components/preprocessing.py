@@ -73,6 +73,18 @@ class Preprocessor:
             )
         return text
 
+    def obtain_text_and_id(self, value):
+        try:
+            ObjectId(value)
+            return self.mongoDB.get_text_or_id_from_orginal_collection(
+                text_id=value, text=None
+            )
+        except Exception as e:
+            return self.mongoDB.get_text_or_id_from_orginal_collection(
+                text=value, text_id=None
+            )
+
+
 class PairPreprocessor:
     def __init__(self, mongoDB, tokenizer, min_n_tokens:int=500, upsample:bool=False):
         self.mongoDB = mongoDB
@@ -97,14 +109,16 @@ class PairPreprocessor:
         texts = list(texts)
         assert len(texts) == 2, "Input must contain exactly two text entries."
 
-        def resolve(value:str):
+        def resolve(value: str):
             try:
                 ObjectId(value)
                 return self.mongoDB.get_text_or_id_from_orginal_collection(
                     text_id=value, text=None
                 )
             except Exception as e:
-                return self.mongoDB.get_text_or_id_from_orginal_collection(text=value, text_id=None)
+                return self.mongoDB.get_text_or_id_from_orginal_collection(
+                    text=value, text_id=None
+                )
 
         left_text, left_id = resolve(texts[0])
         right_text, right_id = resolve(texts[1])

@@ -22,6 +22,7 @@ from typing import Optional
 from datasets import load_from_disk
 from dotenv import load_dotenv
 
+from genai_detection.detectors.components.preprocessing import Preprocessor
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -95,6 +96,7 @@ class MongoDBSavedGenerator(BaseImpostorGenerator):
     ):
         super().__init__(n_impostors)
         self.mongoDB = ParaphraseMongoDB()
+        self.text_processor = Preprocessor()
 
     def generate_impostors(
             self, text: Optional[str], text_id: Optional[str]
@@ -108,6 +110,22 @@ class MongoDBSavedGenerator(BaseImpostorGenerator):
             text=None, text_id=text_id
         )
         return self.generate_impostors(text=text, text_id=text_id)
+
+    def obtain_existing_paraphrases(self, collection, search_args: dict):
+        if "text_id" not in search_args.keys():
+            logging.info(f"Must provide text_id, but only provides {search_args.keys()}.")
+            return [], {}
+        else:
+            cursor = self.mongoDB.find_document_by_multiple_fields(collection=collection, search_args=search_args)
+            docs = list(cursor)  # materialize once, safe if the number is small
+
+            # FIXME: key not present
+            impostor_field_name = "impostor_text" if "index" in search_args.keys() else "paraphrase"
+            impostors = [doc[impostor_field_name] for doc in docs]
+            extracted_info = next(
+                (doc["extracted_info"] for doc in docs if "extracted_info" in doc), {}
+            )
+            return impostors, extracted_info
 
 
 class LLMImpostorGenerator(MongoDBSavedGenerator):
