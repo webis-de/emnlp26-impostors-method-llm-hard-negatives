@@ -34,21 +34,7 @@ class TwoStepImpostorGenerator(NonNaiveLLMImpostorGenerator):
     def generate_impostors(
         self, text: Optional[str], text_id: Optional[str]
     ) -> List[str]:
-        # look at base class
-        # text, text_id = self.mongoDB.get_text_or_id_from_orginal_collection(text, text_id)
-
-        # returns a list of impostor texts with n_impostors impostors
-        # extracted_info = {}
         n_imp_to_generate = self.n_impostors
-        # impostors = []
-        # if text_id is not None:
-        #     cursor = self.mongoDB.find_paraphrases(document_id=text_id)
-        #     docs = list(cursor)  # materialize once, safe if the number is small
-        #
-        #     impostors = [doc["paraphrase"] for doc in docs if "paraphrase" in doc]
-        #     extracted_info = next(
-        #         (doc["extracted_info"] for doc in docs if "extracted_info" in doc), {}
-        #     )
         impostors, extracted_info = self.obtain_existing_paraphrases(collection=self.mongoDB.paraphrase_collection, search_args={"text_id": text_id})
 
         n_imp_to_generate -= len(impostors)
