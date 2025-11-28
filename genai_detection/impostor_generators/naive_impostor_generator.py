@@ -67,4 +67,5 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
                 len(paraphrasers) > 0
             ), "At least one paraphraser must be provided."
             self.paraphrasers = paraphrasers
+        # FIXME: prompts??
         self.prompts = CONFIG.OPENAI_MODEL
