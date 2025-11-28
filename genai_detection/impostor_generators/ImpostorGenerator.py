@@ -119,7 +119,6 @@ class MongoDBSavedGenerator(BaseImpostorGenerator):
             cursor = self.mongoDB.find_document_by_multiple_fields(collection=collection, search_args=search_args)
             docs = list(cursor)  # materialize once, safe if the number is small
 
-            # FIXME: key not present
             impostor_field_name = "impostor_text" if "index" in search_args.keys() else "paraphrase"
             impostors = [doc[impostor_field_name] for doc in docs]
             extracted_info = next(
