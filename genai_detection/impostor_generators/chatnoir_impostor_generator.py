@@ -50,8 +50,15 @@ class ChatNoirSearchImpostorGenerator(SearchImpostorGeneratorBase):
         :param n_max_words: Maximum number of words in a query (default: 5)
         :param index_name: Name of the index to use (default: `msmarco`).
         """
-        super().__init__(n_impostors=n_impostors, api_key=api_key, results_per_query=results_per_query,
-         max_workers=max_workers, n_max_words=n_max_words, n_min_words=n_min_words,index_name=index_name)
+        super().__init__(
+            n_impostors=n_impostors,
+            api_key=api_key,
+            results_per_query=results_per_query,
+            max_workers=max_workers,
+            n_max_words=n_max_words,
+            n_min_words=n_min_words,
+            index_name=index_name
+        )
 
     def fetch_results(self, query: str) -> List[Dict]:
         """
