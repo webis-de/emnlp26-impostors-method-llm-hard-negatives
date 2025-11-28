@@ -19,7 +19,7 @@ IMPOSTOR_GENERATORS = {
     "translation": TranslationImpostorGenerator,
     "fixed": FixedImpostorGenerator,
     "blogs": BlogImpostorGenerator,
-    "on-the-fly": ChatNoirSearchImpostorGenerator, #GoogleSearchImpostorGenerator,
+    "on-the-fly": ChatNoirSearchImpostorGenerator,#GoogleSearchImpostorGenerator,
     "content": ContentImpostorGenerator,
     "mirror_minds": MirrorMindsGenerator,
     "text_len": TextLenImpostorGenerator,
