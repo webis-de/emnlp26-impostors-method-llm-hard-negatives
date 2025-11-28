@@ -1314,7 +1314,7 @@ class VisDetectors:
         )
         label_translations = {
             "fixed": "Fixed",
-            "on-the-fly": "On-the-Fly",
+            "on_the_fly": "On-the-Fly",
             "unsupervised_baseline_min-max": "Unsup. Min-Max (B)",
             "unsupervised_baseline_cosine": "Unsup. Cosine (B)",
             "supervised_baseline": "Sup. SVM (B)",

@@ -55,7 +55,10 @@ class ImpostorDetector(ImpostorBase):
         impostor_technique: Literal[
             "translation",
             "text_len",
-            "on-the-fly",
+            "on-the-fly",   # Startpage by default
+            "on_the_fly_chatnoir",
+            "on_the_fly_serpapi",
+            "on_the_fly_startpage",
             "blogs",
             "fixed",
             "content",
@@ -85,7 +88,8 @@ class ImpostorDetector(ImpostorBase):
             - "two_step_llm": use two-step LLM approach to generate impostors (i.e., first extracting information and then, generating paraphrases based on these information)
             - "text_len": generate impostors of similar length from a predefined dataset (our baseline w/o reference, default)
             - "fixed": use a fixed set of impostors (Koppel et. A. (2014), not implemented yet), impostors are not related to the input text
-            - "on-the-fly": generate same-topic impostors on-the-fly (Koppel et al. (2014), not implemented yet)
+            - "on_the_fly": generate same-topic impostors on-the-fly (Koppel et al. (2014))
+            - "on_the_fly_<approach>": Where <approach> is either  "chatnoir", "serpapi", "startpage"; i.e., different implementations of the same approach.
             - "blogs": use blogs to obtain same genre impostors (Koppel et al. (2014), not implemented yet)
         :param path2imp: Path to the impostor directory, where fixed impostors are saved or where to save newly
         generated impostors
@@ -314,7 +318,10 @@ if __name__ == "__main__":
 
     # "translation",
     # "text_len",
-    # "on-the-fly",
+    # "on-the-fly", # startpage by default
+    # "on_the_fly_chatnoir",
+    # "on_the_fly_serpapi",
+    # "on_the_fly_startpage",
     # "blogs",
     # "fixed",
     # "content",

@@ -15,25 +15,19 @@
 import argparse
 import json
 import os
-from pathlib import Path
-import re
 import sys
 import traceback
+from pathlib import Path
 from typing import Literal, Optional
-from datasets import load_from_disk
-from matplotlib import pyplot as plt
+
 import numpy as np
 import pandas as pd
+from datasets import load_from_disk
+from matplotlib import pyplot as plt
 from sklearn.metrics import (
-    ConfusionMatrixDisplay,
-    confusion_matrix,
-    f1_score,
     precision_recall_curve,
-    roc_curve,
-    accuracy_score,
 )
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-import seaborn as sns
+
 from genai_detection.detectors.detector_base import DetectorBase
 from genai_detection.detectors.impostor import ImpostorDetector
 from genai_detection.detectors.impostor_supervised_baseline import (
@@ -597,7 +591,7 @@ class VisDetectors:
         )
         label_translations = {
             "fixed": "Fixed",
-            "on-the-fly": "On-the-Fly",
+            "on_the_fly": "On-the-Fly",
             "naive_llm": "One-Step Paraphraser (LLM)",
             "non_naive_llm": "Two-Step Paraphraser (LLM)",
             "unsupervised_baseline_min-max": "Unsup. Min-Max (B)",
