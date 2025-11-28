@@ -216,7 +216,7 @@ class SearchImpostorGeneratorBase(MongoDBSavedGenerator):
 
         # Insert into document into paraphrase collection
         self.mongoDB.on_the_fly_collection.insert_one(paraphrase_doc)
-        logging.info(f"Inserted paraphrase for document ID: {original_text_id}")
+        logging.info(f"Inserted paraphrase for document ID: {original_text_id} on index {self.index_name}")
 
     def _parallel_fetch(
         self, queries: List[str], text: Optional[str], text_id: Optional[str]
@@ -236,7 +236,10 @@ class SearchImpostorGeneratorBase(MongoDBSavedGenerator):
             }
             for future in as_completed(futures):
                 query = futures[future]  # Retrieve which query produced this future
-                new_imps = future.result()["results"]
+                # if "results" in future.result():
+                #     new_imps = future.result()["results"]
+                # else:
+                new_imps = future.result()
 
                 for new_imp in new_imps:
                     if ("lang" not in new_imp.keys()) or (new_imp["lang"] == "en"):
@@ -282,7 +285,7 @@ class SearchImpostorGeneratorBase(MongoDBSavedGenerator):
         Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’. Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
         """
         if not isinstance(text, str):
-            text, text_id = self.text_processor.obtain_text_and_id(value=text)
+            text, text_id = self.text_processor.obtain_text_and_id(value=text_id)
             assert text.strip(), "Input text must be a non-empty string."
 
         impostors, _ = self.obtain_existing_paraphrases(

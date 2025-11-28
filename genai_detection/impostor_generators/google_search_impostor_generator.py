@@ -26,7 +26,7 @@ class GoogleSearchImpostorGenerator(SearchImpostorGeneratorBase):
 
     def __init__(
         self,
-        api_key: str,
+        api_key: str=CONFIG.SERPAPI_KEY,
         num_queries: int = 1,
         results_per_query: int = 25,
         max_workers: int = 2,
@@ -81,72 +81,19 @@ class GoogleSearchImpostorGenerator(SearchImpostorGeneratorBase):
                 "devices": "desktop",  # use desktop results
             }
             search = serpapi.search(params)
+            logging.info("Obtained SERPAPI search results.")
             results = search.as_dict()
             return [
                 {
                     "query": query,
-                    "title": res.get("title"),
-                    "url": res.get("link"),
+                    "target_uri": res.get("link"),
                     "snippet": res.get("snippet"),
-                    "rich_snippet": res.get("rich_snippet", ""),
-                    "author": res.get("author", "unknown"),
-                    "position": res.get("position"),
-                    "full_text": self._extract_text_from_url(res.get("link")),
                 }
                 for res in results.get("organic_results", [])
             ]
         except Exception as e:
             logging.warning(f"Error fetching results for '{query}': {e}")
             return []
-
-    # def generate_impostors(
-    #     self, text: Optional[str], text_id:Optional[str]
-    # ) -> pd.DataFrame:
-    #     """
-    #     Generates impostors for the given input text using Google search results.
-    #
-    #     Steps:
-    #     1. Extract medium-frequency words from the input text.
-    #     2. Formulate search queries using random combinations of those words.
-    #     3. Use the SerpAPI to retrieve search result snippets.
-    #     4. Save the results to a CSV file.
-    #     5. Format results into a dictionary with keys as query and position, and values as the full text (or snippets) of the search result.
-    #
-    #     While Koppel et al. (2014) randomly choose n imposters among the top m imposter, we use all of them.
-    #
-    #     :param text: Input text to generate impostors for.
-    #
-    #     :return: DataFrame containing search results with columns: 'query', 'title', 'url', 'snippet' (i.e. short content summary of search result), and 'position' (i.e. number of result in the search results)
-    #
-    #     References:
-    #     ===========
-    #     Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’. Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
-    #     """
-    #     if not isinstance(text, str):
-    #         text, text_id = self.text_processor.obtain_text_and_id(value=text)
-    #         assert text.strip(), "Input text must be a non-empty string."
-    #
-    #     # TODO: fix this
-    #     medium_frequency_words = self.get_medium_frequency_words(text)
-    #     queries = self._generate_queries_based_on_candidate_words(
-    #         medium_frequency_words
-    #     )
-    #     # aggregate results' texts, preferably using full_text, if empty use snippet and return a list of texts
-    #     impostor_texts = {
-    #         f"{re.sub(' ', '_', string=row['query'])}_{row['position']}": row[
-    #             "full_text"
-    #         ]
-    #         for _, row in result_df.iterrows()
-    #         if pd.notnull(row.get("full_text"))
-    #     }
-    #
-    #     # full_text is missing but snippet is present
-    #     for _, row in result_df.iterrows():
-    #         if pd.isna(row.get("full_text")) and pd.notnull(row.get("snippet")):
-    #             key = f"{re.sub(' ', '_', row['query'])}_{row['position']}"
-    #             impostor_texts[key] = row["snippet"]
-    #
-    #     return impostor_texts
 
 if __name__ == "__main__":
     google_retriever = GoogleSearchImpostorGenerator(api_key=CONFIG.SERPAPI_KEY)
