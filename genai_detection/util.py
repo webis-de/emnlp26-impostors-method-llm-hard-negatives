@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import typing as t
 import html
+import logging
 import re
+import typing as t
+import unicodedata
+
 import torch
 import torch.nn.functional as F
-from tqdm import tqdm
-import unicodedata
 import transformers
+from tqdm import tqdm
 from transformers import (
     AutoModelForCausalLM,
     AutoModelForSequenceClassification,
@@ -27,6 +29,8 @@ from transformers import (
     BitsAndBytesConfig,
 )
 
+logger = logging.getLogger(__name__)
+logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 __all__ = [
     "AutoModelClsType",
