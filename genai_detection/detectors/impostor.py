@@ -192,14 +192,16 @@ class ImpostorDetector(ImpostorBase):
                     )
                 )
                 logging.info(
-                    f"Obtained impostors by text ID for left text with text ID {pair['left']['id']}."
+                    f"Obtained impostors by text ID for left text with text ID {pair['left']['id']}. Type of "
+                    f"impostors is {type(impostors_of_left)}"
                 )
                 impostors_of_right = (
                     self.impostor_generator.generate_impostors_by_text_id(
                         text_id=pair["right"]["id"]
                     )
                 )
-                logging.info(f"Obtained impostors by text ID for right text with text ID {pair['right']['id']}.")
+                logging.info(f"Obtained impostors by text ID for right text with text ID {pair['right']['id']}. Type "
+                             f"of impostors is {type(impostors_of_right)}")
 
             else:
                 impostors_of_left = self.impostor_generator.generate_impostors(
@@ -304,9 +306,10 @@ class ImpostorDetector(ImpostorBase):
 if __name__ == "__main__":
     # generating 1 x 50 impostors takes around 40 minutes using openai.
     # ..dd: Ass4 and author TDH426, ..4f: Ass3 and author TDH426, ...e8: Ass4 and author ASR497
-    doc_pairs = ["68f50029edacdf3d5c0279dd", "68f50029edacdf3d5c027d4f"]#, "68f50029edacdf3d5c0279e8"]#,
-    # "68f50029edacdf3d5c0279eb",
+    doc_pairs = ["68f50029edacdf3d5c0279dd", #"68f50029edacdf3d5c027d4f"]#, "68f50029edacdf3d5c0279e8"]#,
+    # "68f50029edacdf3d5c0279eb"]
     # "68f50029edacdf3d5c0279d9"]
+                 "68f50029edacdf3d5c0279ec"]
 
     # "translation",
     # "text_len",
@@ -317,6 +320,6 @@ if __name__ == "__main__":
     # "naive_llm",
     # "two_step_llm",
     # "mirror_minds",
-    imp = ImpostorDetector(impostor_technique="on-the-fly", n_impostors=50)
+    imp = ImpostorDetector(impostor_technique="on-the-fly", n_impostors=2)
     res = imp.get_score(text=doc_pairs, normalize=True)
     logging.info(res)
