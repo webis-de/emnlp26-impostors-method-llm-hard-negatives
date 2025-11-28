@@ -11,13 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import datetime
 import logging
-import re
-from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict
 
-import pandas as pd
 import serpapi
 
 from genai_detection.config import CONFIG
@@ -103,120 +99,54 @@ class GoogleSearchImpostorGenerator(SearchImpostorGeneratorBase):
             logging.warning(f"Error fetching results for '{query}': {e}")
             return []
 
-    def generate_impostors(
-        self, text: Optional[str], text_id:Optional[str]
-    ) -> pd.DataFrame:
-        """
-        Generates impostors for the given input text using Google search results.
-
-        Steps:
-        1. Extract medium-frequency words from the input text.
-        2. Formulate search queries using random combinations of those words.
-        3. Use the SerpAPI to retrieve search result snippets.
-        4. Save the results to a CSV file.
-        5. Format results into a dictionary with keys as query and position, and values as the full text (or snippets) of the search result.
-
-        While Koppel et al. (2014) randomly choose n imposters among the top m imposter, we use all of them.
-
-        :param text: Input text to generate impostors for.
-
-        :return: DataFrame containing search results with columns: 'query', 'title', 'url', 'snippet' (i.e. short content summary of search result), and 'position' (i.e. number of result in the search results)
-
-        References:
-        ===========
-        Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’. Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
-        """
-        if not isinstance(text, str):
-            text, text_id = self.text_processor.obtain_text_and_id(value=text)
-            assert text.strip(), "Input text must be a non-empty string."
-
-        # TODO: fix this
-        if self.real_time_generation:
-            logging.info("Generating impostors in real-time.")
-            medium_frequency_words = self.get_medium_frequency_words(text)
-            queries = self._generate_queries_based_on_candidate_words(
-                medium_frequency_words
-            )
-            try:
-                result_df = pd.DataFrame(self._parallel_fetch(queries))
-                result_df.drop_duplicates(subset="url", inplace=True)
-
-                if result_df.empty:
-                    logging.info("Warning: No results fetched. CSV not saved.")
-                    return result_df
-                # TODO: use mongo collection instead
-                if path2imp is None:
-                    path2imp = (
-                        Path(__file__).resolve().parents[2]
-                        / CONFIG.PATH2GENERIC_ON_FLY_IMP
-                    )
-                else:
-                    path2imp = Path(path2imp)
-                if path2imp.suffix != ".csv" or path2imp.is_dir():
-                    if path2imp.is_file():
-                        path2imp = path2imp.with_suffix(".csv")
-                    else:
-                        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                        path2imp = (
-                            path2imp / f"google_on_fly_impostor_results_{timestamp}.csv"
-                        )
-
-                path2imp.parent.mkdir(parents=True, exist_ok=True)
-                result_df.to_csv(path2imp, index=False)
-            except Exception as e:
-                logging.warning(
-                    f"Error during fetching results (probabily no more free API calls): {e}"
-                )
-                return {"imposter": "Error during fetching results, check logs."}
-        else:  # use precomputed results
-            logging.info("Using precomputed results from path2imp. No real-time generation.")
-            if "PUCK" in text:  # Midsummer Night's Dream
-                path2imp = (
-                    path2imp
-                    / "impostor_A_Midsummer_Nights_Dream_William_Shakespeare_results_20250608_201352.csv"
-                )
-            elif "Frankenstein" in text:  # Frankenstein
-                path2imp = (
-                    path2imp
-                    / "impostor_Frankenstein_Mary_Wollstonecraft_(Godwin)_Shelley_results_20250608_145350.csv"
-                )
-            elif "unlineal" in text:  # Macbeth
-                path2imp = (
-                    path2imp
-                    / "impostor_Macbeth_William_Shakespeare_results_20250608_211827.csv"
-                )
-            elif "auld" in text:  # Orthello
-                path2imp = (
-                    path2imp
-                    / "impostor_Othello_the_Moor_of_Venice_William_Shakespeare_results_20250608_212040.csv"
-                )
-            else:  # A Lovers Complaint
-                path2imp = (
-                    path2imp
-                    / "impostor_A_Lovers_Complaint_William_Shakespeare_results_20250608_202134.csv"
-                )
-            if not Path(path2imp).exists():
-                return {
-                    "imposter": f"No real time generation and Path {path2imp} does not exist."
-                }
-            result_df = pd.read_csv(path2imp)
-
-        # aggregate results' texts, preferably using full_text, if empty use snippet and return a list of texts
-        impostor_texts = {
-            f"{re.sub(' ', '_', string=row['query'])}_{row['position']}": row[
-                "full_text"
-            ]
-            for _, row in result_df.iterrows()
-            if pd.notnull(row.get("full_text"))
-        }
-
-        # full_text is missing but snippet is present
-        for _, row in result_df.iterrows():
-            if pd.isna(row.get("full_text")) and pd.notnull(row.get("snippet")):
-                key = f"{re.sub(' ', '_', row['query'])}_{row['position']}"
-                impostor_texts[key] = row["snippet"]
-
-        return impostor_texts
+    # def generate_impostors(
+    #     self, text: Optional[str], text_id:Optional[str]
+    # ) -> pd.DataFrame:
+    #     """
+    #     Generates impostors for the given input text using Google search results.
+    #
+    #     Steps:
+    #     1. Extract medium-frequency words from the input text.
+    #     2. Formulate search queries using random combinations of those words.
+    #     3. Use the SerpAPI to retrieve search result snippets.
+    #     4. Save the results to a CSV file.
+    #     5. Format results into a dictionary with keys as query and position, and values as the full text (or snippets) of the search result.
+    #
+    #     While Koppel et al. (2014) randomly choose n imposters among the top m imposter, we use all of them.
+    #
+    #     :param text: Input text to generate impostors for.
+    #
+    #     :return: DataFrame containing search results with columns: 'query', 'title', 'url', 'snippet' (i.e. short content summary of search result), and 'position' (i.e. number of result in the search results)
+    #
+    #     References:
+    #     ===========
+    #     Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’. Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
+    #     """
+    #     if not isinstance(text, str):
+    #         text, text_id = self.text_processor.obtain_text_and_id(value=text)
+    #         assert text.strip(), "Input text must be a non-empty string."
+    #
+    #     # TODO: fix this
+    #     medium_frequency_words = self.get_medium_frequency_words(text)
+    #     queries = self._generate_queries_based_on_candidate_words(
+    #         medium_frequency_words
+    #     )
+    #     # aggregate results' texts, preferably using full_text, if empty use snippet and return a list of texts
+    #     impostor_texts = {
+    #         f"{re.sub(' ', '_', string=row['query'])}_{row['position']}": row[
+    #             "full_text"
+    #         ]
+    #         for _, row in result_df.iterrows()
+    #         if pd.notnull(row.get("full_text"))
+    #     }
+    #
+    #     # full_text is missing but snippet is present
+    #     for _, row in result_df.iterrows():
+    #         if pd.isna(row.get("full_text")) and pd.notnull(row.get("snippet")):
+    #             key = f"{re.sub(' ', '_', row['query'])}_{row['position']}"
+    #             impostor_texts[key] = row["snippet"]
+    #
+    #     return impostor_texts
 
 if __name__ == "__main__":
     google_retriever = GoogleSearchImpostorGenerator(api_key=CONFIG.SERPAPI_KEY)

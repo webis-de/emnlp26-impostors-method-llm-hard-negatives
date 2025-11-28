@@ -185,17 +185,6 @@ class SearchImpostorGeneratorBase(MongoDBSavedGenerator):
         """
         pass
 
-    def _parallel_fetch(self, queries: List[str], text:Optional[str], text_id:Optional[str]) -> List[Dict]:
-        """
-        Fetches results for multiple queries in parallel using a thread pool.
-        Impostor texts are crawled websites, stripped of HTML tags if possible and provided snippets by search engine if crawling was not possible.
-        :param queries: List of search queries to fetch results for
-        :param text: Text of the original text (used to derive the query from), only used as metadata when storing result in mongoDB collection.
-        :param text_id: Id of the original text (used to derive the query from), only used as metadata when storing result in mongoDB collection.
-        :return: List of impostor texts. # TODO: delete this: dictionaries containing search results for all queries
-        """
-        pass
-
     def _save_on_the_fly_in_mongodb(self, original_text_id:str, original_text:str, impostor_text:str, query:str, uri:str) -> None:
         """
         Save the paraphrase to the MongoDB database collection called "paraphrase".
@@ -292,22 +281,14 @@ class SearchImpostorGeneratorBase(MongoDBSavedGenerator):
         ===========
         Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’. Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
         """
-        # TODO: get text from text ID if not given
         if not isinstance(text, str):
             text, text_id = self.text_processor.obtain_text_and_id(value=text)
             assert text.strip(), "Input text must be a non-empty string."
 
-        # impostors = []
-        # if text_id is not None:
         impostors, _ = self.obtain_existing_paraphrases(
             collection=self.mongoDB.on_the_fly_collection,
             search_args={"text_id": text_id, "index": self.index_name},
         )
-        # cursor = self.mongoDB.find_document_by_non_id_field(collection=self.mongoDB.on_the_fly_collection, document_field_name="text_id", document_value=text_id)
-        # docs = list(cursor)  # materialize once, safe if the number is small
-        #
-        # impostors = [doc["impostor_text"] for doc in docs if "impostor_text" in doc]
-
         n_imp_to_generate = self.n_impostors - len(impostors)
         if n_imp_to_generate <= 0:
             logging.info(
@@ -324,7 +305,10 @@ class SearchImpostorGeneratorBase(MongoDBSavedGenerator):
         )
         try:
             # also saves new impostors in the mongoDB collection
-            return impostors.extend(self._parallel_fetch(queries=queries, text=text, text_id=text_id)) # list of impostor texts
+            impostors.extend(
+                self._parallel_fetch(queries=queries, text=text, text_id=text_id)
+            )
+            return impostors # list of impostor texts
 
         except Exception as e:
             logging.warning(
