@@ -309,7 +309,8 @@ if __name__ == "__main__":
     doc_pairs = ["68f50029edacdf3d5c0279dd", #"68f50029edacdf3d5c027d4f"]#, "68f50029edacdf3d5c0279e8"]#,
     # "68f50029edacdf3d5c0279eb"]
     # "68f50029edacdf3d5c0279d9"]
-                 "68f50029edacdf3d5c0279ec"]
+    #              "68f50029edacdf3d5c0279ec"]
+                 "68f50029edacdf3d5c0279e0"]
 
     # "translation",
     # "text_len",
