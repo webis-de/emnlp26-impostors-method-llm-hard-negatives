@@ -53,7 +53,9 @@ class Paraphraser(ABC):
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
-    def save_paraphrase_in_mongodb(self, original_text_id:str, original_text:str, paraphrased_text:str, extracted_info:Optional[dict], total_costs:Optional[float],temperature:float=1.0, prompt:str="bullet points dspy") -> None:
+    def save_paraphrase_in_mongodb(self, original_text_id:str, original_text:str, paraphrased_text:str,
+                                   extracted_info:Optional[dict], total_costs:Optional[float],temperature:float=1.0,
+                                   prompt:str="bullet points dspy", intermediate_prompt:str="bullet points dspy",) -> None:
         """
         Save the paraphrase to the MongoDB database collection called "paraphrase".
         :param original_text_id: The id of the original text in the original_text collection.
@@ -74,7 +76,7 @@ class Paraphraser(ABC):
             "text_id": original_text_id,  # ID of the original text document
             "length_original_text": len(original_text.split()),
             "length_paraphrased_text": len(paraphrased_text.split()),
-            "intermediate_prompt": "bullet points dspy",
+            "intermediate_prompt": intermediate_prompt,
             "prompt": prompt,
             "llm": self.model_id,
             "temperature": temperature,

@@ -58,7 +58,8 @@ class TranslationImpostorGenerator(NonNaiveLLMImpostorGenerator):
                 paraphrased_text=imp,
                 extracted_info={"language": self.translation_paraphraser.language},
                 total_costs=0,
-                temperature=1.0,  # Temperature requirements for reasoning models like gpt-5-nano
+                prompt=self.translation_paraphraser.generator_prompt,
+                intermediate_prompt=self.translation_paraphraser.extractor_prompt,
             )
         if impostors:
             new_impostors.extend(impostors)
