@@ -89,7 +89,7 @@ def compute_prec_recall_f1_acc_dict(
         predictions[imp_generation_technique] = score
         logging.info(f"Finished obtaining impostor scores with {imp_generation_technique}.\n")
     logging.info(f"Finished obtaining impostor scores.\n{predictions}\n")
-    # FIXME:
+
     baselines = {
         "unsupervised_baseline_min-max": UnSupervisedImpostorBaseline(
             use_cosine_simiarity=False, dataset_name=dataset_name
@@ -213,7 +213,7 @@ def plot_precision_recall_curve(results:dict, dataset_name:str):
 
         for format in ["svg"]:  # "png",
             figure_name = (
-                f"11111roc_prec_recall_curve_dif_{dataset_name.replace(' ', '_')}_"
+                f"roc_prec_recall_curve_dif_{dataset_name.replace(' ', '_')}_"
                 f"{positive_class.lower().replace(' ', '_')}_imp_gen"
                 f".{format}"
             )
