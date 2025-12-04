@@ -12,7 +12,7 @@ from genai_detection.impostor_generators.two_step_impostor_generator import TwoS
 
 IMPOSTOR_GENERATORS = {
     "two_step_llm": TwoStepImpostorGenerator,
-    "naive_llm": NaiveImpostorGenerator,
+    "one_step_llm": NaiveImpostorGenerator,
     "translation": TranslationImpostorGenerator,
     "in_domain": InDomainImpostorGenerator,
     "on_the_fly":StartPageSearchImpostorGenerator,

@@ -67,7 +67,7 @@ if __name__ == "__main__":
     our_figure_impostor_options = [
         "on_the_fly",
         "in_domain",
-        "naive_llm",
+        "one_step_llm",
         "two_step_llm",
         "translation",
         # "mirror_minds",
