@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from bson import ObjectId
 from pymongo import MongoClient
@@ -37,6 +37,7 @@ class ParaphraseMongoDB:
             CONFIG.MONGO_ON_THE_FLY_COLLECTION,
             CONFIG.MONGO_TRANSLATION_COLLECTION,
             CONFIG.MONGO_NAIVE_PARAPHRASE_COLLECTION,
+            CONFIG.MOGO_TEST_PAIRS_COLLECTION,
         ]:
             if collection_name not in self.db.list_collection_names():
                 self.db.create_collection(collection_name)
@@ -56,6 +57,14 @@ class ParaphraseMongoDB:
         self.paraphrase_score_collection = self.db[CONFIG.MONGO_PARAPHRASE_SCORE_COLLECTION]  # paraphrase scores
         self.impostor_output_collection = self.db[CONFIG.MONGO_IMPOSTOR_OUTPUT_COLLECTION]  # output of impostor
         # approach
+        self.test_pairs_collection = self.db[CONFIG.MOGO_TEST_PAIRS_COLLECTION] # IDs of texts and their ground truth (reproducibility of evaluation)
+
+    def reset_collection(self, collection_name:str):
+        self.db.drop_collection(collection_name)
+        logging.info(f"Dropepd collection {collection_name}")
+        self.db.create_collection(collection_name)
+        logging.info(f"Created new collection {collection_name}")
+        return self.db[collection_name]
 
     @staticmethod
     def update_document(collection, _id: str, update_data: dict) -> int:
@@ -82,6 +91,16 @@ class ParaphraseMongoDB:
         """
         assert isinstance(insert_data, dict), f"insert_data must be a dictionary, but is {type(insert_data)}."
         collection.insert_one(insert_data)
+
+    @staticmethod
+    def insert_documents(collection, insert_data: List[dict]):
+        """
+        Insert an entry in the specified collection.
+        :param collection: The MongoDB collection to insert.
+        :param insert_data: A dictionary with the data to insert.
+        :return: -
+        """
+        collection.insert_many(insert_data)
 
     @staticmethod
     def find_document_by_id(collection, document_id: str):
