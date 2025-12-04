@@ -32,6 +32,10 @@ from sklearn.metrics import (
 from genai_detection.config import CONFIG
 from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENERATORS
 from genai_detection.detectors.impostor import ImpostorDetector
+from genai_detection.detectors.impostor_supervised_baseline import SupervisedImpostorBaseline
+from genai_detection.detectors.impostor_unsupervised_baseline import UnSupervisedImpostorBaseline
+from genai_detection.detectors.ppmd import PPMdDetector
+from genai_detection.detectors.unmasking import UnmaskingDetector
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -85,25 +89,20 @@ def compute_prec_recall_f1_acc_dict(
         predictions[imp_generation_technique] = score
         logging.info(f"Finished obtaining impostor scores with {imp_generation_technique}.\n")
     logging.info(f"Finished obtaining impostor scores.\n{predictions}\n")
-    baselines = {}
     # FIXME:
-    # baselines = {
-    #     "unsupervised_baseline_min-max": UnSupervisedImpostorBaseline(
-    #         use_cosine_simiarity=False, dataset_name=dataset_name
-    #     ),
-    #     "unsupervised_baseline_cosine": UnSupervisedImpostorBaseline(
-    #         use_cosine_simiarity=True, dataset_name=dataset_name
-    #     ),
-    #     "supervised_baseline": SupervisedImpostorBaseline(dataset_name=dataset_name),
-    #     "unmasking": UnmaskingDetector(),
-    #     "ppmd": PPMdDetector(),
-    # }
+    baselines = {
+        "unsupervised_baseline_min-max": UnSupervisedImpostorBaseline(
+            use_cosine_simiarity=False, dataset_name=dataset_name
+        ),
+        "unsupervised_baseline_cosine": UnSupervisedImpostorBaseline(
+            use_cosine_simiarity=True, dataset_name=dataset_name
+        ),
+        "supervised_baseline": SupervisedImpostorBaseline(dataset_name=dataset_name),
+        "unmasking": UnmaskingDetector(),
+        "ppmd": PPMdDetector(),
+    }
     for baseline_name, baseline in baselines.items():
-        pairs = text_test_pairs
-        if baseline_name in ["unmasking", "ppmd"]:
-            pairs = [item for sublist in pairs for item in sublist]
-
-        preds = baseline.get_score(pairs)
+        preds = baseline.get_score(text_test_pairs)
         preds = preds.tolist() if not isinstance(preds, list) else preds
 
         predictions[f"{baseline_name.replace(' ','_')}_score"] = np.array(
@@ -187,7 +186,7 @@ def plot_precision_recall_curve(results:dict, dataset_name:str):
         "ppmd": "PPMd",
     }
 
-    plt.figure(figsize=(10, 7))
+    fig = plt.figure(figsize=(10, 7))
 
     for positive_class_id in [0, 1]:
         positive_class = "Same Author" if positive_class_id == 1 else "Different Author"
@@ -220,3 +219,4 @@ def plot_precision_recall_curve(results:dict, dataset_name:str):
             )
             plt.savefig(LOCAL_SAVE_PATH / figure_name, bbox_inches="tight")
             logging.info(f"Saved figure {figure_name} to {LOCAL_SAVE_PATH}.")
+        fig.clear()
