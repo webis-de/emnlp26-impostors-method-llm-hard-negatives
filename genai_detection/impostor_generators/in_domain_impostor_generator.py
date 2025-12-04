@@ -12,8 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import random
 from typing import Optional, List
 
+import numpy as np
+
+from genai_detection.detectors.components.feature_extractor import TfidfFeatureExtractor
+from genai_detection.detectors.components.vector_similarity import minmax_similarity
 from genai_detection.impostor_generators.ImpostorGenerator import (
     MongoDBSavedGenerator,
 )
@@ -52,9 +57,41 @@ class InDomainImpostorGenerator(MongoDBSavedGenerator):
         # ensure text ID not same
         search_args = {"dataset": self.dataset_name, "id": {"$ne": text_id}}
         logging.info(f"InDomainImpostorGenerator: Search arguments: {search_args}")
-        # TODO: return all, compare in terms of min-max similarity, keep best m=250 and random sampling of n=25 (or
-        #  n_impostors)
-        cursor = self.mongoDB.get_random_matching_documents_from_collection(collection=self.mongoDB.original_collection, search_args=search_args, num_samples=self.n_impostors)
+
+        # use this, if the returned impostors should be completely random in-domain texts
+        # cursor = self.mongoDB.get_random_matching_documents_from_collection(collection=self.mongoDB.original_collection, search_args=search_args, num_samples=self.n_impostors)
+        # impostors = [doc["text"] for doc in cursor]
+        # return impostors
+
+        # use this, if the returned impostors should be random among the most similar in-domain texts
+        cursor = self.mongoDB.find_document_by_multiple_fields(collection=self.mongoDB.original_collection,search_args=search_args)
         impostors = [doc["text"] for doc in cursor]
-        logging.info(f"InDomainImpostorGenerator: Number of impostors: {len(impostors)}")
-        return impostors
+        logging.info(f"Obtained {len(impostors)} potential in-domain impostors.")
+        # Add original text at the end
+        impostors.append(text)
+        tfidf_vectorizer = TfidfFeatureExtractor()
+        vectors = tfidf_vectorizer.fit_transform(impostors)
+        logging.info(f"Vectorized {vectors.shape[0]} documents with {vectors.shape[1]} features.")
+
+        # Separate original text vector
+        original_vector = vectors[-1]  # last one
+        impostor_vectors = vectors[:-1]  # all except last
+        logging.info(f"Obtained original vector.")
+
+        # Sort impostors by similarity to original (lowest similarity first)
+        similarities = [
+            minmax_similarity(original_vector, vec) for vec in impostor_vectors
+        ]
+        logging.info(f"Obtained {len(similarities)} similarities.")
+        impostors_sorted = [impostors[i] for i in np.argsort(similarities)]
+
+        # Take top N impostors (min(n_impostors*2, available))
+        num_to_select = min(self.n_impostors * 10, len(impostors_sorted))
+        selected_impostors = impostors_sorted[:num_to_select]
+
+        logging.info(
+            f"InDomainImpostorGenerator: Number of impostors: {len(selected_impostors)}"
+        )
+
+        # Sample n_impostors randomly from selected impostors
+        return random.sample(selected_impostors, self.n_impostors)

@@ -70,7 +70,7 @@ if __name__ == "__main__":
         "one_step_llm",
         "two_step_llm",
         "translation",
-        # "mirror_minds",
+        # "mirror_minds",   # raises error
     ]
 
     results_dict = compute_prec_recall_f1_acc_dict(dataset_name=args.dataset_name, imp_gen_techniques=our_figure_impostor_options)
