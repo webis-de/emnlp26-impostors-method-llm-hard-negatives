@@ -15,7 +15,7 @@ import logging
 # FIXME: make compatible with new mongodb idea
 import os
 import sys
-from abc import ABC, abstractmethod
+from abc import ABC
 from pathlib import Path
 from typing import Optional
 
@@ -41,55 +41,6 @@ class BaseImpostorGenerator(ABC):
         """
         self.n_impostors = n_impostors
 
-class NonLLMImpostorGenerator(BaseImpostorGenerator):
-    def __init__(self, n_impostors: int, path2imp: str, split: str = "test"):
-        """
-        :param n_impostors: Number of impostors to generate.
-        :param path2imp: Path to the directory where impostors are sampled from.
-        :param split: The split to use when generating paraphrases.
-        """
-        super().__init__(n_impostors)
-        self.split = split
-        assert os.path.exists(path2imp), "Path {} does not exist.".format(path2imp)
-        self.path2imp = path2imp
-
-    @abstractmethod
-    def generate_impostors(
-        self, text: str
-    ) -> dict:
-        """Get a dictionary of impostor texts for the given input text.
-
-        References:
-        ===========
-        Kocher, Mirco, and Jacques Savoy. ‘UniNE at CLEF 2015: Author Identification’, 2015.
-        Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’.
-        Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
-
-        :param text_id: ID in a mongo database containing texts to retrieve impostors from
-        :param text: input text to generate impostors for (i.e., the candidate text, NOT the disputed text)
-        """
-        pass
-
-    def _get_dataset_split_from_path(self, path2imp: str):
-        path2imp = Path(path2imp)
-        if not path2imp.exists():
-            raise FileNotFoundError(f"Data not found at {path2imp}")
-        dataset = load_from_disk(
-            os.path.join(
-                os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")),
-                path2imp,
-            )
-        )
-        if self.split not in dataset:
-            raise ValueError(
-                f"Dataset {path2imp} does not contain '{self.split}' split."
-            )
-
-        ds = dataset[self.split]
-        if len(ds) == 0:
-            raise ValueError("Dataset split is empty.")
-        return ds
-
 class MongoDBSavedGenerator(BaseImpostorGenerator):
     def __init__(
         self, n_impostors: int
@@ -111,6 +62,43 @@ class MongoDBSavedGenerator(BaseImpostorGenerator):
         )
         return self.generate_impostors(text=text, text_id=text_id)
 
+# TODO: delete? maybe not bc dataset name
+class NonLLMImpostorGenerator(MongoDBSavedGenerator):
+    def __init__(self, n_impostors: int, dataset_name: str):
+        """
+        :param n_impostors: Number of impostors to generate.
+        :param dataset_name: Path to the directory where impostors are sampled from.
+        :param split: The split to use when generating paraphrases.
+        """
+        super().__init__(n_impostors)
+        self.split = split
+        assert os.path.exists(dataset_name), "Path {} does not exist.".format(dataset_name)
+        self.path2imp = dataset_name
+
+    def _get_dataset_split_from_path(self, path2imp: str):
+        path2imp = Path(path2imp)
+        if not path2imp.exists():
+            raise FileNotFoundError(f"Data not found at {path2imp}")
+        dataset = load_from_disk(
+            os.path.join(
+                os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")),
+                path2imp,
+            )
+        )
+        if self.split not in dataset:
+            raise ValueError(
+                f"Dataset {path2imp} does not contain '{self.split}' split."
+            )
+
+        ds = dataset[self.split]
+        if len(ds) == 0:
+            raise ValueError("Dataset split is empty.")
+        return ds
+
+class GenerativeImpostorGenerator(MongoDBSavedGenerator):
+    def __init__(self, n_impostors: int):
+        super().__init__(n_impostors)
+
     def obtain_existing_paraphrases(self, collection, search_args: dict):
         if "text_id" not in search_args.keys():
             logging.info(f"Must provide text_id, but only provides {search_args.keys()}.")
@@ -127,12 +115,11 @@ class MongoDBSavedGenerator(BaseImpostorGenerator):
             return impostors, extracted_info
 
 
-class LLMImpostorGenerator(MongoDBSavedGenerator):
+class LLMImpostorGenerator(GenerativeImpostorGenerator):
     def __init__(
         self, n_impostors: int
     ):
         super().__init__(n_impostors)
-
 
 
 class NonNaiveLLMImpostorGenerator(LLMImpostorGenerator):

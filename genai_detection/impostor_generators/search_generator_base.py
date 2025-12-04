@@ -26,15 +26,13 @@ import spacy
 from bs4 import BeautifulSoup
 from nltk import download
 
-from genai_detection.impostor_generators.ImpostorGenerator import (
-    MongoDBSavedGenerator,
-)
+from genai_detection.impostor_generators.ImpostorGenerator import GenerativeImpostorGenerator
 
 logger = logging.getLogger(__name__)
 logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 
-class SearchImpostorGeneratorBase(MongoDBSavedGenerator):
+class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
 
     def __init__(
         self,
