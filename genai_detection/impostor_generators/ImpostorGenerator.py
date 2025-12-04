@@ -16,10 +16,8 @@ import logging
 import os
 import sys
 from abc import ABC
-from pathlib import Path
 from typing import Optional
 
-from datasets import load_from_disk
 from dotenv import load_dotenv
 
 from genai_detection.detectors.components.preprocessing import Preprocessor
@@ -61,39 +59,6 @@ class MongoDBSavedGenerator(BaseImpostorGenerator):
             text=None, text_id=text_id
         )
         return self.generate_impostors(text=text, text_id=text_id)
-
-# TODO: delete? maybe not bc dataset name
-class NonLLMImpostorGenerator(MongoDBSavedGenerator):
-    def __init__(self, n_impostors: int, dataset_name: str):
-        """
-        :param n_impostors: Number of impostors to generate.
-        :param dataset_name: Path to the directory where impostors are sampled from.
-        :param split: The split to use when generating paraphrases.
-        """
-        super().__init__(n_impostors)
-        self.split = split
-        assert os.path.exists(dataset_name), "Path {} does not exist.".format(dataset_name)
-        self.path2imp = dataset_name
-
-    def _get_dataset_split_from_path(self, path2imp: str):
-        path2imp = Path(path2imp)
-        if not path2imp.exists():
-            raise FileNotFoundError(f"Data not found at {path2imp}")
-        dataset = load_from_disk(
-            os.path.join(
-                os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")),
-                path2imp,
-            )
-        )
-        if self.split not in dataset:
-            raise ValueError(
-                f"Dataset {path2imp} does not contain '{self.split}' split."
-            )
-
-        ds = dataset[self.split]
-        if len(ds) == 0:
-            raise ValueError("Dataset split is empty.")
-        return ds
 
 class GenerativeImpostorGenerator(MongoDBSavedGenerator):
     def __init__(self, n_impostors: int):
