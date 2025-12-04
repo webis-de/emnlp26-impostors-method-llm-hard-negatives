@@ -58,7 +58,7 @@ class ImpostorDetector(ImpostorBase):
             "on_the_fly_serpapi",
             "on_the_fly_startpage",
             "in_domain",
-            "naive_llm",
+            "one_step_llm",
             "two_step_llm",
             "mirror_minds",
         ] = "two_step_llm",
@@ -79,7 +79,7 @@ class ImpostorDetector(ImpostorBase):
         :param threshold: Threshold for the minimum similarity score to consider two texts same-author, Koppel et al. (2014) use 0.1
         :param impostor_technique: Technique to use to generate impostors. Options are:
             - "translation": use LLMs to generate impostors (i.e., English to x and x to English)
-            - "naive_llm": use a naive LLM approach to generate impostors
+            - "one_step_llm": use a naive LLM approach to generate impostors
             - "two_step_llm": use two-step LLM approach to generate impostors (i.e., first extracting information and then, generating paraphrases based on these information)
             - "in_domain": use a fixed set of in-domain impostors (Koppel et. A. (2014), not implemented yet),
             impostors are not related to the input text
@@ -330,9 +330,9 @@ if __name__ == "__main__":
     # "on_the_fly_serpapi",
     # "on_the_fly_startpage",
     # "in_domain",  # former fixed
-    # "naive_llm",
+    # "one_step_llm",
     # "two_step_llm",
     # "mirror_minds",
-    imp = ImpostorDetector(impostor_technique="naive_llm", n_impostors=5)
+    imp = ImpostorDetector(impostor_technique="one_step_llm", n_impostors=5)
     res = imp.get_score(text=doc_pairs, normalize=True)
     logging.info(res)

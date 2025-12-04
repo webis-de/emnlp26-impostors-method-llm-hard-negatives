@@ -46,7 +46,7 @@ if __name__ == "__main__":
             "on_the_fly_serpapi",
             "on_the_fly_startpage",
             "in_domain",
-            "naive_llm",
+            "one_step_llm",
             "two_step_llm",
             "mirror_minds",
         ],
@@ -69,11 +69,12 @@ if __name__ == "__main__":
         "in_domain",
         "naive_llm",
         "two_step_llm",
+        "translation",
+        # "mirror_minds",
     ]
 
     results_dict = compute_prec_recall_f1_acc_dict(dataset_name=args.dataset_name, imp_gen_techniques=our_figure_impostor_options)
     logging.info(f"results_dict: {results_dict}")
-
 
     # results_dict: {approach_name: DataFrame}
     dfs = []
