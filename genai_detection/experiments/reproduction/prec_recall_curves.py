@@ -105,7 +105,7 @@ def compute_prec_recall_f1_acc_dict(
         preds = baseline.get_score(text_test_pairs)
         preds = preds.tolist() if not isinstance(preds, list) else preds
 
-        predictions[f"{baseline_name.replace(' ','_')}_score"] = np.array(
+        predictions[f"{baseline_name.replace(' ','_')}"] = np.array(
             preds
         ).ravel().tolist()
 
@@ -177,8 +177,8 @@ def plot_precision_recall_curve(results:dict, dataset_name:str):
     label_translations = {
         "in_domain": "In-Domain",
         "on_the_fly": "On-the-Fly",
-        "naive_llm": "One-Step Paraphraser (LLM)",
-        "non_naive_llm": "Two-Step Paraphraser (LLM)",
+        "one_step_llm": "One-Step Paraphraser (LLM)",
+        "two_step_llm": "Two-Step Paraphraser (LLM)",
         "unsupervised_baseline_min-max": "Unsup. Min-Max (B)",
         "unsupervised_baseline_cosine": "Unsup. Cosine (B)",
         "supervised_baseline": "Sup. SVM (B)",
