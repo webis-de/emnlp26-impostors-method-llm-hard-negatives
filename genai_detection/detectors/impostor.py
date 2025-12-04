@@ -22,7 +22,6 @@ __all__ = ["ImpostorDetector"]
 logger = logging.getLogger(__name__)
 logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
-
 class ImpostorDetector(ImpostorBase):
     """
     The Impostor method extends the ngram-unmasking method.
@@ -63,7 +62,6 @@ class ImpostorDetector(ImpostorBase):
             "two_step_llm",
             "mirror_minds",
         ] = "two_step_llm",
-            # TODO: delete or make dataset name for mongodb original collection
         dataset_name: str = "student_essays",
         min_n_tokens: int = 500,  # minimum number of tokens to consider input sequence valid, defaults to 500
         upsample: bool = True,  # whether to upsample short texts (default: True, i.e., upsample) or skip them
@@ -182,6 +180,14 @@ class ImpostorDetector(ImpostorBase):
             if hasattr(
                 self.impostor_generator, "generate_impostors_by_text_id"
             ) and callable(self.impostor_generator.generate_impostors_by_text_id):
+                # check if result has already been computed and stored in the mongoDB collection
+
+                cursor = list(self.mongoDB.find_document_by_multiple_fields(collection=self.mongoDB.impostor_output_collection, search_args={"impostor_generation_technique": self.impostor_technique, "left_id":pair["left"]["id"], "right_id":pair["right"]["id"]}))
+                if len(cursor) > 0:
+                    final_scores.append(cursor[0]["scores_over_different_rounds"])
+                    logging.info(f"Found pre-computed scores for {pair['left']['id']}, {pair['right']['id']} in mongoDB collection. Using pre-computed scores.")
+                    continue
+
                 impostors_of_left = (
                     self.impostor_generator.generate_impostors_by_text_id(
                         text_id=pair["left"]["id"]
@@ -275,6 +281,7 @@ class ImpostorDetector(ImpostorBase):
                 if new_key != "impostors_tfidf"
             }
             document2insert["scores_over_different_rounds"] = self.scorer.score_pair(pair=pair, vectorizer=feature_extractor.vectorizer)
+            document2insert["impostor_generation_technique"] = self.impostor_technique
             logging.info(f"Obtained final score of {document2insert['scores_over_different_rounds']} for text input pair.")
             try:
                 self.mongoDB.insert_document(collection=self.mongoDB.impostor_output_collection, insert_data=document2insert)
