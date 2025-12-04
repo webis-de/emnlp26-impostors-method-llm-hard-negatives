@@ -68,7 +68,7 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
 
         # TODO: create one method with search generator: No, bc i need if here anyway
         impostors, _ = self.obtain_existing_paraphrases(
-            collection=self.mongoDB.non_naive_paraphrase_collection,
+            collection=self.mongoDB.naive_paraphrase_collection,
             search_args={"text_id": text_id},
         )
 
@@ -104,6 +104,7 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
                     extracted_info={},
                     total_costs=0,
                     prompt=CONFIG.PROMPT,
+                    intermediate_prompt="",
                     collection=self.mongoDB.naive_paraphrase_collection,
                 )
             except Exception as e:
