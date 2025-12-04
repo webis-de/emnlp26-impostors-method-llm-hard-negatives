@@ -57,6 +57,7 @@ class BaseConfig:
     MONGO_DATABASE = "impostors"  # initial db (!= collection in db)
     MONGO_ORIGINAL_TEXT_COLLECTION = "original_text"  # collection (!= db)
     MONGO_PARAPHRASE_COLLECTION = "paraphrase"  # collection (!= db)
+    MONGO_NAIVE_PARAPHRASE_COLLECTION = "naive_paraphrase"  # collection (!= db); formerly one-step paraphrases
     MONGO_ON_THE_FLY_COLLECTION = "on_the_fly"  # collection (!= db)
     MONGO_TRANSLATION_COLLECTION = "translation"  # collection (!= db)
     MONGO_PARAPHRASE_SCORE_COLLECTION = "paraphrase_score"  # collection (!= db)
