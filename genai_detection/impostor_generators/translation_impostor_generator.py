@@ -61,6 +61,7 @@ class TranslationImpostorGenerator(NonNaiveLLMImpostorGenerator):
                 # if there are still DeepL API calls left, this endpoint will be used instead of the LLM (i.e., prompts and model_id are not relevant)
                 prompt=self.translation_paraphraser.generator_prompt,
                 intermediate_prompt=self.translation_paraphraser.extractor_prompt,
+                collection=self.mongoDB.translation_collection,
             )
         if impostors:
             new_impostors.extend(impostors)

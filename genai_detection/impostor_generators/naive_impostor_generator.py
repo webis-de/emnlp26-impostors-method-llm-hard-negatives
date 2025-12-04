@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import random
 from typing import Optional, List
 
 from genai_detection.config import CONFIG
@@ -22,10 +21,6 @@ from genai_detection.paraphrasing.one_step_paraphrasers import (
     OneStepParaphraser,
 )
 from genai_detection.paraphrasing.paraphraser import Paraphraser
-from genai_detection.paraphrasing.translation_paraphraser import TranslationParaphraser
-from genai_detection.paraphrasing.two_step_paraphrasers import (
-    TwoStepParaphraser
-)
 
 
 class NaiveImpostorGenerator(LLMImpostorGenerator):
@@ -65,8 +60,6 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
                 len(paraphrasers) > 0
             ), "At least one paraphraser must be provided."
             self.paraphrasers = paraphrasers
-        # FIXME: prompts??
-        self.prompts = CONFIG.OPENAI_MODEL
 
     def generate_impostors(
         self, text: Optional[str], text_id: Optional[str]
@@ -75,7 +68,7 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
 
         # TODO: create one method with search generator: No, bc i need if here anyway
         impostors, _ = self.obtain_existing_paraphrases(
-            collection=self.mongoDB.paraphrase_collection,
+            collection=self.mongoDB.non_naive_paraphrase_collection,
             search_args={"text_id": text_id},
         )
 
@@ -94,10 +87,8 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
         for i in range(n_imp_to_generate):
             # randomly select a paraphraser and a prompt
             paraphraser = self.paraphrasers[i % len(self.paraphrasers)]
-            p_id = random.randint(0, len(self.prompts) - 1)
-            prompt = self.prompts[p_id]
             try:
-                impostor_text = paraphraser.paraphrase(text, prompt=prompt)
+                impostor_text = paraphraser.paraphrase(text, prompt=CONFIG.PROMPT)
                 if (
                     isinstance(paraphraser, OneStepParaphraser)
                     and paraphraser.model_id == "qwen3-32b"
@@ -112,7 +103,8 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
                     paraphrased_text=impostor_text,
                     extracted_info={},
                     total_costs=0,
-                    prompt=prompt,
+                    prompt=CONFIG.PROMPT,
+                    collection=self.mongoDB.naive_paraphrase_collection,
                 )
             except Exception as e:
                 logging.warning(f"Error generating impostor with {paraphraser}: {e}")
