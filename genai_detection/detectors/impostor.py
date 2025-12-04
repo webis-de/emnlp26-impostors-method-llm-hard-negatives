@@ -189,7 +189,7 @@ class ImpostorDetector(ImpostorBase):
                 )
                 logging.info(
                     f"Obtained impostors by text ID for left text with text ID {pair['left']['id']}. Type of "
-                    f"impostors is {type(impostors_of_left)}"
+                    f"impostors is {type(impostors_of_left)}."
                 )
                 impostors_of_right = (
                     self.impostor_generator.generate_impostors_by_text_id(
@@ -197,7 +197,7 @@ class ImpostorDetector(ImpostorBase):
                     )
                 )
                 logging.info(f"Obtained impostors by text ID for right text with text ID {pair['right']['id']}. Type "
-                             f"of impostors is {type(impostors_of_right)}")
+                             f"of impostors is {type(impostors_of_right)}.")
 
             else:
                 impostors_of_left = self.impostor_generator.generate_impostors(
@@ -305,8 +305,8 @@ if __name__ == "__main__":
     doc_pairs = ["68f50029edacdf3d5c0279dd", #"68f50029edacdf3d5c027d4f"]#, "68f50029edacdf3d5c0279e8"]#,
     # "68f50029edacdf3d5c0279eb"]
     # "68f50029edacdf3d5c0279d9"]
-    #              "68f50029edacdf3d5c0279ec"]
-                 "68f50029edacdf3d5c0279e0"]
+                 "68f50029edacdf3d5c0279ec"]
+                 # "68f50029edacdf3d5c0279e0"]
 
     # "translation",
     # "on-the-fly", # startpage by default
@@ -317,6 +317,6 @@ if __name__ == "__main__":
     # "naive_llm",
     # "two_step_llm",
     # "mirror_minds",
-    imp = ImpostorDetector(impostor_technique="in_domain", n_impostors=50)
+    imp = ImpostorDetector(impostor_technique="naive_llm", n_impostors=5)
     res = imp.get_score(text=doc_pairs, normalize=True)
     logging.info(res)
