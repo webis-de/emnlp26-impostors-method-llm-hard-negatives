@@ -324,6 +324,6 @@ if __name__ == "__main__":
     # "naive_llm",
     # "two_step_llm",
     # "mirror_minds",
-    imp = ImpostorDetector(impostor_technique="translation", n_impostors=2)
+    imp = ImpostorDetector(impostor_technique="naive_llm", n_impostors=2)
     res = imp.get_score(text=doc_pairs, normalize=True)
     logging.info(res)

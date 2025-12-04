@@ -4,11 +4,11 @@ import inspect
 from genai_detection.impostor_generators.MirrorMinds_generator import MirrorMindsGenerator
 from genai_detection.impostor_generators.chatnoir_impostor_generator import ChatNoirSearchImpostorGenerator
 from genai_detection.impostor_generators.content_impostor_generator import ContentImpostorGenerator
-from genai_detection.impostor_generators.fixed_impostor_generator import (
-    FixedImpostorGenerator,
+from genai_detection.impostor_generators.google_search_impostor_generator import GoogleSearchImpostorGenerator
+from genai_detection.impostor_generators.in_domain_impostor_generator import (
+    InDomainImpostorGenerator,
     BlogImpostorGenerator,
 )
-from genai_detection.impostor_generators.google_search_impostor_generator import GoogleSearchImpostorGenerator
 from genai_detection.impostor_generators.naive_impostor_generator import NaiveImpostorGenerator
 from genai_detection.impostor_generators.startpage_impostor_generator import StartPageSearchImpostorGenerator
 from genai_detection.impostor_generators.text_length_impostor_generator import TextLenImpostorGenerator
@@ -19,7 +19,7 @@ IMPOSTOR_GENERATORS = {
     "two_step_llm": TwoStepImpostorGenerator,
     "naive_llm": NaiveImpostorGenerator,
     "translation": TranslationImpostorGenerator,
-    "fixed": FixedImpostorGenerator,
+    "fixed": InDomainImpostorGenerator,
     "blogs": BlogImpostorGenerator,
     "on_the_fly":StartPageSearchImpostorGenerator,
     "on_the_fly_chatnoir": ChatNoirSearchImpostorGenerator,

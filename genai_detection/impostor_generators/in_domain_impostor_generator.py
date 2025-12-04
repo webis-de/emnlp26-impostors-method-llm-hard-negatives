@@ -19,9 +19,11 @@ from genai_detection.config import CONFIG
 from genai_detection.impostor_generators.ImpostorGenerator import NonLLMImpostorGenerator
 
 
-class FixedImpostorGenerator(NonLLMImpostorGenerator):
+class InDomainImpostorGenerator(NonLLMImpostorGenerator):
     def __init__(self, n_impostors: int, path2imp: str, split: str = "test"):
         """
+        This impostor generator gets in-domain impostors from the dataset the input texts originate from.
+
         :param n_impostors: Number of impostors to generate.
         :param path2imp: Path to the directory where impostors are sampled from.
         :param split: The split to use when generating paraphrases.
@@ -63,7 +65,7 @@ class FixedImpostorGenerator(NonLLMImpostorGenerator):
         return impostors
 
 
-class BlogImpostorGenerator(FixedImpostorGenerator):
+class BlogImpostorGenerator(InDomainImpostorGenerator):
     def __init__(self, n_impostors: int, split: str = "test"):
         super().__init__(n_impostors=n_impostors, split=split, path2imp=os.path.join(os.path.abspath(".."),
         CONFIG.PATH2BLOG))
