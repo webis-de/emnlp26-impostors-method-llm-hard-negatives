@@ -590,7 +590,7 @@ class VisDetectors:
             same_author_precisions.keys(),
         )
         label_translations = {
-            "fixed": "Fixed",
+            "in_domain": "In-Domain",
             "on_the_fly": "On-the-Fly",
             "naive_llm": "One-Step Paraphraser (LLM)",
             "non_naive_llm": "Two-Step Paraphraser (LLM)",
