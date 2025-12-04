@@ -185,7 +185,9 @@ class ImpostorDetector(ImpostorBase):
                     pair["right"]["id"], str
                 ), f"Both input IDs must be strings, but are {type(pair['left']['id'])} and {type(pair['left']['id'])}"
 
-                cursor = list(self.mongoDB.find_document_by_multiple_fields(collection=self.mongoDB.impostor_output_collection, search_args={"impostor_generation_technique": self.impostor_technique, "left_id":pair["left"]["id"], "right_id":pair["right"]["id"]}))
+                cursor = list(self.mongoDB.find_document_by_multiple_fields(
+                    collection=self.mongoDB.impostor_output_collection, search_args={"impostor_generation_technique":
+                       self.impostor_technique, "left_id":pair["left"]["id"], "right_id":pair["right"]["id"], "n_impostors":self.n_impostors}))
                 if len(cursor) > 0:
                     final_scores.append(cursor[0]["scores_over_different_rounds"])
                     logging.info(f"Found pre-computed scores for {pair['left']['id']}, {pair['right']['id']} in mongoDB collection. Using pre-computed scores.")
@@ -285,6 +287,7 @@ class ImpostorDetector(ImpostorBase):
             }
             document2insert["scores_over_different_rounds"] = self.scorer.score_pair(pair=pair, vectorizer=feature_extractor.vectorizer)
             document2insert["impostor_generation_technique"] = self.impostor_technique
+            document2insert["n_impostors"] = self.n_impostors
             logging.info(f"Obtained final score of {document2insert['scores_over_different_rounds']} for text input pair.")
             try:
                 self.mongoDB.insert_document(collection=self.mongoDB.impostor_output_collection, insert_data=document2insert)
