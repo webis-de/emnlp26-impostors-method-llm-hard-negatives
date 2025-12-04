@@ -55,13 +55,13 @@ class BaseConfig:
     PROMPT = "Paraphrase the text above without changing its meaning. Use different words and vary the sentence structure while maintaining a consistent tone. Your paraphrase should be three times as long than the original. Output only the paraphrased sentence, with NO explanations or extra text."
 
     MONGO_DATABASE = "impostors"  # initial db (!= collection in db)
-    MONGO_ORIGINAL_TEXT_COLLECTION = "original_text"  # collection (!= db)
-    MONGO_PARAPHRASE_COLLECTION = "paraphrase"  # collection (!= db)
-    MONGO_NAIVE_PARAPHRASE_COLLECTION = "naive_paraphrase"  # collection (!= db); formerly one-step paraphrases
-    MONGO_ON_THE_FLY_COLLECTION = "on_the_fly"  # collection (!= db)
-    MONGO_TRANSLATION_COLLECTION = "translation"  # collection (!= db)
-    MONGO_PARAPHRASE_SCORE_COLLECTION = "paraphrase_score"  # collection (!= db)
-    MONGO_IMPOSTOR_OUTPUT_COLLECTION = "impostors_output" # collection (!= db)
+    MONGO_ORIGINAL_TEXT_COLLECTION = "original_texts"  # collection (!= db)
+    MONGO_PARAPHRASE_COLLECTION = "non_naive_paraphrases"  # collection (!= db); for (formerly) two-step paraphrases
+    MONGO_NAIVE_PARAPHRASE_COLLECTION = "naive_paraphrases"  # collection (!= db); for (formerly) one-step paraphrases
+    MONGO_ON_THE_FLY_COLLECTION = "on_the_fly_paraphrases"  # collection (!= db)
+    MONGO_TRANSLATION_COLLECTION = "translation_paraphrases"  # collection (!= db)
+    MONGO_PARAPHRASE_SCORE_COLLECTION = "paraphrase_scores"  # collection (!= db)
+    MONGO_IMPOSTOR_OUTPUT_COLLECTION = "impostors_outputs" # collection (!= db)
     MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME")
     MONGO_PASSWORD = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
     MONGO_HOST = "localhost:27018"  # Local, but forwarded to server
