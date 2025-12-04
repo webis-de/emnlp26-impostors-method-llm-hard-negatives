@@ -54,18 +54,17 @@ class ImpostorDetector(ImpostorBase):
         threshold:float=0.1,
         impostor_technique: Literal[
             "translation",
-            "text_len",
             "on-the-fly",   # Startpage by default
             "on_the_fly_chatnoir",
             "on_the_fly_serpapi",
             "on_the_fly_startpage",
             "blogs",
-            "fixed",
-            "content",
+            "in_domain",
             "naive_llm",
             "two_step_llm",
             "mirror_minds",
         ] = "two_step_llm",
+            # TODO: delete or make dataset name for mongodb original collection
         path2imp: str = CONFIG.PATH2BLOG,  # PATH2GENERIC_ON_FLY_IMP,  # path to impostor file, where fixed impostors are saved or where to save generated impostors
         min_n_tokens: int = 500,  # minimum number of tokens to consider input sequence valid, defaults to 500
         upsample: bool = True,  # whether to upsample short texts (default: True, i.e., upsample) or skip them
@@ -85,13 +84,13 @@ class ImpostorDetector(ImpostorBase):
             - "translation": use LLMs to generate impostors (i.e., English to x and x to English)
             - "naive_llm": use a naive LLM approach to generate impostors
             - "two_step_llm": use two-step LLM approach to generate impostors (i.e., first extracting information and then, generating paraphrases based on these information)
-            - "text_len": generate impostors of similar length from a predefined dataset (our baseline w/o reference, default)
-            - "fixed": use a fixed set of impostors (Koppel et. A. (2014), not implemented yet), impostors are not related to the input text
+            - "in_domain": use a fixed set of in-domain impostors (Koppel et. A. (2014), not implemented yet),
+            impostors are not related to the input text
             - "on_the_fly": generate same-topic impostors on-the-fly (Koppel et al. (2014))
             - "on_the_fly_<approach>": Where <approach> is either  "chatnoir", "serpapi", "startpage"; i.e., different implementations of the same approach.
             - "blogs": use blogs to obtain same genre impostors (Koppel et al. (2014), not implemented yet)
         :param path2imp: Path to the impostor directory, where fixed impostors are saved or where to save newly
-        generated impostors
+        generated impostors # TODO
         :param min_n_tokens: Minimum number of tokens to consider input sequence valid, defaults to 500 (Bevendorff
         et al. (2019): 500 words)
         :param upsample: Whether to upsample short texts (default: True, i.e. upsample acc. to Bevendorff (2019)) or
@@ -313,14 +312,12 @@ if __name__ == "__main__":
                  "68f50029edacdf3d5c0279e0"]
 
     # "translation",
-    # "text_len",
     # "on-the-fly", # startpage by default
     # "on_the_fly_chatnoir",
     # "on_the_fly_serpapi",
     # "on_the_fly_startpage",
     # "blogs",
-    # "fixed",
-    # "content",
+    # "in_domain",  # former fixed
     # "naive_llm",
     # "two_step_llm",
     # "mirror_minds",
