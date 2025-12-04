@@ -107,6 +107,7 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
                     intermediate_prompt="",
                     collection=self.mongoDB.naive_paraphrase_collection,
                 )
+                impostors.append(impostor_text)
             except Exception as e:
                 logging.warning(f"Error generating impostor with {paraphraser}: {e}")
 
