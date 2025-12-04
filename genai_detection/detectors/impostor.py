@@ -181,6 +181,9 @@ class ImpostorDetector(ImpostorBase):
                 self.impostor_generator, "generate_impostors_by_text_id"
             ) and callable(self.impostor_generator.generate_impostors_by_text_id):
                 # check if result has already been computed and stored in the mongoDB collection
+                assert isinstance(pair["left"]["id"], str) and isinstance(
+                    pair["right"]["id"], str
+                ), f"Both input IDs must be strings, but are {type(pair['left']['id'])} and {type(pair['left']['id'])}"
 
                 cursor = list(self.mongoDB.find_document_by_multiple_fields(collection=self.mongoDB.impostor_output_collection, search_args={"impostor_generation_technique": self.impostor_technique, "left_id":pair["left"]["id"], "right_id":pair["right"]["id"]}))
                 if len(cursor) > 0:
@@ -285,9 +288,12 @@ class ImpostorDetector(ImpostorBase):
             logging.info(f"Obtained final score of {document2insert['scores_over_different_rounds']} for text input pair.")
             try:
                 self.mongoDB.insert_document(collection=self.mongoDB.impostor_output_collection, insert_data=document2insert)
+                logging.info(
+                    f"Inserted score into MongoDB collection {CONFIG.MONGO_IMPOSTOR_OUTPUT_COLLECTION}."
+                )
             except Exception as e:
                 logging.error(f"Failed to insert document: {document2insert}\n\n{e}")
-            logging.info(f"Inserted score into MongoDB collection {CONFIG.MONGO_IMPOSTOR_OUTPUT_COLLECTION}.")
+
             final_scores.append(document2insert["scores_over_different_rounds"])
             logging.info(f"Finished computing score for texts with ID {pair['left']['id']} and ID {pair['right']['id']}.")
 
