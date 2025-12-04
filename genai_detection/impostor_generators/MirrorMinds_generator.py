@@ -15,7 +15,7 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import pandas as pd
 import torch
@@ -26,12 +26,12 @@ from llm_question_generator.question_generator import QuestionGenerator
 from llm_response_generator.response_config import ResponseGeneratorConfig
 from llm_response_generator.response_generator import ResponseGenerator
 
-from genai_detection.impostor_generators.ImpostorGenerator import BaseImpostorGenerator
+from genai_detection.impostor_generators.ImpostorGenerator import MongoDBSavedGenerator
 
 logger = logging.getLogger(__name__)
 logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
-class MirrorMindsGenerator(BaseImpostorGenerator):
+class MirrorMindsGenerator(MongoDBSavedGenerator):
     """
     MirrorMindsGenerator is a generator that creates impostor texts by mirroring the structure of the original text.
     It uses the MirrorMinds model to generate paraphrases that maintain the original meaning while altering the wording.
@@ -42,10 +42,11 @@ class MirrorMindsGenerator(BaseImpostorGenerator):
     ):
         super().__init__(n_impostors=n_impostors)
         torch.cuda.empty_cache()
+        self.model_id = model_id
         self.model_path = snapshot_download(repo_id="google/flan-t5-small")
 
     def generate_impostors(
-        self, text: str, real_time_generation: bool = True, path2imp: str = None
+        self, text: Optional[str], text_id: Optional[str]
     ) -> List[str]:
         """
         Generate an impostor text by mirroring the structure of the input text.
@@ -61,7 +62,7 @@ class MirrorMindsGenerator(BaseImpostorGenerator):
         tmp_path = Path(os.getcwd()) / "tmp-MirrorMinds"
         os.makedirs(tmp_path, exist_ok=True)
         text_df.to_pickle(tmp_path / "sample_essays.pkl")
-        impostor_texts = {}
+        impostor_texts = []
         for i in range(self.n_impostors):
             question_config = QuestionGeneratorConfig(
                 model_path=self.model_path,
@@ -94,16 +95,13 @@ class MirrorMindsGenerator(BaseImpostorGenerator):
             if not df.empty:
                 val = df["generated_text"].iloc[0]
                 if pd.notna(val) and not (isinstance(val, float)):
-                    impostor_texts[f"impostor_{i}_mirror_minds"] = val
+                    impostor_texts.append(val)
             else:
                 logging.warning(f"ERROR: No valid response generated. Original was: {text[:200]}")
-                impostor_texts[f"impostor_{i}_mirror_minds"] = (
-                    "ERROR: No valid response generated."
-                )
+                impostor_texts.append("ERROR: No valid response generated.")
 
-        # logging.info(f"Total script runtime: {time.time() - start_time:.2f} seconds")
-        # logging.info("Generated questions and responses saved successfully.")
-        # logging.info("%s", df)
+        logging.info(f"Total script runtime: {time.time() - start_time:.2f} seconds")
+        logging.info("Generated questions and responses saved successfully.")
         os.remove(tmp_path / "sample_essays.pkl")
         os.remove(tmp_path / "generated_questions.pkl")
         os.remove(tmp_path / "generated_responses.pkl")
