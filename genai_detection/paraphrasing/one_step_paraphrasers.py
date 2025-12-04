@@ -242,7 +242,7 @@ class SAIAParaphraser(OneStepParaphraser):
 
     def paraphrase(
         self, text: str, prompt: str, max_length: float = CONFIG.MAX_LENGTH
-    ) -> List[str]:
+    ) -> str:
         """
         Generate paraphrased versions of the input text.
 
@@ -250,10 +250,8 @@ class SAIAParaphraser(OneStepParaphraser):
         :param prompt: The prompt to be used for paraphrasing. This model allows for JSON structured ouput, hence, specify here the prompt to be used for paraphrasing.
         The prompt is inserted after the text to enforce its importance in the LLM's context when working on long texts.
         :param max_length: The maximum number of tokens to generate in the paraphrase.
-        :return: A list of paraphrased versions of the input text.
+        :return: A paraphrased version of the input text.
         """
-        responses = []
-
         # max token differs across models but usually at least 40k tokens, so we crop at less to be safe
         body = {
             "model": self.model_id,
@@ -264,7 +262,7 @@ class SAIAParaphraser(OneStepParaphraser):
                 },
                 {"role": "user", "content": f"{text[:30000]}\n{prompt.strip()}"},
             ],
-            "temperature": CONFIG.SAIA_TEMPERATURE,
+            "temperature": CONFIG.TEMPERATURE,
         }
         try:
             response = self.client.chat.completions.create(**body)
@@ -274,11 +272,10 @@ class SAIAParaphraser(OneStepParaphraser):
 
             try:
                 data = json.loads(resp)
-                responses.append(data)
+                return data
             except json.JSONDecodeError:
-                responses.append(response.choices[0].message.content)
+                return response.choices[0].message.content
 
-            return responses
         except openai.RateLimitError as e:
             logging.warning(
                 f"[ERROR] Rate limit exceeded for {self.model_id}: {e}. Sleeping 1 minute and trying again..."
