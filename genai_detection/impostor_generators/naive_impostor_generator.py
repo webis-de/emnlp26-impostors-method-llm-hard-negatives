@@ -11,11 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
+import random
 from typing import Optional, List
 
 from genai_detection.config import CONFIG
 from genai_detection.impostor_generators.ImpostorGenerator import LLMImpostorGenerator
-from genai_detection.paraphrasing.one_step_paraphrasers import SAIAParaphraser
+from genai_detection.paraphrasing.one_step_paraphrasers import (
+    SAIAParaphraser,
+    OneStepParaphraser,
+)
 from genai_detection.paraphrasing.paraphraser import Paraphraser
 from genai_detection.paraphrasing.translation_paraphraser import TranslationParaphraser
 from genai_detection.paraphrasing.two_step_paraphrasers import (
@@ -24,7 +29,7 @@ from genai_detection.paraphrasing.two_step_paraphrasers import (
 
 
 class NaiveImpostorGenerator(LLMImpostorGenerator):
-   def __init__(
+    def __init__(
         self, n_impostors: int, paraphrasers: Optional[List[Paraphraser]] = None
     ):
         super().__init__(n_impostors=n_impostors)
@@ -43,11 +48,6 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
             )
             self.saiai_paraphraser_qwen = SAIAParaphraser(model_id="qwen3-32b")
 
-            self.two_step_paraphraser = TwoStepParaphraser()
-            self.translation_paraphraser = TranslationParaphraser(
-                text_extractor=self.saiai_paraphraser_gpt,
-                text_generator=self.saiai_paraphraser_gpt,
-            )
             self.paraphrasers = [
                 # self.t5_chatgpt_paraphraser,
                 # self.t5_google_paws_paraphraser,
@@ -56,8 +56,6 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
                 self.saiai_paraphraser_mistral,
                 self.saiai_paraphraser_gpt,
                 self.saiai_paraphraser_qwen,  # explanations in the output, separated by </think>
-                self.two_step_paraphraser,
-                self.translation_paraphraser,
             ]
         else:
             assert all(
@@ -69,3 +67,54 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
             self.paraphrasers = paraphrasers
         # FIXME: prompts??
         self.prompts = CONFIG.OPENAI_MODEL
+
+    def generate_impostors(
+        self, text: Optional[str], text_id: Optional[str]
+    ) -> List[str]:
+        n_imp_to_generate = self.n_impostors
+
+        # TODO: create one method with search generator: No, bc i need if here anyway
+        impostors, _ = self.obtain_existing_paraphrases(
+            collection=self.mongoDB.paraphrase_collection,
+            search_args={"text_id": text_id},
+        )
+
+        n_imp_to_generate -= len(impostors)
+        if n_imp_to_generate <= 0:
+            logging.info(
+                "Number of impostors in mongodb collection: {} for text with ID: {}. No need to generate more impostors, just returning {} impostors.".format(
+                    len(impostors), text_id, self.n_impostors
+                )
+            )
+            return impostors[: self.n_impostors]
+
+        logging.info(
+            f"{len(impostors)} precomputed impostors found in mongoDB. Generating {n_imp_to_generate} impostors for text {text[:100]}..."
+        )
+        for i in range(n_imp_to_generate):
+            # randomly select a paraphraser and a prompt
+            paraphraser = self.paraphrasers[i % len(self.paraphrasers)]
+            p_id = random.randint(0, len(self.prompts) - 1)
+            prompt = self.prompts[p_id]
+            try:
+                impostor_text = paraphraser.paraphrase(text, prompt=prompt)
+                if (
+                    isinstance(paraphraser, OneStepParaphraser)
+                    and paraphraser.model_id == "qwen3-32b"
+                ):
+                    # qwen3-32b returns thinking steps and the final answer, separated by </think>
+                    impostor_text = impostor_text.split("</think>")[-1]
+
+                # automatically inserts model_id
+                paraphraser.save_paraphrase_in_mongodb(
+                    original_text=text,
+                    original_text_id=text_id,
+                    paraphrased_text=impostor_text,
+                    extracted_info={},
+                    total_costs=0,
+                    prompt=prompt,
+                )
+            except Exception as e:
+                logging.warning(f"Error generating impostor with {paraphraser}: {e}")
+
+        return impostors

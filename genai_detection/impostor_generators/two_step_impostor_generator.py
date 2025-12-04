@@ -35,6 +35,8 @@ class TwoStepImpostorGenerator(NonNaiveLLMImpostorGenerator):
         self, text: Optional[str], text_id: Optional[str]
     ) -> List[str]:
         n_imp_to_generate = self.n_impostors
+
+        # TODO: create one method with search generator: No, bc i need if here anyway
         impostors, extracted_info = self.obtain_existing_paraphrases(collection=self.mongoDB.paraphrase_collection, search_args={"text_id": text_id})
 
         n_imp_to_generate -= len(impostors)
