@@ -19,6 +19,10 @@ import torch
 from more_itertools import ichunked
 
 from genai_detection.config import CONFIG
+from genai_detection.detectors.components.vector_similarity import (
+    minmax_similarity,
+    cosine_similarity,
+)
 from genai_detection.detectors.impostor_base import ImpostorBaselineBase
 
 logger = logging.getLogger(__name__)
@@ -77,9 +81,9 @@ class UnSupervisedImpostorBaseline(ImpostorBaselineBase):
             vectors = [self.get_tfidf_vector_for_text(t) for t in text_pair]
             assert len(vectors) == 2, "Input text must be a list of pairs of texts."
             if self.cosine:
-                scores_per_pair.append(self.cosine_similarity(vectors[0], vectors[1]))
+                scores_per_pair.append(cosine_similarity(vectors[0], vectors[1]))
             else:
-                scores_per_pair.append(self.minmax_similarity(vectors[0], vectors[1]))
+                scores_per_pair.append(minmax_similarity(vectors[0], vectors[1]))
 
         return np.array(scores_per_pair)
 

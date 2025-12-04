@@ -11,6 +11,7 @@ from genai_detection.detectors.components.feature_extractor import TfidfFeatureE
 from genai_detection.detectors.components.impostor_factory import create_impostor_generator
 from genai_detection.detectors.components.preprocessing import Preprocessor, PairPreprocessor
 from genai_detection.detectors.components.scorer import Scorer
+from genai_detection.detectors.components.vector_similarity import minmax_similarity
 from genai_detection.detectors.impostor_base import ImpostorBase
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
@@ -113,7 +114,7 @@ class ImpostorDetector(ImpostorBase):
         )
         self.text_preprocessor = Preprocessor()
         self.pair_processor = PairPreprocessor(mongoDB=self.mongoDB, tokenizer=self.tokenizer, min_n_tokens=self.min_n_tokens, upsample=self.upsample)
-        self.scorer = Scorer(rounds=self.rounds, portion_delete=self.portion_delete, similarity_fn=self.minmax_similarity)
+        self.scorer = Scorer(rounds=self.rounds, portion_delete=self.portion_delete, similarity_fn=minmax_similarity)
 
     def set_treshold(self, threshold: float):
         """

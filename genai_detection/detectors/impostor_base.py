@@ -21,7 +21,6 @@ import numpy as np
 import pandas as pd
 from datasets import load_from_disk
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 
 from genai_detection.config import CONFIG
 from genai_detection.detectors.detector_base import DetectorBase
@@ -81,32 +80,6 @@ class ImpostorBase(DetectorBase):
 
         else:
             return [text[i : i + n] for i in range(0, len(text) - n + 1)]
-
-    @staticmethod
-    def cosine_similarity(vec1, vec2):
-        """
-        Calculate cosine similarity between two vectors.
-        Koppel et al. (2014) have use cosine similarity as a baseline.
-        """
-        return (
-            cosine_similarity(vec1, vec2).flatten()[0]
-            if vec1 is not None and vec2 is not None
-            else 0.0
-        )
-
-    def minmax_similarity(self, vec1, vec2):
-        """
-        Calculate min-max similarity between two vectors in TFIDF format.
-        Koppel et al. (2014) use min-max similarity.
-        """
-        if vec1 is None or vec2 is None:
-            return 0.0
-        assert len(vec1) == len(vec2), "Vectors must be of the same length."
-        vec1 = vec1.flatten()
-        vec2 = vec2.flatten()
-        numerator = np.minimum(vec1, vec2).sum()
-        denominator = np.maximum(vec1, vec2).sum()
-        return 0.0 if denominator == 0 else numerator / denominator
 
 
 class ImpostorBaselineBase(ImpostorBase):
