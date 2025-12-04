@@ -52,6 +52,8 @@ class InDomainImpostorGenerator(MongoDBSavedGenerator):
         # ensure text ID not same
         search_args = {"dataset": self.dataset_name, "id": {"$ne": text_id}}
         logging.info(f"InDomainImpostorGenerator: Search arguments: {search_args}")
+        # TODO: return all, compare in terms of min-max similarity, keep best m=250 and random sampling of n=25 (or
+        #  n_impostors)
         cursor = self.mongoDB.get_random_matching_documents_from_collection(collection=self.mongoDB.original_collection, search_args=search_args, num_samples=self.n_impostors)
         impostors = [doc["text"] for doc in cursor]
         logging.info(f"InDomainImpostorGenerator: Number of impostors: {len(impostors)}")
