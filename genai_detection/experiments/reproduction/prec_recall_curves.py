@@ -40,7 +40,8 @@ logger = logging.getLogger(__name__)
 logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 
-NUM_SAMPLES = 20
+LOCAL_SAVE_PATH = Path(__file__).resolve().parents[3] / CONFIG.SAVE_PATH / "reproduction"
+LOCAL_SAVE_PATH.mkdir(parents=True, exist_ok=True)
 
 
 # reproduction of Figure 4 a, b from Koppel et al. (2014)
@@ -160,6 +161,7 @@ def compute_prec_recall_f1_acc_dict(
             results[key] = df
             logging.info(f"Computed metrics for {key}.")
     logging.info("Finished computing metrics.")
+
     return results
 
 
@@ -211,12 +213,10 @@ def plot_precision_recall_curve(results:dict, dataset_name:str):
         plt.tight_layout()
 
         for format in ["svg"]:  # "png",
-            savefig_base = Path(__file__).resolve().parent.parent / CONFIG.SAVE_PATH / "new"
-            savefig_base.mkdir(parents=True, exist_ok=True)
             figure_name = (
                 f"11111roc_prec_recall_curve_dif_{dataset_name.replace(' ', '_')}_"
                 f"{positive_class.lower().replace(' ', '_')}_imp_gen"
                 f".{format}"
             )
-            plt.savefig(savefig_base / figure_name, bbox_inches="tight")
-            logging.info(f"Saved figure {figure_name} to {savefig_base}.")
+            plt.savefig(LOCAL_SAVE_PATH / figure_name, bbox_inches="tight")
+            logging.info(f"Saved figure {figure_name} to {LOCAL_SAVE_PATH}.")
