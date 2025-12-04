@@ -79,8 +79,9 @@ def compute_prec_recall_f1_acc_dict(
         # TODO: use more impostors
         impostor_detector = ImpostorDetector(impostor_technique=imp_generation_technique, n_impostors=2)
         # if existent, pre-computed scores are used
-        predictions[imp_generation_technique] = impostor_detector.get_score(text=text_test_pairs)
-        assert predictions[imp_generation_technique], f"{imp_generation_technique} is None."
+        score = impostor_detector.get_score(text=text_test_pairs)
+        assert score is not None, f"{imp_generation_technique} returned None."
+        predictions[imp_generation_technique] = score
         logging.info(f"Finished obtaining impostor scores with {imp_generation_technique}.\n")
     logging.info(f"Finished obtaining impostor scores.\n{predictions}\n")
     baselines = {}
@@ -149,7 +150,7 @@ def compute_prec_recall_f1_acc_dict(
             )
         return imp_gen_technique, pd.DataFrame(rows)
 
-    args_list = [(key, preds) for key, preds in preds.items() if key != "ground_truth"]
+    args_list = [(key, preds) for key, preds in predictions.items() if key != "ground_truth"]
 
     # Compute in parallel
     results = {}
@@ -210,7 +211,8 @@ def plot_precision_recall_curve(results:dict, dataset_name:str):
         plt.tight_layout()
 
         for format in ["svg"]:  # "png",
-            savefig_base = Path(__file__).resolve().parent.parent / CONFIG.SAVE_PATH
+            savefig_base = Path(__file__).resolve().parent.parent / CONFIG.SAVE_PATH / "new"
+            savefig_base.mkdir(parents=True, exist_ok=True)
             figure_name = (
                 f"11111roc_prec_recall_curve_dif_{dataset_name.replace(' ', '_')}_"
                 f"{positive_class.lower().replace(' ', '_')}_imp_gen"
