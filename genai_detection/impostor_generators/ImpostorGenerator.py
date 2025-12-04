@@ -133,39 +133,6 @@ class LLMImpostorGenerator(MongoDBSavedGenerator):
     ):
         super().__init__(n_impostors)
 
-    # def generate_impostors():
-    # for i in range(n_imp_to_generate):
-    #     # randomly select a paraphraser and a prompt
-    #     paraphraser = self.paraphrasers[i % len(self.paraphrasers)]
-    #     p_id = random.randint(0, len(self.prompts) - 1)
-    #     prompt = self.prompts[p_id]
-    #     try:
-    #         impostor_texts = paraphraser.paraphrase(text, prompt=prompt)
-    #         if (
-    #             isinstance(paraphraser, OneStepParaphraser)
-    #             and paraphraser.model_id == "qwen3-32b"
-    #         ):
-    #             # qwen3-32b returns thinking steps and the final answer, separated by </think>
-    #             impostor_texts = [
-    #                 item.split("</think>")[-1] for item in impostor_texts
-    #             ]
-    #
-    #         for imp in impostor_texts:
-    #             if (
-    #                 imp and (len(imp.split()) / len(text.split())) >= 0.6
-    #             ):  # only non-empty + valid length filter
-    #                 # read json requires no " or { }
-    #                 imp = imp.replace("{", "(").replace("}", ")").replace('"', "'")
-    #                 key = f"impostor_{i}_prompt{p_id}_{paraphraser.model_id}"
-    #                 j = i
-    #                 while key in list(impostors.keys()):
-    #                     j += 1
-    #                     key = f"impostor_{j}_prompt{p_id}_{paraphraser.model_id}"
-    #                 impostors[key] = imp
-    #     except Exception as e:
-    #         logging.warning(f"Error generating impostor with {paraphraser}: {e}")
-
-    # return impostors
 
 
 class NonNaiveLLMImpostorGenerator(LLMImpostorGenerator):
