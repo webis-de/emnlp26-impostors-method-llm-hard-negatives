@@ -13,6 +13,7 @@
 # limitations under the License.
 """Find original code base: https://git.webis.de/code-research/web-search/affiliate-marketing-and-search/-/blob/main/serp_crawler/serp_crawler/crawler.py?ref_type=heads (28.11.2025)"""
 import logging
+import random
 from random import choice
 from typing import List, Dict
 from urllib import parse as urlparse
@@ -170,6 +171,9 @@ class StartPageSearchImpostorGenerator(SearchImpostorGeneratorBase):
                         snippet=snippet.text.strip() if snippet else "",
                     )
                 )
+            if not result_list:
+                logger.error("No results found. Random changing word order")
+                return self.fetch_results(query=" ".join(random.shuffle(query.split())))
             logging.info(f"Fetched {len(result_list)} results from {query}")
             return result_list
         except Exception as e:
