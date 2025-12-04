@@ -36,7 +36,7 @@ class Paraphraser(ABC):
         self.n_paraphrases = n_paraphrases
         self.mongoDB = ParaphraseMongoDB()
         self.original_collection = self.mongoDB.original_collection
-        self.paraphrase_collection = self.mongoDB.paraphrase_collection
+        self.paraphrase_collection = self.mongoDB.non_naive_paraphrase_collection
         self.model_id = model_id
 
     def paraphrase(
@@ -54,7 +54,8 @@ class Paraphraser(ABC):
         raise NotImplementedError("Subclasses must implement this method.")
 
     def save_paraphrase_in_mongodb(self, original_text_id:str, original_text:str, paraphrased_text:str,
-                                   extracted_info:Optional[dict], total_costs:Optional[float],temperature:float=1.0,
+                                   extracted_info:Optional[dict], total_costs:Optional[float],
+                                   collection, temperature:float=1.0,
                                    prompt:str="bullet points dspy", intermediate_prompt:str="bullet points dspy",) -> None:
         """
         Save the paraphrase to the MongoDB database collection called "paraphrase".
@@ -62,6 +63,7 @@ class Paraphraser(ABC):
         :param original_text: The original text as a string.
         :param paraphrased_text: The paraphrased text as a string.
         :param extracted_info: A dictionary containing the extracted information from the paraphrase.
+        :param collection: The collection where the paraphrase should be stored.
         :param total_costs: The total cost of the paraphrase (including extracted information and paraphrase generation).
         :return:-
         """
@@ -87,7 +89,7 @@ class Paraphraser(ABC):
         }
 
         # Insert into document into paraphrase collection
-        self.paraphrase_collection.insert_one(paraphrase_doc)
+        collection.insert_one(paraphrase_doc)
         logging.info(f"Inserted paraphrase for document ID: {original_text_id}")
 
 

@@ -37,7 +37,7 @@ class TwoStepImpostorGenerator(NonNaiveLLMImpostorGenerator):
         n_imp_to_generate = self.n_impostors
 
         # TODO: create one method with search generator: No, bc i need if here anyway
-        impostors, extracted_info = self.obtain_existing_paraphrases(collection=self.mongoDB.paraphrase_collection, search_args={"text_id": text_id})
+        impostors, extracted_info = self.obtain_existing_paraphrases(collection=self.mongoDB.non_naive_paraphrase_collection, search_args={"text_id": text_id})
 
         n_imp_to_generate -= len(impostors)
         if n_imp_to_generate <= 0:
@@ -75,6 +75,7 @@ class TwoStepImpostorGenerator(NonNaiveLLMImpostorGenerator):
                 extracted_info=extracted_info,
                 total_costs=total_cost / len(new_impostors),
                 temperature=1.0,  # Temperature requirements for reasoning models like gpt-5-nano
+                collection=self.mongoDB.non_naive_paraphrase_collection,
             )
         if impostors:
             new_impostors.extend(impostors)

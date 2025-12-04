@@ -15,7 +15,7 @@ logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(m
 # MongoDB setup
 mongoDB = ParaphraseMongoDB()
 original_collection = mongoDB.original_collection
-paraphrase_collection = mongoDB.paraphrase_collection
+paraphrase_collection = mongoDB.non_naive_paraphrase_collection
 
 # 30.10.25, morning: $7,891.29 balance left on OpenAI account
 # 30.10.25, evening: $7,891.28 balance left on OpenAI account
