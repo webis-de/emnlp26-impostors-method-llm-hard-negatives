@@ -47,6 +47,7 @@ for author in authors_of_ass3:
     left_docs = ass3_by_author.get(author, [])
     right_docs = ass4_by_author.get(author, [])
 
+    # TODO: do not save assignments, bc not applicable to other datasets
     # Create all cross combinations for same author
     for left, right in product(left_docs, right_docs):
         same_author_pairs.append({
@@ -56,7 +57,8 @@ for author in authors_of_ass3:
             "right_author": right["author"],
             "left_assignment": left["assignment"],
             "right_assignment": right["assignment"],
-            "same": True
+            "same": True,
+            "dataset_name": CONFIG.STUDENT_ESSAYS
         })
 
 # --- Build DIFFERENT-AUTHOR pairs ---
@@ -68,6 +70,7 @@ for left in ass3_docs:
     # authors different from left
     negative_authors = [a for a in all_authors if a != left["author"]]
 
+    # TODO: do not save assignments, bc not applicable to other datasets
     # choose a random negative author for the right side
     for neg_author in negative_authors:
         if neg_author in ass4_by_author:
@@ -79,7 +82,8 @@ for left in ass3_docs:
                     "right_author": right["author"],
                     "left_assignment": left["assignment"],
                     "right_assignment": right["assignment"],
-                    "same": False
+                    "same": False,
+                    "dataset_name": CONFIG.STUDENT_ESSAYS
                 })
 
 # --- Balance: half same-author, half different-author ---
