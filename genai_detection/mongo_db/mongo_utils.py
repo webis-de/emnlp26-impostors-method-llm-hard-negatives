@@ -118,6 +118,24 @@ class ParaphraseMongoDB:
         document = collection.find({**search_args})
         return document
 
+    def get_random_matching_documents_from_collection(self, collection, num_samples: int, search_args:dict):
+        """
+        Obtain random documents from the MongoDB collection for the given dataset.
+        Ensures texts are not identical to the anchor text.
+
+        :param num_samples: Number of impostor samples to retrieve.
+        :param collection: The MongoDB collection to search.
+        :param search_args: The names of the fields and their values in a dictionary.
+        :return: A list of randomly sampled documents.
+        """
+        pipeline = [
+            {"$match": search_args},
+            {"$sample": {"size": num_samples}},
+        ]
+
+        # Use aggregation to avoid materializing huge collections
+        return collection.aggregate(pipeline)
+
     def get_text_or_id_from_orginal_collection(self, text: Optional[str], text_id: Optional[str]):
         """
         Returns text and text_id from a document in the original collection.

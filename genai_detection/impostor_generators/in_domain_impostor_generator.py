@@ -11,61 +11,52 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
+from typing import Optional, List
 
-import os
-from typing import Dict
+from genai_detection.impostor_generators.ImpostorGenerator import (
+    MongoDBSavedGenerator,
+)
 
-from genai_detection.config import CONFIG
-from genai_detection.impostor_generators.ImpostorGenerator import NonLLMImpostorGenerator
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 
-class InDomainImpostorGenerator(NonLLMImpostorGenerator):
-    def __init__(self, n_impostors: int, path2imp: str, split: str = "test"):
+class InDomainImpostorGenerator(MongoDBSavedGenerator):
+    def __init__(self, n_impostors: int, dataset_name: str):
         """
         This impostor generator gets in-domain impostors from the dataset the input texts originate from.
 
         :param n_impostors: Number of impostors to generate.
-        :param path2imp: Path to the directory where impostors are sampled from.
-        :param split: The split to use when generating paraphrases.
+        :param dataset_name: Name of dataset from which impostors are sampled from.
 
         References:
         ===========
         Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’. Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
         """
-        super().__init__(n_impostors=n_impostors, split=split, path2imp=path2imp)
+        super().__init__(n_impostors=n_impostors)
+        unique_dataset_names_saved = self.mongoDB.original_collection.distinct("dataset")
+        assert dataset_name in unique_dataset_names_saved, f"{dataset_name} not in {unique_dataset_names_saved}"
+        self.dataset_name=dataset_name
+        logging.info(f"InDomainImpostorGenerator: Dataset name: {self.dataset_name}")
 
     def generate_impostors(
-        self, text: str
-    ) -> Dict[str, str]:
+        self, text: str, text_id: Optional[str]=None
+    ) -> List[str]:
         """
-        Generates impostors from a pre-defined dataset.
+        Generates in-domain impostors from a pre-defined dataset.
         :param text: Input text to generate impostors for (not used in this implementation).
+        :param text_id: Optional text ID of the text for which the impostors should be generated.
         :return: Dictionary of impostors with keys as ids and values as texts.
         """
-        ds = self._get_dataset_split_from_path(self.path2imp)
-
-        sampled = ds.shuffle().select(
-            range(max(1, min(len(ds), self.n_impostors // 2)))
-        )
-        impostors = {}
-        for i, row in sampled.to_pandas().iterrows():
-            entry = row.to_dict()
-            assert isinstance(
-                entry, dict
-            ), "Each entry in the dataset must be a dictionary."
-            if "pair" not in entry:
-                continue
-            key = entry.get("id", f"impostor_{i}_fixed")
-            impostors[f"{key}_left"] = entry["pair"][0]
-            impostors[f"{key}_right"] = entry["pair"][1]
-
-        if not impostors:
-            raise ValueError("No impostors found with 'pair' field.")
-
+        # TODO: obtain random impostors from mongoDB original text collection,
+        # ensure text ID not same
+        search_args = {"dataset": self.dataset_name, "id": {"$ne": text_id}}
+        logging.info(f"InDomainImpostorGenerator: Search arguments: {search_args}")
+        cursor = self.mongoDB.get_random_matching_documents_from_collection(collection=self.mongoDB.original_collection, search_args=search_args, num_samples=self.n_impostors)
+        # ds = list(cursor)   # materialize the small cursor (small because of subsampling)
+        impostors = [doc["text"] for doc in cursor]
+        logging.info(f"InDomainImpostorGenerator: Number of impostors: {len(impostors)}")
+        for i,impostor in enumerate(impostors):
+            logging.info(f"Impostor no: {i} with text: {impostor[:20]}")
         return impostors
-
-
-class BlogImpostorGenerator(InDomainImpostorGenerator):
-    def __init__(self, n_impostors: int, split: str = "test"):
-        super().__init__(n_impostors=n_impostors, split=split, path2imp=os.path.join(os.path.abspath(".."),
-        CONFIG.PATH2BLOG))

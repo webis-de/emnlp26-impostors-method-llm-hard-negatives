@@ -58,14 +58,13 @@ class ImpostorDetector(ImpostorBase):
             "on_the_fly_chatnoir",
             "on_the_fly_serpapi",
             "on_the_fly_startpage",
-            "blogs",
             "in_domain",
             "naive_llm",
             "two_step_llm",
             "mirror_minds",
         ] = "two_step_llm",
             # TODO: delete or make dataset name for mongodb original collection
-        path2imp: str = CONFIG.PATH2BLOG,  # PATH2GENERIC_ON_FLY_IMP,  # path to impostor file, where fixed impostors are saved or where to save generated impostors
+        dataset_name: str = "student_essays",
         min_n_tokens: int = 500,  # minimum number of tokens to consider input sequence valid, defaults to 500
         upsample: bool = True,  # whether to upsample short texts (default: True, i.e., upsample) or skip them
     ):
@@ -88,13 +87,11 @@ class ImpostorDetector(ImpostorBase):
             impostors are not related to the input text
             - "on_the_fly": generate same-topic impostors on-the-fly (Koppel et al. (2014))
             - "on_the_fly_<approach>": Where <approach> is either  "chatnoir", "serpapi", "startpage"; i.e., different implementations of the same approach.
-            - "blogs": use blogs to obtain same genre impostors (Koppel et al. (2014), not implemented yet)
-        :param path2imp: Path to the impostor directory, where fixed impostors are saved or where to save newly
-        generated impostors # TODO
-        :param min_n_tokens: Minimum number of tokens to consider input sequence valid, defaults to 500 (Bevendorff
+        :param dataset_name: Name of dataset, where fixed impostors are sampled from (in mongoDB original_text collection)
+        :param min_n_tokens: Minimum number of tokens to consider the input sequence valid, defaults to 500 (Bevendorff
         et al. (2019): 500 words)
-        :param upsample: Whether to upsample short texts (default: True, i.e. upsample acc. to Bevendorff (2019)) or
-        skip them (Bevendorff et al. (2019)/ Koppel et al (2014) at 500 words)
+        :param upsample: Whether to upsample short texts (default: True, i.e., upsample acc. to Bevendorff (2019)) or
+        skip them (Bevendorff et al. (2019)/ Koppel et al. (2014) at 500 words)
         """
         super().__init__()
 
@@ -106,7 +103,7 @@ class ImpostorDetector(ImpostorBase):
         self.tfidf_freqs = tfidf_freqs
         self.tokenizer = tokenizer or self.tokenize_char_ngrams
         self.threshold = threshold
-        self.path2imp = path2imp
+        self.dataset_name = dataset_name
         self.min_n_tokens = min_n_tokens
         self.upsample = upsample
         self.impostor_technique = impostor_technique
@@ -114,7 +111,7 @@ class ImpostorDetector(ImpostorBase):
         self.mongoDB = ParaphraseMongoDB()
 
         self.impostor_generator = create_impostor_generator(
-            impostor_technique=impostor_technique, n_impostors=self.n_impostors, path2imp=self.path2imp,
+            impostor_technique=impostor_technique, n_impostors=self.n_impostors, dataset_name=self.dataset_name,
         )
         self.text_preprocessor = Preprocessor()
         self.pair_processor = PairPreprocessor(mongoDB=self.mongoDB, tokenizer=self.tokenizer, min_n_tokens=self.min_n_tokens, upsample=self.upsample)
@@ -142,7 +139,7 @@ class ImpostorDetector(ImpostorBase):
             impostor_technique=self.impostor_technique,
             n_impostors=self.n_impostors,
             split="test" if self._training_mode else "train",
-            path2imp=self.path2imp
+            path2imp=self.dataset_name
         )
 
     def _get_score_impl(
@@ -316,11 +313,10 @@ if __name__ == "__main__":
     # "on_the_fly_chatnoir",
     # "on_the_fly_serpapi",
     # "on_the_fly_startpage",
-    # "blogs",
     # "in_domain",  # former fixed
     # "naive_llm",
     # "two_step_llm",
     # "mirror_minds",
-    imp = ImpostorDetector(impostor_technique="naive_llm", n_impostors=2)
+    imp = ImpostorDetector(impostor_technique="in_domain", n_impostors=50)
     res = imp.get_score(text=doc_pairs, normalize=True)
     logging.info(res)
