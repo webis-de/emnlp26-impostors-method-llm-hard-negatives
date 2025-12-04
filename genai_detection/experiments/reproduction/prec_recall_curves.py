@@ -73,15 +73,16 @@ def compute_prec_recall_f1_acc_dict(
     logging.info(f"text pairs:\n{text_test_pairs}")
 
     # get results for text pairs (given as IDs) for each of the impostor generation options
-    preds = {"ground_truth":ground_truth_test_pairs}
+    predictions = {"ground_truth":ground_truth_test_pairs}
     for imp_generation_technique in imp_gen_techniques:
         logging.info(f"Start obtaining impostor scores with {imp_generation_technique}...")
         # TODO: use more impostors
         impostor_detector = ImpostorDetector(impostor_technique=imp_generation_technique, n_impostors=2)
         # if existent, pre-computed scores are used
-        preds[imp_generation_technique] = impostor_detector.get_score(text=text_test_pairs)
+        predictions[imp_generation_technique] = impostor_detector.get_score(text=text_test_pairs)
+        assert predictions[imp_generation_technique], f"{imp_generation_technique} is None."
         logging.info(f"Finished obtaining impostor scores with {imp_generation_technique}.\n")
-    logging.info(f"Finished obtaining impostor scores.\n{preds}\n")
+    logging.info(f"Finished obtaining impostor scores.\n{predictions}\n")
     baselines = {}
     # FIXME:
     # baselines = {
@@ -103,9 +104,9 @@ def compute_prec_recall_f1_acc_dict(
         preds = baseline.get_score(pairs)
         preds = preds.tolist() if not isinstance(preds, list) else preds
 
-        preds[f"{baseline_name.replace(' ','_')}_score"] = np.array(
+        predictions[f"{baseline_name.replace(' ','_')}_score"] = np.array(
             preds
-        ).ravel()
+        ).ravel().tolist()
 
     # compute precision, recall, accuracy, f1 for 11-points
     thresholds = np.arange(0.0, 1.05, 0.1)
@@ -185,32 +186,35 @@ def plot_precision_recall_curve(results:dict, dataset_name:str):
 
     plt.figure(figsize=(10, 7))
 
-    for key, df in results.items():
-        # Pick translated label if available
-        label = label_translations.get(key, key)
+    for positive_class_id in [0, 1]:
+        positive_class = "Same Author" if positive_class_id == 1 else "Different Author"
+        for key, df in results.items():
+            # Pick translated label if available
+            label = label_translations.get(key, key)
 
-        # Extract precision/recall for positive class = 1
-        precisions = df["precision"].apply(lambda x: x[1]).values
-        recalls = df["recall"].apply(lambda x: x[1]).values
+            # Extract precision/recall for positive class
+            precisions = df["precision"].apply(lambda x: x[positive_class_id]).values
+            recalls = df["recall"].apply(lambda x: x[positive_class_id]).values
 
-        # Plot PR curve
-        plt.plot(recalls, precisions, marker='o', label=label)
+            # Plot PR curve
+            plt.plot(recalls, precisions, marker='o', label=label)
 
-    plt.title("Precision–Recall Curve Across Impostor Generation Techniques")
-    plt.grid(True, linestyle="--", alpha=0.6)
-    plt.ylim(0, 1)
-    plt.gca().set_aspect("equal")
-    plt.xlabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
-    plt.ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
-    title = f"Precision-Recall Curve for {dataset_name} Data"
-    plt.title(title)
-    plt.legend()
-    plt.tight_layout()
+        plt.grid(True, linestyle="--", alpha=0.6)
+        plt.ylim(0, 1)
+        plt.gca().set_aspect("equal")
+        plt.xlabel("Recall $\\frac{{TP}}{{TP + FN}}$", fontsize=14)
+        plt.ylabel("Precision $\\frac{{TP}}{{TP + FP}}$", fontsize=14)
+        title = f"Precision-Recall Curve Across Impostor Generation Techniques\nOn {dataset_name} Data with {positive_class} Class"
+        plt.title(title)
+        plt.legend()
+        plt.tight_layout()
 
-    for format in ["svg"]:  # "png",
-        savefig_base = Path(__file__).resolve().parent.parent / CONFIG.SAVE_PATH
-        figure_name = (
-            f"11111roc_prec_recall_curve_dif_{dataset_name.replace(' ', '_')}_imp_gen.{format}"
-        )
-        plt.savefig(savefig_base / figure_name, bbox_inches="tight")
-        logging.info(f"Saved figure {figure_name} to {savefig_base}.")
+        for format in ["svg"]:  # "png",
+            savefig_base = Path(__file__).resolve().parent.parent / CONFIG.SAVE_PATH
+            figure_name = (
+                f"11111roc_prec_recall_curve_dif_{dataset_name.replace(' ', '_')}_"
+                f"{positive_class.lower().replace(' ', '_')}_imp_gen"
+                f".{format}"
+            )
+            plt.savefig(savefig_base / figure_name, bbox_inches="tight")
+            logging.info(f"Saved figure {figure_name} to {savefig_base}.")
