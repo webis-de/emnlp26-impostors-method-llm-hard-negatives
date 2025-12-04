@@ -49,14 +49,10 @@ class InDomainImpostorGenerator(MongoDBSavedGenerator):
         :param text_id: Optional text ID of the text for which the impostors should be generated.
         :return: Dictionary of impostors with keys as ids and values as texts.
         """
-        # TODO: obtain random impostors from mongoDB original text collection,
         # ensure text ID not same
         search_args = {"dataset": self.dataset_name, "id": {"$ne": text_id}}
         logging.info(f"InDomainImpostorGenerator: Search arguments: {search_args}")
         cursor = self.mongoDB.get_random_matching_documents_from_collection(collection=self.mongoDB.original_collection, search_args=search_args, num_samples=self.n_impostors)
-        # ds = list(cursor)   # materialize the small cursor (small because of subsampling)
         impostors = [doc["text"] for doc in cursor]
         logging.info(f"InDomainImpostorGenerator: Number of impostors: {len(impostors)}")
-        for i,impostor in enumerate(impostors):
-            logging.info(f"Impostor no: {i} with text: {impostor[:20]}")
         return impostors
