@@ -184,6 +184,7 @@ def plot_precision_recall_curve(results:dict, dataset_name:str):
         "supervised_baseline": "Sup. SVM (B)",
         "unmasking": "Unmasking",
         "ppmd": "PPMd",
+        "translation": "Translation",
     }
 
     fig = plt.figure(figsize=(10, 7))
@@ -191,10 +192,10 @@ def plot_precision_recall_curve(results:dict, dataset_name:str):
     for positive_class_id in [0, 1]:
         positive_class = "Same Author" if positive_class_id == 1 else "Different Author"
         for key, df in results.items():
-            # Pick translated label if available
+            # Pick the translated label if available
             label = label_translations.get(key, key)
 
-            # Extract precision/recall for positive class
+            # Extract precision/recall for the positive class
             precisions = df["precision"].apply(lambda x: x[positive_class_id]).values
             recalls = df["recall"].apply(lambda x: x[positive_class_id]).values
 
