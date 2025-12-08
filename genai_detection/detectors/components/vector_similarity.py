@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.sparse import csr_matrix
+from sklearn.metrics.pairwise import cosine_similarity as cs
 
 
 def cosine_similarity(vec1, vec2):
@@ -8,7 +9,7 @@ def cosine_similarity(vec1, vec2):
     Koppel et al. (2014) have use cosine similarity as a baseline.
     """
     return (
-        cosine_similarity(vec1, vec2).flatten()[0]
+        cs(vec1, vec2).flatten()[0]
         if vec1 is not None and vec2 is not None
         else 0.0
     )
