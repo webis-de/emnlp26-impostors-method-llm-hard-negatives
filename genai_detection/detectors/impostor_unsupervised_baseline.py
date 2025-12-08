@@ -75,7 +75,7 @@ class UnSupervisedImpostorBaseline(ImpostorBaselineBase):
 
         scores_per_pair = (
             []
-        )  # id is index of pair (i.e, length is half of the input text list)
+        )  # id is the index of pair (i.e, length is half of the input text list)
         pairs = list(ichunked(text, 2)) if type(text[0]) == str else text
         for text_pair in pairs:
             vectors = [self.get_tfidf_vector_for_text(t) for t in text_pair]
