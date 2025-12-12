@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 
-LOCAL_SAVE_PATH = Path(__file__).resolve().parents[3] / CONFIG.SAVE_PATH / "reproduction"
+LOCAL_SAVE_PATH = Path(__file__).resolve().parents[3] / CONFIG.SAVE_PATH / "reproduction" / "n_imp_selection_config"
 LOCAL_SAVE_PATH.mkdir(parents=True, exist_ok=True)
 
 # reproduction of Tab. 1, 2 from Koppel et al. (2014)
@@ -180,7 +180,6 @@ def plot_acc_curve(results:dict, dataset_name:str):
         "translation": "Translation",
     }
 
-    fig = plt.figure(figsize=(10, 7))
     METRICS = ["f1", "accuracy", "precision", "recall"]
 
     for positive_class_id in [0, 1]:
@@ -196,6 +195,8 @@ def plot_acc_curve(results:dict, dataset_name:str):
             for metric in METRICS:
 
                 heat = np.zeros((len(n_potential_vals), len(n_selected_vals)))
+                if metric == "accuracy" and positive_class_id == 0:
+                    continue
 
                 for i, n_pot in enumerate(n_potential_vals):
                     for j, n_sel in enumerate(n_selected_vals):
@@ -204,8 +205,6 @@ def plot_acc_curve(results:dict, dataset_name:str):
                         if metric == "accuracy":
                             # accuracy is a float per threshold → take max directly
                             best = df["accuracy"].max()
-                            if positive_class_id == 0:
-                                continue
                         else:
                             # f1 / precision / recall return arrays → use second entry (=positive class = same-author)
                             best = df[metric].apply(lambda arr: arr[positive_class_id]).max()
@@ -222,11 +221,30 @@ def plot_acc_curve(results:dict, dataset_name:str):
                 plt.ylabel("Number of Potential Impostors")
                 plt.title(f"{tech_name} — Max {metric} Heatmap ({dataset_name}, {positive_class})")
 
-                # save
+                # ---------- save plot ----------
+                save_path = LOCAL_SAVE_PATH / technique
+                save_path.mkdir(parents=True, exist_ok=True)
                 fname = (
                     f"heatmap_{technique}_{metric}_"
                     f"{positive_class.replace(' ', '_')}_{dataset_name.replace(' ', '_')}.svg"
                 )
-                plt.savefig(LOCAL_SAVE_PATH / fname, dpi=300, bbox_inches="tight")
+                plt.savefig(save_path / fname, dpi=300, bbox_inches="tight")
                 plt.close()
                 logging.info(f"Saved {fname}.")
+                # ---------- save CSV ----------
+                csv_name = (
+                    f"heatmap_{technique}_{metric}_"
+                    f"{positive_class.replace(' ', '_')}_{dataset_name.replace(' ', '_')}.csv"
+                )
+
+                df_csv = pd.DataFrame(
+                    heat,
+                    index=n_potential_vals,
+                    columns=n_selected_vals,
+                )
+                df_csv = df_csv.T
+                df_csv.index.name = "n_potential"
+                df_csv.columns.name = "n_selected"
+
+                df_csv.to_csv(save_path / csv_name)
+                logging.info(f"Saved {csv_name}.")
