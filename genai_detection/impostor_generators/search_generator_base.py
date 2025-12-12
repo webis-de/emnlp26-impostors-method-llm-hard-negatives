@@ -64,7 +64,7 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
         self.api_key = api_key
         self.results_per_query = results_per_query
         assert isinstance(results_per_query, int) and results_per_query > 1, f"results_per_query must be a positive integer: {results_per_query}"
-        self.num_queries = max(1, n_impostors // results_per_query)
+        self.num_queries = max(1, self.num_potential_impostors // results_per_query)
         self.max_workers = max_workers
         assert isinstance(n_min_words, int) and isinstance(n_max_words, int), f"Type of n_min_words or n_max_words is not int, but n_min_words: {type(n_min_words)}/ n_max_words: {type(n_max_words)}"
         assert (
@@ -234,9 +234,6 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
             }
             for future in as_completed(futures):
                 query = futures[future]  # Retrieve which query produced this future
-                # if "results" in future.result():
-                #     new_imps = future.result()["results"]
-                # else:
                 new_imps = future.result()
 
                 for new_imp in new_imps:
@@ -260,7 +257,7 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
 
     def generate_impostors(
         self, text: Optional[str], text_id:Optional[str]
-    ) -> pd.DataFrame:
+    ) -> List[str]:
         """
         Generates impostors for the given input text using Google search results.
 
@@ -309,7 +306,9 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
             impostors.extend(
                 self._parallel_fetch(queries=queries, text=text, text_id=text_id)
             )
-            return impostors # list of impostor texts
+            # list of impostor texts
+            return self._select_random_n_imps_among_best_m_potential_impostors(all_impostors=impostors,
+                                                                               reference_text=text)
 
         except Exception as e:
             logging.warning(

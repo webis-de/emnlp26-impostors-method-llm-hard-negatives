@@ -58,7 +58,7 @@ def compute_acc_across_n_selected_potential_imps(
                                                                                       f"{imp_gen_techniques} not "
                                                                                       f"supported. Supported are: {IMPOSTOR_GENERATORS.keys()}")
     # TODO: implement for more imp generator techniques
-    imp_gen_techniques = ["in_domain"]
+    imp_gen_techniques = ["on_the_fly"] #"in_domain",]
 
     N_IMP_SELECTION_CONFIG = {"n_selected": [10, 25, 50, 100], "n_potential": [100, 250, 500, 1000]}
 
