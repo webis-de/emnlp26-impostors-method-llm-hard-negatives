@@ -12,13 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import random
 from typing import Optional, List
 
-import numpy as np
-
-from genai_detection.detectors.components.feature_extractor import TfidfFeatureExtractor
-from genai_detection.detectors.components.vector_similarity import minmax_similarity
 from genai_detection.impostor_generators.ImpostorGenerator import (
     MongoDBSavedGenerator,
 )
@@ -66,32 +61,4 @@ class InDomainImpostorGenerator(MongoDBSavedGenerator):
         # use this, if the returned impostors should be random among the most similar in-domain texts
         cursor = self.mongoDB.find_document_by_multiple_fields(collection=self.mongoDB.original_collection,search_args=search_args)
         impostors = [doc["text"] for doc in cursor]
-        logging.info(f"Obtained {len(impostors)} potential in-domain impostors.")
-        # Add original text at the end
-        impostors.append(text)
-        tfidf_vectorizer = TfidfFeatureExtractor()
-        vectors = tfidf_vectorizer.fit_transform(impostors)
-        logging.info(f"Vectorized {vectors.shape[0]} documents with {vectors.shape[1]} features.")
-
-        # Separate original text vector
-        original_vector = vectors[-1]  # last one
-        impostor_vectors = vectors[:-1]  # all except last
-        logging.info(f"Obtained original vector.")
-
-        # Sort impostors by similarity to original (lowest similarity first)
-        similarities = [
-            minmax_similarity(original_vector, vec) for vec in impostor_vectors
-        ]
-        logging.info(f"Obtained {len(similarities)} similarities.")
-        impostors_sorted = [impostors[i] for i in np.argsort(similarities)]
-
-        # Take top M impostors, "potential" in Koppel et al. (2014)
-        num_to_select = min(self.num_potential_impostors, len(impostors_sorted))
-        selected_impostors = impostors_sorted[:num_to_select]
-
-        logging.info(
-            f"InDomainImpostorGenerator: Number of impostors: {len(selected_impostors)}"
-        )
-
-        # Sample n_impostors randomly from selected impostors
-        return random.sample(selected_impostors, self.n_impostors)
+        return self._select_random_n_imps_among_best_m_potential_impostors(all_impostors=impostors, reference_text=text)

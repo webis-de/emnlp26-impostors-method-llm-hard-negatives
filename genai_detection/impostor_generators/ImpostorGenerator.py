@@ -14,13 +14,17 @@
 import logging
 # FIXME: make compatible with new mongodb idea
 import os
+import random
 import sys
 from abc import ABC
-from typing import Optional
+from typing import Optional, List
 
+import numpy as np
 from dotenv import load_dotenv
 
+from genai_detection.detectors.components.feature_extractor import TfidfFeatureExtractor
 from genai_detection.detectors.components.preprocessing import Preprocessor
+from genai_detection.detectors.components.vector_similarity import minmax_similarity
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -46,6 +50,46 @@ class BaseImpostorGenerator(ABC):
         assert isinstance(num_potential_impostors, int), (f"num_potential_impostors must an integer, "
                                                           f"got {type(num_potential_impostors)}")
         self.num_potential_impostors = max(num_potential_impostors, self.n_impostors)
+
+    def _select_random_n_imps_among_best_m_potential_impostors(self, all_impostors: List[str], reference_text:str) -> List[str]:
+        """
+        Return impostors random among the most similar texts.
+        :param all_impostors: List of all impostor texts
+        :param reference_text: Reference text
+        :return: List of random impostor texts among most similar texts
+        """
+        logging.info(f"Obtained {len(all_impostors)} impostors.")
+        # Add original text at the end
+        all_impostors.append(reference_text)
+        tfidf_vectorizer = TfidfFeatureExtractor()
+        vectors = tfidf_vectorizer.fit_transform(all_impostors)
+        logging.info(
+            f"Vectorized {vectors.shape[0]} documents with {vectors.shape[1]} features."
+        )
+
+        # Separate original text vector
+        original_vector = vectors[-1]  # last one
+        impostor_vectors = vectors[:-1]  # all except last
+        logging.info(f"Obtained original vector.")
+
+        # Sort impostors by similarity to original (start lowest similarity first)
+        similarities = [
+            minmax_similarity(original_vector, vec) for vec in impostor_vectors
+        ]
+        logging.info(f"Obtained {len(similarities)} similarities.")
+        impostors_sorted = [all_impostors[i] for i in np.argsort(similarities)]
+
+        # Take top M impostors, "potential" in Koppel et al. (2014)
+        num_to_select = min(self.num_potential_impostors, len(impostors_sorted))
+        selected_impostors = impostors_sorted[:num_to_select]
+
+        logging.info(
+            f"Number of potential impostors: {len(selected_impostors)}"
+        )
+
+        # Sample n_impostors randomly from selected impostors
+        return random.sample(selected_impostors, self.n_impostors)
+
 
 class MongoDBSavedGenerator(BaseImpostorGenerator):
     def __init__(
