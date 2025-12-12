@@ -208,7 +208,7 @@ def plot_acc_curve(results:dict, dataset_name:str):
                                 continue
                         else:
                             # f1 / precision / recall return arrays → use second entry (=positive class = same-author)
-                            best = df[metric].apply(lambda arr: arr[positive_class]).max()
+                            best = df[metric].apply(lambda arr: arr[positive_class_id]).max()
 
                         heat[i, j] = best
 
