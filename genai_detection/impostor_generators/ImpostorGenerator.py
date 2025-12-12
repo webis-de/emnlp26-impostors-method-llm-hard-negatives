@@ -38,6 +38,14 @@ class BaseImpostorGenerator(ABC):
         :param n_impostors: number of impostors to generate
         """
         self.n_impostors = n_impostors
+        # optional; Koppel et al. (2014) select N random impostors among top M impostors with on-the-fly and in-data
+        # impostors generation method
+        self.num_potential_impostors = n_impostors
+
+    def set_num_potential_impostors(self, num_potential_impostors: int):
+        assert isinstance(num_potential_impostors, int), (f"num_potential_impostors must an integer, "
+                                                          f"got {type(num_potential_impostors)}")
+        self.num_potential_impostors = max(num_potential_impostors, self.n_impostors)
 
 class MongoDBSavedGenerator(BaseImpostorGenerator):
     def __init__(

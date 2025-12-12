@@ -85,8 +85,8 @@ class InDomainImpostorGenerator(MongoDBSavedGenerator):
         logging.info(f"Obtained {len(similarities)} similarities.")
         impostors_sorted = [impostors[i] for i in np.argsort(similarities)]
 
-        # Take top N impostors (min(n_impostors*2, available))
-        num_to_select = min(self.n_impostors * 10, len(impostors_sorted))
+        # Take top M impostors, "potential" in Koppel et al. (2014)
+        num_to_select = min(self.num_potential_impostors, len(impostors_sorted))
         selected_impostors = impostors_sorted[:num_to_select]
 
         logging.info(
