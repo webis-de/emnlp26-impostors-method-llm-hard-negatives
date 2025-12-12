@@ -172,8 +172,10 @@ class StartPageSearchImpostorGenerator(SearchImpostorGeneratorBase):
                 )
             while not result_list:
                 logger.error(f"No results found. Random changing word order for query '{query}'")
-                random.shuffle(query.split())
-                result_list.append(self.fetch_results(query=" ".join(query)))
+                words = query.split()
+                random.shuffle(words)
+                shuffled_query = " ".join(words)
+                result_list.extend(self.fetch_results(query=shuffled_query))
             logging.info(f"Fetched {len(result_list)} results from {query}")
             return result_list
         except Exception as e:
