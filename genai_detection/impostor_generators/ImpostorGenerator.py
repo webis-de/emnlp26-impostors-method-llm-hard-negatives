@@ -88,7 +88,7 @@ class BaseImpostorGenerator(ABC):
         )
 
         # Sample n_impostors randomly from selected impostors
-        return random.sample(selected_impostors, self.n_impostors)
+        return random.sample(selected_impostors, min(len(selected_impostors), self.n_impostors))
 
 
 class MongoDBSavedGenerator(BaseImpostorGenerator):
