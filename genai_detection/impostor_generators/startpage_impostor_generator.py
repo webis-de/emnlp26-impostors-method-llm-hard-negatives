@@ -122,7 +122,6 @@ class StartPageSearchImpostorGenerator(SearchImpostorGeneratorBase):
         """
         assert query, "No query to fetch results for."
 
-
         request_headers = {
             "User-Agent": choice(USER_AGENTS),
             "Content-Type": "application/x-www-form-urlencoded",
@@ -173,7 +172,8 @@ class StartPageSearchImpostorGenerator(SearchImpostorGeneratorBase):
                 )
             while not result_list:
                 logger.error(f"No results found. Random changing word order for query '{query}'")
-                result_list.append(self.fetch_results(query=" ".join(random.shuffle(query.split()))))
+                random.shuffle(query.split())
+                result_list.append(self.fetch_results(query=" ".join(query)))
             logging.info(f"Fetched {len(result_list)} results from {query}")
             return result_list
         except Exception as e:
