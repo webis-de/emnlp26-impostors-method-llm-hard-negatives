@@ -17,7 +17,7 @@ import os
 import random
 import sys
 from abc import ABC
-from typing import Optional, List
+from typing import Optional, List, Union, Dict
 
 import numpy as np
 from dotenv import load_dotenv
@@ -51,7 +51,7 @@ class BaseImpostorGenerator(ABC):
                                                           f"got {type(num_potential_impostors)}")
         self.num_potential_impostors = max(num_potential_impostors, self.n_impostors)
 
-    def _select_random_n_imps_among_best_m_potential_impostors(self, all_impostors: List[str], reference_text:str) -> List[str]:
+    def _select_random_n_imps_among_best_m_potential_impostors(self, all_impostors: Union[List[str],List[Dict]], reference_text:str) -> List[str]:
         """
         Return impostors random among the most similar texts.
         :param all_impostors: List of all impostor texts
