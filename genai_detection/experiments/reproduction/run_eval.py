@@ -1,11 +1,16 @@
 import argparse
 
-from genai_detection.experiments.reproduction.acc_n_imp_selection_config import run_acc_curves
+import ray
+
+from genai_detection.experiments.reproduction.acc_n_imp_selection import run_acc_curves
 from genai_detection.experiments.reproduction.prec_recall_curves import *
 
 logger = logging.getLogger(__name__)
 logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
+ray.init()
+
+# ray job submit --address https://ray.srv.webis.de --working-dir . --runtime-env env.yml -- python genai_detection/experiments/reproduction/run_eval.py
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Compare detectors.")
