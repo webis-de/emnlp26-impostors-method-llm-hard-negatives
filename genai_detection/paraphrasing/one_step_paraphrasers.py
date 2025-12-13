@@ -13,6 +13,7 @@
 # limitations under the License.
 import json
 import logging
+import os
 import re
 from typing import List
 
@@ -235,8 +236,8 @@ class SAIAParaphraser(OneStepParaphraser):
 
     def __init__(self, model_id: str = CONFIG.SAIA_MODEL):
         self.client = OpenAI(
-            base_url=CONFIG.SAIA_URL,
-            api_key=CONFIG.SAIA_KEY,
+            base_url=CONFIG.SAIA_URL if os.path.exists("/Users/klara") else os.environ['SAIA_URL'],
+            api_key=CONFIG.SAIA_KEY if os.path.exists("/Users/klara") else os.environ['SAIA_KEY'],
         )
         self.model_id = model_id
 
@@ -291,6 +292,6 @@ class OllamaParaphraser(SAIAParaphraser):
     def __init__(self, model_id: str = CONFIG.OLLAMA_MODEL):
         super().__init__(model_id=model_id)
         self.client = OpenAI(
-            base_url=CONFIG.OLLAMA_URL,
-            api_key=CONFIG.OPENAI_KEY,
+            base_url=CONFIG.OLLAMA_URL if os.path.exists("/Users/klara") else os.environ['OLLAMA_URL'],
+            api_key=CONFIG.OLLAMA_KEY if os.path.exists("/Users/klara") else os.environ['OLLAMA_KEY'],
         )
