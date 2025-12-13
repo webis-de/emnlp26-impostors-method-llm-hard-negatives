@@ -73,14 +73,13 @@ def main():
     scores = detector.get_score(text=args.input_document_ids)
     logging.info("Scores: %s", scores)
 
-# ray job submit --address https://ray.srv.webis.de --working-dir . --runtime-env env.yml -- python genai_detection/cli/run_impostor.py --input_document_ids 68f50029edacdf3d5c0279dd 68f50029edacdf3d5c0279ec
+# ray job submit --address https://ray.srv.webis.de --working-dir . --runtime-env env.yml -- python genai_detection/cli/run_impostor.py --input_document_ids 68f50029edacdf3d5c0279dd 68f50029edacdf3d5c0279d9
 
    # generating 1 x 50 impostors takes around 40 minutes using openai.
     # ..dd: Ass4 and author TDH426, ..4f: Ass3 and author TDH426, ...e8: Ass4 and author ASR497
     # doc_pairs = ["68f50029edacdf3d5c0279dd", #"68f50029edacdf3d5c027d4f"]#, "68f50029edacdf3d5c0279e8"]#,
     # "68f50029edacdf3d5c0279eb"]
     # "68f50029edacdf3d5c0279d9"]
-    #              "68f50029edacdf3d5c0279ec"]
     # "68f50029edacdf3d5c0279e0"]
 
 if __name__ == "__main__":
