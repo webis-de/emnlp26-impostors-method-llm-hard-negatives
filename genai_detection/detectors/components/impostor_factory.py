@@ -1,7 +1,6 @@
 # components/impostor_factory.py
 import inspect
 
-from genai_detection.impostor_generators.MirrorMinds_generator import MirrorMindsGenerator
 from genai_detection.impostor_generators.chatnoir_impostor_generator import ChatNoirSearchImpostorGenerator
 from genai_detection.impostor_generators.google_search_impostor_generator import GoogleSearchImpostorGenerator
 from genai_detection.impostor_generators.in_domain_impostor_generator import InDomainImpostorGenerator
@@ -19,7 +18,7 @@ IMPOSTOR_GENERATORS = {
     "on_the_fly_chatnoir": ChatNoirSearchImpostorGenerator,
     "on_the_fly_serpapi": GoogleSearchImpostorGenerator,
     "on_the_fly_startpage": StartPageSearchImpostorGenerator,
-    "mirror_minds": MirrorMindsGenerator
+    # "mirror_minds": MirrorMindsGenerator
 }
 
 def create_impostor_generator(impostor_technique, **kwargs):
