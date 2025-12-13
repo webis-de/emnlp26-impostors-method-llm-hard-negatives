@@ -1,6 +1,8 @@
 import argparse
 import logging
 
+import ray
+
 from genai_detection.config import CONFIG
 from genai_detection.detectors.impostor import ImpostorDetector
 
@@ -8,6 +10,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
+ray.init()
 
 def main():
     parser = argparse.ArgumentParser(
