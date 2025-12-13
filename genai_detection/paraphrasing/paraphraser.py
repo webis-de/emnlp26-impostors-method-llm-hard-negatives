@@ -92,33 +92,3 @@ class Paraphraser(ABC):
         # Insert into document into paraphrase collection
         collection.insert_one(paraphrase_doc)
         logging.info(f"Inserted paraphrase for document ID: {original_text_id}")
-
-
-#
-# def get_paraphraser_dict() -> Dict[str, Paraphraser]:
-#     """
-#     Returns a dictionary of paraphrasers with their names as keys and instances as values.
-#     """
-#     paraphrasers: Dict[str, Paraphraser] = {
-#         # often fail with NotImplementedError: Cannot copy out of meta tensor; no data! ...
-#         "t5_ChatGPT": T5ChatGPTParaphraser(),
-#         "t5_Google_PAWS": T5GooglePAWSParaphraser(),
-#         "ollama": OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL),
-#         # works better than t5 models and ollama
-#         "qwen3-32b": SAIAParaphraser("qwen3-32b"),
-#         "mistral-large-instruct": SAIAParaphraser("mistral-large-instruct"),
-#         "openai-gpt-oss-120b": SAIAParaphraser("openai-gpt-oss-120b"),
-#         "meta-llama-3.1-8b-instruct": SAIAParaphraser("meta-llama-3.1-8b-instruct"),
-#     }
-#     two_step_paraphraser = TwoStepParaphraser()
-#     translation_paraphraser = TranslationParaphraser(
-#         text_extractor=paraphrasers["openai-gpt-oss-120b"],
-#         text_generator=paraphrasers["openai-gpt-oss-120b"],
-#     )
-#     paraphrasers.update(
-#         {
-#             "two-step": two_step_paraphraser,
-#             "translation": translation_paraphraser,
-#         }
-#     )
-#     return paraphrasers
