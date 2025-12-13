@@ -315,26 +315,3 @@ class ImpostorDetector(ImpostorBase):
         """
         scores = self.get_score(text)
         return [score > self.threshold for score in scores]
-
-
-if __name__ == "__main__":
-    # generating 1 x 50 impostors takes around 40 minutes using openai.
-    # ..dd: Ass4 and author TDH426, ..4f: Ass3 and author TDH426, ...e8: Ass4 and author ASR497
-    doc_pairs = ["68f50029edacdf3d5c0279dd", #"68f50029edacdf3d5c027d4f"]#, "68f50029edacdf3d5c0279e8"]#,
-    # "68f50029edacdf3d5c0279eb"]
-    # "68f50029edacdf3d5c0279d9"]
-                 "68f50029edacdf3d5c0279ec"]
-                 # "68f50029edacdf3d5c0279e0"]
-
-    # "translation",
-    # "on-the-fly", # startpage by default
-    # "on_the_fly_chatnoir",
-    # "on_the_fly_serpapi",
-    # "on_the_fly_startpage",
-    # "in_domain",  # former fixed
-    # "one_step_llm",
-    # "two_step_llm",
-    # "mirror_minds",
-    imp = ImpostorDetector(impostor_technique="one_step_llm", n_impostors=5)
-    res = imp.get_score(text=doc_pairs, normalize=True)
-    logging.info(res)
