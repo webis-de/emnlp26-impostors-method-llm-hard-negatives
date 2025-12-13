@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from pathlib import Path
 from typing import List
 
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 # MongoDB setup
-mongoDB = ParaphraseMongoDB()
+mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
 original_collection = mongoDB.original_collection
 paraphrase_collection = mongoDB.non_naive_paraphrase_collection
 

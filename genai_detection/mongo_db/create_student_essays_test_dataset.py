@@ -4,6 +4,7 @@
 # (- 2000 pairs)
 # (- 500 words)
 import logging
+import os
 import random
 from itertools import product
 
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 
-mongoDB = ParaphraseMongoDB()
+mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
 ass3_cursor = mongoDB.find_document_by_non_id_field(collection=mongoDB.original_collection,
                                                     document_field_name="assignment", document_value="Ass3")
 ass3_docs = list(ass3_cursor)

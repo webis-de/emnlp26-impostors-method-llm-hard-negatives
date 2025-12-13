@@ -96,7 +96,7 @@ class MongoDBSavedGenerator(BaseImpostorGenerator):
         self, n_impostors: int
     ):
         super().__init__(n_impostors)
-        self.mongoDB = ParaphraseMongoDB()
+        self.mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
         self.text_processor = Preprocessor()
 
     def generate_impostors(

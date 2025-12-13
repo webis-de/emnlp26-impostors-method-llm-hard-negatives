@@ -1,4 +1,5 @@
 import logging
+import os
 from pathlib import Path
 from typing import Optional, List
 
@@ -14,9 +15,16 @@ logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(levelname)s] %
 
 class ParaphraseMongoDB:
 
-    def __init__(self):
-        uri = f"mongodb://{CONFIG.MONGO_USER}:{CONFIG.MONGO_PASSWORD}@{CONFIG.MONGO_HOST}/"
-        self.client = MongoClient(uri)
+    def __init__(self, local_ray=True):
+        if local_ray:
+            # Local (via local ray instance)
+            self.mongodb_uri = f"mongodb://{CONFIG.MONGO_USER}:{CONFIG.MONGO_PASSWORD}@{CONFIG.MONGO_HOST}:{CONFIG.MONGO_PORT}/"
+            # uri = f"mongodb://{CONFIG.MONGO_USER}:{CONFIG.MONGO_PASSWORD}@{CONFIG.MONGO_HOST}:{CONFIG.MONGO_PORT}/"
+        else:
+            # Ray on betaweb server
+            self.mongodb_uri = f"mongodb://{os.environ['MONGO_USER']}:{os.environ['MONGO_PASSWORD']}@artificial-authorship-verification-mongodb.webisservices.svc.cluster.local:27017/"
+
+        self.client = MongoClient(self.mongodb_uri)
         try:
             self.client.admin.command("ping")
             logging.info("Successfully connected as MongoDB root user!")

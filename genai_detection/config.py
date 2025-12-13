@@ -66,7 +66,8 @@ class BaseConfig:
     # reproducibility of evaluation)
     MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME")
     MONGO_PASSWORD = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
-    MONGO_HOST = "localhost:27018"  # Local, but forwarded to server
+    MONGO_HOST = "localhost"  # Local, but forwarded to server
+    MONGO_PORT = 27018
     # MONGO_HOST = "artificial-authorship-verification-mongodb.webisservices.svc.cluster.local:27017" # Kubernetes
 
 

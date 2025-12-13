@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+import os
 from abc import ABC
 from datetime import datetime
 from typing import Optional
@@ -34,7 +35,7 @@ class Paraphraser(ABC):
     """
     def __init__(self, n_paraphrases: int, model_id: str = CONFIG.OPENAI_MODEL):
         self.n_paraphrases = n_paraphrases
-        self.mongoDB = ParaphraseMongoDB()
+        self.mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
         self.original_collection = self.mongoDB.original_collection
         self.paraphrase_collection = self.mongoDB.non_naive_paraphrase_collection
         self.model_id = model_id

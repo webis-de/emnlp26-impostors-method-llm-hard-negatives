@@ -1,4 +1,5 @@
 import logging
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -12,7 +13,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 
 class ParaphraseScoresVisualizer():
     def __init__(self):
-        self.mongoDB = ParaphraseMongoDB()
+        self.mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
         self.original_collection = self.mongoDB.original_collection
         self.paraphrase_collection = self.mongoDB.non_naive_paraphrase_collection
         self.paraphrase_score_collection = self.mongoDB.paraphrase_score_collection

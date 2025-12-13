@@ -107,7 +107,7 @@ class ImpostorDetector(ImpostorBase):
         self.upsample = upsample
         self.impostor_technique = impostor_technique
         self._training_mode = True  # set to True if you are in training mode, False for validation of model
-        self.mongoDB = ParaphraseMongoDB()
+        self.mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
 
         self.impostor_generator = create_impostor_generator(
             impostor_technique=impostor_technique, n_impostors=self.n_impostors, dataset_name=self.dataset_name,

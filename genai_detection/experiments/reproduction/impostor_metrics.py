@@ -1,4 +1,5 @@
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Iterable, Tuple
 
@@ -34,7 +35,7 @@ def load_test_pairs(dataset_name: str) -> Tuple[List[str], List[int]]:
     """
     Load text-pair IDs and ground-truth labels from MongoDB.
     """
-    mongoDB = ParaphraseMongoDB()
+    mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
 
     test_pairs = list(
         mongoDB.find_document_by_non_id_field(
