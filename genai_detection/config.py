@@ -13,6 +13,7 @@ class BaseConfig:
     SAIA_KEY = os.getenv("SAIA_KEY")
     DEEPL_API_KEY = os.getenv("DEEPL_KEY")
     OPENAI_API_KEY = os.getenv("OPENAI_KEY")
+    OLLAMA_KEY = os.getenv("OLLAMA_KEY")
     OPENAI_PROJECT_ID = os.getenv("OPENAI_PROJECT_ID")
     CHATNOIR_KEY = os.getenv("CHATNOIR_KEY")
     DATA_BASE_PATH = "data/datasets"
@@ -68,7 +69,5 @@ class BaseConfig:
     MONGO_PASSWORD = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
     MONGO_HOST = "localhost"  # Local, but forwarded to server
     MONGO_PORT = 27018
-    # MONGO_HOST = "artificial-authorship-verification-mongodb.webisservices.svc.cluster.local:27017" # Kubernetes
-
 
 CONFIG = BaseConfig()
