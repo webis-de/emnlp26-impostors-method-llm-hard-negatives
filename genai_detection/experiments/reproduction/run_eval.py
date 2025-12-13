@@ -1,9 +1,5 @@
 import argparse
 
-from genai_detection.experiments.reproduction.acc_n_imp_selection_config import (
-    compute_acc_across_n_selected_potential_imps,
-    plot_acc_curve,
-)
 from genai_detection.experiments.reproduction.prec_recall_curves import *
 
 logger = logging.getLogger(__name__)
@@ -77,27 +73,8 @@ if __name__ == "__main__":
         # "mirror_minds",   # raises error
     ]
 
-    # results_dict = compute_prec_recall_f1_acc_dict(dataset_name=args.dataset_name, imp_gen_techniques=our_figure_impostor_options)
+    # run_acc_curves(dataset_name=args.dataset_name,imp_gen_techniques=our_figure_impostor_options)
 
-    results_dict = compute_acc_across_n_selected_potential_imps(
-        dataset_name=args.dataset_name, imp_gen_techniques=our_figure_impostor_options
-    )
+    run_prec_recall_curves(dataset_name=args.dataset_name, imp_gen_techniques=our_figure_impostor_options)
 
-    logging.info(f"results_dict: {results_dict}")
-    plot_acc_curve(results=results_dict, dataset_name=args.dataset_name)
 
-    # results_dict: {approach_name: DataFrame}
-    # dfs = []
-    # for approach, df in results_dict.items():
-    #     temp_df = df.copy()
-    #     temp_df["approach"] = approach
-    #     dfs.append(temp_df)
-    #
-    # # Combine all approaches
-    # combined_df = pd.concat(dfs, ignore_index=True)
-    #
-    # # Save to CSV
-    # combined_df.to_csv(LOCAL_SAVE_PATH / "effectiveness_scores.csv", index=False)
-    # logging.info(f"Saved effectiveness scores as csv to {LOCAL_SAVE_PATH}/effectiveness_scores.csv.")
-
-    # plot_precision_recall_curve(results=results_dict, dataset_name=args.dataset_name)
