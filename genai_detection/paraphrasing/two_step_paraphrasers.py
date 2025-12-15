@@ -100,7 +100,7 @@ class TwoStepParaphraser(Paraphraser):
         self.lm = dspy.LM(
             model_id,
             api_base=CONFIG.OPENAI_URL if os.path.exists("/Users/klara") else os.environ['OPENAI_URL'],
-            api_key=CONFIG.OPENAI_API_KEY if os.path.exists("/Users/klara") else os.environ['OPENAI_API_KEY'],
+            api_key=CONFIG.OPENAI_KEY if os.path.exists("/Users/klara") else os.environ['OPENAI_KEY'],
             model_type="chat",  # better for structured output such as extracted information
             cache=False, # to avoid reusing the same response
             temperature=1.0 if is_reasoning_model else temperature, # TODO: change to non-reasoning for less deterministic results?

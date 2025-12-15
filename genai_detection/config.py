@@ -12,7 +12,6 @@ class BaseConfig:
     OPENAI_KEY = os.getenv("OPENAI_KEY")
     SAIA_KEY = os.getenv("SAIA_KEY")
     DEEPL_API_KEY = os.getenv("DEEPL_KEY")
-    OPENAI_API_KEY = os.getenv("OPENAI_KEY")
     OLLAMA_KEY = os.getenv("OLLAMA_KEY")
     OPENAI_PROJECT_ID = os.getenv("OPENAI_PROJECT_ID")
     CHATNOIR_KEY = os.getenv("CHATNOIR_KEY")
