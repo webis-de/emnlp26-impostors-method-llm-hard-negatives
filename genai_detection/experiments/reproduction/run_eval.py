@@ -73,7 +73,7 @@ if __name__ == "__main__":
     our_figure_impostor_options = [
         "on_the_fly",
         "in_domain",
-        "one_step_llm",
+        # "one_step_llm",   # SAIA URL on betaweb error: httpx.InvalidURL: Invalid port: 'academiccloud:de'
         "two_step_llm",
         "translation",
         # "mirror_minds",   # raises error
