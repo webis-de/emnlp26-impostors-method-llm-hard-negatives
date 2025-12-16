@@ -12,18 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import os
 import re
 from collections import Counter
 from operator import itemgetter
-from pathlib import Path
 
 import numpy as np
-import pandas as pd
-from datasets import load_from_disk
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from genai_detection.config import CONFIG
 from genai_detection.detectors.detector_base import DetectorBase
+from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 logger = logging.getLogger(__name__)
 logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
@@ -36,6 +35,7 @@ class ImpostorBase(DetectorBase):
         extend this base class.
         """
         super().__init__()
+        self.mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
 
     @staticmethod
     def tokenize_char_ngrams(
@@ -90,25 +90,25 @@ class ImpostorBaselineBase(ImpostorBase):
 
     def __init__(self, dataset_name: str = CONFIG.STUDENT_ESSAYS):
         super().__init__()
-        dataset = (
-            CONFIG.PATH2STUDENT_ESSAYS
-            if dataset_name == CONFIG.STUDENT_ESSAYS
-            else CONFIG.PATH2BLOG
-        )
-        self.dataset = load_from_disk(Path(__file__).resolve().parents[2] / dataset)[
-            "train"
-        ].to_pandas()
-        self.dataset[["disputed_text", "candidate_text"]] = pd.DataFrame(
-            self.dataset["pair"].tolist(), index=self.dataset.index
-        )
-        logging.info("Obtained dataset.")
+        # FIXME: does not work on server for unsupervised baselines
+        # get all original texts from mongodb collection whose ID is not in test pairs mongodb collection
+        self.train_dataset_generator = self.mongoDB.get_training_data_from_original_texts(dataset_name=dataset_name)
+        logging.info(f"Training dataset ready (streaming, generator).")
+
+        def preprocessed_texts():
+            # generator is exhausted after computing the vocabulary, and loading whole data into memory is not a good idea
+            self.train_dataset_generator = self.mongoDB.get_training_data_from_original_texts(dataset_name=dataset_name)
+
+            for doc in self.train_dataset_generator:
+                yield " ".join(self.tokenize_char_ngrams(doc["text"]))
+
         self._vectorizer = TfidfVectorizer(
             vocabulary=self.get_top_tokens(), input="content", dtype=np.float32
-        ).fit(
-            [
-                " ".join(self.tokenize_char_ngrams(t))
-                for t in self.dataset["disputed_text"].tolist()
-            ]
+        ).fit(preprocessed_texts()
+            # [
+            #     " ".join(self.tokenize_char_ngrams(t))
+            #     for t in (doc["text"] for doc in self.train_dataset)
+            # ]
         )
         logging.info("Fitted vectorizer.")
 
@@ -119,13 +119,16 @@ class ImpostorBaselineBase(ImpostorBase):
         :param max_tokens: The maximum number of tokens to return.
         :return: A list of the top tokens.
         """
-        logging.info("%s", self.dataset.columns)
-        all_texts = self.dataset["disputed_text"].tolist()
-        tokens = [self.tokenize_char_ngrams(text, 4) for text in all_texts]
-        flat_list = [item for sublist in tokens for item in sublist]
-        freqs = Counter(flat_list)
+        freqs = Counter()
+
+        # Iterate over generator and tokenize on the fly
+        for doc in self.train_dataset_generator:
+            text = doc["text"]
+            tokens = self.tokenize_char_ngrams(text, n=4)  # adjust n if needed
+            freqs.update(tokens)
+
         freqs = Counter({k: v for k, v in freqs.items() if v > 1})
-        return list(map(itemgetter(0), freqs.most_common(max_tokens)))
+        return [itemgetter(0)(item) for item in freqs.most_common(max_tokens)]#list(map(itemgetter(0), freqs.most_common(max_tokens)))
 
     def get_tfidf_vector_for_text(self, text: str):
         """

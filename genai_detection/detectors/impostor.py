@@ -13,7 +13,6 @@ from genai_detection.detectors.components.preprocessing import Preprocessor, Pai
 from genai_detection.detectors.components.scorer import Scorer
 from genai_detection.detectors.components.vector_similarity import minmax_similarity
 from genai_detection.detectors.impostor_base import ImpostorBase
-from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from genai_detection.config import CONFIG
@@ -107,7 +106,6 @@ class ImpostorDetector(ImpostorBase):
         self.upsample = upsample
         self.impostor_technique = impostor_technique
         self._training_mode = True  # set to True if you are in training mode, False for validation of model
-        self.mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
 
         self.impostor_generator = create_impostor_generator(
             impostor_technique=impostor_technique, n_impostors=self.n_impostors, dataset_name=self.dataset_name,

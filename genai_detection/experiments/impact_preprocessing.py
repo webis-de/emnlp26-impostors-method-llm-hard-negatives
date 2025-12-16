@@ -13,24 +13,22 @@
 # limitations under the License.
 
 
+import html
 # Impact of Preprocessing Steps on Vocabulary Size (default: unique space-free character 4-grams)
 import json
 import os
-from pathlib import Path
-
-import pandas as pd
-from tqdm import tqdm
-from genai_detection.visualization import datasets
-from genai_detection.config import CONFIG
-from genai_detection.dataset_util import StudentEssayDatasetLoader
-from genai_detection.detectors.impostor_base import ImpostorBase
-import html
 import re
 import unicodedata
-from torch import t
+from pathlib import Path
+
 import matplotlib.pyplot as plt
+import pandas as pd
 from matplotlib.ticker import FuncFormatter
 
+from genai_detection.config import CONFIG
+from genai_detection.dataset.dataset_util import StudentEssayDatasetLoader
+from genai_detection.detectors.impostor_base import ImpostorBase
+from genai_detection.visualization import datasets
 
 preproc_impact = pd.DataFrame(columns=["Student Essay", "Blog", "Gutenberg", "PAN20"])
 

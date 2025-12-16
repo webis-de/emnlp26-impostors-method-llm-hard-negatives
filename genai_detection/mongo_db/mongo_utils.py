@@ -5,6 +5,7 @@ from typing import Optional, List
 
 from bson import ObjectId
 from pymongo import MongoClient
+from pymongo.errors import PyMongoError
 
 from genai_detection.config import CONFIG
 
@@ -210,3 +211,53 @@ class ParaphraseMongoDB:
         """
         documents = self.non_naive_paraphrase_collection.find({"text_id": document_id})
         return documents
+
+    def get_training_data_from_original_texts(self, dataset_name: str, batch_size: int = 1000):
+        """
+        Generator that yields original text documents for a specific dataset whose _id is NOT in the test pairs collection.
+        Uses batching and streaming to handle large datasets.
+
+        :param dataset_name: Only fetch documents belonging to this dataset.
+        :param batch_size: Number of documents to fetch per batch.
+        :return: Yields dictionaries with "_id" and "text" for each document.
+        """
+        try:
+            # Step 1: Fetch all test pair IDs (as a set)
+            test_pair_ids = {
+                ObjectId(doc_id)
+                for doc in self.test_pairs_collection.find(
+                    {"dataset_name": dataset_name}, {"_id": 0, "left_id": 1, "right_id": 1}
+                )
+                for doc_id in (doc["left_id"], doc["right_id"])
+            }
+            logging.info(f"Loaded {len(test_pair_ids)} test pair IDs.")
+
+            # Step 2: Stream original texts in batches
+            last_id = None
+            while True:
+                query = {"dataset": dataset_name, "_id": {"$nin": list(test_pair_ids)}}
+                if last_id:
+                    query["_id"][
+                        "$gt"
+                    ] = last_id  # Continue from last_id to avoid duplicates
+
+                cursor = (
+                    self.original_collection.find(query)
+                    .sort("_id", 1)
+                    .limit(batch_size)
+                )
+
+                batch_count = 0
+                for doc in cursor:
+                    yield doc
+                    last_id = doc["_id"]
+                    batch_count += 1
+
+                if batch_count < batch_size:
+                    # No more documents left
+                    break
+
+        except PyMongoError as e:
+            logging.error(f"MongoDB error while fetching documents: {e}")
+        except Exception as e:
+            logging.error(f"Unexpected error: {e}")
