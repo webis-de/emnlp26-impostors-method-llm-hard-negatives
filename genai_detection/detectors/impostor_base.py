@@ -90,7 +90,6 @@ class ImpostorBaselineBase(ImpostorBase):
 
     def __init__(self, dataset_name: str = CONFIG.STUDENT_ESSAYS):
         super().__init__()
-        # FIXME: does not work on server for unsupervised baselines
         # get all original texts from mongodb collection whose ID is not in test pairs mongodb collection
         self.train_dataset_generator = self.mongoDB.get_training_data_from_original_texts(dataset_name=dataset_name)
         logging.info(f"Training dataset ready (streaming, generator).")
@@ -103,13 +102,7 @@ class ImpostorBaselineBase(ImpostorBase):
                 yield " ".join(self.tokenize_char_ngrams(doc["text"]))
 
         self._vectorizer = TfidfVectorizer(
-            vocabulary=self.get_top_tokens(), input="content", dtype=np.float32
-        ).fit(preprocessed_texts()
-            # [
-            #     " ".join(self.tokenize_char_ngrams(t))
-            #     for t in (doc["text"] for doc in self.train_dataset)
-            # ]
-        )
+            vocabulary=self.get_top_tokens(), input="content", dtype=np.float32).fit(preprocessed_texts())
         logging.info("Fitted vectorizer.")
 
     def get_top_tokens(self, max_tokens: int = 100000):
