@@ -25,14 +25,47 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 
 # Field descriptions dictionary
 FIELD_DESCRIPTIONS = {
-    "heading": "A brief header or heading suitable for the text, capturing its main subject or theme in a clear and concise way.",
-    "genre": "The literary or content genre of the text (e.g., essay, poem, news article, academic paper, novel, speech, letter, religious text, etc.).",
-    "tone": "The emotional or stylistic tone (e.g., formal, humorous, persuasive, neutral, melancholic, satirical, didactic).",
-    "register_style": "The social level of language used in the text (e.g., casual, colloquial, academic, bureaucratic, poetic, technical).",
-    "century": "The century in which the text was likely written (e.g., '18th century', '20th century', '21st century'). Use language, style, and context clues to infer.",
-    "audience": "The intended audience or readership (e.g., general public, scholars, children, political leaders, students, religious followers).",
-    "author": "A concise author profile including likely traits such as gender (if implied), profession, education level, nationality, or perspective (e.g., 'a 19th-century British poet', 'a modern journalist', 'an academic researcher'), using idiosyncrasies in the text (e.g., spelling or grammar errors) to guide the inference.",
-    "bulletpoints": "A list of concise bullet points summarizing the main ideas or arguments of the text, written in plain language, focusing on meaning rather than wording.",
+    "heading": (
+        "A short, reader-facing title or header that names or frames the text for presentation. "
+        "It reflects how the content is labeled or introduced, and may use stylistic, rhetorical, "
+        "or attention-directing language. Multiple different headings could plausibly describe the same topic."
+    ),
+    "topic": (
+        "The core subject matter or thematic focus of the text, expressed abstractly and independently "
+        "of wording or presentation. This should describe what the text is about at a conceptual level, "
+        "typically as a concise noun phrase, and should remain stable even if the heading or phrasing changes."
+    ),
+    "authorial_task": (
+        "The primary communicative or rhetorical purpose the author is pursuing in writing the text, i.e., "
+        "what the author is trying to accomplish (e.g., to inform, persuade, narrate, explain, "
+        "criticize, reflect, instruct, or document). This reflects intention rather than emotional style."
+    ),
+    "tone": (
+        "The emotional, attitudinal, or stylistic coloring of the language, i.e., how the author sounds while "
+        "carrying out the authorial task (e.g., neutral, urgent, ironic, solemn, sarcastic, optimistic). "
+        "Tone describes manner or affect, not purpose."
+    ),
+    "genre": (
+        "The literary or content genre of the text (e.g., essay, poem, news article, academic paper, novel, "
+        "speech, letter, religious text, etc.)."
+    ),
+    "register_style": (
+        "The social level of language used in the text (e.g., casual, colloquial, academic, bureaucratic, poetic, technical)."
+    ),
+    "century": (
+        "The century in which the text was likely written (e.g., '18th century', '20th century', '21st century'). "
+        "Use language, style, and context clues to infer."
+    ),
+    "audience": (
+        "The intended audience or readership (e.g., general public, scholars, children, political leaders, students, "
+        "religious followers)."
+    ),
+    "author": (
+        "A concise author profile including likely traits such as gender (if implied), profession, education level, nationality, or perspective (e.g., 'a 19th-century British poet', 'a modern journalist', 'an academic researcher'), using idiosyncrasies in the text (e.g., spelling or grammar errors) to guide the inference."
+    ),
+    "bulletpoints": (
+        "A list of concise bullet points summarizing the main ideas or arguments of the text, written in plain language, focusing on meaning rather than wording."
+    ),
     "length": "The approximate target length of the generated text, in number of words.",
 }
 
@@ -42,8 +75,10 @@ class ExtractInfo(dspy.Signature):
 
     text: str = dspy.InputField(desc="The full input text to analyze.")
     heading: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["heading"])
+    topic: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["topic"])
     genre: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["genre"])
     tone: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["tone"])
+    authorial_task: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["authorial_task"])
     register_style: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["register_style"])
     century: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["century"])
     audience: str = dspy.OutputField(desc=FIELD_DESCRIPTIONS["audience"])
@@ -55,8 +90,10 @@ class GenerateText(dspy.Signature):
     """Generate one complete alternative version of the text, unifying all bullet points into a coherent composition and reflecting the defined style and structure."""
 
     heading: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["heading"])
+    topic: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["topic"])
     genre: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["genre"])
     tone: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["tone"])
+    authorial_task: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["authorial_task"])
     register_style: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["register_style"])
     century: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["century"])
     audience: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["audience"])
@@ -67,8 +104,8 @@ class GenerateText(dspy.Signature):
         desc=(
             "A single, complete paraphrased text written in the style defined by the provided parameters. "
             "The text must integrate **all** bullet points into one coherent composition, follow the specified "
-            "**heading**, **genre**, **tone**, **register**, **century**, **audience**, and **author profile**, and "
-            "approximately match the requested word length."
+            "**heading**, **topic**, **genre**, **tone**, **authorial task** **register**, **century**, **audience**, "
+            "and **author profile**, and approximately match the requested word length."
         )
     )
 
