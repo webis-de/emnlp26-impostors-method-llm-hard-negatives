@@ -120,6 +120,7 @@ def compute_metrics_parallel(
 
     def _worker(args):
         name, scores = args
+        logger.info(f"Compute metrics for {name}. Input scores are None: {scores is None}. Thresholds are None: {thresholds is None}")
         return name, compute_metrics_for_thresholds(
             ground_truth, scores, thresholds
         )
@@ -128,7 +129,7 @@ def compute_metrics_parallel(
     with ThreadPoolExecutor() as executor:
         for name, df in executor.map(_worker, predictions.items()):
             results[name] = df
-            logger.info("Computed metrics for %s", name)
+            logger.info(f"Computed metrics for {name}. Obtained metrics are None: {results[name] is None}")
 
     return results
 
