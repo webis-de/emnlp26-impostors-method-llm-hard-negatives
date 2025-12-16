@@ -50,6 +50,15 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         assert (
             self.path.exists()
         ), f"Path {self.path} does not exist. Current path: {os.getcwd()}"
+        self.features = Features(
+            {
+                # "pair": [Value("string")],
+                "disputed_text": Value("string"),
+                "candidate_text": Value("string"),
+                "authors": [Value("string")],
+                "same": Value("bool"),
+            }
+        )
 
     def load(
         self, train_split_portion: float = 0.7, min_num_words: int = MIN_NUM_WORDS
@@ -129,18 +138,10 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             f"Generated {len(train_pairs)} training pairs and {len(test_pairs)} test pairs."
         )
 
-        features = Features(
-            {
-                "pair": [Value("string")],
-                "authors": [Value("string")],
-                "same": Value("bool"),
-            }
-        )
-
         return DatasetDict(
             {
-                "train": Dataset.from_list(train_pairs, features=features),
-                "test": Dataset.from_list(test_pairs, features=features),
+                "train": Dataset.from_list(train_pairs, features=self.features),
+                "test": Dataset.from_list(test_pairs, features=self.features),
             }
         )
 
@@ -291,7 +292,9 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
                             continue  # skip same-author, already handled
                         diff_author_pairs.append(
                             {
-                                "pair": [r1["text"], r2["text"]],
+                                # "pair": [r1["text"], r2["text"]],
+                                "disputed_text": r2["text"],
+                                "candidate_text": Value("string"),
                                 "authors": [r1["author_id"], r2["author_id"]],
                                 "same": False,
                             }

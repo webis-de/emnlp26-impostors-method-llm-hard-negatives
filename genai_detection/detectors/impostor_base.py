@@ -91,6 +91,7 @@ class ImpostorBaselineBase(ImpostorBase):
     def __init__(self, dataset_name: str = CONFIG.STUDENT_ESSAYS):
         super().__init__()
         # get all original texts from mongodb collection whose ID is not in test pairs mongodb collection
+        self.dataset_name = dataset_name
         self.train_dataset_generator = self.mongoDB.get_training_data_from_original_texts(dataset_name=dataset_name)
         logging.info(f"Training dataset ready (streaming, generator).")
 
