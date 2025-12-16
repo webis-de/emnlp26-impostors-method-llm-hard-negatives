@@ -28,7 +28,6 @@ from matplotlib.ticker import FuncFormatter
 from genai_detection.config import CONFIG
 from genai_detection.dataset.dataset_util import StudentEssayDatasetLoader
 from genai_detection.detectors.impostor_base import ImpostorBase
-from genai_detection.visualization import datasets
 
 preproc_impact = pd.DataFrame(columns=["Student Essay", "Blog", "Gutenberg", "PAN20"])
 
