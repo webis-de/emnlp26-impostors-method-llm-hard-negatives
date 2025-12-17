@@ -73,7 +73,7 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
         for text_pair in pairs:
             vectors = [self.get_tfidf_vector_for_text(t) for t in text_pair]
             assert len(vectors) == 2, "Input text must be a list of pairs of texts."
-            # get score for potive class: https://scikit-learn.org/stable/modules/svm.html#classification (06.08.2025)
+            # get score for positive class: https://scikit-learn.org/stable/modules/svm.html#classification (06.08.2025)
             scores_per_pair.append(
                 self.model.decision_function(abs(vectors[0] - vectors[1]))
             )
@@ -118,6 +118,13 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
             # get documents which are not used as test pairs (from mongoDB collection)
             # documents contain "author", "assignment", "text", "_id", ...
             # sample training pairs from these documents
+            # FIXME: is empty
+            # generator is exhausted after computing the vocabulary, and loading whole data into memory is not a good idea
+            self.train_dataset_generator = (
+                self.mongoDB.get_training_data_from_original_texts(
+                    dataset_name=self.dataset_name
+                )
+            )
             train_docs = list(self.train_dataset_generator)
             if not train_docs:
                 raise ValueError("Training dataset is empty.")
@@ -131,7 +138,8 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
             logging.info(f"Loaded {len(df)} training documents.")
             # TODO: Add option for dataset loaders
             dataset_loader = StudentEssayDatasetLoader(path="dummy")
-            training_pairs = dataset_loader.generate_pairs(df=df)
+            df.rename(columns={"author": "author_id", "assignment": "task"}, inplace=True)
+            training_pairs = dataset_loader.generate_pairs(df=df, groupby_cols=["task"])
             if not training_pairs:
                 raise ValueError("No training pairs generated.")
             train_dataset = Dataset.from_list(training_pairs, features=dataset_loader.features)

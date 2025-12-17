@@ -25,12 +25,8 @@ from matplotlib import pyplot as plt
 from genai_detection.config import CONFIG
 from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENERATORS
 from genai_detection.detectors.impostor import ImpostorDetector
-from genai_detection.detectors.impostor_supervised_baseline import (
-    SupervisedImpostorBaseline,
-)
-from genai_detection.detectors.impostor_unsupervised_baseline import (
-    UnSupervisedImpostorBaseline,
-)
+from genai_detection.detectors.impostor_supervised_baseline import SupervisedImpostorBaseline
+from genai_detection.detectors.impostor_unsupervised_baseline import UnSupervisedImpostorBaseline
 from genai_detection.detectors.ppmd import PPMdDetector
 from genai_detection.detectors.unmasking import UnmaskingDetector
 from genai_detection.experiments.reproduction.impostor_metrics import (
