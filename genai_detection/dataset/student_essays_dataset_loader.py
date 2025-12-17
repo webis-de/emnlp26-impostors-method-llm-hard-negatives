@@ -18,6 +18,7 @@ from itertools import product
 from pathlib import Path
 
 import chardet
+import numpy as np
 import pandas as pd
 import pyreadstat
 from datasets import (
@@ -47,9 +48,9 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
     def __init__(self, path: str, name: str = CONFIG.STUDENT_ESSAYS):
         super().__init__(name=name)
         self.path = Path(path)
-        assert (
-            self.path.exists()
-        ), f"Path {self.path} does not exist. Current path: {os.getcwd()}"
+        # assert (
+        #     self.path.exists()
+        # ), f"Path {self.path} does not exist. Current path: {os.getcwd()}"
         self.features = Features(
             {
                 # "pair": [Value("string")],
@@ -95,16 +96,15 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         # construct pairs
         groupby_cols = [
             "task",
-            "sex",
-            "ethnicity",
-            "political_orientation",
+            # "sex",
+            # "ethnicity",
+            # "political_orientation",
             # "teacher",
             # "year",
         ]
         assert all(
             col in df.columns for col in groupby_cols
         ), "Missing required metadata columns."
-
         # shuffle and split groups such that tasks are not overlapping between train and test sets
         all_tasks = df["task"].unique().tolist()
         random.seed(352)
@@ -253,7 +253,9 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
                 ):  # enforce different tasks (should always be the case)
                     same_author_pairs.append(
                         {
-                            "pair": [a["text"], b["text"]],
+                            "disputed_text": a["text"],
+                            "candidate_text": b["text"],
+                            # "pair": [a["text"], b["text"]],
                             "authors": [author, author],
                             "same": True,
                         }
@@ -267,6 +269,10 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         # ----------------
         # Separate task from other grouping cols
         subgroup_cols = [c for c in groupby_cols if c != "task"]
+        if not subgroup_cols:
+            # create a random subgroup
+            df["_random_subgroup"] = np.random.randint(0, 20, size=len(df))
+            subgroup_cols = ["_random_subgroup"]
 
         subgrouped = df.groupby(subgroup_cols, dropna=False, observed=True)
         diff_author_pairs = []
@@ -293,8 +299,8 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
                         diff_author_pairs.append(
                             {
                                 # "pair": [r1["text"], r2["text"]],
-                                "disputed_text": r2["text"],
-                                "candidate_text": Value("string"),
+                                "disputed_text": r1["text"],
+                                "candidate_text": r2["text"],
                                 "authors": [r1["author_id"], r2["author_id"]],
                                 "same": False,
                             }
