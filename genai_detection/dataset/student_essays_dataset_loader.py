@@ -45,12 +45,12 @@ MIN_NUM_WORDS = 700  # minimum number of words in a text to be considered valid
 
 
 class StudentEssayDatasetLoader(BaseDatasetLoader):
-    def __init__(self, path: str, name: str = CONFIG.STUDENT_ESSAYS):
+    def __init__(self, path: Optional[str], name: str = CONFIG.STUDENT_ESSAYS):
         super().__init__(name=name)
         self.path = Path(path)
-        # assert (
-        #     self.path.exists()
-        # ), f"Path {self.path} does not exist. Current path: {os.getcwd()}"
+        assert (
+                path is None or self.path.exists()
+        ), f"Path {self.path} is explicit input parameter but does not exist. Current path: {os.getcwd()}"
         self.features = Features(
             {
                 # "pair": [Value("string")],
@@ -61,12 +61,11 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             }
         )
 
-    def load(
-        self, train_split_portion: float = 0.7, min_num_words: int = MIN_NUM_WORDS
-    ) -> DatasetDict:
+    def load_texts(self,min_num_words: int = MIN_NUM_WORDS):
         """
-        Loader for the Student Essay dataset.
-        The dataset can be obtained from James W. Pennebaker.
+        Loader for texts with metadata (no pairs).
+        :param min_num_words: Minimum number of words to consider
+        :return: pd.DataFrame
         """
         # build student essays dataset
         df = self._load_student_essays(min_num_words=min_num_words)
@@ -92,15 +91,27 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             rsuffix="_meta",
         )
         logging.info("joined student essays with metadata.")
+        return df
+
+    def load(
+        self, train_split_portion: float = 0.7, min_num_words: int = MIN_NUM_WORDS
+    ) -> DatasetDict:
+        """
+        Loader for the Student Essay dataset.
+        Generates pairs for train and test splits.
+        The dataset can be obtained from James W. Pennebaker.
+        """
+        # build student essays dataset
+        df = self.load_texts(min_num_words=min_num_words)
 
         # construct pairs
         groupby_cols = [
             "task",
-            # "sex",
-            # "ethnicity",
-            # "political_orientation",
-            # "teacher",
-            # "year",
+            "sex",
+            "ethnicity",
+            "political_orientation",
+            "teacher",
+            "year",
         ]
         assert all(
             col in df.columns for col in groupby_cols
@@ -226,7 +237,6 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             num_nans = df[col].isna().sum()
             if num_nans > 0:
                 logging.info(f"Column '{col}' has {num_nans} NaN values.")
-                # logging.info(f"Rows with NaN in '{col}':\n{df[df[col].isna()]}\n")
         pairs = []
 
         # each author appears <=1 time per task: same-author pairs have to be generated across tasks
@@ -241,7 +251,6 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             author_groups.setdefault(item["author_id"], []).append(item)
         for author, texts in author_groups.items():
             if len(texts) < 2:
-                # logging.info(f"Skipping author {author} with only {len(texts)} text(s).")
                 continue
 
             selected = random.sample(texts, min(n_pairs * 2, len(texts)))
@@ -271,6 +280,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         subgroup_cols = [c for c in groupby_cols if c != "task"]
         if not subgroup_cols:
             # create a random subgroup
+            logging.warning("No subgroup columns, generating random pairs.")
             df["_random_subgroup"] = np.random.randint(0, 20, size=len(df))
             subgroup_cols = ["_random_subgroup"]
 

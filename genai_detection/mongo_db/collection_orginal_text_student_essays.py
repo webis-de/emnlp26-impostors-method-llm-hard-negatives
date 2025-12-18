@@ -1,93 +1,91 @@
-import os
 import hashlib
+import logging
+
+from pymongo import errors
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
+import os
 from pathlib import Path
+
 from genai_detection.config import CONFIG
-from pymongo import MongoClient, errors
+from genai_detection.dataset.student_essays_dataset_loader import StudentEssayDatasetLoader
+from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-print("Starting initialization: loading original_text dataset...")
 
-# Get database name from environment or default
-db_name = CONFIG.MONGO_DATABASE or "impostors"
+def main():
+    base_dir = (
+        Path(__file__).resolve().parents[2]
+        / CONFIG.DATA_BASE_PATH
+        / "student_essays/Intro2006"
+    )
+    assert (
+        base_dir.exists()
+    ), f"Path {base_dir} to student essays dataset does not exist."
 
-# Connect to MongoDB (default host/port for container)
-uri = f"mongodb://{CONFIG.MONGO_USER}:{CONFIG.MONGO_PASSWORD}@{CONFIG.MONGO_HOST}/"
-client = MongoClient(uri)
-db = client[db_name]
+    logger.info("Starting initialization: loading original_text dataset...")
 
-# Collection name
-collection_name = CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION or "original_text"
+    # Connect to MongoDB (default host/port for container)
+    mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
+    collection_name = CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION
 
-# Create collection if it does not exist
-if collection_name not in db.list_collection_names():
-    db.create_collection(collection_name)
-    print(f"Created collection: {collection_name}")
-else:
-    print(f"Collection '{collection_name}' already exists. Skipping creation.")
+    # Create unique index on text_hash
+    new_collection = mongoDB.reset_collection(collection_name=collection_name)
+    new_collection.create_index("text_hash", unique=True)
 
-# Create unique index on text_hash
-db[collection_name].create_index("text_hash", unique=True)
+    # Dataset base path from environment
+    dataset_base_path = (PROJECT_ROOT / CONFIG.PATH2STUDENT_ESSAYS).parent
+    assert dataset_base_path.exists(), f"Dataset base path does not exist: {dataset_base_path}"
 
-# Dataset base path from environment
-dataset_base_path = (PROJECT_ROOT / CONFIG.PATH2STUDENT_ESSAYS).parent
-assert dataset_base_path.exists(), f"Dataset base path does not exist: {dataset_base_path}"
+    dataset_name = CONFIG.STUDENT_ESSAYS
+    logger.info(f"{dataset_name} dataset base path: {dataset_base_path}")
 
-dataset_name = CONFIG.STUDENT_ESSAYS
-print(f"{dataset_name} dataset base path: {dataset_base_path}")
+    loader = StudentEssayDatasetLoader(path=base_dir)
+    original_texts_df = loader.load_texts()
 
-docs_to_insert = []
+    # Compute hashes
+    original_texts_df["text_hash"] = original_texts_df["text"].apply(
+        lambda x: hashlib.sha256(x.encode("utf-8")).hexdigest()
+    )
+    logger.info(f"{len(original_texts_df)} original texts found")
 
-# List directories under dataset_base_path
-for dir_name in os.listdir(dataset_base_path):
-    dir_path = dataset_base_path / dir_name
-    if not dir_path.is_dir() or not dir_name.startswith("Ass"):
-        continue
+    # Convert to list of dicts
+    records = original_texts_df.to_dict(orient="records")
 
-    print(f"Processing assignment directory: {dir_name}")
+    # Fetch existing hashes in bulk to avoid repeated DB queries
+    existing_hashes = set(mongoDB.original_collection.distinct("text_hash"))
 
-    # List .txt files in this assignment directory
-    for file_name in os.listdir(dir_path):
-        if not file_name.endswith(".txt"):
-            continue
-
-        file_path = dir_path / file_name
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                text_content = f.read()
-        except Exception as e:
-            print(f"Could not read file: {file_path}. Error: {e}")
-            continue
-
-        author_name = file_name.replace(".txt", "")
-        text_hash = hashlib.sha256(text_content.encode("utf-8")).hexdigest()
-
-        # Check if document already exists
-        exists = db[collection_name].find_one(
-            {"author": author_name, "assignment": dir_name, "text_hash": text_hash}
-        )
-        if exists:
-            continue
-
-        doc = {
-            "text": text_content,
-            "author": author_name,
+    # Filter new docs
+    docs_to_insert = [
+        {
+            "author": r.pop("author_id"),
+            "assignment": r.pop("task"),
+            **r,
             "dataset": dataset_name,
-            "assignment": dir_name,
-            "text_hash": text_hash,
         }
+        for r in records
+        if r["text_hash"] not in existing_hashes
+    ]
 
-        docs_to_insert.append(doc)
+    # Insert documents
+    if docs_to_insert:
+        try:
+            result = mongoDB.original_collection.insert_many(
+                docs_to_insert, ordered=False
+            )
+            logger.info(
+                f"Inserted {len(result.inserted_ids)} documents into '{collection_name}'"
+            )
+        except errors.BulkWriteError:
+            logger.info(
+                "Duplicate key error encountered during insertMany. Some documents may already exist."
+            )
+    else:
+        logger.info("No new documents to insert.")
 
-# Insert documents
-if docs_to_insert:
-    try:
-        result = db[collection_name].insert_many(docs_to_insert, ordered=False)
-        print(f"Inserted {len(result.inserted_ids)} documents into '{collection_name}'")
-    except errors.BulkWriteError as e:
-        print(
-            "Duplicate key error encountered during insertMany. Some documents may already exist."
-        )
-else:
-    print("No documents found to insert.")
+    logger.info("Initialization complete.")
 
-print("Initialization complete.")
+if __name__ == "__main__":
+    main()
