@@ -18,6 +18,7 @@ from collections import Counter
 from operator import itemgetter
 
 import numpy as np
+import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from genai_detection.config import CONFIG
@@ -92,15 +93,25 @@ class ImpostorBaselineBase(ImpostorBase):
         super().__init__()
         # get all original texts from mongodb collection whose ID is not in test pairs mongodb collection
         self.dataset_name = dataset_name
-        self.train_dataset_generator = self.mongoDB.get_training_data_from_original_texts(dataset_name=dataset_name)
-        logging.info(f"Training dataset ready (streaming, generator).")
+        train_dataset_generator = self.mongoDB.get_training_data_from_original_texts(dataset_name=dataset_name)
+        self.train_dataset = pd.DataFrame(list(train_dataset_generator))
+        self.train_dataset["left_text"] = self.train_dataset["left_id"].apply(
+            lambda x: self.mongoDB.get_text_or_id_from_orginal_collection(
+                text=None, text_id=x
+            )
+        )
+        self.train_dataset["right_text"] = self.train_dataset["right_id"].apply(
+            lambda x: self.mongoDB.get_text_or_id_from_orginal_collection(
+                text=None, text_id=x
+            )
+        )
+        logging.info(f"Training dataset ready (in-memory).")
 
         def preprocessed_texts():
             # generator is exhausted after computing the vocabulary, and loading whole data into memory is not a good idea
-            self.train_dataset_generator = self.mongoDB.get_training_data_from_original_texts(dataset_name=dataset_name)
-
-            for doc in self.train_dataset_generator:
-                yield " ".join(self.tokenize_char_ngrams(doc["text"]))
+            for pair in self.train_dataset:
+                yield " ".join(self.tokenize_char_ngrams(pair["left_text"]))
+                yield " ".join(self.tokenize_char_ngrams(pair["right_text"]))
 
         self._vectorizer = TfidfVectorizer(
             vocabulary=self.get_top_tokens(), input="content", dtype=np.float32).fit(preprocessed_texts())

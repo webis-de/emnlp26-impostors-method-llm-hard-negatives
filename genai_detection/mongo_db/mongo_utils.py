@@ -214,7 +214,6 @@ class ParaphraseMongoDB:
         documents = self.non_naive_paraphrase_collection.find({"text_id": document_id})
         return documents
 
-    # TODO: obsolete, existing training mongodb collection
     def get_training_data_from_original_texts(self, dataset_name: str, batch_size: int = 1000):
         """
         Generator that yields original text documents for a specific dataset whose _id is NOT in the test pairs collection.
@@ -225,31 +224,27 @@ class ParaphraseMongoDB:
         :return: Yields dictionaries with "_id" and "text" for each document.
         """
         try:
-            # Step 1: Fetch all test pair IDs (as a set)
-            test_pair_ids = {
+            # Step 1: Fetch all train pair IDs (as a set)
+            train_pair_ids = {
                 ObjectId(doc_id)
-                for doc in self.test_pairs_collection.find(
+                for doc in self.train_pairs_collection.find(
                     {"dataset_name": dataset_name}, {"_id": 0, "left_id": 1, "right_id": 1}
                 )
                 for doc_id in (doc["left_id"], doc["right_id"])
             }
-            logging.info(f"Loaded {len(test_pair_ids)} test pair IDs.")
+            logging.info(f"Loaded {len(train_pair_ids)} test pair IDs.")
 
             # Step 2: Stream original texts in batches
             last_id = None
             while True:
-                query = {"dataset": dataset_name, "_id": {"$nin": list(test_pair_ids)}}
-                if last_id:
-                    query["_id"][
-                        "$gt"
-                    ] = last_id  # Continue from last_id to avoid duplicates
-
+                query = {"dataset": dataset_name, "_id": {"$in": list(train_pair_ids)}}
+                if last_id is not None:
+                    query["_id"]["$gt"] = last_id
                 cursor = (
                     self.original_collection.find(query)
                     .sort("_id", 1)
                     .limit(batch_size)
                 )
-
                 batch_count = 0
                 for doc in cursor:
                     yield doc
