@@ -11,7 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
+
+import hashlib
 import random
 from collections import defaultdict
 from itertools import product
@@ -27,12 +32,11 @@ from datasets import (
     Features,
     Value,
 )
+from pymongo import errors
 
 from genai_detection.dataset.base_dataset_loader import BaseDatasetLoader
 from genai_detection.paraphrasing.two_step_paraphrasers import *
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 random.seed(42)
 # Koppel et al. (2004): 500 words
@@ -54,9 +58,17 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         self.features = Features(
             {
                 # "pair": [Value("string")],
-                "disputed_text": Value("string"),
-                "candidate_text": Value("string"),
-                "authors": [Value("string")],
+                # "left_text": Value("string"),
+                # "right_text": Value("string"),
+                "_id": Value("string"),
+                "left_id": Value("string"),
+                "right_id": Value("string"),
+                "left_author": Value("string"),
+                "right_author": Value("string"),
+                "left_assignment": Value("string"),
+                "right_assignment": Value("string"),
+                "dataset_name": Value("string"),
+                # "authors": [Value("string")],
                 "same": Value("bool"),
             }
         )
@@ -67,22 +79,29 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         :param min_num_words: Minimum number of words to consider
         :return: pd.DataFrame
         """
+        cursor = self.mongoDB.find_document_by_non_id_field(collection=self.mongoDB.original_collection, document_field_name="dataset", document_value=self.name)
+        records = list(cursor)
+        if records and len(records) > 0:
+            print(records)
+            logger.debug(f"Found {records} documents in {CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION}")
+            return pd.DataFrame(records)
         # build student essays dataset
         df = self._load_student_essays(min_num_words=min_num_words)
-        logging.info(f"obtained student essays dataset with {len(df)} entries.")
+        logger.info(f"obtained student essays dataset with {len(df)} entries.")
+        print(f"obtained student essays dataset with {len(df)} entries.")
 
         # metadata dataframe
         author_metadata = self._load_student_metadata()
         # run once to save metadata
-        # author_metadata.to_excel(
-        #     Path(__file__).resolve().parent.parent
-        #     / CONFIG.DATA_BASE_PATH
-        #     / "student_essays/Intro2006"
-        #     / "file_metadata.xlsx",
-        #     index=False,
-        # )
-        # keep NaNs, no answer is also an answer group
-        logging.info(f"obtained author metadata with {len(author_metadata)} entries.")
+        path2metadata = (Path(__file__).resolve().parents[2]
+            / CONFIG.DATA_BASE_PATH
+            / "student_essays/Intro2006"
+            / "file_metadata.xlsx")
+        if not path2metadata.exists():
+            author_metadata.to_excel(path2metadata,
+                index=False,
+            )
+        logger.info(f"obtained author metadata with {len(author_metadata)} entries.")
 
         df = df.join(
             author_metadata.set_index("author_id"),
@@ -90,8 +109,37 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             how="left",
             rsuffix="_meta",
         )
-        logging.info("joined student essays with metadata.")
-        return df
+        df["text_hash"] = df["text"].apply(
+            lambda x: hashlib.sha256(x.encode("utf-8")).hexdigest()
+        )
+        logger.info("joined student essays with metadata.")
+
+        records = df.to_dict(orient="records")
+        docs_to_insert = [
+            {
+                "author": r.pop("author_id"),
+                **r,
+                "dataset": self.name,
+            }
+            for r in records
+        ]
+
+        # Insert documents
+        if docs_to_insert:
+            try:
+                result = self.mongoDB.original_collection.insert_many(
+                    docs_to_insert, ordered=False
+                )
+                logger.info(
+                    f"Inserted {len(result.inserted_ids)} documents into '{self.name}' collection.'"
+                )
+            except errors.BulkWriteError:
+                logger.info(
+                    "Duplicate key error encountered during insertMany. Some documents may already exist."
+                )
+        else:
+            logger.info("No new documents to insert.")
+        return pd.DataFrame(list(self.mongoDB.find_document_by_non_id_field(collection=self.mongoDB.original_collection, document_field_name="dataset", document_value=self.name)))
 
     def load(
         self, train_split_portion: float = 0.7, min_num_words: int = MIN_NUM_WORDS
@@ -101,23 +149,26 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         Generates pairs for train and test splits.
         The dataset can be obtained from James W. Pennebaker.
         """
-        # build student essays dataset
+        # build student essays dataset including metadata
+        # TODO: load form mongoDB collection, if not existent; create one
         df = self.load_texts(min_num_words=min_num_words)
+        print(df)
 
         # construct pairs
+        assignment_col_name = "assignment"
         groupby_cols = [
-            "task",
+            assignment_col_name,
             "sex",
             "ethnicity",
             "political_orientation",
-            "teacher",
-            "year",
+            # "teacher",
+            # "year",
         ]
         assert all(
             col in df.columns for col in groupby_cols
-        ), "Missing required metadata columns."
+        ), f"Missing required metadata columns. Only got {df.columns}, but requires {groupby_cols}"
         # shuffle and split groups such that tasks are not overlapping between train and test sets
-        all_tasks = df["task"].unique().tolist()
+        all_tasks = df[assignment_col_name].unique().tolist()
         random.seed(352)
         random.shuffle(all_tasks)
 
@@ -132,22 +183,25 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             test_tasks
         ), "Task overlap between train and test."
         train_df = (
-            df[df["task"].isin(train_tasks)]
+            df[df[assignment_col_name].isin(train_tasks)]
             .sample(frac=1, random_state=42)
             .reset_index(drop=True)
         )
         test_df = (
-            df[df["task"].isin(test_tasks)]
+            df[df[assignment_col_name].isin(test_tasks)]
             .sample(frac=1, random_state=42)
             .reset_index(drop=True)
         )
-        logging.info(f"Train tasks: {train_tasks}, Test tasks: {test_tasks}\n\n")
+        logger.info(f"Train tasks: {train_tasks}, Test tasks: {test_tasks}\n\n")
 
         train_pairs = self.generate_pairs(df=train_df, groupby_cols=groupby_cols)
+        self.save2mongoDB(train_pairs, is_train_split=True)
         test_pairs = self.generate_pairs(df=test_df, groupby_cols=groupby_cols)
-        logging.info(
+        self.save2mongoDB(test_pairs, is_train_split=False)
+        logger.info(
             f"Generated {len(train_pairs)} training pairs and {len(test_pairs)} test pairs."
         )
+        print(train_pairs[0].keys())
 
         return DatasetDict(
             {
@@ -161,8 +215,9 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         Load student essays.
         Koppel et al. (2014) use only the first 4 assignments.
         """
+        assignment_col_name = "assignment"
         student_essays_df = pd.DataFrame(
-            columns=["author_id", "text", "task", "task_description"]
+            columns=["author_id", "text", assignment_col_name, "task_description"]
         )
         task_description = {
             "Ass1": "Stream of consciousness",
@@ -208,7 +263,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
                                 {
                                     "author_id": author_id,
                                     "text": essay_text,
-                                    "task": task,
+                                    assignment_col_name: task,
                                     "task_description": task_description[dir],
                                 }
                             ]
@@ -216,6 +271,24 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
                     ]
                 )
         return student_essays_df
+
+    def _make_pair_dict(self, a, b, same=True):
+        """
+        Generate a pair dict dynamically using FEATURE_MAP.
+        """
+        assignment_col_name = "assignment"
+        author_col_name = "author"
+        FEATURE_MAP = {
+            "_id": "_id",
+            "_author": author_col_name,
+            "_assignment": assignment_col_name,
+        }
+        return {
+            "dataset_name": self.name,
+            **{f"left{key}": a[val] for key, val in FEATURE_MAP.items()},
+            **{f"right{key}": b[val] for key, val in FEATURE_MAP.items()},
+            "same": same,
+        }
 
     def generate_pairs(
         self, df, n_pairs=2, groupby_cols: list = ["task", "sex", "ethnicity"]
@@ -230,13 +303,15 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         :return: List of pairs with their authors and a boolean indicating if they are from the
         same author.
         """
+        author_col_name = "author"
+        assignment_col_name = "assignment"
         for col in groupby_cols:
             assert col in df.columns, f"Column '{col}' not found in DataFrame."
 
         for col in groupby_cols:
             num_nans = df[col].isna().sum()
             if num_nans > 0:
-                logging.info(f"Column '{col}' has {num_nans} NaN values.")
+                logger.info(f"Column '{col}' has {num_nans} NaN values.")
         pairs = []
 
         # each author appears <=1 time per task: same-author pairs have to be generated across tasks
@@ -248,7 +323,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         author_groups = {}
         records = df.to_dict(orient="records")
         for item in records:
-            author_groups.setdefault(item["author_id"], []).append(item)
+            author_groups.setdefault(item[author_col_name], []).append(item)
         for author, texts in author_groups.items():
             if len(texts) < 2:
                 continue
@@ -258,26 +333,18 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             for i in range(0, len(selected) - 1, 2):
                 a, b = selected[i], selected[i + 1]
                 if (
-                    a["task"] != b["task"]
+                    a[assignment_col_name] != b[assignment_col_name]
                 ):  # enforce different tasks (should always be the case)
-                    same_author_pairs.append(
-                        {
-                            "disputed_text": a["text"],
-                            "candidate_text": b["text"],
-                            # "pair": [a["text"], b["text"]],
-                            "authors": [author, author],
-                            "same": True,
-                        }
-                    )
+                    same_author_pairs.append(self._make_pair_dict(a=a,b=b,same=True))
         pairs.extend(same_author_pairs)
-        logging.info(f"Generated {len(same_author_pairs)} same-author pairs.")
+        logger.info(f"Generated {len(same_author_pairs)} same-author pairs.")
 
         # Prepare cross-task (cf. Koppel et al. (2014)) different-author pairs
         # ----------------
         # Different-author pairs (same subgroup, different tasks)
         # ----------------
         # Separate task from other grouping cols
-        subgroup_cols = [c for c in groupby_cols if c != "task"]
+        subgroup_cols = [c for c in groupby_cols if c != assignment_col_name]
         if not subgroup_cols:
             # create a random subgroup
             logging.warning("No subgroup columns, generating random pairs.")
@@ -291,7 +358,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             # Collect authors by task inside this subgroup
             task_buckets = defaultdict(list)
             for row in subgroup_df.to_dict(orient="records"):
-                task_buckets[row["task"]].append(row)
+                task_buckets[row[assignment_col_name]].append(row)
 
             tasks = list(task_buckets.keys())
             if len(tasks) < 2:
@@ -303,18 +370,10 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
                     t1, t2 = tasks[i], tasks[j]
                     texts1, texts2 = task_buckets[t1], task_buckets[t2]
 
-                    for r1, r2 in product(texts1, texts2):
-                        if r1["author_id"] == r2["author_id"]:
+                    for a, b in product(texts1, texts2):
+                        if a[author_col_name] == b[author_col_name]:
                             continue  # skip same-author, already handled
-                        diff_author_pairs.append(
-                            {
-                                # "pair": [r1["text"], r2["text"]],
-                                "disputed_text": r1["text"],
-                                "candidate_text": r2["text"],
-                                "authors": [r1["author_id"], r2["author_id"]],
-                                "same": False,
-                            }
-                        )
+                        diff_author_pairs.append(self._make_pair_dict(a=a,b=b,same=False))
 
         # Randomly sample to balance with same-author pairs
         n_diff_pairs_target = len(same_author_pairs)
@@ -322,7 +381,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         diff_author_pairs = diff_author_pairs[:n_diff_pairs_target]
 
         pairs.extend(diff_author_pairs)
-        logging.info(f"Generated {len(diff_author_pairs)} different-author pairs.\n")
+        logger.info(f"Generated {len(diff_author_pairs)} different-author pairs.\n")
 
         return pairs
 

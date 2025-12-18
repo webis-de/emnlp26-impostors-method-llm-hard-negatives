@@ -29,7 +29,7 @@ ass4_docs = list(ass4_cursor)
 logging.info(f"Found {len(authors_of_ass3)} unique authors.")
 
 # --- Drop old collection ---
-mongoDB.reset_collection(collection_name=CONFIG.MOGO_TEST_PAIRS_COLLECTION)
+mongoDB.reset_collection(collection_name=CONFIG.MONGO_TEST_PAIRS_COLLECTION)
 
 # --- Organize by author ---
 ass3_by_author = {}

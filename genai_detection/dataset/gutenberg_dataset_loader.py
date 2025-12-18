@@ -25,6 +25,7 @@ from datasets import (
     Value,
 )
 
+from genai_detection.dataset.base_dataset_loader import BaseDatasetLoader
 from genai_detection.paraphrasing.two_step_paraphrasers import *
 
 logger = logging.getLogger(__name__)

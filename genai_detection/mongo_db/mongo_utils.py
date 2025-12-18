@@ -46,7 +46,8 @@ class ParaphraseMongoDB:
             CONFIG.MONGO_ON_THE_FLY_COLLECTION,
             CONFIG.MONGO_TRANSLATION_COLLECTION,
             CONFIG.MONGO_NAIVE_PARAPHRASE_COLLECTION,
-            CONFIG.MOGO_TEST_PAIRS_COLLECTION,
+            CONFIG.MONGO_TEST_PAIRS_COLLECTION,
+            CONFIG.MONGO_TRAIN_PAIRS_COLLECTION,
         ]:
             if collection_name not in self.db.list_collection_names():
                 self.db.create_collection(collection_name)
@@ -66,11 +67,12 @@ class ParaphraseMongoDB:
         self.paraphrase_score_collection = self.db[CONFIG.MONGO_PARAPHRASE_SCORE_COLLECTION]  # paraphrase scores
         self.impostor_output_collection = self.db[CONFIG.MONGO_IMPOSTOR_OUTPUT_COLLECTION]  # output of impostor
         # approach
-        self.test_pairs_collection = self.db[CONFIG.MOGO_TEST_PAIRS_COLLECTION] # IDs of texts and their ground truth (reproducibility of evaluation)
+        self.test_pairs_collection = self.db[CONFIG.MONGO_TEST_PAIRS_COLLECTION] # IDs of texts and their ground truth (reproducibility of evaluation)
+        self.train_pairs_collection = self.db[CONFIG.MONGO_TRAIN_PAIRS_COLLECTION] # IDs of texts and their ground truth
 
     def reset_collection(self, collection_name:str):
         self.db.drop_collection(collection_name)
-        logging.info(f"Dropepd collection {collection_name}")
+        logging.info(f"Dropped collection {collection_name}")
         self.db.create_collection(collection_name)
         logging.info(f"Created new collection {collection_name}")
         return self.db[collection_name]
@@ -212,6 +214,7 @@ class ParaphraseMongoDB:
         documents = self.non_naive_paraphrase_collection.find({"text_id": document_id})
         return documents
 
+    # TODO: obsolete, existing training mongodb collection
     def get_training_data_from_original_texts(self, dataset_name: str, batch_size: int = 1000):
         """
         Generator that yields original text documents for a specific dataset whose _id is NOT in the test pairs collection.

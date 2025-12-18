@@ -40,7 +40,7 @@ MIN_NUM_WORDS = 700  # minimum number of words in a text to be considered valid
 
 def run_student_essay():
     base_dir = (
-        Path(__file__).resolve().parent.parent
+        Path(__file__).resolve().parents[2]
         / CONFIG.DATA_BASE_PATH
         / "student_essays/Intro2006"
     )
@@ -164,4 +164,4 @@ if __name__ == "__main__":
     # run_koppel_webis()
     # run_blog_corpus()
     # run_gutenberg_corpus()
-    # run_student_essay()
+    run_student_essay()

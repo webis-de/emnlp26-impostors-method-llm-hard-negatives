@@ -21,6 +21,7 @@ from datasets import (
     DatasetDict,
 )
 
+from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 from genai_detection.paraphrasing.one_step_paraphrasers import *
 from genai_detection.paraphrasing.two_step_paraphrasers import *
 from genai_detection.util import preprocess_text as _preprocess_text
@@ -41,6 +42,8 @@ MIN_NUM_WORDS = 700  # minimum number of words in a text to be considered valid
 class BaseDatasetLoader(ABC):
     def __init__(self, name: str):
         self.name = name
+        # Connect to MongoDB (default host/port for container)
+        self.mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
 
     @abstractmethod
     def load(self) -> DatasetDict:
@@ -78,4 +81,13 @@ class BaseDatasetLoader(ABC):
             )
 
         return pairs
+
+    def save2mongoDB(self, data: List[dict], is_train_split: bool=True):
+        collection_name = f"{'train' if is_train_split else 'test'}_pairs"
+        collection = self.mongoDB.db[collection_name]
+        self.mongoDB.insert_documents(collection=collection, insert_data=data)
+
+
+
+
 

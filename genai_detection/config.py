@@ -62,8 +62,11 @@ class BaseConfig:
     MONGO_TRANSLATION_COLLECTION = "translation_paraphrases"  # collection (!= db)
     MONGO_PARAPHRASE_SCORE_COLLECTION = "paraphrase_scores"  # collection (!= db)
     MONGO_IMPOSTOR_OUTPUT_COLLECTION = "impostors_outputs" # collection (!= db)
-    MOGO_TEST_PAIRS_COLLECTION = "test_pairs" # collection (!= db); for IDs of texts and their ground truth (
+    MONGO_TEST_PAIRS_COLLECTION = "test_pairs" # collection (!= db); for IDs of texts and their ground truth (
     # reproducibility of evaluation)
+    MONGO_TRAIN_PAIRS_COLLECTION = (
+        "train_pairs"  # collection (!= db); for IDs of texts and their ground truth
+    )
     MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME")
     MONGO_PASSWORD = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
     MONGO_HOST = "localhost"  # Local, but forwarded to server
