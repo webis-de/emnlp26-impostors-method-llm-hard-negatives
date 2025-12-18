@@ -1,6 +1,6 @@
 import itertools
 from random import sample
-from typing import Dict, Any, List
+from typing import Dict, Any, List, DefaultDict
 
 import numpy as np
 
@@ -29,7 +29,7 @@ class Scorer:
         """Reduce vector to the selected feature indices."""
         return np.asarray(v)[idx]
 
-    def score_pair(self, pair: Dict[str, Any], vectorizer) -> float:
+    def score_pair(self, pair: Dict[str, Any], vectorizer) -> [float, Dict]:
         """
         Compute a score between left/right texts using the impostor method.
 
@@ -46,6 +46,7 @@ class Scorer:
 
         feature_count = len(vectorizer.vocabulary_)
         total_score = 0.0
+        p_values = DefaultDict(float)
 
         # iterate over the permutations ("left" as disputed, "right" as candidate, and vice versa)
         for j, (disputed, candidate) in enumerate(
@@ -78,6 +79,7 @@ class Scorer:
 
             # 5) Running mean over permutations
             total_score += round_score
+            p_values[f"{disputed}_disputed_{candidate}_candidate_p_value"] = float(round_score)
             total_score /= j + 1
 
-        return total_score
+        return total_score, p_values

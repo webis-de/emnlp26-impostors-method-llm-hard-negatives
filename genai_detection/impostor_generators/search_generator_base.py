@@ -316,4 +316,4 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
             logging.warning(
                 f"Error during fetching results: {e}"
             )
-            return {"imposter": "Error during fetching results, check logs."}
+            return impostors

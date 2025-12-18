@@ -198,7 +198,7 @@ class ImpostorDetector(ImpostorBase):
                     )
                 )
                 logging.info(
-                    f"Obtained impostors by text ID for left text with text ID {pair['left']['id']}. Type of "
+                    f"Obtained {len(impostors_of_left)} impostors by text ID for left text with text ID {pair['left']['id']}. Type of "
                     f"impostors is {type(impostors_of_left)}."
                 )
                 impostors_of_right = (
@@ -206,7 +206,7 @@ class ImpostorDetector(ImpostorBase):
                         text_id=pair["right"]["id"]
                     )
                 )
-                logging.info(f"Obtained impostors by text ID for right text with text ID {pair['right']['id']}. Type "
+                logging.info(f"Obtained {len(impostors_of_right)} impostors by text ID for right text with text ID {pair['right']['id']}. Type "
                              f"of impostors is {type(impostors_of_right)}.")
 
             else:
@@ -282,13 +282,25 @@ class ImpostorDetector(ImpostorBase):
                 f"{old_key}_{new_key}": pair[old_key][new_key]
                 for old_key in ["left", "right"]
                 for new_key in pair[old_key]
-                if new_key != "impostors_tfidf"
+                if new_key  not in ["tfidf", "processed_text", "tokens", "processed_impostors", "impostors",
+                                    "original_text", "impostors_tfidf"]
             }
-            document2insert["scores_over_different_rounds"] = self.scorer.score_pair(pair=pair, vectorizer=feature_extractor.vectorizer)
+            document2insert["scores_over_different_rounds"], p_values = self.scorer.score_pair(pair=pair, vectorizer=feature_extractor.vectorizer)
+            # TODO: compare p-value to p_0 for statistical significance to random selection
+            preds = {
+                f"{key}_pred": bool(p_val < (1 / (self.n_impostors + 1)))
+                for key, p_val in p_values.items()
+            }
+
+            # Update the document dictionary
+            document2insert.update(preds)
+            document2insert.update(p_values)
+
             document2insert["impostor_generation_technique"] = self.impostor_technique
             document2insert["n_impostors"] = self.n_impostors
             document2insert["n_potential_impostors"] = self.impostor_generator.num_potential_impostors
-            logging.info(f"Obtained final score of {document2insert['scores_over_different_rounds']} for text input pair.")
+            logging.info(f"Obtained final score of {document2insert['scores_over_different_rounds']} for text input "
+                         f"pair. About to insert instance with following keys: {document2insert.keys()}.")
             try:
                 self.mongoDB.insert_document(collection=self.mongoDB.impostor_output_collection, insert_data=document2insert)
                 logging.info(

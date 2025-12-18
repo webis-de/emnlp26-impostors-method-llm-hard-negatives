@@ -101,12 +101,12 @@ class MongoDBSavedGenerator(BaseImpostorGenerator):
 
     def generate_impostors(
             self, text: Optional[str], text_id: Optional[str]
-    ):
+    ) -> List[str]:
         pass
 
     def generate_impostors_by_text_id(
             self, text_id: str
-    ):
+    )-> List[str]:
         text, text_id = self.mongoDB.get_text_or_id_from_orginal_collection(
             text=None, text_id=text_id
         )

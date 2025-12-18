@@ -43,7 +43,8 @@ def load_test_pairs(dataset_name: str) -> Tuple[List[str], List[int]]:
             document_field_name="dataset_name",
             document_value=dataset_name,
         )
-    )
+        # TODO: increase
+    )[:2]
 
     text_ids = [
         str(id_)
@@ -149,8 +150,10 @@ def extract_best_metric(
     if metric == "accuracy":
         return float(df["accuracy"].max())
 
-    return float(
-        df[metric]
-        .apply(lambda arr: arr[positive_class_id])
-        .max()
-    )
+    def safe_get(arr):
+        if len(arr) > positive_class_id:
+            return arr[positive_class_id]
+        return 0.0
+
+    return float(df[metric].apply(safe_get).max())
+
