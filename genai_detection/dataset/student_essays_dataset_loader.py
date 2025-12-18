@@ -11,15 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import logging
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
-
-
 import hashlib
 import random
-from collections import defaultdict
-from itertools import product
+from itertools import product, combinations
 from pathlib import Path
 
 import chardet
@@ -37,17 +31,26 @@ from pymongo import errors
 from genai_detection.dataset.base_dataset_loader import BaseDatasetLoader
 from genai_detection.paraphrasing.two_step_paraphrasers import *
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
+# ==============================================================================
+# Constants
+# ==============================================================================
 random.seed(42)
 # Minimum length constraints motivated by prior work:
 # - Koppel et al. (2004): 500 words
 # - Bevendorff et al. (2019): 700 words
 # - Bevendorff et al. (2025): 3000 characters
-MIN_NUM_WORDS = 700
+MIN_NUM_WORDS = 500
 
 # Canonical column names used throughout the loader
 ASSIGNMENT_COL_NAME = "assignment"
 AUTHOR_COL_NAME = "author"
+
+# ==============================================================================
+# Dataset Loader
+# ==============================================================================
 
 class StudentEssayDatasetLoader(BaseDatasetLoader):
     """
@@ -68,7 +71,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
        """
     def __init__(self, path: Optional[str], name: str = CONFIG.STUDENT_ESSAYS):
         super().__init__(name=name)
-        self.path = Path(path)
+        self.path = Path(path) if path is not None else None
         assert (
                 path is None or self.path.exists()
         ), f"Path {self.path} is explicit input parameter but does not exist. Current path: {os.getcwd()}"
@@ -342,7 +345,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         }
 
     def generate_pairs(
-        self, df, n_pairs=2, groupby_cols: list[str] = [ASSIGNMENT_COL_NAME, "sex", "ethnicity"]
+        self, df:pd.DataFrame, n_pairs=2000, groupby_cols: list[str] = [ASSIGNMENT_COL_NAME, "sex", "ethnicity"]
     ):
         """
         Generate labeled text pairs for authorship verification.
@@ -355,14 +358,12 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             the number of same-author pairs.
 
         :param df: DataFrame containing essays and metadata.
-        :param n_pairs: Number of same-author pairs per author (upper bound).
+        :param n_pairs: Number of same-author and different-author pairs (upper bound). Koppel and Winter (2014) have 2000 pairs.
         :param groupby_cols: Metadata columns defining demographic subgroups.
         :return: List of labeled text pair dictionaries.
         """
         for col in groupby_cols:
             assert col in df.columns, f"Column '{col}' not found in DataFrame."
-
-        for col in groupby_cols:
             num_nans = df[col].isna().sum()
             if num_nans > 0:
                 logger.info(f"Column '{col}' has {num_nans} NaN values.")
@@ -374,22 +375,27 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         # ----------------
         same_author_pairs = []
         # group texts by author disregarding the task
-        author_groups = {}
-        records = df.to_dict(orient="records")
-        for item in records:
-            author_groups.setdefault(item[AUTHOR_COL_NAME], []).append(item)
-        for author, texts in author_groups.items():
-            if len(texts) < 2:
-                continue
+        author_groups = {
+            author: group.to_dict(orient="records")
+            for author, group in df.groupby(AUTHOR_COL_NAME)
+            if len(group) >= 2
+        }
+        n_pairs_per_author = max(n_pairs // (2 * len(author_groups)), 1)
+        for texts in author_groups.values():
+            # Sample at most 2 * n_pairs_per_author texts
+            sampled = random.sample(texts, min(len(texts), 2 * n_pairs_per_author))
 
-            selected = random.sample(texts, min(n_pairs * 2, len(texts)))
-            random.shuffle(selected)
-            for i in range(0, len(selected) - 1, 2):
-                a, b = selected[i], selected[i + 1]
-                if (
-                    a[ASSIGNMENT_COL_NAME] != b[ASSIGNMENT_COL_NAME]
-                ):  # enforce different tasks (should always be the case)
-                    same_author_pairs.append(self._make_pair_dict(left_text=a,right_text=b,same=True))
+            # Pair consecutively
+            for a, b in zip(sampled[::2], sampled[1::2]):
+                if a[ASSIGNMENT_COL_NAME] != b[ASSIGNMENT_COL_NAME]:
+                    same_author_pairs.append(
+                        self._make_pair_dict(
+                            left_text=a,
+                            right_text=b,
+                            same=True,
+                        )
+                    )
+
         pairs.extend(same_author_pairs)
         logger.info(f"Generated {len(same_author_pairs)} same-author pairs.")
 
@@ -405,29 +411,29 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             df["_random_subgroup"] = np.random.randint(0, 20, size=len(df))
             subgroup_cols = ["_random_subgroup"]
 
-        subgrouped = df.groupby(subgroup_cols, dropna=False, observed=True)
         diff_author_pairs = []
 
-        for subgroup_values, subgroup_df in subgrouped:
+        for _, subgroup in df.groupby(subgroup_cols, dropna=False, observed=True):
             # Collect authors by task inside this subgroup
-            task_buckets = defaultdict(list)
-            for row in subgroup_df.to_dict(orient="records"):
-                task_buckets[row[ASSIGNMENT_COL_NAME]].append(row)
-
-            tasks = list(task_buckets.keys())
-            if len(tasks) < 2:
+            # bucket rows by assignment (no DataFrame → dict conversions)
+            task_buckets = {
+                task: group.to_dict(orient="records")
+                for task, group in subgroup.groupby(ASSIGNMENT_COL_NAME)
+            }
+            if len(task_buckets) < 2:
                 continue  # need at least 2 tasks to cross-pair
 
-            # All cross-task combinations
-            for i in range(len(tasks)):
-                for j in range(i + 1, len(tasks)):
-                    t1, t2 = tasks[i], tasks[j]
-                    texts1, texts2 = task_buckets[t1], task_buckets[t2]
-
-                    for a, b in product(texts1, texts2):
-                        if a[AUTHOR_COL_NAME] == b[AUTHOR_COL_NAME]:
-                            continue  # skip same-author, already handled
-                        diff_author_pairs.append(self._make_pair_dict(left_text=a,right_text=b,same=False))
+            # iterate over cross-task combinations
+            for (t1, texts1), (t2, texts2) in combinations(task_buckets.items(), 2):
+                for a, b in product(texts1, texts2):
+                    if a[AUTHOR_COL_NAME] != b[AUTHOR_COL_NAME]:
+                        diff_author_pairs.append(
+                            self._make_pair_dict(
+                                left_text=a,
+                                right_text=b,
+                                same=False,
+                            )
+                        )
 
         # Randomly sample to balance with same-author pairs
         n_diff_pairs_target = len(same_author_pairs)
