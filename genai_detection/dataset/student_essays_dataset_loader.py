@@ -39,16 +39,33 @@ from genai_detection.paraphrasing.two_step_paraphrasers import *
 
 
 random.seed(42)
-# Koppel et al. (2004): 500 words
-# Bevendorff et al. (2019): 700 words (https://www.degruyterbrill.com/document/doi/10.1515/itit-2019-0046/html?casa_token=pbCaF7FgUXoAAAAA:8Vw71FUWE5spAbSsEuGGTdIjjm_o1_eb_inHwU3BR6eSrdVMOYy3--iqvDJwCV7EQ1HWtQBh610)
-# Bevendorff et al. (2025): 3000 characters (https://aclanthology.org/2025.findings-acl.194.pdf)
-MIN_NUM_WORDS = 700  # minimum number of words in a text to be considered valid
+# Minimum length constraints motivated by prior work:
+# - Koppel et al. (2004): 500 words
+# - Bevendorff et al. (2019): 700 words
+# - Bevendorff et al. (2025): 3000 characters
+MIN_NUM_WORDS = 700
 
-
-# === Student Essay LOADER ===
-
+# Canonical column names used throughout the loader
+ASSIGNMENT_COL_NAME = "assignment"
+AUTHOR_COL_NAME = "author"
 
 class StudentEssayDatasetLoader(BaseDatasetLoader):
+    """
+       Dataset loader for the Student Essay (Intro2006) corpus.
+
+       The loader:
+         1. Reads raw essay texts from disk.
+         2. Filters texts by minimum length.
+         3. Joins essays with demographic metadata.
+         4. Stores normalized documents in MongoDB.
+         5. Generates labeled text pairs for authorship verification.
+
+       Pair generation follows Koppel et al. (2014), ensuring:
+         - same-author and different-author pairs are drawn from different assignments,
+         - train and test splits do not share assignments.
+
+        Additionally, our different-author pairs share demographic subgroups.
+       """
     def __init__(self, path: Optional[str], name: str = CONFIG.STUDENT_ESSAYS):
         super().__init__(name=name)
         self.path = Path(path)
@@ -57,38 +74,76 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         ), f"Path {self.path} is explicit input parameter but does not exist. Current path: {os.getcwd()}"
         self.features = Features(
             {
-                # "pair": [Value("string")],
-                # "left_text": Value("string"),
-                # "right_text": Value("string"),
                 "_id": Value("string"),
                 "left_id": Value("string"),
                 "right_id": Value("string"),
-                "left_author": Value("string"),
-                "right_author": Value("string"),
-                "left_assignment": Value("string"),
-                "right_assignment": Value("string"),
+                f"left_{AUTHOR_COL_NAME}": Value("string"),
+                f"right_{AUTHOR_COL_NAME}": Value("string"),
+                f"left_{ASSIGNMENT_COL_NAME}": Value("string"),
+                f"right_{ASSIGNMENT_COL_NAME}": Value("string"),
                 "dataset_name": Value("string"),
-                # "authors": [Value("string")],
                 "same": Value("bool"),
             }
         )
 
-    def load_texts(self,min_num_words: int = MIN_NUM_WORDS):
+    def _save_df2original_mongoDB_collection(self, df: pd.DataFrame):
         """
-        Loader for texts with metadata (no pairs).
-        :param min_num_words: Minimum number of words to consider
-        :return: pd.DataFrame
+        Persist the processed essay DataFrame to the MongoDB collection
+        for original (non-paired) texts.
+
+        Each document is stored with:
+          - author identifier,
+          - text and metadata,
+          - dataset name for later retrieval.
+
+        Duplicate inserts are ignored.
         """
+        records = df.to_dict(orient="records")
+        docs_to_insert = [
+            {
+                "author": r.pop("author_id"),
+                **r,
+                "dataset": self.name,
+            }
+            for r in records
+        ]
+
+        if docs_to_insert:
+            try:
+                result = self.mongoDB.original_collection.insert_many(
+                    docs_to_insert, ordered=False
+                )
+                logger.info(
+                    f"Inserted {len(result.inserted_ids)} documents into '{self.name}' collection.'"
+                )
+            except errors.BulkWriteError:
+                logger.warning(
+                    "Duplicate key error encountered during insertMany. Some documents may already exist."
+                )
+        else:
+            logger.info("No new documents to insert.")
+
+    def load_texts(self, min_num_words: int = MIN_NUM_WORDS):
+        """
+        Load essay texts with metadata.
+
+        If the dataset is already indexed in MongoDB, it is loaded directly.
+        Otherwise, raw essays are read from disk, enriched with metadata,
+        stored in MongoDB, and reloaded to ensure consistent document IDs.
+
+        :param min_num_words: Minimum word count required for an essay.
+        :return: DataFrame containing essays and metadata.
+        """
+        # return already indexed documents if existent
         cursor = self.mongoDB.find_document_by_non_id_field(collection=self.mongoDB.original_collection, document_field_name="dataset", document_value=self.name)
         records = list(cursor)
         if records and len(records) > 0:
-            print(records)
             logger.debug(f"Found {records} documents in {CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION}")
             return pd.DataFrame(records)
+
         # build student essays dataset
         df = self._load_student_essays(min_num_words=min_num_words)
         logger.info(f"obtained student essays dataset with {len(df)} entries.")
-        print(f"obtained student essays dataset with {len(df)} entries.")
 
         # metadata dataframe
         author_metadata = self._load_student_metadata()
@@ -103,6 +158,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             )
         logger.info(f"obtained author metadata with {len(author_metadata)} entries.")
 
+        # join plain data with metadata
         df = df.join(
             author_metadata.set_index("author_id"),
             on="author_id",
@@ -114,45 +170,31 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         )
         logger.info("joined student essays with metadata.")
 
-        records = df.to_dict(orient="records")
-        docs_to_insert = [
-            {
-                "author": r.pop("author_id"),
-                **r,
-                "dataset": self.name,
-            }
-            for r in records
-        ]
+        # save obtained data in mongoDB collection
+        self._save_df2original_mongoDB_collection(df=df)
 
-        # Insert documents
-        if docs_to_insert:
-            try:
-                result = self.mongoDB.original_collection.insert_many(
-                    docs_to_insert, ordered=False
-                )
-                logger.info(
-                    f"Inserted {len(result.inserted_ids)} documents into '{self.name}' collection.'"
-                )
-            except errors.BulkWriteError:
-                logger.info(
-                    "Duplicate key error encountered during insertMany. Some documents may already exist."
-                )
-        else:
-            logger.info("No new documents to insert.")
+        # obtain data from mongodb collection for correct text IDs
         return pd.DataFrame(list(self.mongoDB.find_document_by_non_id_field(collection=self.mongoDB.original_collection, document_field_name="dataset", document_value=self.name)))
 
     def load(
         self, train_split_portion: float = 0.7, min_num_words: int = MIN_NUM_WORDS
     ) -> DatasetDict:
         """
-        Loader for the Student Essay dataset.
-        Generates pairs for train and test splits.
-        The dataset can be obtained from James W. Pennebaker.
+        Build the full Student Essay dataset with train/test splits.
+
+        Essays are split by assignment to ensure that no assignment
+        appears in both training and test sets.
+
+        For each split, labeled text pairs are generated and stored
+        in MongoDB before being returned as HuggingFace datasets.
+
+        :param train_split_portion: Fraction of assignments used for training.
+        :param min_num_words: Minimum word count per essay.
+        :return: DatasetDict with 'train' and 'test' splits.
         """
         # build student essays dataset including metadata
-        # TODO: load form mongoDB collection, if not existent; create one
+        # load from mongoDB collection, if not existent; create one
         df = self.load_texts(min_num_words=min_num_words)
-        print(df)
 
         # construct pairs
         assignment_col_name = "assignment"
@@ -201,7 +243,6 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         logger.info(
             f"Generated {len(train_pairs)} training pairs and {len(test_pairs)} test pairs."
         )
-        print(train_pairs[0].keys())
 
         return DatasetDict(
             {
@@ -212,8 +253,15 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
 
     def _load_student_essays(self, min_num_words: int = MIN_NUM_WORDS) -> pd.DataFrame:
         """
-        Load student essays.
-        Koppel et al. (2014) use only the first 4 assignments.
+        Load and preprocess raw student essays from disk.
+
+        Essays are read from assignment-specific directories, decoded using
+        automatic encoding detection, and filtered by length.
+
+        Only the first four assignments are used, following Koppel et al. (2014).
+
+        :param min_num_words: Minimum word count required for an essay.
+        :return: DataFrame containing raw essays and assignment metadata.
         """
         assignment_col_name = "assignment"
         student_essays_df = pd.DataFrame(
@@ -272,39 +320,45 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
                 )
         return student_essays_df
 
-    def _make_pair_dict(self, a, b, same=True):
+    def _make_pair_dict(self, left_text:dict, right_text:dict, same:bool=True):
         """
-        Generate a pair dict dynamically using FEATURE_MAP.
+        Construct a standardized pair dictionary for HuggingFace datasets.
+
+        :param left_text: First essay record.
+        :param right_text: Second essay record.
+        :param same: Whether both essays originate from the same author.
+        :return: Dictionary representing a labeled text pair.
         """
-        assignment_col_name = "assignment"
-        author_col_name = "author"
         FEATURE_MAP = {
             "_id": "_id",
-            "_author": author_col_name,
-            "_assignment": assignment_col_name,
+            "_author": AUTHOR_COL_NAME,
+            "_assignment": ASSIGNMENT_COL_NAME,
         }
         return {
             "dataset_name": self.name,
-            **{f"left{key}": a[val] for key, val in FEATURE_MAP.items()},
-            **{f"right{key}": b[val] for key, val in FEATURE_MAP.items()},
+            **{f"left{key}": left_text[val] for key, val in FEATURE_MAP.items()},
+            **{f"right{key}": right_text[val] for key, val in FEATURE_MAP.items()},
             "same": same,
         }
 
     def generate_pairs(
-        self, df, n_pairs=2, groupby_cols: list = ["task", "sex", "ethnicity"]
+        self, df, n_pairs=2, groupby_cols: list[str] = [ASSIGNMENT_COL_NAME, "sex", "ethnicity"]
     ):
         """
-        Generate pairs of texts from the dataset based on the specified groupby columns.
-        Koppel et al. (2014) select pairs of texts from the different tasks, regardless of same or different author label.
+        Generate labeled text pairs for authorship verification.
 
-        :param df: DataFrame containing the dataset with at least 'text' and 'author' columns.
-        :param n_pairs: Number of pairs to generate per group.
-        :param groupby_cols: Columns to group by, should include 'genre'.
-        :return: List of pairs with their authors and a boolean indicating if they are from the
-        same author.
+        Pair construction strategy:
+          - Same-author pairs are sampled across different assignments.
+          - Different-author pairs are sampled across assignments within
+            the same demographic subgroup.
+          - The number of different-author pairs is balanced to match
+            the number of same-author pairs.
+
+        :param df: DataFrame containing essays and metadata.
+        :param n_pairs: Number of same-author pairs per author (upper bound).
+        :param groupby_cols: Metadata columns defining demographic subgroups.
+        :return: List of labeled text pair dictionaries.
         """
-        author_col_name = "author"
-        assignment_col_name = "assignment"
         for col in groupby_cols:
             assert col in df.columns, f"Column '{col}' not found in DataFrame."
 
@@ -323,7 +377,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         author_groups = {}
         records = df.to_dict(orient="records")
         for item in records:
-            author_groups.setdefault(item[author_col_name], []).append(item)
+            author_groups.setdefault(item[AUTHOR_COL_NAME], []).append(item)
         for author, texts in author_groups.items():
             if len(texts) < 2:
                 continue
@@ -333,9 +387,9 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             for i in range(0, len(selected) - 1, 2):
                 a, b = selected[i], selected[i + 1]
                 if (
-                    a[assignment_col_name] != b[assignment_col_name]
+                    a[ASSIGNMENT_COL_NAME] != b[ASSIGNMENT_COL_NAME]
                 ):  # enforce different tasks (should always be the case)
-                    same_author_pairs.append(self._make_pair_dict(a=a,b=b,same=True))
+                    same_author_pairs.append(self._make_pair_dict(left_text=a,right_text=b,same=True))
         pairs.extend(same_author_pairs)
         logger.info(f"Generated {len(same_author_pairs)} same-author pairs.")
 
@@ -344,7 +398,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         # Different-author pairs (same subgroup, different tasks)
         # ----------------
         # Separate task from other grouping cols
-        subgroup_cols = [c for c in groupby_cols if c != assignment_col_name]
+        subgroup_cols = [c for c in groupby_cols if c != ASSIGNMENT_COL_NAME]
         if not subgroup_cols:
             # create a random subgroup
             logging.warning("No subgroup columns, generating random pairs.")
@@ -358,7 +412,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             # Collect authors by task inside this subgroup
             task_buckets = defaultdict(list)
             for row in subgroup_df.to_dict(orient="records"):
-                task_buckets[row[assignment_col_name]].append(row)
+                task_buckets[row[ASSIGNMENT_COL_NAME]].append(row)
 
             tasks = list(task_buckets.keys())
             if len(tasks) < 2:
@@ -371,9 +425,9 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
                     texts1, texts2 = task_buckets[t1], task_buckets[t2]
 
                     for a, b in product(texts1, texts2):
-                        if a[author_col_name] == b[author_col_name]:
+                        if a[AUTHOR_COL_NAME] == b[AUTHOR_COL_NAME]:
                             continue  # skip same-author, already handled
-                        diff_author_pairs.append(self._make_pair_dict(a=a,b=b,same=False))
+                        diff_author_pairs.append(self._make_pair_dict(left_text=a,right_text=b,same=False))
 
         # Randomly sample to balance with same-author pairs
         n_diff_pairs_target = len(same_author_pairs)
@@ -386,6 +440,14 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         return pairs
 
     def _load_student_metadata(self):
+        """
+        Load and normalize demographic metadata for student authors.
+
+        Metadata is read from the original SPSS file and restricted
+        to attributes required for subgroup-based pairing.
+
+        :return: DataFrame containing cleaned author metadata.
+        """
         author_metadata_columns = [
             "ID",
             "TEACHER",
