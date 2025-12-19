@@ -30,7 +30,7 @@ from genai_detection.detectors.detector_base import DetectorBase
 __all__ = ["UnmaskingDetector"]
 
 logger = logging.getLogger(__name__)
-logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
+logging.basicConfig( level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 warnings.simplefilter("ignore", category=ConvergenceWarning)
 

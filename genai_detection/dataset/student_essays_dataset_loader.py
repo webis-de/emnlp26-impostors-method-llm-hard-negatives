@@ -32,7 +32,7 @@ from genai_detection.dataset.base_dataset_loader import BaseDatasetLoader
 from genai_detection.paraphrasing.two_step_paraphrasers import *
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 # ==============================================================================
 # Constants

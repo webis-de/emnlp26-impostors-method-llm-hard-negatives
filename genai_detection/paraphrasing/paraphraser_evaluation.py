@@ -38,7 +38,7 @@ from genai_detection.util import preprocess_text as _preprocess_text
 
 nltk.download("wordnet")  # necessary for METEOR score
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 
 # FIXME: Restructure code to get extracted information from mongoDB instead of re-extracting it here.

@@ -21,7 +21,7 @@ from genai_detection.config import CONFIG
 __all__ = ["ImpostorDetector"]
 
 logger = logging.getLogger(__name__)
-logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
+logging.basicConfig( level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class ImpostorDetector(ImpostorBase):
     """
@@ -288,7 +288,7 @@ class ImpostorDetector(ImpostorBase):
                                     "original_text", "impostors_tfidf"]
             }
             document2insert["scores_over_different_rounds"], p_values = self.scorer.score_pair(pair=pair, vectorizer=feature_extractor.vectorizer)
-            # compare corrected p-value (times 2, since two tests) to alpha for statistical significance 
+            # compare corrected p-value (times 2, since two tests) to alpha for statistical significance
             preds = {
                 f"{key}_pred": bool(2 * p_val < self.significance_level)
                 for key, p_val in p_values.items()

@@ -29,7 +29,7 @@ from genai_detection.config import CONFIG
 from genai_detection.detectors.impostor import ImpostorDetector
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class BaseDatasetVisualization(ABC):
     def __init__(

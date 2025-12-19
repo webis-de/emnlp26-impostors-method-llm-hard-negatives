@@ -27,7 +27,7 @@ from genai_detection.util import preprocess_text as _preprocess_text
 __all__ = ["DetectorBase"]
 
 logger = logging.getLogger(__name__)
-logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
+logging.basicConfig( level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 
 class DetectorBase:

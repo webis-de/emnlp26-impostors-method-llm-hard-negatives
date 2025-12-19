@@ -26,7 +26,7 @@ from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 nltk.download("punkt_tab")
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 
 class Paraphraser(ABC):

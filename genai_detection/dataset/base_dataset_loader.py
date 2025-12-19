@@ -27,7 +27,7 @@ from genai_detection.paraphrasing.two_step_paraphrasers import *
 from genai_detection.util import preprocess_text as _preprocess_text
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 random.seed(42)
 # Koppel et al. (2004): 500 words

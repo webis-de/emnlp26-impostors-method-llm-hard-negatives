@@ -6,7 +6,7 @@ from genai_detection.experiments.reproduction.acc_n_imp_selection import run_acc
 from genai_detection.experiments.reproduction.prec_recall_curves import *
 
 logger = logging.getLogger(__name__)
-logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
+logging.basicConfig( level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 ray.init()
 

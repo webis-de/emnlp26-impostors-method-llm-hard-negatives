@@ -9,7 +9,7 @@ from genai_detection.experiments.reproduction.impostor_metrics import LABEL_TRAN
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 

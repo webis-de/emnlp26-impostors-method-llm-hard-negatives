@@ -7,7 +7,7 @@ from genai_detection.config import CONFIG
 from genai_detection.detectors.impostor import ImpostorDetector
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 ray.init()
