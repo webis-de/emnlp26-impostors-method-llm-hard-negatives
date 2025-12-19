@@ -8,11 +8,21 @@ def cosine_similarity(vec1, vec2):
     Calculate cosine similarity between two vectors.
     Koppel et al. (2014) have use cosine similarity as a baseline.
     """
-    return (
-        cs(vec1, vec2).flatten()[0]
-        if vec1 is not None and vec2 is not None
-        else 0.0
-    )
+    if vec1 is None or vec2 is None:
+        return 0.0
+
+        # Ensure both are numpy arrays
+    vec1 = np.asarray(vec1)
+    vec2 = np.asarray(vec2)
+
+    # Reshape only if 1D
+    if vec1.ndim == 1:
+        vec1 = vec1.reshape(1, -1)
+    if vec2.ndim == 1:
+        vec2 = vec2.reshape(1, -1)
+
+    # Compute cosine similarity (returns 2D array)
+    return cs(vec1, vec2).flatten()[0]
 
 
 def minmax_similarity(vec1, vec2):
