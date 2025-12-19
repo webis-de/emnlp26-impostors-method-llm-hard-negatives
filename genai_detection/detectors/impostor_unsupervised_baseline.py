@@ -78,10 +78,11 @@ class UnSupervisedImpostorBaseline(ImpostorBaselineBase):
         )  # id is the index of pair (i.e, length is half of the input text list)
         pairs = list(ichunked(text, 2)) if type(text[0]) == str else text
         for text_pair in pairs:
-            vectors = [self.get_tfidf_vector_for_text(t) for t in text_pair]
+            vectors = self.get_tfidf_vector_for_text(text_pair)
+            logging.info("Obtained TFIDF vectors for tex pair of shape %s", vectors.shape)
             assert len(vectors) == 2, "Input text must be a list of pairs of texts."
             if self.cosine:
-                scores_per_pair.append(cosine_similarity(vectors[0], vectors[1]))
+                scores_per_pair.append(cosine_similarity(vectors[0].reshape(-1, 1), vectors[1].reshape(-1, 1)))
             else:
                 scores_per_pair.append(minmax_similarity(vectors[0], vectors[1]))
 

@@ -185,7 +185,7 @@ class ParaphraseMongoDB:
             assert (
                 (text is not None) and type(text) == str and len(text) > 0
             ), f"Text ID {text_id} not found."
-            logging.info("Obtained text from text ID: %s, length of text %d, length of text ID %d", text_id, len(text), len(text_id))
+            logging.info("Obtained text from text ID: %s, length of text %d", text_id, len(text))
 
         if not text_id:
             text_id = self.find_document_by_non_id_field(collection=self.original_collection, document_field_name="text", document_value=text)[0]["_id"]
@@ -214,48 +214,55 @@ class ParaphraseMongoDB:
         documents = self.non_naive_paraphrase_collection.find({"text_id": document_id})
         return documents
 
-    def get_training_data_from_original_texts(self, dataset_name: str, batch_size: int = 1000):
+    def get_training_data_from_original_texts(
+        self,
+        dataset_name: str,
+        batch_size: int = 1000,
+    ):
         """
-        Generator that yields original text documents for a specific dataset whose _id is NOT in the test pairs collection.
-        Uses batching and streaming to handle large datasets.
-
-        :param dataset_name: Only fetch documents belonging to this dataset.
-        :param batch_size: Number of documents to fetch per batch.
-        :return: Yields dictionaries with "_id" and "text" for each document.
+        Single-use generator that yields training pairs with original texts.
+        Uses batching to minimize MongoDB round-trips and memory usage.
         """
         try:
-            # Step 1: Fetch all train pair IDs (as a set)
-            train_pair_ids = {
-                ObjectId(doc_id)
-                for doc in self.train_pairs_collection.find(
-                    {"dataset_name": dataset_name}, {"_id": 0, "left_id": 1, "right_id": 1}
-                )
-                for doc_id in (doc["left_id"], doc["right_id"])
-            }
-            logging.info(f"Loaded {len(train_pair_ids)} test pair IDs.")
+            pairs_cursor = self.train_pairs_collection.find(
+                {"dataset_name": dataset_name},
+                {"_id": 0, "left_id": 1, "right_id": 1, "same": 1},
+                batch_size=batch_size,
+            )
 
-            # Step 2: Stream original texts in batches
-            last_id = None
-            while True:
-                query = {"dataset": dataset_name, "_id": {"$in": list(train_pair_ids)}}
-                if last_id is not None:
-                    query["_id"]["$gt"] = last_id
-                cursor = (
-                    self.original_collection.find(query)
-                    .sort("_id", 1)
-                    .limit(batch_size)
-                )
-                batch_count = 0
-                for doc in cursor:
-                    yield doc
-                    last_id = doc["_id"]
-                    batch_count += 1
+            batch = []
 
-                if batch_count < batch_size:
-                    # No more documents left
-                    break
+            for pair in pairs_cursor:
+                batch.append(pair)
+
+                if len(batch) >= batch_size:
+                    yield from self._process_pair_batch(batch)
+                    batch.clear()
+
+            # process remaining pairs
+            if batch:
+                yield from self._process_pair_batch(batch)
 
         except PyMongoError as e:
             logging.error(f"MongoDB error while fetching documents: {e}")
         except Exception as e:
-            logging.error(f"Unexpected error: {e}")
+            logging.exception("Unexpected error while fetching training data")
+
+    def _process_pair_batch(self, pairs):
+        text_ids = {pid for p in pairs for pid in (p["left_id"], p["right_id"])}
+
+        texts_cursor = self.original_collection.find(
+            {"_id": {"$in": list(text_ids)}},
+            {"text": 1},
+        )
+
+        text_map = {doc["_id"]: doc["text"] for doc in texts_cursor}
+
+        for p in pairs:
+            yield {
+                "left_id": p["left_id"],
+                "right_id": p["right_id"],
+                "same": p["same"],
+                "left_text": text_map.get(p["left_id"]),
+                "right_text": text_map.get(p["right_id"]),
+            }

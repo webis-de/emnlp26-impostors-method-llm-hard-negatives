@@ -51,6 +51,43 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
         super().__init__(dataset_name=dataset_name)
         self.model = self.get_trained_linear_svc()
 
+    def _process_pairs_with_func(
+        self, text: t.Iterable[str], score_fn: t.Callable[[np.ndarray], t.Any]
+    ) -> t.List[t.Any]:
+        """
+        Process text pairs and apply a scoring function to the difference of TF-IDF vectors.
+
+        :param text: Iterable of strings or iterable of pairs of strings
+        :param score_fn: Function to compute score from vector difference
+        :return: List of results from score_fn
+        """
+        # Normalize input
+        if isinstance(text, str):
+            text = [text]
+
+        # Yield pairs
+        if isinstance(text[0], str):
+            pairs = list(ichunked(text, 2))
+        # elif not isinstance(text, (list, tuple)):
+        #     pairs = list(ichunked(text, 2))
+        else:
+            pairs = text
+
+        results = []
+        for text_pair in pairs:
+            vectors = self.get_tfidf_vector_for_text(text_pair)
+            logger.info("TFIDF shape of pair: %s", vectors.shape)
+            assert len(vectors) == 2, "Each pair must contain exactly two texts."
+
+            diff = abs(vectors[0] - vectors[1])
+            logger.info("TFIDF diff of pair: %s %s", diff, diff.shape)
+            diff = diff.reshape(1, -1)  # shape: (1, n_features)
+            logger.info("TFIDF diff of pair: %s %s", diff, diff.shape)
+            results.append(score_fn(diff))
+            logger.info("TFIDF score of pair: %s", results[-1])
+
+        return results
+
     def _get_score_impl(
         self, text: t.Iterable[str]
     ) -> t.Union[torch.Tensor, np.ndarray, t.Iterable[float]]:
@@ -60,21 +97,8 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
         :param text: An iterable of strings (texts) to score.
         :return: A list of scores for each text.
         """
-        if isinstance(text, str):
-            text = [text]
-
-        scores_per_pair = (
-            []
-        )  # id is the index of the pair (i.e., length is half of the input text list)
-        pairs = list(ichunked(text, 2)) if type(text[0]) == str else text
-        for text_pair in pairs:
-            vectors = [self.get_tfidf_vector_for_text(t) for t in text_pair]
-            assert len(vectors) == 2, "Input text must be a list of pairs of texts."
-            # get score for positive class: https://scikit-learn.org/stable/modules/svm.html#classification (06.08.2025)
-            scores_per_pair.append(
-                self.model.decision_function(abs(vectors[0] - vectors[1]))
-            )
-        return np.array(scores_per_pair)
+        scores = self._process_pairs_with_func(text, self.model.decision_function)
+        return np.array(scores)
 
     def get_prediction(self, text: t.Iterable[str]) -> t.List[bool]:
         """
@@ -83,18 +107,7 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
         :param text: input text or batch of input texts
         :return: boolean classifications of whether inputs are likely same author.
         """
-        if isinstance(text, str):
-            text = [text]
-
-        scores_per_pair = (
-            []
-        )  # id is index of pair (i.e, length is half of the input text list)
-        pairs = list(ichunked(text, 2)) if type(text[0]) == str else text
-        for text_pair in pairs:
-            vectors = [self.get_tfidf_vector_for_text(t) for t in text_pair]
-            assert len(vectors) == 2, "Input text must be a list of pairs of texts."
-            scores_per_pair.append(self.model.predict(abs(vectors[0] - vectors[1])))
-        return np.array(scores_per_pair)
+        return self._process_pairs_with_func(text, self.model.predict)
 
     def get_trained_linear_svc(self, save_model: bool = False) -> LinearSVC:
         """
@@ -112,25 +125,22 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
             return pickle.load(path2model)
         else:
             model = LinearSVC()
-            self.train_dataset = (
-                self.mongoDB.get_training_data_from_original_texts(
-                    dataset_name=self.dataset_name
-                )
-            )
+            # TODO: list comprehension?
             disputed_texts = self.train_dataset["left_text"]
             candidate_texts = self.train_dataset["right_text"]
-            disputed_vectors = self._vectorizer.transform(
-                [" ".join(self.tokenize_char_ngrams(t)) for t in disputed_texts]
-            )
-            candidate_vectors = self._vectorizer.transform(
-                [" ".join(self.tokenize_char_ngrams(t)) for t in candidate_texts]
-            )
+            logger.info(f"Training {len(candidate_texts)} candidate texts")
+            disputed_vectors = self.get_tfidf_vector_for_text(texts=disputed_texts)
+            candidate_vectors = self.get_tfidf_vector_for_text(texts=candidate_texts)
+            logger.info(f"Training {len(candidate_vectors)} candidate vectors111111")
+
             # Calculate element-wise difference
-            X = abs(disputed_vectors - candidate_vectors)
+            X = [abs(d - c) for d, c in zip(disputed_vectors, candidate_vectors)]
             # y = train_dataset["same"].astype(int).values
             y = np.array(self.train_dataset["same"], dtype=int)
+            logger.info(f"Training {len(y)} labels")
             # Train model
             model.fit(X, y)
+            logger.info(f"Saving trained LinearSVC model to {path2model}")
             if save_model:
                 # pickle.dump(model, open(path2model, "wb"))
                 with open(path2model, "wb") as f:

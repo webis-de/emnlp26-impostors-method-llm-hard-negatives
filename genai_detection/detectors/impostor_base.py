@@ -14,8 +14,7 @@
 import logging
 import os
 import re
-from collections import Counter
-from operator import itemgetter
+from typing import List
 
 import numpy as np
 import pandas as pd
@@ -38,6 +37,7 @@ class ImpostorBase(DetectorBase):
         super().__init__()
         self.mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
 
+    # TODO: obsolete? TFIDF vectorizer has this built-in
     @staticmethod
     def tokenize_char_ngrams(
         text: str, n: int = 4, normalize_ws: bool = True, space_free: bool = True
@@ -93,58 +93,36 @@ class ImpostorBaselineBase(ImpostorBase):
         super().__init__()
         # get all original texts from mongodb collection whose ID is not in test pairs mongodb collection
         self.dataset_name = dataset_name
-        train_dataset_generator = self.mongoDB.get_training_data_from_original_texts(dataset_name=dataset_name)
-        self.train_dataset = pd.DataFrame(list(train_dataset_generator))
-        self.train_dataset["left_text"] = self.train_dataset["left_id"].apply(
-            lambda x: self.mongoDB.get_text_or_id_from_orginal_collection(
-                text=None, text_id=x
-            )
-        )
-        self.train_dataset["right_text"] = self.train_dataset["right_id"].apply(
-            lambda x: self.mongoDB.get_text_or_id_from_orginal_collection(
-                text=None, text_id=x
-            )
-        )
-        logging.info(f"Training dataset ready (in-memory).")
+        self.train_dataset = pd.DataFrame(self.mongoDB.get_training_data_from_original_texts(dataset_name=self.dataset_name))
+        logger.info("Number of training pairs %d (in-memory)", self.train_dataset.shape[0])
 
-        def preprocessed_texts():
-            # generator is exhausted after computing the vocabulary, and loading whole data into memory is not a good idea
-            for pair in self.train_dataset:
-                yield " ".join(self.tokenize_char_ngrams(pair["left_text"]))
-                yield " ".join(self.tokenize_char_ngrams(pair["right_text"]))
+        texts = pd.concat(
+            [
+                self.train_dataset["left_text"],
+                self.train_dataset["right_text"],
+            ],
+            ignore_index=True,
+        )
 
         self._vectorizer = TfidfVectorizer(
-            vocabulary=self.get_top_tokens(), input="content", dtype=np.float32).fit(preprocessed_texts())
+            max_features=100000,
+            dtype=np.float32,
+            ngram_range=(4, 4), analyzer="char_wb", min_df=2
+        )
+
+        self._vectorizer.fit(texts)
         logging.info("Fitted vectorizer.")
 
-    def get_top_tokens(self, max_tokens: int = 100000):
+    def get_tfidf_vector_for_text(self, texts: List[str]):
         """
-        Get the top tokens from the corpus.
+        Get the TF-IDF vector for a list of texts.
 
-        :param max_tokens: The maximum number of tokens to return.
-        :return: A list of the top tokens.
-        """
-        freqs = Counter()
-
-        # Iterate over generator and tokenize on the fly
-        for doc in self.train_dataset_generator:
-            text = doc["text"]
-            tokens = self.tokenize_char_ngrams(text, n=4)  # adjust n if needed
-            freqs.update(tokens)
-
-        freqs = Counter({k: v for k, v in freqs.items() if v > 1})
-        return [itemgetter(0)(item) for item in freqs.most_common(max_tokens)]#list(map(itemgetter(0), freqs.most_common(max_tokens)))
-
-    def get_tfidf_vector_for_text(self, text: str):
-        """
-        Get the TF-IDF vector for a given text.
-
-        :param text: The input text to vectorize.
+        :param texts: The input texts to vectorize.
         :return: A TF-IDF vector as a NumPy array.
         """
-        ngrams = self.tokenize_char_ngrams(text, 4)
-        tfidf_matrix = self._vectorizer.fit_transform(
-            [" ".join(ngrams)]
-        )  # format: (n_samples=1, n_features=self.top_n)
+        if not isinstance(texts, list):
+            # pandas Series or generator
+            texts = list(texts) 
+        tfidf_matrix = self._vectorizer.transform(texts)  # format: (n_samples=1, n_features=self.top_n)
 
         return tfidf_matrix.toarray()
