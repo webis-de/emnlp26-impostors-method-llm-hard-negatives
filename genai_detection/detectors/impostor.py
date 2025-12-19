@@ -114,6 +114,7 @@ class ImpostorDetector(ImpostorBase):
         self.text_preprocessor = Preprocessor()
         self.pair_processor = PairPreprocessor(mongoDB=self.mongoDB, tokenizer=self.tokenizer, min_n_tokens=self.min_n_tokens, upsample=self.upsample)
         self.scorer = Scorer(rounds=self.rounds, portion_delete=self.portion_delete, similarity_fn=minmax_similarity)
+        self.significance_level = 0.05
 
     def set_treshold(self, threshold: float):
         """
@@ -287,9 +288,9 @@ class ImpostorDetector(ImpostorBase):
                                     "original_text", "impostors_tfidf"]
             }
             document2insert["scores_over_different_rounds"], p_values = self.scorer.score_pair(pair=pair, vectorizer=feature_extractor.vectorizer)
-            # TODO: compare p-value to p_0 for statistical significance to random selection
+            # compare corrected p-value (times 2, since two tests) to alpha for statistical significance 
             preds = {
-                f"{key}_pred": bool(p_val < (1 / (self.n_impostors + 1)))
+                f"{key}_pred": bool(2 * p_val < self.significance_level)
                 for key, p_val in p_values.items()
             }
 
