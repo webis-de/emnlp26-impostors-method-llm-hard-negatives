@@ -147,7 +147,7 @@ class ParaphraseMongoDB:
         :param search_args: The names of the non-id fields and their values of a non-id fields in a dictionary.
         :return: The found document as a cursor object, or None if not found.
         """
-        document = collection.find({**search_args})
+        document = collection.find({**search_args}).sort("_id", 1)
         return document
 
     def get_random_matching_documents_from_collection(self, collection, num_samples: int, search_args:dict):
@@ -211,7 +211,7 @@ class ParaphraseMongoDB:
 
         https://www.mongodb.com/docs/manual/reference/method/db.collection.find/ (06.11.2025)
         """
-        documents = self.non_naive_paraphrase_collection.find({"text_id": document_id})
+        documents = self.non_naive_paraphrase_collection.find({"text_id": document_id}).sort("_id", 1)
         return documents
 
     def get_training_data_from_original_texts(
@@ -228,7 +228,7 @@ class ParaphraseMongoDB:
                 {"dataset_name": dataset_name},
                 {"_id": 0, "left_id": 1, "right_id": 1, "same": 1},
                 batch_size=batch_size,
-            )
+            ).sort("_id", 1)
 
             batch = []
 
@@ -254,7 +254,7 @@ class ParaphraseMongoDB:
         texts_cursor = self.original_collection.find(
             {"_id": {"$in": list(text_ids)}},
             {"text": 1},
-        )
+        ).sort("_id", 1)
 
         text_map = {doc["_id"]: doc["text"] for doc in texts_cursor}
 
