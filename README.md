@@ -256,6 +256,13 @@ kubectl port-forward -n webisservices deployment/artificial-authorship-verificat
 - This will forward the local port `27018` to the remote port `27017` of the MongoDB deployment.
 - You can then access the database locally at `localhost:27018`.
 
+If you want automatic retries in case of errors, run:
+```bash
+while ! kubectl port-forward -n webisservices deployment/artificial-authorship-verification-mongodb 27018:27017; do sleep 1; done
+```
+This will rerun the command in case it breaks (because your WIFI is turned off or something else happened).
+You can stop it via `Ctrl + C`.
+
 (2) Via Pycharm:
 
   (2.1) Go to `Database` > `+` > `Data Source` > `MongoDB` tab.
