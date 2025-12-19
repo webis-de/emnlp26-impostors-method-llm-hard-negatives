@@ -156,7 +156,6 @@ def plot_precision_recall_curve(
 
         for key, df in results.items():
             label = LABEL_TRANSLATIONS.get(key, key)
-
             precisions = df["precision"].apply(
                 lambda x: x[positive_class_id]
             )
@@ -197,6 +196,7 @@ def plot_precision_recall_curve(
 
 def run_prec_recall_curves(dataset_name:str, imp_gen_techniques:List[str]):
     results_dict = compute_prec_recall_f1_acc_dict(dataset_name=dataset_name, imp_gen_techniques=imp_gen_techniques)
+    logger.info("Obtained scores for approaches %s", results_dict.keys())
 
     # results_dict: {approach_name: DataFrame}
     dfs = []
