@@ -205,10 +205,11 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
             "length_original_text": len(original_text.split()),
             "length_impostor_text": len(impostor_text.split()),
             "query": query,
-            "impostor_text": impostor_text,
+            # mongoDB collection allows at most 16 MB per document (puffer for features other than text)
+            "impostor_text": impostor_text[: 14 * 2 ^ 20],
             "uri": uri,
             "index": self.index_name,
-            "created_at": datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            "created_at": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
         }
 
         # Insert into document into paraphrase collection
@@ -224,7 +225,7 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
         :param queries: List of search queries to fetch results for
         :param text: Text of the original text (used to derive the query from), only used as metadata when storing result in mongoDB collection.
         :param text_id: Id of the original text (used to derive the query from), only used as metadata when storing result in mongoDB collection.
-        :return: List of impostor texts. # TODO: delete this: dictionaries containing search results for all queries
+        :return: List of impostor texts.
         """
         all_results = []
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -288,6 +289,7 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
             search_args={"text_id": text_id, "index": self.index_name},
         )
         n_imp_to_generate = self.n_impostors - len(impostors)
+        print(f"Found {len(impostors)}/{self.n_impostors} impostors.")
         if n_imp_to_generate <= 0:
             logging.info(
                 "Number of impostors in mongodb collection: {} for text with ID: {}. No need to generate more impostors, just returning {} impostors.".format(
