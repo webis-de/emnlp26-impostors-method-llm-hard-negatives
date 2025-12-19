@@ -181,7 +181,7 @@ class StartPageSearchImpostorGenerator(SearchImpostorGeneratorBase):
         except Exception as e:
             logger.error("Connection error while fetching results.")
             logger.exception(e)
-            return []
+            return self.fetch_results(query=query)#[]
 
 
 if __name__ == "__main__":
