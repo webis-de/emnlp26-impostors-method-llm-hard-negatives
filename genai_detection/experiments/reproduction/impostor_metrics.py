@@ -44,7 +44,7 @@ def load_test_pairs(dataset_name: str) -> Tuple[List[str], List[int]]:
             document_value=dataset_name,
         )
         # TODO: increase
-    )[:2]
+    )[:3]
 
     text_ids = [
         str(id_)
@@ -85,18 +85,21 @@ def compute_metrics_for_thresholds(
                 "precision": precision_score(
                     ground_truth,
                     binary_preds,
+                    labels=[0, 1],
                     average=None,
                     zero_division=0,
                 ),
                 "recall": recall_score(
                     ground_truth,
                     binary_preds,
+                    labels=[0, 1],
                     average=None,
                     zero_division=0,
                 ),
                 "f1": f1_score(
                     ground_truth,
                     binary_preds,
+                    labels=[0, 1],
                     average=None,
                     zero_division=0,
                 ),
@@ -156,4 +159,3 @@ def extract_best_metric(
         return 0.0
 
     return float(df[metric].apply(safe_get).max())
-
