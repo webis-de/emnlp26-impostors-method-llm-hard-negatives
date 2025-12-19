@@ -191,7 +191,7 @@ class ImpostorDetector(ImpostorBase):
                        self.impostor_technique, "left_id":pair["left"]["id"], "right_id":pair["right"]["id"],"n_impostors":self.n_impostors, "n_potential_impostors":self.impostor_generator.num_potential_impostors}))
                 if len(cursor) > 0:
                     final_scores.append(cursor[0]["scores_over_different_rounds"])
-                    logging.info(f"Found pre-computed scores for {pair['left']['id']}, {pair['right']['id']} in mongoDB collection. Using pre-computed scores.")
+                    logger.info(f"Found pre-computed scores for {pair['left']['id']}, {pair['right']['id']} in mongoDB collection. Using pre-computed scores.")
                     continue
 
                 impostors_of_left = (
@@ -199,7 +199,7 @@ class ImpostorDetector(ImpostorBase):
                         text_id=pair["left"]["id"]
                     )
                 )
-                logging.info(
+                logger.info(
                     f"Obtained {len(impostors_of_left)} impostors by text ID for left text with text ID {pair['left']['id']}. Type of "
                     f"impostors is {type(impostors_of_left)}."
                 )
@@ -208,18 +208,18 @@ class ImpostorDetector(ImpostorBase):
                         text_id=pair["right"]["id"]
                     )
                 )
-                logging.info(f"Obtained {len(impostors_of_right)} impostors by text ID for right text with text ID {pair['right']['id']}. Type "
+                logger.info(f"Obtained {len(impostors_of_right)} impostors by text ID for right text with text ID {pair['right']['id']}. Type "
                              f"of impostors is {type(impostors_of_right)}.")
 
             else:
                 impostors_of_left = self.impostor_generator.generate_impostors(
                     text=pair["left"]["original_text"]
                 )
-                logging.info(f"Obtained impostors by text for left text.")
+                logger.info(f"Obtained impostors by text for left text.")
                 impostors_of_right = self.impostor_generator.generate_impostors(
                     text=pair["right"]["original_text"]
                 )
-                logging.info(f"Obtained impostors by text for right text.")
+                logger.info(f"Obtained impostors by text for right text.")
             if not isinstance(impostors_of_right, list) or len(impostors_of_right) < 2:
                 raise ValueError(
                     f"Right impostor generator must return a list with at least 2 impostors. Is list {isinstance(impostors_of_right, list)} with {len(impostors_of_right)} impostors."
@@ -230,7 +230,7 @@ class ImpostorDetector(ImpostorBase):
                 )
             pair["left"]["impostors"] = impostors_of_left
             pair["left"]["processed_impostors"] = [self.text_preprocessor.upsample_to_min_n_tokens(text=imp, min_n_tokens=self.min_n_tokens, upsample=self.upsample) for imp in impostors_of_left]
-            logging.info(f"Processed left impostors.")
+            logger.info(f"Processed left impostors.")
 
             pair["right"]["impostors"] = impostors_of_right
             pair["right"]["processed_impostors"] = [
@@ -239,14 +239,14 @@ class ImpostorDetector(ImpostorBase):
                 )
                 for imp in impostors_of_right
             ]
-            logging.info(f"Processed right impostors.")
+            logger.info(f"Processed right impostors.")
             # --- 2) Build corpus for TFIDF -----------------------------------------------
             # Compute TFIDF based on the processed text, which is upsampled if upsample is set to true and the original (preprocessed) text otherwise
             corpus = [pair["left"]["processed_text"], pair["right"]["processed_text"]] +  pair["left"]["processed_impostors"] +  pair["right"]["processed_impostors"]
 
             feature_extractor = TfidfFeatureExtractor()
             X = feature_extractor.fit_transform(corpus)
-            logging.info(f"Feature extractor (i.e., TFIDF) fit-transform done.")
+            logger.info(f"Feature extractor (i.e., TFIDF) fit-transform done.")
 
             # --- 3) Slice TF-IDF vectors cleanly -----------------------------------------
             def dense_vector(row):
@@ -276,7 +276,7 @@ class ImpostorDetector(ImpostorBase):
             ]
             pair["left"]["impostors_tfidf"] = left_impostors_tfidf
             pair["right"]["impostors_tfidf"] = right_impostors_tfidf
-            logging.info("Obtained TFIDF vector for candidate and disputed text, as well as impostors.")
+            logger.info("Obtained TFIDF vector for candidate and disputed text, as well as impostors.")
 
             # --- 4) Final store structure ------------------------------------------------
             # TFIDF is too big to be saved (BSON error during mongodb upload)
@@ -302,18 +302,18 @@ class ImpostorDetector(ImpostorBase):
             document2insert["n_impostors"] = self.n_impostors
             document2insert["n_potential_impostors"] = self.impostor_generator.num_potential_impostors
             document2insert["created_at"] = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            logging.info(f"Obtained final score of {document2insert['scores_over_different_rounds']} for text input "
+            logger.info(f"Obtained final score of {document2insert['scores_over_different_rounds']} for text input "
                          f"pair. About to insert instance with following keys: {document2insert.keys()}.")
             try:
                 self.mongoDB.insert_document(collection=self.mongoDB.impostor_output_collection, insert_data=document2insert)
-                logging.info(
+                logger.info(
                     f"Inserted score into MongoDB collection {CONFIG.MONGO_IMPOSTOR_OUTPUT_COLLECTION}."
                 )
             except Exception as e:
-                logging.error(f"Failed to insert document: {document2insert}\n\n{e}")
+                logger.error(f"Failed to insert document: {document2insert}\n\n{e}")
 
             final_scores.append(document2insert["scores_over_different_rounds"])
-            logging.info(f"Finished computing score for texts with ID {pair['left']['id']} and ID {pair['right']['id']}.")
+            logger.info(f"Finished computing score for texts with ID {pair['left']['id']} and ID {pair['right']['id']}.")
 
         # one element = averaged score of X,Y and Y,X pair (score=number of rounds where the candidate was the most similar)
         # threshold is in [0,1], hence: normalized by rounds
