@@ -300,7 +300,7 @@ class ImpostorDetector(ImpostorBase):
             document2insert["impostor_generation_technique"] = self.impostor_technique
             document2insert["n_impostors"] = self.n_impostors
             document2insert["n_potential_impostors"] = self.impostor_generator.num_potential_impostors
-            document2insert["created_at"] = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            document2insert["created_at"] = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             logging.info(f"Obtained final score of {document2insert['scores_over_different_rounds']} for text input "
                          f"pair. About to insert instance with following keys: {document2insert.keys()}.")
             try:
