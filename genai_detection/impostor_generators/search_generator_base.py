@@ -198,6 +198,11 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
         ), f"paraphrased_text must be a str, but is of type {type(impostor_text)}"
         assert len(impostor_text.split()) > 0, "paraphrased_text is empty"
 
+        MAX_BYTES = 14 * 2**20  # 14 MB buffer
+        # mongoDB collection allows at most 16 MB per document (puffer for features other than text)
+        impostor_text_bytes = impostor_text.encode("utf-8")[:MAX_BYTES]
+        impostor_text_safe = impostor_text_bytes.decode("utf-8", errors="ignore")
+
         # Build the new document
         paraphrase_doc = {
             # Do not use text_id as _id since a text will be paraphrased multiple times with different settings
@@ -205,8 +210,7 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
             "length_original_text": len(original_text.split()),
             "length_impostor_text": len(impostor_text.split()),
             "query": query,
-            # mongoDB collection allows at most 16 MB per document (puffer for features other than text)
-            "impostor_text": impostor_text[: 14 * 2 ^ 20],
+            "impostor_text": impostor_text_safe,
             "uri": uri,
             "index": self.index_name,
             "created_at": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
