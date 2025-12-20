@@ -3,7 +3,7 @@ from random import sample
 from typing import Dict, Any, List, DefaultDict
 
 import numpy as np
-from scipy.stats import binom
+from scipy.stats import binomtest
 
 
 class Scorer:
@@ -80,12 +80,12 @@ class Scorer:
 
             # 5) Running mean over permutations
             total_score += round_score
-            # p-value is the probability of witness selecting suspect at least round_score times given p_0 is selection
-            # probability: P(X>= round_score) = 1 - CDF(round_score - 1) = SF(round_score - 1)
-            # SF ist survival function: https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.binom.html (
-            # 19.12.2025)
+            # right-tail binomial test
+            # (https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.binomtest.html 20.12.2025)
             p_feat_name = f"{disputed}_disputed_{candidate}_candidate_uncorrected_p_value"
-            p_values[p_feat_name] = binom.sf(k=int(round_score)- 1, n=self.rounds, p=1/(1 + len(pair[candidate]["impostors_tfidf"])))
+            result = binomtest(int(round_score), n=self.rounds, p=1/(1 + len(pair[candidate]["impostors_tfidf"])),
+                                              alternative='greater')
+            p_values[p_feat_name] = result.pvalue
             total_score /= j + 1
 
         return total_score, p_values
