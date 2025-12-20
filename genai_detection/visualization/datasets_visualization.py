@@ -24,12 +24,14 @@ import numpy as np
 import pandas as pd
 from datasets import load_from_disk, concatenate_datasets
 
+from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
+
 sys.path.append(os.path.abspath(".."))
 from genai_detection.config import CONFIG
 from genai_detection.detectors.impostor import ImpostorDetector
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class BaseDatasetVisualization(ABC):
     def __init__(
@@ -42,7 +44,8 @@ class BaseDatasetVisualization(ABC):
         """
         self.name = name
         self.dataset = self.load_dataset()
-        self.savefig_base = Path(__file__).resolve().parent.parent.parent / savefig_base
+        self.mongoDB =  ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
+        self.savefig_base = Path(__file__).resolve().parents[2] / savefig_base
         assert (
             self.savefig_base.exists()
         ), f"Savefig base path {self.savefig_base} does not exist."
@@ -73,7 +76,7 @@ class BaseDatasetVisualization(ABC):
         ), f"Invalid dataset {self.name} provided."
 
         dataset = load_from_disk(
-            os.path.join(os.path.abspath(".."), name2path[self.name])
+            Path(__file__).resolve().parents[2]/ name2path[self.name]
         )
         combined = concatenate_datasets([split for split in dataset.values()])
         return combined.to_pandas()
@@ -86,14 +89,34 @@ class BaseDatasetVisualization(ABC):
         """
         if dataset is None:
             dataset = self.dataset
-        text_lengths = [len(text) for text in chain.from_iterable(dataset["pair"])]
-        num_words = [len(text.split()) for text in chain.from_iterable(dataset["pair"])]
+
+        # collect unique ids first
+        all_ids = set(dataset["left_id"]) | set(dataset["right_id"])
+        all_authors = set(dataset["left_author"]) | set(dataset["right_author"])
+        logger.info(f"Obtained {len(all_ids)} ids and {len(all_authors)} authors.")
+
+        # fetch texts once per id
+        id_to_text = {
+            id: self.mongoDB.get_text_or_id_from_orginal_collection(
+                text=None, text_id=id
+            )[0]
+            for id in all_ids
+        }
+        logger.info("Obtained mapping from ID to text")
+
+        # rebuild list in original order
+        all_texts = [id_to_text[id] for id in dataset["left_id"]]
+        all_texts += [id_to_text[id] for id in dataset["right_id"]]
+        logger.info("Obtained texts from IDs.")
+
+        text_lengths = [len(text) for text in all_texts]
+        num_words = [len(text.split()) for text in all_texts]
         text_lengths = np.array(text_lengths)
         num_words = np.array(num_words)
         stats = {
             "dataset": self.name,
             "num_pairs": len(dataset),
-            "num_authors": len(set(chain.from_iterable(dataset["authors"]))),
+            "num_authors": len(all_authors),
             "num_same_pairs": dataset["same"].sum(),
             "num_different_pairs": len(dataset) - dataset["same"].sum(),
             "avg_text_len_chars": round(text_lengths.mean(), 2),
@@ -115,6 +138,7 @@ class BaseDatasetVisualization(ABC):
             stats_df.to_csv(
                 save_path / f"{self.name}_stats.csv", index=False, float_format="%.2f"
             )
+            logger.info(f"Statistics saved to {save_path / self.name}_stats.csv")
 
         return stats_df
 
@@ -345,3 +369,7 @@ class StudentEssaysVisualization(BaseDatasetVisualization):
 class ArtificialStudentEssaysVisualization(BaseDatasetVisualization):
     def __init__(self, name: str = CONFIG.ARTIFICIAL_STUDENT_ESSAYS):
         super().__init__(name=name)
+
+if __name__ == "__main__":
+    student_essays_visualization = StudentEssaysVisualization()
+    student_essays_visualization.dataset_stats()
