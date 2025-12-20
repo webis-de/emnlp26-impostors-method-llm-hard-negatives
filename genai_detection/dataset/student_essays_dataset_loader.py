@@ -42,7 +42,7 @@ random.seed(42)
 # - Koppel et al. (2004): 500 words
 # - Bevendorff et al. (2019): 700 words
 # - Bevendorff et al. (2025): 3000 characters
-MIN_NUM_WORDS = 500
+MIN_NUM_WORDS = 700 # TODO: rerun with 700
 
 # Canonical column names used throughout the loader
 ASSIGNMENT_COL_NAME = "assignment"
