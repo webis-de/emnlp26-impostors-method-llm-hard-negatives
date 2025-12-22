@@ -27,7 +27,7 @@ from genai_detection.dataset.student_essays_dataset_loader import StudentEssayDa
 from genai_detection.paraphrasing.two_step_paraphrasers import *
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 random.seed(42)
 # Koppel et al. (2004): 500 words

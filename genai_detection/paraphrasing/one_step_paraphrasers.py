@@ -27,7 +27,7 @@ from genai_detection.config import CONFIG
 from genai_detection.paraphrasing.paraphraser import Paraphraser
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class OneStepParaphraser(Paraphraser):
     """

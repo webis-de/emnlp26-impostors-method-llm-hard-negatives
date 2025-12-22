@@ -19,7 +19,7 @@ from genai_detection.impostor_generators.ImpostorGenerator import (
 )
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 
 class InDomainImpostorGenerator(MongoDBSavedGenerator):
