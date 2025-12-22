@@ -24,14 +24,15 @@ from matplotlib import pyplot as plt
 
 from genai_detection.config import CONFIG
 from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENERATORS
+from genai_detection.detectors.impostor import ImpostorDetector
 from genai_detection.detectors.impostor_supervised_baseline import SupervisedImpostorBaseline
 from genai_detection.detectors.impostor_unsupervised_baseline import UnSupervisedImpostorBaseline
 from genai_detection.detectors.ppmd import PPMdDetector
 from genai_detection.detectors.unmasking import UnmaskingDetector
 from genai_detection.experiments.reproduction.impostor_metrics import (
-    load_test_pairs,
     compute_metrics_parallel,
     LABEL_TRANSLATIONS,
+    load_test_pairs,
 )
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
@@ -88,17 +89,17 @@ def compute_prec_recall_f1_acc_dict(
 
     predictions: Dict[str, List[float]] = {}
 
-    # for technique in imp_gen_techniques:
-    #     logger.info("Obtaining impostor scores: %s", technique)
-    #     detector = ImpostorDetector(
-    #         impostor_technique=technique,
-    #         n_impostors=50,
-    #     )
-    #     scores = detector.get_score(text=text_test_ID_pairs)
-    #     print(technique)
-    #     print(len(scores), scores)
-    #     assert scores is not None
-    #     predictions[technique] = scores
+    for technique in imp_gen_techniques:
+        logger.info("Obtaining impostor scores: %s", technique)
+        detector = ImpostorDetector(
+            impostor_technique=technique,
+            n_impostors=50,
+        )
+        scores = detector.get_score(text=text_test_ID_pairs)
+        print(technique)
+        print(len(scores), scores)
+        assert scores is not None
+        predictions[technique] = scores
 
     baselines = {
         "unsupervised_baseline_min-max": UnSupervisedImpostorBaseline(
@@ -121,11 +122,12 @@ def compute_prec_recall_f1_acc_dict(
 
     for name, baseline in baselines.items():
         # baselines assume text is raw text, not text ID
+        print(name)
 
         preds = baseline.get_score(text_test_pairs)
         preds = preds.tolist() if hasattr(preds, "tolist") else preds
         predictions[name] = np.asarray(preds).ravel().tolist()
-
+        print(predictions[name])
     # -----------------------------------------------------------------
     # Metric computation (shared implementation)
     # -----------------------------------------------------------------
