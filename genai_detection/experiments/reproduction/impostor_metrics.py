@@ -11,7 +11,7 @@ from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 logger = logging.getLogger(__name__)
 
-THRESHOLDS = np.arange(0.0, 1.05, 0.1)
+THRESHOLDS = np.arange(0.0, 1.05, 0.01)
 
 LABEL_TRANSLATIONS = {
     "in_domain": "In-Domain",
@@ -30,27 +30,32 @@ LABEL_TRANSLATIONS = {
 # ---------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------
-
-def load_test_pairs(dataset_name: str) -> Tuple[List[str], List[int]]:
+def _load_input_pairs(dataset_name: str, test_split:bool=True) -> Tuple[List[str], List[int]]:
     """
     Load text-pair IDs and ground-truth labels from MongoDB.
     """
     mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
+    collection = mongoDB.test_pairs_collection if test_split else mongoDB.train_pairs_collection
 
     test_pairs = list(
         mongoDB.find_document_by_non_id_field(
-            collection=mongoDB.test_pairs_collection,
+            collection=collection,
             document_field_name="dataset_name",
             document_value=dataset_name,
         )
         # TODO: increase
-    )[:3]
+    )#[:50]
 
     text_ids = [
         str(id_)
         for pair in test_pairs
         for id_ in (pair["left_id"], pair["right_id"])
     ]
+    # TODO:
+    output_path = "text_ids.txt"
+
+    with open(output_path, "a", encoding="utf-8") as f:
+        f.write(",".join(text_ids) + "\n")
     ground_truth = [pair["same"] for pair in test_pairs]
 
     logger.info(
@@ -61,6 +66,14 @@ def load_test_pairs(dataset_name: str) -> Tuple[List[str], List[int]]:
 
     return text_ids, ground_truth
 
+def load_test_pairs(dataset_name: str) -> Tuple[List[str], List[int]]:
+    """
+    Load text-pair IDs and ground-truth labels from MongoDB.
+    """
+    return _load_input_pairs(dataset_name, test_split=True)
+
+def load_train_pairs(dataset_name: str) -> Tuple[List[str], List[int]]:
+    return _load_input_pairs(dataset_name, test_split=False)
 
 # ---------------------------------------------------------------------
 # Metric computation
