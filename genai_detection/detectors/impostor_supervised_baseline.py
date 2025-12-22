@@ -61,30 +61,38 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
         :param score_fn: Function to compute score from vector difference
         :return: List of results from score_fn
         """
-        # Normalize input
-        if isinstance(text, str):
-            text = [text]
+        print("Processing pairs with TF-IDF scoring function", len(text))
 
-        # Yield pairs
-        if isinstance(text[0], str):
-            pairs = list(ichunked(text, 2))
-        # elif not isinstance(text, (list, tuple)):
-        #     pairs = list(ichunked(text, 2))
+        if isinstance(text, str):
+            raise ValueError("Expected iterable of texts, got a single string")
+
+        if (
+            isinstance(text, (list, tuple))
+            and len(text) == 2
+            and all(isinstance(t, str) for t in text)
+        ):
+            pairs = [text]  # already one pair
         else:
-            pairs = text
+            pairs = list(ichunked(text, 2))
 
         results = []
-        for text_pair in pairs:
+        for chunk in pairs:
+            text_pair = list(chunk)
+            # print("textst", text_pair)
             vectors = self.get_tfidf_vector_for_text(text_pair)
-            logger.info("TFIDF shape of pair: %s", vectors.shape)
+            # print(vectors.shape)
+            # print("Non-zeros text 0:", np.count_nonzero(vectors[0]))
+            # print("Non-zeros text 1:", np.count_nonzero(vectors[1]))
+
+            # print("TFIDF shape of pair: %s", vectors.shape)
             assert len(vectors) == 2, "Each pair must contain exactly two texts."
 
             diff = abs(vectors[0] - vectors[1])
-            logger.info("TFIDF diff of pair: %s %s", diff, diff.shape)
+            logger.info("TFIDF diff of pair: %s %s %s", diff, np.unique(diff.data), diff.shape)
             diff = diff.reshape(1, -1)  # shape: (1, n_features)
-            logger.info("TFIDF diff of pair: %s %s", diff, diff.shape)
+            # print("TFIDF diff of pair: %s %s", diff, np.unique(diff.data), diff.shape)
             results.append(score_fn(diff))
-            logger.info("TFIDF score of pair: %s", results[-1])
+            # print("TFIDF score of pair: %s", results[-1])
 
         return results
 
@@ -102,7 +110,7 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
 
     def get_prediction(self, text: t.Iterable[str]) -> t.List[bool]:
         """
-        Predict if the input text(s) were written by a the same author.
+        Predict if the input text(s) were written by the same author.
 
         :param text: input text or batch of input texts
         :return: boolean classifications of whether inputs are likely same author.
@@ -121,7 +129,7 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
         )
         path2model.parent.mkdir(parents=True, exist_ok=True)
         if path2model.exists():
-            logging.info(f"Loading trained LinearSVC model from {path2model}")
+            print(f"Loading trained LinearSVC model from {path2model}")
             return pickle.load(path2model)
         else:
             model = LinearSVC()
@@ -131,7 +139,7 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
             logger.info(f"Training {len(candidate_texts)} candidate texts")
             disputed_vectors = self.get_tfidf_vector_for_text(texts=disputed_texts)
             candidate_vectors = self.get_tfidf_vector_for_text(texts=candidate_texts)
-            logger.info(f"Training {len(candidate_vectors)} candidate vectors111111")
+            print(f"Training {len(candidate_vectors)} candidate vectors111111")
 
             # Calculate element-wise difference
             X = [abs(d - c) for d, c in zip(disputed_vectors, candidate_vectors)]
@@ -145,5 +153,5 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
                 # pickle.dump(model, open(path2model, "wb"))
                 with open(path2model, "wb") as f:
                     pickle.dump(model, f)
-                    logging.info(f"Saved trained LinearSVC model to {path2model}")
+                    print(f"Saved trained LinearSVC model to {path2model}")
             return model

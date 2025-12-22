@@ -24,7 +24,6 @@ from matplotlib import pyplot as plt
 
 from genai_detection.config import CONFIG
 from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENERATORS
-from genai_detection.detectors.impostor import ImpostorDetector
 from genai_detection.detectors.impostor_supervised_baseline import SupervisedImpostorBaseline
 from genai_detection.detectors.impostor_unsupervised_baseline import UnSupervisedImpostorBaseline
 from genai_detection.detectors.ppmd import PPMdDetector
@@ -34,12 +33,13 @@ from genai_detection.experiments.reproduction.impostor_metrics import (
     compute_metrics_parallel,
     LABEL_TRANSLATIONS,
 )
+from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
-    level=logging.WARNING,
+    level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 
@@ -79,7 +79,8 @@ def compute_prec_recall_f1_acc_dict(
     # Load test data
     # -----------------------------------------------------------------
 
-    text_test_pairs, ground_truth = load_test_pairs(dataset_name)
+    text_test_ID_pairs, ground_truth = load_test_pairs(dataset_name)
+    print(len(text_test_ID_pairs))
 
     # -----------------------------------------------------------------
     # Collect predictions
@@ -87,15 +88,17 @@ def compute_prec_recall_f1_acc_dict(
 
     predictions: Dict[str, List[float]] = {}
 
-    for technique in imp_gen_techniques:
-        logger.info("Obtaining impostor scores: %s", technique)
-        detector = ImpostorDetector(
-            impostor_technique=technique,
-            n_impostors=2,  # TODO: increase
-        )
-        scores = detector.get_score(text=text_test_pairs)
-        assert scores is not None
-        predictions[technique] = scores
+    # for technique in imp_gen_techniques:
+    #     logger.info("Obtaining impostor scores: %s", technique)
+    #     detector = ImpostorDetector(
+    #         impostor_technique=technique,
+    #         n_impostors=50,
+    #     )
+    #     scores = detector.get_score(text=text_test_ID_pairs)
+    #     print(technique)
+    #     print(len(scores), scores)
+    #     assert scores is not None
+    #     predictions[technique] = scores
 
     baselines = {
         "unsupervised_baseline_min-max": UnSupervisedImpostorBaseline(
@@ -113,7 +116,12 @@ def compute_prec_recall_f1_acc_dict(
         "ppmd": PPMdDetector(),
     }
 
+    mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
+    text_test_pairs = mongoDB.get_texts_for_ids(text_ids=text_test_ID_pairs)
+
     for name, baseline in baselines.items():
+        # baselines assume text is raw text, not text ID
+
         preds = baseline.get_score(text_test_pairs)
         preds = preds.tolist() if hasattr(preds, "tolist") else preds
         predictions[name] = np.asarray(preds).ravel().tolist()
@@ -146,10 +154,8 @@ def plot_precision_recall_curve(
     """
     Precision–Recall curves (Figures 4a, 4b in Koppel et al., 2014).
     """
-
-    fig = plt.figure(figsize=(10, 7))
-
     for positive_class_id in [0, 1]:
+        fig = plt.figure(figsize=(10, 7))
         positive_class = (
             "Same Author" if positive_class_id == 1 else "Different Author"
         )
@@ -162,6 +168,14 @@ def plot_precision_recall_curve(
             recalls = df["recall"].apply(
                 lambda x: x[positive_class_id]
             )
+            # print(key, positive_class_id, len(precisions), len(recalls), recalls, precisions)
+            unique_pairs = set(zip(recalls, precisions))
+
+            print(key, positive_class_id)
+            print("Number of unique (x, y) pairs:", len(unique_pairs))
+            # print("Unique (x, y) pairs:")
+            # for x, y in sorted(unique_pairs):
+            #     print(f"({x}, {y})")
 
             plt.plot(
                 recalls,
@@ -179,8 +193,10 @@ def plot_precision_recall_curve(
             "Precision–Recall Curve Across Impostor Generation Techniques\n"
             f"Dataset: {dataset_name} ({positive_class})"
         )
+        plt.xlim(-0.01, 1.01)
+        plt.ylim(-0.01, 1.01)
         plt.legend()
-        plt.tight_layout()
+        # plt.tight_layout()
 
         fname = (
             f"roc_prec_recall_curve_{dataset_name.replace(' ', '_')}_"
@@ -190,7 +206,7 @@ def plot_precision_recall_curve(
             LOCAL_SAVE_PATH / fname,
             bbox_inches="tight",
         )
-        logger.info("Saved %s", fname)
+        logger.info("Saved %s to %s", fname, LOCAL_SAVE_PATH)
 
         fig.clear()
 
@@ -210,9 +226,6 @@ def run_prec_recall_curves(dataset_name:str, imp_gen_techniques:List[str]):
 
     # Save to CSV
     combined_df.to_csv(LOCAL_SAVE_PATH / "effectiveness_scores.csv", index=False)
-    logging.info(f"Saved effectiveness scores as csv to {LOCAL_SAVE_PATH}/effectiveness_scores.csv.")
+    logger.info(f"Saved effectiveness scores as csv to {LOCAL_SAVE_PATH}/effectiveness_scores.csv.")
 
     plot_precision_recall_curve(results=results_dict, dataset_name=dataset_name)
-    logging.info(
-        f"Saved precision-recall plots as csv to {LOCAL_SAVE_PATH}/effectiveness_scores.csv."
-    )
