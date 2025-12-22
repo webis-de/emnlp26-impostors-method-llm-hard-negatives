@@ -19,7 +19,7 @@ from genai_detection.paraphrasing.one_step_paraphrasers import SAIAParaphraser
 from genai_detection.paraphrasing.translation_paraphraser import TranslationParaphraser
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class TranslationImpostorGenerator(NonNaiveLLMImpostorGenerator):
     def __init__(self, n_impostors: int, language: str = "French", model_id: Optional[str] = "openai-gpt-oss-120b"):
