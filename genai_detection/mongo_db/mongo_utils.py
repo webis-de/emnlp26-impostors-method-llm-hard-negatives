@@ -12,7 +12,7 @@ from genai_detection.config import CONFIG
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class ParaphraseMongoDB:
 
@@ -202,6 +202,35 @@ class ParaphraseMongoDB:
                     insert_data={"text": text},
                 )
         return text, text_id
+
+    def get_texts_for_ids(self, text_ids: List[str]) -> List[str]:
+        """
+        Retrieve texts for a list of IDs from the original collection in bulk in order.
+        :param text_ids: List of MongoDB document IDs
+        :return: List of texts corresponding to the IDs (in the same order)
+        """
+        if not text_ids:
+            return []
+        if isinstance(text_ids[0], str):
+            text_ids = [ObjectId(text_id) for text_id in text_ids]
+
+        # Bulk query: _id in text_ids
+        cursor = self.original_collection.find(
+            {"_id": {"$in": text_ids}},  # $in matches any ID in the list
+            {"_id": True, "text": True},  # only return the text field
+        )
+
+        # Convert to list of texts, keeping order
+        docs = list(cursor)
+        id_to_text = {doc["_id"]: doc["text"] for doc in docs}
+        texts = [id_to_text[ObjectId(i)] for i in text_ids]
+
+        # Optional sanity check
+        if len(texts) != len(text_ids):
+            missing = set(text_ids) - {doc["_id"] for doc in cursor}
+            logging.warning("Some IDs not found in MongoDB: %s", missing)
+
+        return texts
 
     def find_paraphrases(self, document_id: str):
         """
