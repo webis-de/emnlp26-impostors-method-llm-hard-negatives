@@ -14,6 +14,8 @@
 import logging
 from typing import Optional, List
 
+from bson import ObjectId
+
 from genai_detection.impostor_generators.ImpostorGenerator import (
     MongoDBSavedGenerator,
 )
@@ -49,9 +51,12 @@ class InDomainImpostorGenerator(MongoDBSavedGenerator):
         :param text_id: Optional text ID of the text for which the impostors should be generated.
         :return: Dictionary of impostors with keys as ids and values as texts.
         """
+        text_id = ObjectId(text_id)
+        print("Run in-domain impostors generator with text_id", text_id, type(text_id))
+        original_text = self.mongoDB.original_collection.find_one({"_id": text_id})
         # ensure text ID not same
-        search_args = {"dataset": self.dataset_name, "id": {"$ne": text_id}}
-        logging.info(f"InDomainImpostorGenerator: Search arguments: {search_args}")
+        search_args = {"dataset": self.dataset_name, "task_description":original_text["task_description"], "id": {"$ne": text_id}}
+        print(f"InDomainImpostorGenerator: Search arguments: {search_args}")
 
         # use this, if the returned impostors should be completely random in-domain texts
         # cursor = self.mongoDB.get_random_matching_documents_from_collection(collection=self.mongoDB.original_collection, search_args=search_args, num_samples=self.n_impostors)
@@ -59,6 +64,7 @@ class InDomainImpostorGenerator(MongoDBSavedGenerator):
         # return impostors
 
         # use this, if the returned impostors should be random among the most similar in-domain texts
-        cursor = self.mongoDB.find_document_by_multiple_fields(collection=self.mongoDB.original_collection,search_args=search_args)
+        cursor = self.mongoDB.find_document_by_multiple_fields(collection=self.mongoDB.original_collection,search_args=search_args).limit(self.num_potential_impostors)
         impostors = [doc["text"] for doc in cursor]
+        print("Num imps", len(impostors))
         return self._select_random_n_imps_among_best_m_potential_impostors(all_impostors=impostors, reference_text=text)
