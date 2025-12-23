@@ -18,7 +18,6 @@ from genai_detection.impostor_generators.ImpostorGenerator import NonNaiveLLMImp
 from genai_detection.paraphrasing.two_step_paraphrasers import TwoStepParaphraser
 
 logger = logging.getLogger(__name__)
-logging.basicConfig( level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class TwoStepImpostorGenerator(NonNaiveLLMImpostorGenerator):
     def __init__(self, n_impostors: int):

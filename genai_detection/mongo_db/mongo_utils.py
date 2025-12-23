@@ -12,7 +12,6 @@ from genai_detection.config import CONFIG
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class ParaphraseMongoDB:
 

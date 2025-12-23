@@ -12,7 +12,6 @@ from genai_detection.config import CONFIG
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 
 mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))

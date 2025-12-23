@@ -25,7 +25,6 @@ from genai_detection.config import CONFIG
 from genai_detection.detectors.impostor_base import ImpostorBaselineBase
 
 logger = logging.getLogger(__name__)
-logging.basicConfig( level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class SupervisedImpostorBaseline(ImpostorBaselineBase):
     """

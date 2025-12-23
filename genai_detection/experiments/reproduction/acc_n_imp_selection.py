@@ -35,10 +35,6 @@ from genai_detection.experiments.reproduction.impostor_metrics import (
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.WARNING,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-)
 
 # ---------------------------------------------------------------------
 # Paths

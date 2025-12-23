@@ -28,8 +28,6 @@ from nltk import download
 from genai_detection.impostor_generators.ImpostorGenerator import GenerativeImpostorGenerator
 
 logger = logging.getLogger(__name__)
-logging.basicConfig( level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
-
 
 class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
 

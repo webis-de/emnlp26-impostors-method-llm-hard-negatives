@@ -39,10 +39,6 @@ from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-)
 
 # ---------------------------------------------------------------------
 # Paths

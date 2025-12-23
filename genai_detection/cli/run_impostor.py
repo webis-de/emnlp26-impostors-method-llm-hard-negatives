@@ -6,13 +6,14 @@ import ray
 from genai_detection.config import CONFIG
 from genai_detection.detectors.impostor import ImpostorDetector
 
-logging.basicConfig(
-    level=logging.WARNING,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-)
-ray.init()
 
 def main():
+    logging.basicConfig(
+        level=logging.WARNING,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+    )
+    ray.init()
+
     parser = argparse.ArgumentParser(
         description="Run the Impostor Detector on document pairs."
     )
@@ -75,12 +76,12 @@ def main():
 
 # ray job submit --address https://ray.srv.webis.de --working-dir . --runtime-env env.yml -- python genai_detection/cli/run_impostor.py --input_document_ids 68f50029edacdf3d5c0279dd 68f50029edacdf3d5c0279d9
 
-   # generating 1 x 50 impostors takes around 40 minutes using openai.
-    # ..dd: Ass4 and author TDH426, ..4f: Ass3 and author TDH426, ...e8: Ass4 and author ASR497
-    # doc_pairs = ["68f50029edacdf3d5c0279dd", #"68f50029edacdf3d5c027d4f"]#, "68f50029edacdf3d5c0279e8"]#,
-    # "68f50029edacdf3d5c0279eb"]
-    # "68f50029edacdf3d5c0279d9"]
-    # "68f50029edacdf3d5c0279e0"]
+# generating 1 x 50 impostors takes around 40 minutes using openai.
+# ..dd: Ass4 and author TDH426, ..4f: Ass3 and author TDH426, ...e8: Ass4 and author ASR497
+# doc_pairs = ["68f50029edacdf3d5c0279dd", #"68f50029edacdf3d5c027d4f"]#, "68f50029edacdf3d5c0279e8"]#,
+# "68f50029edacdf3d5c0279eb"]
+# "68f50029edacdf3d5c0279d9"]
+# "68f50029edacdf3d5c0279e0"]
 
 if __name__ == "__main__":
     main()

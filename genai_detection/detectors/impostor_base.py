@@ -25,7 +25,6 @@ from genai_detection.detectors.detector_base import DetectorBase
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 logger = logging.getLogger(__name__)
-logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class ImpostorBase(DetectorBase):
     def __init__(self):

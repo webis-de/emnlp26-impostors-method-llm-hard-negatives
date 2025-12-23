@@ -21,7 +21,6 @@ from genai_detection.config import CONFIG
 from genai_detection.paraphrasing.paraphraser import Paraphraser
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 # Field descriptions dictionary
 FIELD_DESCRIPTIONS = {

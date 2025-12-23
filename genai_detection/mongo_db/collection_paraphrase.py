@@ -11,7 +11,6 @@ from genai_detection.paraphrasing import two_step_paraphrasers
 from genai_detection.paraphrasing.openai_utils import OpenaiCostEstimator
 
 logger = logging.getLogger(__name__)
-logging.basicConfig( level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 # MongoDB setup
 mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))

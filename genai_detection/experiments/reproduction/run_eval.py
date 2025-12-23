@@ -1,18 +1,19 @@
 import argparse
 
-import ray
-
-from genai_detection.experiments.reproduction.acc_n_imp_selection import run_acc_curves
 from genai_detection.experiments.reproduction.prec_recall_curves import *
 
-logger = logging.getLogger(__name__)
-logging.basicConfig( level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
-
-ray.init()
+# ray.init()
 
 # ray job submit --address https://ray.srv.webis.de --working-dir . --runtime-env env.yml -- python genai_detection/experiments/reproduction/run_eval.py
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+    )
+    logger = logging.getLogger(__name__)
+    print(logger.level)
+
     parser = argparse.ArgumentParser(description="Compare detectors.")
     parser.add_argument(
         "--rounds",
@@ -74,13 +75,13 @@ if __name__ == "__main__":
         "on_the_fly",
         "in_domain",
         # "one_step_llm",   # SAIA URL on betaweb error: httpx.InvalidURL: Invalid port: 'academiccloud:de'
-        "two_step_llm",
+        # "two_step_llm",
         # "translation",
         # "mirror_minds",   # raises error
     ]
 
-    run_acc_curves(dataset_name=args.dataset_name,imp_gen_techniques=our_figure_impostor_options)
+    run_prec_recall_curves(
+        dataset_name=args.dataset_name, imp_gen_techniques=our_figure_impostor_options
+    )
 
-    run_prec_recall_curves(dataset_name=args.dataset_name, imp_gen_techniques=our_figure_impostor_options)
-
-
+    # run_acc_curves(dataset_name=args.dataset_name,imp_gen_techniques=our_figure_impostor_options)

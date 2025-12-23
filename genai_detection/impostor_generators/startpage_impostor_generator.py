@@ -25,7 +25,6 @@ from genai_detection.config import CONFIG
 from genai_detection.impostor_generators.search_generator_base import SearchImpostorGeneratorBase
 
 logger = logging.getLogger(__name__)
-logging.basicConfig( level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 # List of user agent strings (has to be rotated regularly to circumvent blacklisting).
 USER_AGENTS = [

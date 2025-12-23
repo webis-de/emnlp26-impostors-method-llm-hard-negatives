@@ -8,10 +8,6 @@ from genai_detection.config import CONFIG
 from genai_detection.experiments.reproduction.impostor_metrics import LABEL_TRANSLATIONS
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.WARNING,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-)
 
 def csv_to_latex_table(
     csv_path: Path,

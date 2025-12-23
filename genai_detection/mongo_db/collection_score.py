@@ -5,7 +5,6 @@ from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 from genai_detection.paraphrasing import paraphraser_evaluation
 
 logger = logging.getLogger(__name__)
-logging.basicConfig( level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 # MongoDB setup
 mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))

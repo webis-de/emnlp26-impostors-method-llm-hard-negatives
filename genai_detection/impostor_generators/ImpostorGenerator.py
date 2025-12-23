@@ -32,7 +32,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")
 load_dotenv()
 
 logger = logging.getLogger(__name__)
-logging.basicConfig( level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s", )
 
 class BaseImpostorGenerator(ABC):
     """Abstract base class for generating impostors."""
@@ -58,6 +57,7 @@ class BaseImpostorGenerator(ABC):
         :param reference_text: Reference text
         :return: List of random impostor texts among most similar texts
         """
+        # TODO: tfidf already fitted?
         logging.info(f"Obtained {len(all_impostors)} impostors.")
         # Add original text at the end
         all_impostors.append(reference_text)
