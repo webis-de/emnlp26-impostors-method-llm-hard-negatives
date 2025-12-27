@@ -16,6 +16,7 @@ from typing import Optional, List
 
 from bson import ObjectId
 
+from genai_detection.dataset.base_dataset_loader import ASSIGNMENT_COL_NAME
 from genai_detection.impostor_generators.ImpostorGenerator import (
     MongoDBSavedGenerator,
 )
@@ -53,7 +54,7 @@ class InDomainImpostorGenerator(MongoDBSavedGenerator):
         print("Run in-domain impostors generator with text_id", text_id, type(text_id))
         original_text = self.mongoDB.original_collection.find_one({"_id": text_id})
         # ensure text ID not same
-        search_args = {"dataset": self.dataset_name, "task_description":original_text["task_description"], "id": {"$ne": text_id}}
+        search_args = {"dataset": self.dataset_name, ASSIGNMENT_COL_NAME:original_text[ASSIGNMENT_COL_NAME], "id": {"$ne": text_id}}
         print(f"InDomainImpostorGenerator: Search arguments: {search_args}")
 
         # use this, if the returned impostors should be completely random in-domain texts
