@@ -128,7 +128,9 @@ class BaseDatasetLoader(ABC):
 
         if docs_to_insert:
             try:
-                result = self.mongoDB.original_collection.insert_many(
+                # TODO: self.mongoDB.original_collection.insert_many(
+                # TODO: delete
+                result = self.mongoDB.tmp_collection.insert_many(
                     docs_to_insert, ordered=False
                 )
                 logger.info(

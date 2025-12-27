@@ -67,6 +67,8 @@ class BaseConfig:
     MONGO_TRAIN_PAIRS_COLLECTION = (
         "train_pairs"  # collection (!= db); for IDs of texts and their ground truth
     )
+    # TODO: delete
+    MONGO_TMP_COLLECTION = "temp_collection"
     MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME")
     MONGO_PASSWORD = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
     MONGO_HOST = "localhost"  # Local, but forwarded to server
