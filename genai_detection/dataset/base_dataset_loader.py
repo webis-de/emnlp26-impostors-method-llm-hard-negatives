@@ -100,7 +100,8 @@ class BaseDatasetLoader(ABC):
         return pairs
 
     def save2mongoDB(self, data: List[dict], is_train_split: bool=True):
-        collection_name = f"{'train' if is_train_split else 'test'}_pairs"
+        # TODO: delete
+        collection_name = f"{'train' if is_train_split else 'test'}_pairs_tmp"
         collection = self.mongoDB.db[collection_name]
         self.mongoDB.insert_documents(collection=collection, insert_data=data)
 
