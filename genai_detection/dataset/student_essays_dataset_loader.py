@@ -15,6 +15,7 @@ import hashlib
 import random
 from itertools import product, combinations
 from pathlib import Path
+from typing import Any
 
 import chardet
 import numpy as np
@@ -28,7 +29,8 @@ from datasets import (
 )
 from pymongo import errors
 
-from genai_detection.dataset.base_dataset_loader import BaseDatasetLoader, AUTHOR_COL_NAME, ASSIGNMENT_COL_NAME
+from genai_detection.dataset.base_dataset_loader import BaseDatasetLoader, AUTHOR_COL_NAME, MIN_NUM_WORDS, \
+    ASSIGNMENT_COL_NAME
 from genai_detection.paraphrasing.two_step_paraphrasers import *
 
 logger = logging.getLogger(__name__)
@@ -37,11 +39,6 @@ logger = logging.getLogger(__name__)
 # Constants
 # ==============================================================================
 random.seed(42)
-# Minimum length constraints motivated by prior work:
-# - Koppel et al. (2004): 500 words
-# - Bevendorff et al. (2019): 700 words
-# - Bevendorff et al. (2025): 3000 characters
-MIN_NUM_WORDS = 700 # TODO: rerun with 700
 
 
 # ==============================================================================
@@ -66,6 +63,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         Additionally, our different-author pairs share demographic subgroups.
        """
     def __init__(self, path: Optional[str], name: str = CONFIG.STUDENT_ESSAYS):
+        self.assignment_col_name = "assignment"
         super().__init__(name=name)
         self.path = Path(path) if path is not None else None
         assert (
@@ -85,11 +83,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         :return: DataFrame containing essays and metadata.
         """
         # return already indexed documents if existent
-        cursor = self.mongoDB.find_document_by_non_id_field(collection=self.mongoDB.original_collection, document_field_name="dataset", document_value=self.name)
-        records = list(cursor)
-        if records and len(records) > 0:
-            logger.debug(f"Found {records} documents in {CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION}")
-            return pd.DataFrame(records)
+        self._return_existing_original_mongodb_collection()
 
         # build student essays dataset
         df = self._load_student_essays(min_num_words=min_num_words)
@@ -119,12 +113,16 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             lambda x: hashlib.sha256(x.encode("utf-8")).hexdigest()
         )
         logger.info("joined student essays with metadata.")
+        df = df.rename(columns={self.assignment_col_name: ASSIGNMENT_COL_NAME})
+        self.assignment_col_name = ASSIGNMENT_COL_NAME
 
         # save obtained data in mongoDB collection
         self._save_df2original_mongoDB_collection(df=df)
 
         # obtain data from mongodb collection for correct text IDs
         return pd.DataFrame(list(self.mongoDB.find_document_by_non_id_field(collection=self.mongoDB.original_collection, document_field_name="dataset", document_value=self.name)))
+
+
 
     def load(
         self, train_split_portion: float = 0.7, min_num_words: int = MIN_NUM_WORDS
@@ -147,9 +145,8 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         df = self.load_texts(min_num_words=min_num_words)
 
         # construct pairs
-        assignment_col_name = "assignment"
         groupby_cols = [
-            assignment_col_name,
+            self.assignment_col_name,
             "sex",
             "ethnicity",
             "political_orientation",
@@ -160,7 +157,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             col in df.columns for col in groupby_cols
         ), f"Missing required metadata columns. Only got {df.columns}, but requires {groupby_cols}"
         # shuffle and split groups such that tasks are not overlapping between train and test sets
-        all_tasks = df[assignment_col_name].unique().tolist()
+        all_tasks = df[self.assignment_col_name].unique().tolist()
         random.seed(352)
         random.shuffle(all_tasks)
 
@@ -175,12 +172,12 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             test_tasks
         ), "Task overlap between train and test."
         train_df = (
-            df[df[assignment_col_name].isin(train_tasks)]
+            df[df[self.assignment_col_name].isin(train_tasks)]
             .sample(frac=1, random_state=42)
             .reset_index(drop=True)
         )
         test_df = (
-            df[df[assignment_col_name].isin(test_tasks)]
+            df[df[self.assignment_col_name].isin(test_tasks)]
             .sample(frac=1, random_state=42)
             .reset_index(drop=True)
         )
@@ -213,9 +210,8 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         :param min_num_words: Minimum word count required for an essay.
         :return: DataFrame containing raw essays and assignment metadata.
         """
-        assignment_col_name = "assignment"
         student_essays_df = pd.DataFrame(
-            columns=["author_id", "text", assignment_col_name, "task_description"]
+            columns=["author_id", "text", self.assignment_col_name, "task_description"]
         )
         task_description = {
             "Ass1": "Stream of consciousness",
@@ -261,7 +257,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
                                 {
                                     "author_id": author_id,
                                     "text": essay_text,
-                                    assignment_col_name: task,
+                                    self.assignment_col_name: task,
                                     "task_description": task_description[dir],
                                 }
                             ]
@@ -313,7 +309,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
 
             # Pair consecutively
             for a, b in zip(sampled[::2], sampled[1::2]):
-                if a[ASSIGNMENT_COL_NAME] != b[ASSIGNMENT_COL_NAME]:
+                if a[self.assignment_col_name] != b[self.assignment_col_name]:
                     same_author_pairs.append(
                         self._make_pair_dict(
                             left_text=a,
@@ -330,7 +326,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         # Different-author pairs (same subgroup, different tasks)
         # ----------------
         # Separate task from other grouping cols
-        subgroup_cols = [c for c in groupby_cols if c != ASSIGNMENT_COL_NAME]
+        subgroup_cols = [c for c in groupby_cols if c != self.assignment_col_name]
         if not subgroup_cols:
             # create a random subgroup
             logging.warning("No subgroup columns, generating random pairs.")
@@ -344,7 +340,7 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
             # bucket rows by assignment (no DataFrame → dict conversions)
             task_buckets = {
                 task: group.to_dict(orient="records")
-                for task, group in subgroup.groupby(ASSIGNMENT_COL_NAME)
+                for task, group in subgroup.groupby(self.assignment_col_name)
             }
             if len(task_buckets) < 2:
                 continue  # need at least 2 tasks to cross-pair

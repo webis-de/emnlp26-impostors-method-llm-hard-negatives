@@ -37,9 +37,8 @@ random.seed(42)
 MIN_NUM_WORDS = 700  # minimum number of words in a text to be considered valid
 
 # Canonical column names used throughout the loader
-ASSIGNMENT_COL_NAME = "assignment"
 AUTHOR_COL_NAME = "author"
-
+ASSIGNMENT_COL_NAME = "assignment"
 
 # === BASE CLASS ===
 
@@ -56,7 +55,7 @@ class BaseDatasetLoader(ABC):
                 "right_id": Value("string"),
                 f"left_{AUTHOR_COL_NAME}": Value("string"),
                 f"right_{AUTHOR_COL_NAME}": Value("string"),
-                f"left_{ASSIGNMENT_COL_NAME}": Value("string"),
+                f"left_{ASSIGNMENT_COL_NAME}": Value("string"), # topic from blogs corpus is mapped to this
                 f"right_{ASSIGNMENT_COL_NAME}": Value("string"),
                 "dataset_name": Value("string"),
                 "same": Value("bool"),
@@ -105,7 +104,7 @@ class BaseDatasetLoader(ABC):
         collection = self.mongoDB.db[collection_name]
         self.mongoDB.insert_documents(collection=collection, insert_data=data)
 
-    def _save_df2original_mongoDB_collection(self, df: pd.DataFrame):
+    def _save_df2original_mongoDB_collection(self, df: pd.DataFrame, id_col_name: str = "author_id"):
         """
         Persist the processed essay DataFrame to the MongoDB collection
         for original (non-paired) texts.
@@ -120,7 +119,7 @@ class BaseDatasetLoader(ABC):
         records = df.to_dict(orient="records")
         docs_to_insert = [
             {
-                "author": r.pop("author_id"),
+                "author": r.pop(id_col_name),
                 **r,
                 "dataset": self.name,
             }
@@ -141,6 +140,17 @@ class BaseDatasetLoader(ABC):
                 )
         else:
             logger.info("No new documents to insert.")
+
+    def _return_existing_original_mongodb_collection(self):
+        """
+        Return already existing MongoDB collection if exists.
+        """
+        cursor = self.mongoDB.find_document_by_non_id_field(collection=self.mongoDB.original_collection,
+                                                            document_field_name="dataset", document_value=self.name)
+        records = list(cursor)
+        if records and len(records) > 0:
+            logger.debug(f"Found {records} documents in {CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION}")
+            return pd.DataFrame(records)
 
     def _make_pair_dict(self, left_text: dict, right_text: dict, same: bool = True):
         """
