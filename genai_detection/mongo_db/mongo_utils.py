@@ -138,6 +138,21 @@ class ParaphraseMongoDB:
             collection=collection, search_args={document_field_name: document_value}
         )
 
+    def delete_documents_by_non_id_field(
+        self, collection, document_field_name: str, document_value: str
+    ) -> int:
+        """
+        Delete all documents in the specified collection where a non-id field
+        matches the given value.
+
+        :param collection: The MongoDB collection to delete from.
+        :param document_field_name: The name of the non-id field.
+        :param document_value: The value to match.
+        :return: Number of documents deleted.
+        """
+        result = collection.delete_many({document_field_name: document_value})
+        return result.deleted_count
+
     @staticmethod
     def find_document_by_multiple_fields(
         collection, search_args:dict

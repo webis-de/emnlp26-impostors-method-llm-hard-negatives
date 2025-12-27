@@ -24,6 +24,7 @@ from genai_detection.dataset.pan_dataset_loader import (
     Pan25DatasetLoader,
 )
 from genai_detection.dataset.student_essays_dataset_loader import StudentEssayDatasetLoader
+from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 from genai_detection.paraphrasing.two_step_paraphrasers import *
 
 logger = logging.getLogger(__name__)
@@ -126,6 +127,12 @@ def run_blog_corpus():
     dataset = loader.load()
     dataset.save_to_disk(output_dir)
 
+def delete_blog_from_mongoDB():
+    mongodb = ParaphraseMongoDB()
+    for collection in [mongodb.original_collection, mongodb.train_pairs_collection, mongodb.test_pairs_collection]:
+        n_deleted = mongodb.delete_documents_by_non_id_field(collection=collection, document_field_name="dataset", document_value=CONFIG.BLOG)
+        logger.info(f"Deleted {n_deleted} documents from collection {collection.name} for dataset {CONFIG.BLOG}.")
+
 
 def run_gutenberg_corpus():
     base_dir = (
@@ -167,5 +174,6 @@ if __name__ == "__main__":
     # run_pan20()
     # run_koppel_webis()
     run_blog_corpus()
+    # delete_blog_from_mongoDB()
     # run_gutenberg_corpus()
     # run_student_essay()
