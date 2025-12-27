@@ -55,8 +55,9 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
 
     def load_texts(self) -> pd.DataFrame:
         # return already indexed documents if existent
-        self._return_existing_original_mongodb_collection()
-
+        df = self._return_existing_original_mongodb_collection()
+        if not df.empty:
+            return df
         df = pd.read_csv(self.path)
         logging.info("Initial number of entries: %d", len(df))
         df["text"] = df["text"].apply(lambda x: self.preprocess(x))
@@ -78,19 +79,17 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
                 TOPIC_COL_NAME: ASSIGNMENT_COL_NAME,
             }
         )
-        self.topic_col_name = ASSIGNMENT_COL_NAME
 
-        # ensure stable ids for Mongo / HF
-        # df["_id"] = df.index.astype(str)
         # save obtained data in mongoDB collection
         self._save_df2original_mongoDB_collection(df=df, id_col_name=AUTHOR_COL_NAME)
 
         logger.info("Entries after filtering: %d", len(df))
-        self._return_existing_original_mongodb_collection()
+        return self._return_existing_original_mongodb_collection()
 
     def load(self) -> DatasetDict[str | NamedSplit, Dataset]:
 
         df = self.load_texts()
+        self.topic_col_name = ASSIGNMENT_COL_NAME
 
         topics = df[self.topic_col_name].unique().tolist()
         random.shuffle(topics)
