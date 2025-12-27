@@ -199,11 +199,11 @@ class ParaphraseMongoDB:
             assert (
                 (text is not None) and type(text) == str and len(text) > 0
             ), f"Text ID {text_id} not found."
-            logging.info("Obtained text from text ID: %s, length of text %d", text_id, len(text))
+            logger.info("Obtained text from text ID: %s, length of text %d", text_id, len(text))
 
         if not text_id:
             text_id = self.find_document_by_non_id_field(collection=self.original_collection, document_field_name="text", document_value=text)[0]["_id"]
-            logging.info("Obtained text ID from text; text ID: %s", text_id)
+            logger.info("Obtained text ID from text; text ID: %s", text_id)
         # Save text in mongoDB if not yet present
         if text and text_id:
             existing = self.find_document_by_id(
