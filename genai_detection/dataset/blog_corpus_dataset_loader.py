@@ -35,7 +35,6 @@ random.seed(42)
 TOPIC_COL_NAME = "topic"
 
 
-
 class BlogCorpusDatasetLoader(BaseDatasetLoader):
     def __init__(self, path: str, name: str = CONFIG.BLOG):
         """Loader for the Blog Corpus dataset.
@@ -58,6 +57,8 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
         df = self._return_existing_original_mongodb_collection()
         if not df.empty:
             return df
+        else:
+            raise RuntimeError("No existing original MongoDB collection found.")
         df = pd.read_csv(self.path)
         logging.info("Initial number of entries: %d", len(df))
         df["text"] = df["text"].apply(lambda x: self.preprocess(x))
@@ -108,12 +109,23 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
             df[df[self.topic_col_name].isin(train_topics)],
             groupby_cols,
         )
-        self.save2mongoDB(train_pairs, is_train_split=True)
+        # self.save2mongoDB(train_pairs, is_train_split=True)
+        # retrieve from mongoDB to include _id fields
+        train_pairs = list(self.mongoDB.find_document_by_non_id_field(
+            collection=self.mongoDB.train_pairs_collection, document_field_name="dataset", document_value=self.name))
         test_pairs = self._generate_temporal_pairs(
             df[df[self.topic_col_name].isin(test_topics)],
             groupby_cols,
         )
-        self.save2mongoDB(test_pairs, is_train_split=False)
+        # self.save2mongoDB(test_pairs, is_train_split=False)
+        test_pairs = list(
+                self.mongoDB.find_document_by_non_id_field(
+                    collection=self.mongoDB.test_pairs_collection,
+                    document_field_name="dataset",
+                    document_value=self.name,
+                )
+            )
+
 
         return DatasetDict(
             {
@@ -121,7 +133,6 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
                 "test": Dataset.from_list(test_pairs, features=self.features),
             }
         )
-
 
     def _generate_temporal_pairs(
             self,
