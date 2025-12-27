@@ -109,7 +109,7 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
             df[df[self.topic_col_name].isin(train_topics)],
             groupby_cols,
         )
-        # self.save2mongoDB(train_pairs, is_train_split=True)
+        self.save2mongoDB(train_pairs, is_train_split=True)
         # retrieve from mongoDB to include _id fields
         train_pairs = list(self.mongoDB.find_document_by_non_id_field(
             collection=self.mongoDB.train_pairs_collection, document_field_name="dataset_name", document_value=self.name))
@@ -118,7 +118,7 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
             df[df[self.topic_col_name].isin(test_topics)],
             groupby_cols,
         )
-        # self.save2mongoDB(test_pairs, is_train_split=False)
+        self.save2mongoDB(test_pairs, is_train_split=False)
         test_pairs = list(
                 self.mongoDB.find_document_by_non_id_field(
                     collection=self.mongoDB.test_pairs_collection,
