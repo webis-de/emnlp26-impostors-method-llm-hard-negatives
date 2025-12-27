@@ -115,7 +115,7 @@ def run_koppel_webis():
 
 def run_blog_corpus():
     base_dir = (
-        Path(__file__).resolve().parent.parent / CONFIG.DATA_BASE_PATH / "Blog_corpus/"
+        Path(__file__).resolve().parents[2] / CONFIG.DATA_BASE_PATH / "Blog_corpus/"
     )
     assert (
         base_dir.exists()
@@ -161,6 +161,6 @@ if __name__ == "__main__":
     # # run_pan25()
     # run_pan20()
     # run_koppel_webis()
-    # run_blog_corpus()
+    run_blog_corpus()
     # run_gutenberg_corpus()
-    run_student_essay()
+    # run_student_essay()
