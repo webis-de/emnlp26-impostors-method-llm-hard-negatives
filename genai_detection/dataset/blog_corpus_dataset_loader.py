@@ -112,7 +112,8 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
         # self.save2mongoDB(train_pairs, is_train_split=True)
         # retrieve from mongoDB to include _id fields
         train_pairs = list(self.mongoDB.find_document_by_non_id_field(
-            collection=self.mongoDB.train_pairs_collection, document_field_name="dataset", document_value=self.name))
+            collection=self.mongoDB.train_pairs_collection, document_field_name="dataset_name", document_value=self.name))
+        assert len(train_pairs) > 1, "No training pairs retrieved."
         test_pairs = self._generate_temporal_pairs(
             df[df[self.topic_col_name].isin(test_topics)],
             groupby_cols,
@@ -121,7 +122,7 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
         test_pairs = list(
                 self.mongoDB.find_document_by_non_id_field(
                     collection=self.mongoDB.test_pairs_collection,
-                    document_field_name="dataset",
+                    document_field_name="dataset_name",
                     document_value=self.name,
                 )
             )
