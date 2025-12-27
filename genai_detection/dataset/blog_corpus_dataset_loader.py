@@ -13,28 +13,27 @@
 # limitations under the License.
 
 import random
+from itertools import combinations
 from pathlib import Path
 
 import pandas as pd
 from datasets import (
     Dataset,
     DatasetDict,
-    Features,
-    Value,
+    NamedSplit,
 )
 
-from genai_detection.dataset.base_dataset_loader import BaseDatasetLoader
+from genai_detection.dataset.base_dataset_loader import BaseDatasetLoader, MIN_NUM_WORDS, AUTHOR_COL_NAME, \
+    ASSIGNMENT_COL_NAME
 from genai_detection.paraphrasing.two_step_paraphrasers import *
 
 logger = logging.getLogger(__name__)
 
-random.seed(42)
-# Koppel et al. (2004): 500 words
-# Bevendorff et al. (2019): 700 words (https://www.degruyterbrill.com/document/doi/10.1515/itit-2019-0046/html?casa_token=pbCaF7FgUXoAAAAA:8Vw71FUWE5spAbSsEuGGTdIjjm_o1_eb_inHwU3BR6eSrdVMOYy3--iqvDJwCV7EQ1HWtQBh610)
-# Bevendorff et al. (2025): 3000 characters (https://aclanthology.org/2025.findings-acl.194.pdf)
-MIN_NUM_WORDS = 700  # minimum number of words in a text to be considered valid
-
 # === Blog Corpus LOADER ===
+
+random.seed(42)
+TOPIC_COL_NAME = "topic"
+
 
 
 class BlogCorpusDatasetLoader(BaseDatasetLoader):
@@ -45,15 +44,19 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
         Confounders can be:
         - topic
         - time period (e.g. 1999 vs. 2006)
-        - age (?!)
-        - gender (?!)
+        - age
+        - gender
 
         Originally dataset is available at: https://www.kaggle.com/datasets/rtatman/blog-authorship-corpus?resource=download (07.06.2025)
         """
         super().__init__(name=name)
+        self.topic_col_name = TOPIC_COL_NAME
         self.path = Path(path)
 
-    def load(self) -> Dataset:
+    def load_texts(self) -> pd.DataFrame:
+        # return already indexed documents if existent
+        self._return_existing_original_mongodb_collection()
+
         df = pd.read_csv(self.path)
         logging.info("Initial number of entries: %d", len(df))
         df["text"] = df["text"].apply(lambda x: self.preprocess(x))
@@ -66,107 +69,165 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
         ).dt.year
         logging.info("number of entries after filtering: %d", len(df))
 
-        topics = df["topic"].unique().tolist()
+        topics = df[TOPIC_COL_NAME].unique().tolist()
+        random.shuffle(topics)
+
+        df = df.rename(
+            columns={
+                "id": AUTHOR_COL_NAME,
+                TOPIC_COL_NAME: ASSIGNMENT_COL_NAME,
+            }
+        )
+        self.topic_col_name = ASSIGNMENT_COL_NAME
+
+        # ensure stable ids for Mongo / HF
+        df["_id"] = df.index.astype(str)
+        # save obtained data in mongoDB collection
+        self._save_df2original_mongoDB_collection(df=df, id_col_name=AUTHOR_COL_NAME)
+
+        logger.info("Entries after filtering: %d", len(df))
+        return df
+
+    def load(self) -> DatasetDict[str | NamedSplit, Dataset]:
+
+        df = self.load_texts()
+
+        topics = df[self.topic_col_name].unique().tolist()
         random.shuffle(topics)
 
         split_idx = int(0.8 * len(topics))
         train_topics = set(topics[:split_idx])
         test_topics = set(topics[split_idx:])
 
-        def generate_pairs(topic_subset, n_pairs=2, groupby_cols: list = ["topic"]):
-            """
-            Generate pairs of texts from the dataset based on the specified topic subset.
-            :param topic_subset: Set of topics to filter the dataset.
-            :param n_pairs: Number of pairs to generate per group.
-            :param groupby_cols: Columns to group by, should include 'topic'.
-            :return: List of pairs with their authors and a boolean indicating if they are from the
-            same author.
-            """
-            topic_df = df[df["topic"].isin(topic_subset)]
-            assert (
-                "topic" in groupby_cols
-            ), "The 'topic' should be one of the columns to group by."
+        groupby_cols = [self.topic_col_name, "year", "gender", "age"]
 
-            grouped = topic_df.groupby(groupby_cols)
-            pairs = []
-
-            for group_values, group in grouped:
-                data = group.to_dict(orient="records")
-
-                # Group texts by author
-                author_groups = {}
-                for item in data:
-                    author_groups.setdefault(item["id"], []).append(item)
-
-                # Same-author pairs
-                same_author_pairs = []
-                for author, texts in author_groups.items():
-                    if len(texts) < 2:
-                        continue
-                    selected = random.sample(texts, min(n_pairs * 2, len(texts)))
-                    random.shuffle(selected)
-                    for i in range(0, len(selected) - 1, 2):
-                        a, b = selected[i], selected[i + 1]
-                        same_author_pairs.append(
-                            {
-                                "pair": [a["text"], b["text"]],
-                                "authors": [author, author],
-                                "same": True,
-                            }
-                        )
-                pairs.extend(same_author_pairs)
-
-                # Different-author pairs, balanced to same author pairs count
-                authors = list(author_groups.keys())
-                if len(authors) > 1 and same_author_pairs:
-                    n_diff_pairs_target = len(
-                        same_author_pairs
-                    )  # goal: match number of different-author pairs to same-author pairs
-                    author_pairs = []
-                    for i in range(len(authors)):
-                        for j in range(i + 1, len(authors)):
-                            author_pairs.append((authors[i], authors[j]))
-                    random.shuffle(author_pairs)
-
-                    count = 0
-                    for a1, a2 in author_pairs:
-                        if (
-                            count >= n_diff_pairs_target
-                        ):  # generate enough different-author pairs
-                            break
-                        if (
-                            not author_groups[a1] or not author_groups[a2]
-                        ):  # ensured above that authors are different
-                            continue
-                        t1 = random.choice(author_groups[a1])
-                        t2 = random.choice(author_groups[a2])
-                        pairs.append(
-                            {
-                                "pair": [t1["text"], t2["text"]],
-                                "authors": [a1, a2],
-                                "same": False,
-                            }
-                        )
-                        count += 1
-
-            return pairs
-
-        features = Features(
-            {
-                "pair": [Value("string")],
-                "authors": [Value("string")],
-                "same": Value("bool"),
-            }
+        train_pairs = self._generate_temporal_pairs(
+            df[df[self.topic_col_name].isin(train_topics)],
+            groupby_cols,
         )
-
-        # define the columns to group by
-        groupby_cols = ["topic", "year", "gender", "age"]
-        train_pairs = generate_pairs(train_topics, groupby_cols=groupby_cols)
-        test_pairs = generate_pairs(test_topics, groupby_cols=groupby_cols)
+        test_pairs = self._generate_temporal_pairs(
+            df[df[self.topic_col_name].isin(test_topics)],
+            groupby_cols,
+        )
 
         return DatasetDict(
             {
-                "train": Dataset.from_list(train_pairs, features=features),
-                "test": Dataset.from_list(test_pairs, features=features),
+                "train": Dataset.from_list(train_pairs, features=self.features),
+                "test": Dataset.from_list(test_pairs, features=self.features),
             }
         )
+
+
+    def _generate_temporal_pairs(
+            self,
+            df: pd.DataFrame,
+            groupby_cols: list[str],
+            n_pairs_per_author: int = 1,
+            early_frac: float = 0.3,
+            late_frac: float = 0.3,
+            min_year_gap: int = 0,
+    ):
+        """
+        Temporal pairing for both same- and different-author pairs.
+
+        SAME author:
+          left  -> early texts
+          right -> late texts
+
+        DIFFERENT authors:
+          left  -> early text of author A
+          right -> late text of author B
+
+        Ensures: left.year <= right.year
+        """
+        pairs = []
+
+        grouped = df.groupby(groupby_cols)
+
+        for _, group in grouped:
+            records = group.to_dict(orient="records")
+
+            # group by author
+            author2texts: dict[str, list[dict]] = {}
+            for r in records:
+                author2texts.setdefault(r["author"], []).append(r)
+
+            # pre-sort texts chronologically per author
+            for author in author2texts:
+                author2texts[author] = sorted(
+                    author2texts[author], key=lambda x: x["year"]
+                )
+
+            same_author_pairs = []
+
+            # ===== SAME AUTHOR PAIRS =====
+            for author, texts in author2texts.items():
+                if len(texts) < 2:
+                    continue
+
+                k_early = max(1, int(len(texts) * early_frac))
+                k_late = max(1, int(len(texts) * late_frac))
+
+                early_pool = texts[:k_early]
+                late_pool = texts[-k_late:]
+
+                for _ in range(n_pairs_per_author):
+                    left = random.choice(early_pool)
+                    right = random.choice(late_pool)
+
+                    if (
+                            left["_id"] == right["_id"]
+                            or right["year"] - left["year"] < min_year_gap
+                    ):
+                        continue
+
+                    same_author_pairs.append(
+                        self._make_pair_dict(left, right, same=True)
+                    )
+
+            pairs.extend(same_author_pairs)
+
+            # ===== DIFFERENT AUTHOR PAIRS (TEMPORAL) =====
+            authors = list(author2texts.keys())
+            if len(authors) < 2 or not same_author_pairs:
+                continue
+
+            target = len(same_author_pairs)
+            author_pairs = list(combinations(authors, 2))
+            random.shuffle(author_pairs)
+
+            count = 0
+            for a1, a2 in author_pairs:
+                if count >= target:
+                    break
+
+                texts_a = author2texts[a1]
+                texts_b = author2texts[a2]
+
+                # define early / late pools per author
+                ea = texts_a[: max(1, int(len(texts_a) * early_frac))]
+                la = texts_a[-max(1, int(len(texts_a) * late_frac)):]
+
+                eb = texts_b[: max(1, int(len(texts_b) * early_frac))]
+                lb = texts_b[-max(1, int(len(texts_b) * late_frac)):]
+
+                # two possible temporal directions → pick valid one
+                candidates = [
+                    (random.choice(ea), random.choice(lb)),
+                    (random.choice(eb), random.choice(la)),
+                ]
+
+                random.shuffle(candidates)
+
+                for left, right in candidates:
+                    if (
+                            left["author"] != right["author"]
+                            and right["year"] - left["year"] >= min_year_gap
+                    ):
+                        pairs.append(
+                            self._make_pair_dict(left, right, same=False)
+                        )
+                        count += 1
+                        break
+
+        return pairs
