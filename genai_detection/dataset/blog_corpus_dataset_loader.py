@@ -81,12 +81,12 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
         self.topic_col_name = ASSIGNMENT_COL_NAME
 
         # ensure stable ids for Mongo / HF
-        df["_id"] = df.index.astype(str)
+        # df["_id"] = df.index.astype(str)
         # save obtained data in mongoDB collection
         self._save_df2original_mongoDB_collection(df=df, id_col_name=AUTHOR_COL_NAME)
 
         logger.info("Entries after filtering: %d", len(df))
-        return df
+        self._return_existing_original_mongodb_collection()
 
     def load(self) -> DatasetDict[str | NamedSplit, Dataset]:
 
