@@ -68,8 +68,6 @@ class ParaphraseMongoDB:
         # approach
         self.test_pairs_collection = self.db[CONFIG.MONGO_TEST_PAIRS_COLLECTION] # IDs of texts and their ground truth (reproducibility of evaluation)
         self.train_pairs_collection = self.db[CONFIG.MONGO_TRAIN_PAIRS_COLLECTION] # IDs of texts and their ground truth
-        # TODO: delete
-        self.tmp_collection = self.db[CONFIG.MONGO_TMP_COLLECTION]
 
     def reset_collection(self, collection_name:str):
         self.db.drop_collection(collection_name)

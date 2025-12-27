@@ -100,8 +100,7 @@ class BaseDatasetLoader(ABC):
         return pairs
 
     def save2mongoDB(self, data: List[dict], is_train_split: bool=True):
-        # TODO: delete
-        collection_name = f"{'train' if is_train_split else 'test'}_pairs_tmp"
+        collection_name = f"{'train' if is_train_split else 'test'}_pairs"
         collection = self.mongoDB.db[collection_name]
         self.mongoDB.insert_documents(collection=collection, insert_data=data)
 
@@ -129,9 +128,7 @@ class BaseDatasetLoader(ABC):
 
         if docs_to_insert:
             try:
-                # TODO: self.mongoDB.original_collection.insert_many(
-                # TODO: delete
-                result = self.mongoDB.tmp_collection.insert_many(
+                result = self.mongoDB.original_collection.insert_many(
                     docs_to_insert, ordered=False
                 )
                 logger.info(
@@ -164,8 +161,7 @@ class BaseDatasetLoader(ABC):
         """
         Return already existing MongoDB collection if exists.
         """
-        # TODO: original_collection
-        cursor = self.mongoDB.find_document_by_non_id_field(collection=self.mongoDB.tmp_collection,
+        cursor = self.mongoDB.find_document_by_non_id_field(collection=self.mongoDB.original_collection,
                                                             document_field_name="dataset", document_value=self.name)
         records = list(cursor)
         if records and len(records) > 0:
