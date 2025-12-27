@@ -98,6 +98,10 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
         split_idx = int(0.8 * len(topics))
         train_topics = set(topics[:split_idx])
         test_topics = set(topics[split_idx:])
+        assert train_topics.isdisjoint(
+            test_topics
+        ), "Topic overlap between train and test."
+        logger.info(f"Train topics: {train_topics}, Test topics: {test_topics}\n\n")
 
         groupby_cols = [self.topic_col_name, "year", "gender", "age"]
 
@@ -105,10 +109,12 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
             df[df[self.topic_col_name].isin(train_topics)],
             groupby_cols,
         )
+        self.save2mongoDB(train_pairs, is_train_split=True)
         test_pairs = self._generate_temporal_pairs(
             df[df[self.topic_col_name].isin(test_topics)],
             groupby_cols,
         )
+        self.save2mongoDB(test_pairs, is_train_split=False)
 
         return DatasetDict(
             {
@@ -186,6 +192,7 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
                     )
 
             pairs.extend(same_author_pairs)
+            logger.info(f"Number same author pairs (for this group): {len(same_author_pairs)}")
 
             # ===== DIFFERENT AUTHOR PAIRS (TEMPORAL) =====
             authors = list(author2texts.keys())
