@@ -148,12 +148,16 @@ class BaseDatasetLoader(ABC):
         """
         Return already existing MongoDB collection if exists.
         """
-        cursor = self.mongoDB.find_document_by_non_id_field(collection=self.mongoDB.original_collection,
+        # TODO: original_collection
+        cursor = self.mongoDB.find_document_by_non_id_field(collection=self.mongoDB.tmp_collection,
                                                             document_field_name="dataset", document_value=self.name)
         records = list(cursor)
         if records and len(records) > 0:
-            logger.debug(f"Found {records} documents in {CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION}")
+            logger.info(f"Found {len(records)} documents in {CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION}")
             return pd.DataFrame(records)
+        else:
+            logger.warning(f"No existing documents found in {CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION} for dataset {self.name}.")
+            return pd.DataFrame()
 
     def _make_pair_dict(self, left_text: dict, right_text: dict, same: bool = True):
         """
