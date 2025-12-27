@@ -90,6 +90,7 @@ def compute_prec_recall_f1_acc_dict(
         detector = ImpostorDetector(
             impostor_technique=technique,
             n_impostors=50,
+            dataset_name=dataset_name,
         )
         scores = detector.get_score(text=text_test_ID_pairs)
         print(technique)
