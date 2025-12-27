@@ -142,6 +142,11 @@ def run_gutenberg_corpus():
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+    )
+
     parser = argparse.ArgumentParser(description="Run Dataset creation.")
     parser.add_argument(
         "--path",
