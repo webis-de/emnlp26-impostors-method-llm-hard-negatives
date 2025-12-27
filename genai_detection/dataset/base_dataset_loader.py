@@ -17,9 +17,11 @@ import typing as t
 from abc import ABC, abstractmethod
 from itertools import combinations
 
+import pandas as pd
 from datasets import (
-    DatasetDict,
+    DatasetDict, Features, Value,
 )
+from pymongo import errors
 
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 from genai_detection.paraphrasing.one_step_paraphrasers import *
@@ -34,6 +36,10 @@ random.seed(42)
 # Bevendorff et al. (2025): 3000 characters (https://aclanthology.org/2025.findings-acl.194.pdf)
 MIN_NUM_WORDS = 700  # minimum number of words in a text to be considered valid
 
+# Canonical column names used throughout the loader
+ASSIGNMENT_COL_NAME = "assignment"
+AUTHOR_COL_NAME = "author"
+
 
 # === BASE CLASS ===
 
@@ -43,6 +49,19 @@ class BaseDatasetLoader(ABC):
         self.name = name
         # Connect to MongoDB (default host/port for container)
         self.mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
+        self.features = Features(
+            {
+                "_id": Value("string"),
+                "left_id": Value("string"),
+                "right_id": Value("string"),
+                f"left_{AUTHOR_COL_NAME}": Value("string"),
+                f"right_{AUTHOR_COL_NAME}": Value("string"),
+                f"left_{ASSIGNMENT_COL_NAME}": Value("string"),
+                f"right_{ASSIGNMENT_COL_NAME}": Value("string"),
+                "dataset_name": Value("string"),
+                "same": Value("bool"),
+            }
+        )
 
     @abstractmethod
     def load(self) -> DatasetDict:
@@ -86,7 +105,60 @@ class BaseDatasetLoader(ABC):
         collection = self.mongoDB.db[collection_name]
         self.mongoDB.insert_documents(collection=collection, insert_data=data)
 
+    def _save_df2original_mongoDB_collection(self, df: pd.DataFrame):
+        """
+        Persist the processed essay DataFrame to the MongoDB collection
+        for original (non-paired) texts.
 
+        Each document is stored with:
+          - author identifier,
+          - text and metadata,
+          - dataset name for later retrieval.
 
+        Duplicate inserts are ignored.
+        """
+        records = df.to_dict(orient="records")
+        docs_to_insert = [
+            {
+                "author": r.pop("author_id"),
+                **r,
+                "dataset": self.name,
+            }
+            for r in records
+        ]
 
+        if docs_to_insert:
+            try:
+                result = self.mongoDB.original_collection.insert_many(
+                    docs_to_insert, ordered=False
+                )
+                logger.info(
+                    f"Inserted {len(result.inserted_ids)} documents into '{self.name}' collection.'"
+                )
+            except errors.BulkWriteError:
+                logger.warning(
+                    "Duplicate key error encountered during insertMany. Some documents may already exist."
+                )
+        else:
+            logger.info("No new documents to insert.")
 
+    def _make_pair_dict(self, left_text: dict, right_text: dict, same: bool = True):
+        """
+        Construct a standardized pair dictionary for HuggingFace datasets.
+
+        :param left_text: First essay record.
+        :param right_text: Second essay record.
+        :param same: Whether both essays originate from the same author.
+        :return: Dictionary representing a labeled text pair.
+        """
+        FEATURE_MAP = {
+            "_id": "_id",
+            "_author": AUTHOR_COL_NAME,
+            "_assignment": ASSIGNMENT_COL_NAME,
+        }
+        return {
+            "dataset_name": self.name,
+            **{f"left{key}": left_text[val] for key, val in FEATURE_MAP.items()},
+            **{f"right{key}": right_text[val] for key, val in FEATURE_MAP.items()},
+            "same": same,
+        }
