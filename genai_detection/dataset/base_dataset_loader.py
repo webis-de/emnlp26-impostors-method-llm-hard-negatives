@@ -144,6 +144,22 @@ class BaseDatasetLoader(ABC):
         else:
             logger.info("No new documents to insert.")
 
+    def delete_dataset_from_mongoDB(self):
+        mongodb = ParaphraseMongoDB()
+        for collection in [
+            mongodb.original_collection,
+            mongodb.train_pairs_collection,
+            mongodb.test_pairs_collection,
+        ]:
+            n_deleted = mongodb.delete_documents_by_non_id_field(
+                collection=collection,
+                document_field_name="dataset",
+                document_value=self.name,
+            )
+            logger.info(
+                f"Deleted {n_deleted} documents from collection {collection.name} for dataset {self.name}."
+            )
+
     def _return_existing_original_mongodb_collection(self):
         """
         Return already existing MongoDB collection if exists.
