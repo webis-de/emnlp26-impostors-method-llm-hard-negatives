@@ -177,7 +177,7 @@ def plot_precision_recall_curve(
             recalls = recalls[mask]
             unique_pairs = set(zip(recalls, precisions))
 
-            logger.info("%d:  %d", key, positive_class_id)
+            logger.info("%s: class %d", key, positive_class_id)
             logger.info("Number of unique (x, y) pairs: %d", len(unique_pairs))
 
             plt.plot(
@@ -201,15 +201,16 @@ def plot_precision_recall_curve(
         plt.ylim(-0.01, 1.01)
         plt.legend()
 
-        fname = (
-            f"roc_prec_recall_curve_{dataset_name.replace(' ', '_')}_"
-            f"{positive_class.lower().replace(' ', '_')}.svg"
-        )
-        plt.savefig(
-            LOCAL_SAVE_PATH / fname,
-            bbox_inches="tight",
-        )
-        logger.info("Saved %s to %s", fname, LOCAL_SAVE_PATH)
+        for format in ["pdf", "svg"]:
+            fname = (
+                f"roc_prec_recall_curve_{dataset_name.replace(' ', '_')}_"
+                f"{positive_class.lower().replace(' ', '_')}.{format}"
+            )
+            plt.savefig(
+                LOCAL_SAVE_PATH / fname,
+                bbox_inches="tight",
+            )
+            logger.info("Saved %s to %s", fname, LOCAL_SAVE_PATH)
 
         fig.clear()
 
