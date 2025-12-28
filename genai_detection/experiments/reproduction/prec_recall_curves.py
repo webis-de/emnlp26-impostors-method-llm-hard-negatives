@@ -167,19 +167,22 @@ def plot_precision_recall_curve(
             recalls = df["recall"].apply(
                 lambda x: x[positive_class_id]
             )
-            # print(key, positive_class_id, len(precisions), len(recalls), recalls, precisions)
+
+            # filter out points where both precision and recall are zero
+            mask = ~((precisions == 0) & (recalls == 0))
+
+            precisions = precisions[mask]
+            recalls = recalls[mask]
             unique_pairs = set(zip(recalls, precisions))
 
-            print(key, positive_class_id)
-            print("Number of unique (x, y) pairs:", len(unique_pairs))
-            # print("Unique (x, y) pairs:")
-            # for x, y in sorted(unique_pairs):
-            #     print(f"({x}, {y})")
+            logger.info(key, positive_class_id)
+            logger.info("Number of unique (x, y) pairs:", len(unique_pairs))
 
             plt.plot(
                 recalls,
                 precisions,
                 marker="o",
+                markersize=4,
                 label=label,
             )
 
