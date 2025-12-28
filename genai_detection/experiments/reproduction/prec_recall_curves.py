@@ -27,8 +27,6 @@ from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENER
 from genai_detection.detectors.impostor import ImpostorDetector
 from genai_detection.detectors.impostor_supervised_baseline import SupervisedImpostorBaseline
 from genai_detection.detectors.impostor_unsupervised_baseline import UnSupervisedImpostorBaseline
-from genai_detection.detectors.ppmd import PPMdDetector
-from genai_detection.detectors.unmasking import UnmaskingDetector
 from genai_detection.experiments.reproduction.impostor_metrics import (
     compute_metrics_parallel,
     LABEL_TRANSLATIONS,
@@ -110,8 +108,8 @@ def compute_prec_recall_f1_acc_dict(
         "supervised_baseline": SupervisedImpostorBaseline(
             dataset_name=dataset_name
         ),
-        "unmasking": UnmaskingDetector(),
-        "ppmd": PPMdDetector(),
+        # "unmasking": UnmaskingDetector(),
+        # "ppmd": PPMdDetector(),
     }
 
     mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
@@ -176,13 +174,13 @@ def plot_precision_recall_curve(
             unique_pairs = set(zip(recalls, precisions))
 
             logger.info(key, positive_class_id)
-            logger.info("Number of unique (x, y) pairs:", len(unique_pairs))
+            logger.info("Number of unique (x, y) pairs: %d", len(unique_pairs))
 
             plt.plot(
                 recalls,
                 precisions,
-                marker="o",
-                markersize=4,
+                # marker="o",
+                # markersize=4,
                 label=label,
             )
 
@@ -193,12 +191,11 @@ def plot_precision_recall_curve(
         plt.ylabel("Precision $\\frac{TP}{TP + FP}$", fontsize=14)
         plt.title(
             "Precision–Recall Curve Across Impostor Generation Techniques\n"
-            f"Dataset: {dataset_name} ({positive_class})"
+            f"Dataset: {dataset_name.capitalize()} ({positive_class})"
         )
         plt.xlim(-0.01, 1.01)
         plt.ylim(-0.01, 1.01)
         plt.legend()
-        # plt.tight_layout()
 
         fname = (
             f"roc_prec_recall_curve_{dataset_name.replace(' ', '_')}_"
