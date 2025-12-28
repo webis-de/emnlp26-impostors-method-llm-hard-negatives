@@ -167,13 +167,17 @@ def plot_precision_recall_curve(
             )
 
             # filter out points where both precision and recall are zero
-            mask = ~((precisions == 0) & (recalls == 0))
+            mask = ~(
+                ((precisions == 0) & (recalls == 0))
+                | ((precisions == 1) & (recalls == 0))
+                | ((precisions == 0) & (recalls == 1))
+            )
 
             precisions = precisions[mask]
             recalls = recalls[mask]
             unique_pairs = set(zip(recalls, precisions))
 
-            logger.info(key, positive_class_id)
+            logger.info("%d:  %d", key, positive_class_id)
             logger.info("Number of unique (x, y) pairs: %d", len(unique_pairs))
 
             plt.plot(
