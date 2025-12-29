@@ -317,7 +317,12 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
                                                                                reference_text=text)
 
         except Exception as e:
-            logging.warning(
-                f"Error during fetching results: {e}"
+            enough_generated = len(impostors) >= self.n_impostors
+            logging.error(
+                f"Error during fetching results: {e}. Retrying: {not enough_generated}"
             )
-            return impostors
+            if enough_generated:
+                return impostors
+            else:
+                # generate impostors again
+                return self.generate_impostors(text=text, text_id=text_id)
