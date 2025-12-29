@@ -42,8 +42,18 @@ class BaseDatasetVisualization(ABC):
         :param name (str): Name of the dataset to load.
         """
         self.name = name
-        self.dataset = self.load_dataset()
+        # self.dataset = self.load_dataset()
         self.mongoDB =  ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
+        test_dataset = pd.DataFrame(self.mongoDB.find_document_by_non_id_field(collection=self.mongoDB.test_pairs_collection, document_field_name="dataset_name", document_value=self.name))
+        train_dataset = pd.DataFrame(self.mongoDB.find_document_by_non_id_field(collection=self.mongoDB.train_pairs_collection, document_field_name="dataset_name", document_value=self.name))
+        self.dataset = pd.concat(
+            [train_dataset, test_dataset],
+            axis=0,
+            ignore_index=True,
+        )
+        print("Train docs:", len(train_dataset))
+        print("Test docs:", len(test_dataset))
+        print(f"Loaded dataset {self.name} {self.dataset.columns}")
         self.savefig_base = Path(__file__).resolve().parents[2] / savefig_base
         assert (
             self.savefig_base.exists()
