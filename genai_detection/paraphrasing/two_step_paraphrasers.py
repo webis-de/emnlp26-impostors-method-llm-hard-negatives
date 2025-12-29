@@ -244,20 +244,13 @@ class TwoStepParaphraser(Paraphraser):
         # Paraphrase: One string
         paraphrases, costs = [], []
         try:
-            summing = True
             for i in range(self.n_paraphrases):
                 paraphrase, cost_after_generator = self.generate_one_paraphrase_based_on_extracted_information(
                     extracted_info=extracted_info, verbose=False
                 )
                 paraphrases.append(paraphrase)
                 costs.append(cost_after_generator)
-
-                # Detect cost accumulation (monotonically increasing across iterations)
-                #TODO
-                if (len(costs) > 1) and not (costs[-1] > costs[-2]):
-                    summing = False
-            cost_after_generator = sum(costs) if not summing else costs[-1]
-            logging.info("The costs are summed up: %s", summing)
+            cost_after_generator = costs[-1]    # costs include all previous requests
 
             # Total cost for both requests
             logging.info(f"ATTENTION. Total cost for extractor + generator: ${cost_after_generator:.6f}")
