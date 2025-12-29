@@ -68,8 +68,6 @@ class ParaphraseMongoDB:
         # approach
         self.test_pairs_collection = self.db[CONFIG.MONGO_TEST_PAIRS_COLLECTION] # IDs of texts and their ground truth (reproducibility of evaluation)
         self.train_pairs_collection = self.db[CONFIG.MONGO_TRAIN_PAIRS_COLLECTION] # IDs of texts and their ground truth
-        # TODO: delete
-        self.tmp_collection = self.db[CONFIG.MONGO_TMP_COLLECTION]
 
     def reset_collection(self, collection_name:str):
         self.db.drop_collection(collection_name)
@@ -138,6 +136,21 @@ class ParaphraseMongoDB:
             collection=collection, search_args={document_field_name: document_value}
         )
 
+    def delete_documents_by_non_id_field(
+        self, collection, document_field_name: str, document_value: str
+    ) -> int:
+        """
+        Delete all documents in the specified collection where a non-id field
+        matches the given value.
+
+        :param collection: The MongoDB collection to delete from.
+        :param document_field_name: The name of the non-id field.
+        :param document_value: The value to match.
+        :return: Number of documents deleted.
+        """
+        result = collection.delete_many({document_field_name: document_value})
+        return result.deleted_count
+
     @staticmethod
     def find_document_by_multiple_fields(
         collection, search_args:dict
@@ -186,11 +199,11 @@ class ParaphraseMongoDB:
             assert (
                 (text is not None) and type(text) == str and len(text) > 0
             ), f"Text ID {text_id} not found."
-            logging.info("Obtained text from text ID: %s, length of text %d", text_id, len(text))
+            logger.info("Obtained text from text ID: %s, length of text %d", text_id, len(text))
 
         if not text_id:
             text_id = self.find_document_by_non_id_field(collection=self.original_collection, document_field_name="text", document_value=text)[0]["_id"]
-            logging.info("Obtained text ID from text; text ID: %s", text_id)
+            logger.info("Obtained text ID from text; text ID: %s", text_id)
         # Save text in mongoDB if not yet present
         if text and text_id:
             existing = self.find_document_by_id(

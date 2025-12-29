@@ -1,3 +1,4 @@
+import logging
 import re
 from random import sample, choices
 from typing import List, Iterable
@@ -8,6 +9,7 @@ from nltk import SnowballStemmer
 
 from genai_detection.detectors.detector_base import DetectorBase
 
+logger = logging.getLogger(__name__)
 
 class Preprocessor:
     def __init__(self):
@@ -169,6 +171,7 @@ class PairPreprocessor:
     # PUBLIC MAIN ENTRY POINT
     # -----------------------------------------------------------
     def preprocess_pairs(self, text_list:Iterable[str]):
+        logger.info(f"Preprocessing {len(text_list)} pairs.")
         text_list = self.turn_input_iterable(text_list)
 
         processed = []

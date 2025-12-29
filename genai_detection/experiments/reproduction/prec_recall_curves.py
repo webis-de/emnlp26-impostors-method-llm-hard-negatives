@@ -27,8 +27,6 @@ from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENER
 from genai_detection.detectors.impostor import ImpostorDetector
 from genai_detection.detectors.impostor_supervised_baseline import SupervisedImpostorBaseline
 from genai_detection.detectors.impostor_unsupervised_baseline import UnSupervisedImpostorBaseline
-from genai_detection.detectors.ppmd import PPMdDetector
-from genai_detection.detectors.unmasking import UnmaskingDetector
 from genai_detection.experiments.reproduction.impostor_metrics import (
     compute_metrics_parallel,
     LABEL_TRANSLATIONS,
@@ -90,6 +88,7 @@ def compute_prec_recall_f1_acc_dict(
         detector = ImpostorDetector(
             impostor_technique=technique,
             n_impostors=50,
+            dataset_name=dataset_name,
         )
         scores = detector.get_score(text=text_test_ID_pairs)
         print(technique)
@@ -109,8 +108,8 @@ def compute_prec_recall_f1_acc_dict(
         "supervised_baseline": SupervisedImpostorBaseline(
             dataset_name=dataset_name
         ),
-        "unmasking": UnmaskingDetector(),
-        "ppmd": PPMdDetector(),
+        # "unmasking": UnmaskingDetector(),
+        # "ppmd": PPMdDetector(),
     }
 
     mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
@@ -166,19 +165,26 @@ def plot_precision_recall_curve(
             recalls = df["recall"].apply(
                 lambda x: x[positive_class_id]
             )
-            # print(key, positive_class_id, len(precisions), len(recalls), recalls, precisions)
+
+            # filter out points where both precision and recall are zero
+            mask = ~(
+                ((precisions == 0) & (recalls == 0))
+                | ((precisions == 1) & (recalls == 0))
+                | ((precisions == 0) & (recalls == 1))
+            )
+
+            precisions = precisions[mask]
+            recalls = recalls[mask]
             unique_pairs = set(zip(recalls, precisions))
 
-            print(key, positive_class_id)
-            print("Number of unique (x, y) pairs:", len(unique_pairs))
-            # print("Unique (x, y) pairs:")
-            # for x, y in sorted(unique_pairs):
-            #     print(f"({x}, {y})")
+            logger.info("%s: class %d", key, positive_class_id)
+            logger.info("Number of unique (x, y) pairs: %d", len(unique_pairs))
 
             plt.plot(
                 recalls,
                 precisions,
-                marker="o",
+                # marker="o",
+                # markersize=4,
                 label=label,
             )
 
@@ -189,22 +195,22 @@ def plot_precision_recall_curve(
         plt.ylabel("Precision $\\frac{TP}{TP + FP}$", fontsize=14)
         plt.title(
             "Precision–Recall Curve Across Impostor Generation Techniques\n"
-            f"Dataset: {dataset_name} ({positive_class})"
+            f"Dataset: {dataset_name.capitalize()} ({positive_class})"
         )
         plt.xlim(-0.01, 1.01)
         plt.ylim(-0.01, 1.01)
         plt.legend()
-        # plt.tight_layout()
 
-        fname = (
-            f"roc_prec_recall_curve_{dataset_name.replace(' ', '_')}_"
-            f"{positive_class.lower().replace(' ', '_')}.svg"
-        )
-        plt.savefig(
-            LOCAL_SAVE_PATH / fname,
-            bbox_inches="tight",
-        )
-        logger.info("Saved %s to %s", fname, LOCAL_SAVE_PATH)
+        for format in ["pdf", "svg"]:
+            fname = (
+                f"roc_prec_recall_curve_{dataset_name.replace(' ', '_')}_"
+                f"{positive_class.lower().replace(' ', '_')}.{format}"
+            )
+            plt.savefig(
+                LOCAL_SAVE_PATH / fname,
+                bbox_inches="tight",
+            )
+            logger.info("Saved %s to %s", fname, LOCAL_SAVE_PATH)
 
         fig.clear()
 

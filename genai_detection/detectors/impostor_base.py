@@ -93,19 +93,9 @@ class ImpostorBaselineBase(ImpostorBase):
         # get all original texts from mongodb collection whose ID is not in test pairs mongodb collection
         self.dataset_name = dataset_name
         self.train_dataset = pd.DataFrame(self.mongoDB.get_training_data_from_original_texts(dataset_name=self.dataset_name))
-        print("Number of training pairs %d (in-memory)", self.train_dataset.shape[0])
-
-        # texts = pd.concat(
-        #     [
-        #         self.train_dataset["left_text"],
-        #         self.train_dataset["right_text"],
-        #     ],
-        #     ignore_index=True,
-        # )
+        logger.info("Number of training pairs %d (in-memory)", self.train_dataset.shape[0])
         texts = pd.DataFrame(self.mongoDB.original_collection.find({"dataset":self.dataset_name},projection={
             '_id': False,"text":True}))
-        # print("Basis for fitting tfidf vectorizer", len(texts))
-        # print(texts["text"].iloc[0][:500])
 
         self._vectorizer = TfidfVectorizer(
             max_features=100000,
@@ -114,9 +104,7 @@ class ImpostorBaselineBase(ImpostorBase):
         )
 
         self._vectorizer = self._vectorizer.fit(texts["text"])
-        # vector = self._vectorizer.transform([texts["text"].iloc[0]]).toarray()[0]
-        # print(vector, np.count_nonzero(vector))
-        print("Fitted vectorizer.")
+        logger.info("Fitted vectorizer.")
 
     def get_tfidf_vector_for_text(self, texts: List[str]):
         """
@@ -128,7 +116,8 @@ class ImpostorBaselineBase(ImpostorBase):
         if not isinstance(texts, list):
             # pandas Series or generator
             texts = list(texts)
-        assert texts[0] != texts[1], "Texts are identical"
+        if texts[0] == texts[1]:
+            logger.warning("Texts are identical %s", texts[0])
         tfidf_matrix = self._vectorizer.transform(texts)  # format: (n_samples=1, n_features=self.top_n)
         n_zero = [np.count_nonzero(vector) == 0 for vector in tfidf_matrix.toarray()]
         assert sum(n_zero) == 0, f"Found all-zero tfidf vector, number of non-zero tfidf vector: {sum(n_zero)}"

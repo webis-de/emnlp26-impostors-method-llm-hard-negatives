@@ -115,7 +115,7 @@ def run_koppel_webis():
 
 def run_blog_corpus():
     base_dir = (
-        Path(__file__).resolve().parent.parent / CONFIG.DATA_BASE_PATH / "Blog_corpus/"
+        Path(__file__).resolve().parents[2] / CONFIG.DATA_BASE_PATH / "Blog_corpus/"
     )
     assert (
         base_dir.exists()
@@ -126,6 +126,9 @@ def run_blog_corpus():
     dataset = loader.load()
     dataset.save_to_disk(output_dir)
 
+def delete_blog_from_mongoDB():
+    loader = BlogCorpusDatasetLoader(path="blogtext.csv")
+    loader.delete_dataset_from_mongoDB()
 
 def run_gutenberg_corpus():
     base_dir = (
@@ -142,6 +145,11 @@ def run_gutenberg_corpus():
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+    )
+
     parser = argparse.ArgumentParser(description="Run Dataset creation.")
     parser.add_argument(
         "--path",
@@ -161,6 +169,7 @@ if __name__ == "__main__":
     # # run_pan25()
     # run_pan20()
     # run_koppel_webis()
-    # run_blog_corpus()
+    run_blog_corpus()
+    # delete_blog_from_mongoDB()
     # run_gutenberg_corpus()
-    run_student_essay()
+    # run_student_essay()

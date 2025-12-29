@@ -100,8 +100,7 @@ class BaseDatasetLoader(ABC):
         return pairs
 
     def save2mongoDB(self, data: List[dict], is_train_split: bool=True):
-        # TODO: delete
-        collection_name = f"{'train' if is_train_split else 'test'}_pairs_tmp"
+        collection_name = f"{'train' if is_train_split else 'test'}_pairs"
         collection = self.mongoDB.db[collection_name]
         self.mongoDB.insert_documents(collection=collection, insert_data=data)
 
@@ -129,9 +128,7 @@ class BaseDatasetLoader(ABC):
 
         if docs_to_insert:
             try:
-                # TODO: self.mongoDB.original_collection.insert_many(
-                # TODO: delete
-                result = self.mongoDB.tmp_collection.insert_many(
+                result = self.mongoDB.original_collection.insert_many(
                     docs_to_insert, ordered=False
                 )
                 logger.info(
@@ -144,6 +141,22 @@ class BaseDatasetLoader(ABC):
         else:
             logger.info("No new documents to insert.")
 
+    def delete_dataset_from_mongoDB(self):
+        mongodb = ParaphraseMongoDB()
+        for collection in [
+            mongodb.original_collection,
+            mongodb.train_pairs_collection,
+            mongodb.test_pairs_collection,
+        ]:
+            n_deleted = mongodb.delete_documents_by_non_id_field(
+                collection=collection,
+                document_field_name="dataset",
+                document_value=self.name,
+            )
+            logger.info(
+                f"Deleted {n_deleted} documents from collection {collection.name} for dataset {self.name}."
+            )
+
     def _return_existing_original_mongodb_collection(self):
         """
         Return already existing MongoDB collection if exists.
@@ -152,8 +165,11 @@ class BaseDatasetLoader(ABC):
                                                             document_field_name="dataset", document_value=self.name)
         records = list(cursor)
         if records and len(records) > 0:
-            logger.debug(f"Found {records} documents in {CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION}")
+            logger.info(f"Found {len(records)} documents in {CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION}")
             return pd.DataFrame(records)
+        else:
+            logger.warning(f"No existing documents found in {CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION} for dataset {self.name}.")
+            return pd.DataFrame()
 
     def _make_pair_dict(self, left_text: dict, right_text: dict, same: bool = True):
         """
