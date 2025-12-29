@@ -43,7 +43,7 @@ class BaseImpostorGenerator(ABC):
         self.n_impostors = n_impostors
         # optional; Koppel et al. (2014) select N random impostors among top M impostors with on-the-fly and in-data
         # impostors generation method
-        self.num_potential_impostors = n_impostors
+        self.num_potential_impostors = int(n_impostors * 1.5)
 
     def set_num_potential_impostors(self, num_potential_impostors: int):
         assert isinstance(num_potential_impostors, int), (f"num_potential_impostors must an integer, "
@@ -58,34 +58,34 @@ class BaseImpostorGenerator(ABC):
         :return: List of random impostor texts among most similar texts
         """
         # TODO: tfidf already fitted?
-        logging.info(f"Obtained {len(all_impostors)} impostors.")
+        if len(all_impostors) <= self.n_impostors:
+            logging.info(
+                f"Impostor selection: Number of available impostors ({len(all_impostors)}) "
+                f"is less than or equal to number of requested impostors ({self.n_impostors}). "
+                f"Returning all available impostors."
+            )
+            return all_impostors
         # Add original text at the end
         all_impostors.append(reference_text)
         tfidf_vectorizer = TfidfFeatureExtractor()
         vectors = tfidf_vectorizer.fit_transform(all_impostors)
         logging.info(
-            f"Vectorized {vectors.shape[0]} documents with {vectors.shape[1]} features."
+            f"Impostor selection: Vectorized {vectors.shape[0]} documents with {vectors.shape[1]} features."
         )
 
         # Separate original text vector
         original_vector = vectors[-1]  # last one
         impostor_vectors = vectors[:-1]  # all except last
-        logging.info(f"Obtained original vector.")
 
         # Sort impostors by similarity to original (start lowest similarity first)
         similarities = [
             minmax_similarity(original_vector, vec) for vec in impostor_vectors
         ]
-        logging.info(f"Obtained {len(similarities)} similarities.")
         impostors_sorted = [all_impostors[i] for i in np.argsort(similarities)]
 
         # Take top M impostors, "potential" in Koppel et al. (2014)
         num_to_select = min(self.num_potential_impostors, len(impostors_sorted))
         selected_impostors = impostors_sorted[:num_to_select]
-
-        logging.info(
-            f"Number of potential impostors: {len(selected_impostors)}"
-        )
 
         # Sample n_impostors randomly from selected impostors
         return random.sample(selected_impostors, min(len(selected_impostors), self.n_impostors))
