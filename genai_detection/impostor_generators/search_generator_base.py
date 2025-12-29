@@ -216,7 +216,7 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
 
         # Insert into document into paraphrase collection
         self.mongoDB.on_the_fly_collection.insert_one(paraphrase_doc)
-        logging.info(f"Inserted paraphrase for document ID: {original_text_id} on index {self.index_name}")
+
 
     def _parallel_fetch(
         self, queries: List[str], text: Optional[str], text_id: Optional[str]
@@ -239,7 +239,6 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
                 new_imps = future.result()
 
                 for new_imp in new_imps:
-                    logger.info(f"Type of new impostor text: {type(new_imp)}")
                     if ("lang" not in new_imp.keys()) or (new_imp["lang"] == "en"):
                         uri = new_imp["target_uri"]
                         extracted_text = self._extract_text_from_url(uri)
@@ -256,6 +255,7 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
                             uri=uri,
                         )
                         all_results.append(impostor_text)
+                logging.info(f"Inserted {len(new_imps)} search results for document ID: {text_id} on index {self.index_name}")
         return all_results
 
     def generate_impostors(
@@ -308,10 +308,10 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
         try:
             # also saves new impostors in the mongoDB collection
             logger.info("About to fetch results.")
-            impostors.extend(
-                self._parallel_fetch(queries=queries, text=text, text_id=text_id)
-            )
-            logger.info("Fetched results, need to subsample.")
+            new_imps = self._parallel_fetch(queries=queries, text=text, text_id=text_id)
+            impostors.extend(new_imps)
+            logger.info(f"Fetched {len(new_imps)} results (total of {len(impostors)}/{self.n_impostors} impostors), "
+                        f"need to subsample: {len(impostors) > self.n_impostors}.")
             # list of impostor texts
             return self._select_random_n_imps_among_best_m_potential_impostors(all_impostors=impostors,
                                                                                reference_text=text)
