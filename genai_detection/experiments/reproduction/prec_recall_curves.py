@@ -50,6 +50,23 @@ LOCAL_SAVE_PATH = (
 LOCAL_SAVE_PATH.mkdir(parents=True, exist_ok=True)
 
 # ---------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------
+
+# Fixed colors per label (matplotlib-compatible)
+LABEL_COLORS = {
+    "in_domain": "#1f77b4",                 # blue
+    "on_the_fly": "#9467bd",                # purple
+    "one_step_llm": "#8c564b",              # brown
+    "two_step_llm": "#e377c2",              # pink
+    "unsupervised_baseline_min-max": "#ff7f0e", # orange
+    "unsupervised_baseline_cosine": "#2ca02c",  # green
+    "supervised_baseline": "#d62728",       # red
+    "unmasking": "#7f7f7f",                 # gray
+    "ppmd": "#bcbd22",                      # olive
+    "translation": "#17becf",               # cyan
+}
+# ---------------------------------------------------------------------
 # Experiment
 # ---------------------------------------------------------------------
 
@@ -159,6 +176,7 @@ def plot_precision_recall_curve(
 
         for key, df in results.items():
             label = LABEL_TRANSLATIONS.get(key, key)
+            color = LABEL_COLORS.get(label, "black")
             precisions = df["precision"].apply(
                 lambda x: x[positive_class_id]
             )
@@ -185,6 +203,7 @@ def plot_precision_recall_curve(
                 precisions,
                 # marker="o",
                 # markersize=4,
+                color=color,
                 label=label,
             )
 
