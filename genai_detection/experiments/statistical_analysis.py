@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------
 
 LOCAL_SAVE_PATH = (
-    Path(__file__).resolve().parents[3]
+    Path(__file__).resolve().parents[2]
     / CONFIG.SAVE_PATH
     / "statistical_analysis"
 )
@@ -59,6 +59,11 @@ class StatisticalAnalysis:
         if missing:
             raise ValueError(f"Missing columns in impostor outputs: {missing}")
 
+        for col in ["left_id","right_id"]:
+            impostor_outputs[col] = impostor_outputs[col] = impostor_outputs[col].apply(
+                lambda x: bson.ObjectId(x) if pd.notna(x) else x
+            )
+
         # --------------------------------------------------------------
         # Load ground truth
         # --------------------------------------------------------------
@@ -94,6 +99,7 @@ class StatisticalAnalysis:
 
         if df["same"].isna().any():
             logger.warning(f"{len(df['same'].isna())}/{len(df)} impostor outputs have no ground-truth match")
+        logger.info(f"Merged ground truth impostor outputs: {df.shape}")
 
         # --------------------------------------------------------------
         # Confusion matrix label
@@ -107,8 +113,8 @@ class StatisticalAnalysis:
                 return "FN"
             return "TN"
 
-        df["confusion_left"] = df.apply(lambda x: confusion_type(row=x, pred_col="left_disputed_left_candidate_uncorrected_p_value_pred"), axis=1)
-        df["confusion_right"] = df.apply(lambda x: confusion_type(row=x, pred_col="left_disputed_right_candidate_uncorrected_p_value_pred"), axis=1)
+        df["confusion_left"] = df.apply(lambda x: confusion_type(row=x, pred_col="left_disputed_right_candidate_uncorrected_p_value_pred"), axis=1)
+        df["confusion_right"] = df.apply(lambda x: confusion_type(row=x, pred_col="right_disputed_left_candidate_uncorrected_p_value_pred"), axis=1)
 
         # --------------------------------------------------------------
         # Long-format p-values (left / right)
@@ -118,7 +124,7 @@ class StatisticalAnalysis:
                 df.assign(
                     side="left",
                     p_value=df[
-                        "left_disputed_left_candidate_uncorrected_p_value"
+                        "left_disputed_right_candidate_uncorrected_p_value"
                     ],
                 ),
                 df.assign(
@@ -148,11 +154,9 @@ class StatisticalAnalysis:
 
                 if tech_df.empty:
                     continue
+                fig, ax = plt.subplots(figsize=(12, 6))
 
                 for side in ["left", "right"]:
-
-                    fig, ax = plt.subplots(figsize=(12, 6))
-
                     sns.violinplot(
                         data=tech_df,
                         x=f"confusion_{side}",
@@ -163,29 +167,29 @@ class StatisticalAnalysis:
                         ax=ax,
                     )
 
-                    ax.set_title(
-                        f"P-value distribution – {dataset_name}\n"
-                        f"Impostor generation: {technique}"
-                    )
-                    ax.set_ylabel("Uncorrected p-value")
-                    ax.set_xlabel("Confusion category")
+                ax.set_title(
+                    f"P-value distribution – {dataset_name}\n"
+                    f"Impostor generation: {technique}"
+                )
+                ax.set_ylabel("Uncorrected p-value")
+                ax.set_xlabel("Confusion category")
 
-                    plt.legend(title="Side", loc="upper right")
-                    plt.tight_layout()
+                plt.legend(title="Side", loc="upper right")
+                plt.tight_layout()
 
-                    # --------------------------------------------------
-                    # Save
-                    # --------------------------------------------------
-                    safe_dataset = dataset_name.replace(" ", "_")
-                    safe_tech = technique.replace(" ", "_")
+                # --------------------------------------------------
+                # Save
+                # --------------------------------------------------
+                safe_dataset = dataset_name.replace(" ", "_")
+                safe_tech = technique.replace(" ", "_")
 
-                    for fmt in ["pdf", "svg"]:
-                        fname = f"{side}_p_vals_{safe_dataset}_{safe_tech}.{fmt}"
-                        out_path = LOCAL_SAVE_PATH / fname
-                        fig.savefig(out_path, bbox_inches="tight")
-                        logger.info("Saved %s", out_path)
+                for fmt in ["pdf", "svg"]:
+                    fname = f"p_vals_{safe_dataset}_{safe_tech}.{fmt}"
+                    out_path = LOCAL_SAVE_PATH / fname
+                    fig.savefig(out_path, bbox_inches="tight")
+                    logger.info("Saved %s", out_path)
 
-                    plt.close(fig)
+                plt.close(fig)
 
 
 if __name__ == "__main__":
