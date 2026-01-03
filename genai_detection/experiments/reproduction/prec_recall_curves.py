@@ -66,6 +66,20 @@ LABEL_COLORS = {
     "ppmd": "#bcbd22",                      # olive
     "translation": "#17becf",               # cyan
 }
+
+LEGEND_TRANSLATIONS = {
+    "in_domain": "In-Domain",
+    "on_the_fly": "Retrieval-Based",
+    "one_step_llm": "One-Step Paraphraser (LLM)",
+    "two_step_llm": "Two-Step Paraphraser (LLM)",
+    "unsupervised_baseline_min-max": "Unsup. Min-Max (B)",
+    "unsupervised_baseline_cosine": "Unsup. Cosine (B)",
+    "supervised_baseline": "Sup. SVM (B)",
+    "unmasking": "Unmasking",
+    "ppmd": "PPMd",
+    "translation": "Translation",
+}
+
 # ---------------------------------------------------------------------
 # Experiment
 # ---------------------------------------------------------------------
