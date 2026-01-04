@@ -21,6 +21,7 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+from sklearn.metrics import auc
 
 from genai_detection.config import CONFIG
 from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENERATORS
@@ -106,7 +107,7 @@ def compute_prec_recall_f1_acc_dict(
     # -----------------------------------------------------------------
 
     text_test_ID_pairs, ground_truth = load_test_pairs(dataset_name)
-    print(len(text_test_ID_pairs))
+    logger.info("Number of texts used %d, number of pairs %d",len(text_test_ID_pairs), len(text_test_ID_pairs)//2)
 
     # -----------------------------------------------------------------
     # Collect predictions
@@ -190,7 +191,7 @@ def plot_precision_recall_curve(
 
         for key, df in results.items():
             label = LABEL_TRANSLATIONS.get(key, key)
-            color = LABEL_COLORS.get(label, "black")
+            color = LABEL_COLORS.get(key, "black")
             precisions = df["precision"].apply(
                 lambda x: x[positive_class_id]
             )
@@ -247,6 +248,62 @@ def plot_precision_recall_curve(
 
         fig.clear()
 
+
+
+def _extract_best_pr_points_per_impostor(
+    results: Dict[str, pd.DataFrame],
+    dataset_name: str,
+) -> pd.DataFrame:
+    rows = []
+
+    for impostor_method, df in results.items():
+
+        for class_id, class_name in [(0, "Different Author"), (1, "Same Author")]:
+            precisions = df["precision"].apply(lambda x: x[class_id]).to_numpy()
+            recalls = df["recall"].apply(lambda x: x[class_id]).to_numpy()
+            thresholds = df["threshold"].to_numpy()
+
+            # Sort by recall for valid PR AUC
+            order = np.argsort(recalls)
+            recalls_sorted = recalls[order]
+            precisions_sorted = precisions[order]
+
+            pr_auc = auc(recalls_sorted, precisions_sorted)
+
+            # ---- Best precision (tie → recall) ----
+            best_p_idx = np.lexsort((-recalls, -precisions))[0]
+
+            # ---- Best recall (tie → precision) ----
+            best_r_idx = np.lexsort((-precisions, -recalls))[0]
+
+            # ---- Best PR operating point (proxy for PR-AUC) ----
+            pr_product = precisions * recalls
+            best_auc_idx = pr_product.argmax()
+
+            rows.append({
+                "dataset": dataset_name.replace("_", " ").capitalize(),
+                "impostor_generation": LEGEND_TRANSLATIONS[impostor_method],
+                "class": class_name,
+
+                "n_test_samples": 50,   # TODO: adjust
+
+                "best_precision": precisions[best_p_idx],
+                "best_precision_recall": recalls[best_p_idx],
+                "best_precision_threshold": thresholds[best_p_idx],
+
+                "best_recall": recalls[best_r_idx],
+                "best_recall_precision": precisions[best_r_idx],
+                "best_recall_threshold": thresholds[best_r_idx],
+
+                "best_auc_precision": precisions[best_auc_idx],
+                "best_auc_recall": recalls[best_auc_idx],
+                "best_auc_threshold": thresholds[best_auc_idx],
+
+                "pr_auc": pr_auc,
+            })
+
+    return pd.DataFrame(rows)
+
 def run_prec_recall_curves(dataset_name:str, imp_gen_techniques:List[str]):
     results_dict = compute_prec_recall_f1_acc_dict(dataset_name=dataset_name, imp_gen_techniques=imp_gen_techniques)
     logger.info("Obtained scores for approaches %s", results_dict.keys())
@@ -264,5 +321,21 @@ def run_prec_recall_curves(dataset_name:str, imp_gen_techniques:List[str]):
     # Save to CSV
     combined_df.to_csv(LOCAL_SAVE_PATH / "effectiveness_scores.csv", index=False)
     logger.info(f"Saved effectiveness scores as csv to {LOCAL_SAVE_PATH}/effectiveness_scores.csv.")
+
+    # best PR operating points
+    best_pr_df = _extract_best_pr_points_per_impostor(
+        results=results_dict,
+        dataset_name=dataset_name,
+    )
+
+    best_pr_df.to_csv(
+        LOCAL_SAVE_PATH / f"best_precision_recall_points_{dataset_name}.csv",
+        index=False,
+        float_format="%.2f"
+    )
+    logger.info(
+        "Saved best precision–recall operating points to %s",
+        LOCAL_SAVE_PATH / "best_precision_recall_points.csv",
+    )
 
     plot_precision_recall_curve(results=results_dict, dataset_name=dataset_name)
