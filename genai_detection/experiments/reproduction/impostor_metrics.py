@@ -26,6 +26,7 @@ LABEL_TRANSLATIONS = {
     "translation": "Translation",
 }
 
+N_PAIRS = 50 # TODO: increase
 
 # ---------------------------------------------------------------------
 # Data loading
@@ -36,7 +37,6 @@ def _load_input_pairs(dataset_name: str, test_split:bool=True) -> Tuple[List[str
     """
     mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
     collection = mongoDB.test_pairs_collection if test_split else mongoDB.train_pairs_collection
-    n_pairs = 40 # TODO: increase
     diff_pairs = list(
         mongoDB.find_document_by_multiple_fields(
             collection=collection,
@@ -44,7 +44,7 @@ def _load_input_pairs(dataset_name: str, test_split:bool=True) -> Tuple[List[str
             {"dataset_name": dataset_name,
              "same":True},
         )
-    )[:n_pairs//2]
+    )[:N_PAIRS//2]
     same_pairs =list(
         mongoDB.find_document_by_multiple_fields(
             collection=collection,
@@ -52,7 +52,7 @@ def _load_input_pairs(dataset_name: str, test_split:bool=True) -> Tuple[List[str
             {"dataset_name": dataset_name,
              "same":False},
         )
-    )[:n_pairs//2]
+    )[:N_PAIRS//2]
 
     test_pairs = diff_pairs + same_pairs
 
