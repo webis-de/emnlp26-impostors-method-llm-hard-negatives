@@ -390,5 +390,5 @@ if __name__ == "__main__":
     )
     logger = logging.getLogger(__name__)
     statistical_analysis = StatisticalAnalysis()
-    # statistical_analysis.display_p_val_per_side()
+    statistical_analysis.display_p_val_per_side()
     statistical_analysis.histogram_per_approach()
