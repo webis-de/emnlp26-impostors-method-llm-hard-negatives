@@ -25,12 +25,14 @@ import nltk
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from bson import ObjectId
 from matplotlib import pyplot as plt
 from nltk.translate import bleu_score, meteor_score
 from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 from word_mover_distance import model  # https://pypi.org/project/word-mover-distance/
 
+from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 from genai_detection.paraphrasing.one_step_paraphrasers import *
 from genai_detection.paraphrasing.two_step_paraphrasers import *
 from genai_detection.util import preprocess_text as _preprocess_text
@@ -56,54 +58,22 @@ class WMDReadyKeyedVectors:
 class ParaphrasingEvaluator:
     def __init__(
         self,
-        paraphrasers: dict,
-        prompts: List[str],
-        original_text: str,
-        n_responses: int = 3,
-        max_length: int = CONFIG.MAX_LENGTH,
-        temperature: float = CONFIG.TEMPERATURE,
         ground_truth: Optional[dict[str, Any]] = None,
         data_category: Optional[str] = None,
         original_file_name: Optional[str] = None,
     ):
         """
         Initializes the ParaphrasingEvaluator with the given paraphrasers and prompts.
-        :param paraphrasers: A dictionary of paraphraser instances with their names as keys.
-        :param prompts: A list of prompts to be used for paraphrasing.
-        :param original_text: The original text to be paraphrased.
-        :param n_responses: The number of paraphrases to generate for each paraphraser.
-        :param max_length: The maximum length of the generated paraphrase.
-        :param temperature: Controls the randomness of the output. Lower values make the output more deterministic.
         :param ground_truth: Optional ground truth data to compare against the generated paraphrases.
         :param data_category: Optional category of the data being evaluated, used for logging and saving results.
         :param original_file_name: Optional name of the original file, used for logging and saving results.
         """
-        assert isinstance(paraphrasers, dict) and all(
-            isinstance(p, Paraphraser) for p in paraphrasers.values()
-        ), "paraphrasers must be a dictionary of Paraphraser instances."
-        self.paraphrasers = paraphrasers
-        assert isinstance(prompts, list) and all(
-            isinstance(p, str) for p in prompts
-        ), "prompts must be a list of strings."
-        self.prompts = prompts
-        assert (
-            isinstance(original_text, str) and original_text.strip()
-        ), "original_text must be a non-empty string."
-        self.original_text = _preprocess_text(original_text)
-        assert (
-            isinstance(n_responses, int) and n_responses > 0
-        ), "n_responses must be a positive integer."
-        self.n_responses = n_responses
-        assert (
-            isinstance(max_length, int) and max_length > 0
-        ), "max_length must be a positive integer."
-        self.max_length = max_length
-        self.temperature = temperature
-        self.original_file_name = (
-            str(original_file_name).replace("/", "_").replace(".", "_")
-            if original_file_name
-            else "unknown"
-        )
+        self.mongodb = ParaphraseMongoDB()
+        # self.original_file_name = (
+        #     str(original_file_name).replace("/", "_").replace(".", "_")
+        #     if original_file_name
+        #     else "unknown"
+        # )
 
         self.rouge_score = evaluate.load("rouge")
         self.bertscore = evaluate.load("bertscore")
@@ -112,7 +82,6 @@ class ParaphrasingEvaluator:
             if torch.cuda.is_available()
             else ("mps" if torch.backends.mps.is_available() else "cpu")
         )
-        tries = 0
         self.sbert_model = None
         try:
             self.sbert_model = SentenceTransformer(
@@ -143,13 +112,13 @@ class ParaphrasingEvaluator:
         self.ground_truth = ground_truth or {}
         self.data_category = data_category or "unknown"
         self.paraphrases_save_base_path = (
-            Path(__file__).resolve().parent.parent.parent
+            Path(__file__).resolve().parents[2]
             / CONFIG.SAVE_PATH
             / "paraphrasing"
-            / "experiments"
             / "paraphrase_evaluation"
             / self.data_category.replace(" ", "_").replace("/", "_")
         )
+        logger.info(f"Paraphrasing evaluation will be saved to {self.paraphrases_save_base_path}")
         self.paraphrases_save_base_path.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
@@ -348,176 +317,139 @@ class ParaphrasingEvaluator:
 
         return df
 
-    def _evaluate_model_on_data(
-        self, paraphraser_name: str, paraphraser, df: pd.DataFrame
-    ):
-        """
-        Evaluate a single paraphraser on the given dataset.
-        Returns metrics dictionary and length difference list.
-        """
-        results_per_text = []
-        lengths = {"original": [], "paraphrase": []}
-        file_existing_paraphrases = (
-            self.paraphrases_save_base_path
-            / f"generated_paraphrases_subset_{self.data_category.replace(' ', '_')}.json"
+    def _obtain_complete_paraphrase_df_from_mongodb(self):
+        # contains paraphrase, prompt, temperature, text_id, extracted_info, length_original_text, length_paraphrased_text
+        paraphrases_cursor = self.mongodb.non_naive_paraphrase_collection.find({})
+        paraphrases = pd.DataFrame(paraphrases_cursor)
+        # flatten extracted_info into columns
+        extracted_df = pd.json_normalize(paraphrases["extracted_info"])
+
+        # drop nested column and concat
+        paraphrases = pd.concat(
+            [paraphrases.drop(columns=["extracted_info"]), extracted_df],
+            axis=1
         )
-        file_existing_extractions = (
-            self.paraphrases_save_base_path
-            / f"extracted_subset_{self.data_category.replace(' ', '_')}.json"
+
+        # obtain original text via text_id (which is _id in original_texts collection)
+        paraphrases["text_id"] = paraphrases["text_id"].map(ObjectId)
+        original_texts_cursor = self.mongodb.original_collection.find(
+            {"_id": {"$in": paraphrases["text_id"].tolist()}},  # $in matches any ID in the list
+            {"_id": True, "text": True, "dataset": True},
         )
-        if "century" not in df.columns and "date" in df.columns:
-            # Blog dataset has 'date' column (eg. 12,May,2004), convert to 'century'
-            df["century"] = df["date"].apply(
-                lambda x: (
-                    self._get_century(int(x.split(",")[2]))
-                    if len(x.split(",")) > 2
-                    else 0
-                )
-            )
+        original_texts = pd.DataFrame(original_texts_cursor)
+        logger.info(f"Obtained {len(original_texts)} original texts from df with columns {original_texts.columns}")
+        print(original_texts["dataset"].value_counts(dropna=False))
 
-        for row in tqdm(
-            df.itertuples(), total=len(df), desc=f"Evaluating {paraphraser_name}"
-        ):
-            text = str(getattr(row, "text", ""))
-            filename = str(getattr(row, "filename", "unknown"))
-            if file_existing_extractions.exists():
-                with open(file_existing_extractions, "r") as f:
-                    data_loaded = json.load(f)
-            else:
-                raise FileNotFoundError(
-                    "Existing extraction file not found: "
-                    + str(file_existing_extractions)
-                )
-                data_loaded = {}
+        # merge data on paraphrases' text_id and original_texts_cursor's _id field
+        df = paraphrases.merge(
+            original_texts,
+            left_on="text_id",
+            right_on="_id",
+            how="left"
+        )
+        return df
 
-            if str(filename) in data_loaded.keys():
-                extra, genre, century = (
-                    data_loaded[filename]["extra"],
-                    data_loaded[filename]["genre"],
-                    data_loaded[filename]["century"],
-                )
-            else:
-                try:
-                    extra, _, genre, century, _, _ = paraphraser._extract_bullet_points(
-                        text=text,
-                        prompt=paraphraser.extractor_prompt,
-                    )
-                    data_loaded[filename] = {
-                        "extra": extra,
-                        "genre": genre,
-                        "century": century,
-                    }
-                    with open(file_existing_extractions, "w") as f:
-                        json.dump(data_loaded, f, indent=4)
-                except Exception as e:
-                    logger.warning(f"Extraction failed for file '{filename}': {e}")
-                    continue
-
-            if (
-                "current" in str(century).lower()
-                or "present" in str(century).lower()
-                or "now" in str(century).lower()
-            ):
-                century = 21
-            else:
-                century = self._get_century(century)
-            gt_genre = getattr(row, "genre", "").lower() or ""
-            gt_century = getattr(row, "century", 0) or 0
-            gt_topic = getattr(row, "topic", "") or ""
-
-            genre_match = np.max(
-                [
-                    self._semantic_similarity(extr_g.strip().lower(), gt_genre)
-                    for extr_g in re.split(r"[ /,]+", str(genre).lower())
-                ]
-            )
-            time_match = self._similarity_numbers(
-                other=century, baseline=gt_century
-            )  # self._similar(century, gt_century)
-            extracted_topic = (
-                extra.get("topic", extra) if isinstance(extra, dict) else extra
-            )
-            topic_match = np.max(
-                [
-                    self._semantic_similarity(
-                        gt_sub_topic.strip(), extracted_topic.strip()
-                    )
-                    for gt_sub_topic in str(gt_topic).lower().split(",")
-                ]
-            )
-
-            # read existing paraphrase if available
-            if file_existing_paraphrases.exists():
-                with open(file_existing_paraphrases, "r") as f:
-                    data_loaded = json.load(f)
-            else:
-                data_loaded = {}
-
-            try:
-                key = (
-                    "null"
-                    if "null" in data_loaded[paraphraser_name][text].keys()
-                    else None
-                )
-                potential_paraphrases = data_loaded[paraphraser_name][text][key]
-                paraphrases = []
-                for temperature in potential_paraphrases.keys():
-                    paraphrases.extend(potential_paraphrases[temperature])
-            except Exception as e:
-                raise RuntimeError(
-                    f"Failed to load paraphrases for {paraphraser_name} on text '{text[:30]}': {e}"
-                ) from e
-                paraphrases = paraphraser.paraphrase(text=text)
-
-                if (
-                    paraphrases
-                    and isinstance(paraphrases, (list, tuple))
-                    and len(paraphrases) > 0
-                ):
-                    # save generated paraphrases to file
-                    data_loaded.setdefault(paraphraser_name, {})
-                    data_loaded[paraphraser_name].setdefault(text, {})
-                    data_loaded[paraphraser_name][text].setdefault(None, {})
-                    data_loaded[paraphraser_name][text][None][
-                        self.temperature
-                    ] = paraphrases
-                    with open(file_existing_paraphrases, "w") as f:
-                        json.dump(data_loaded, f, indent=4)
-
-            paraphrase_len = np.average([len(p.split()) for p in paraphrases])
-
-            orig_len = len(text.split())
-            lengths["original"].append(orig_len)
-            lengths["paraphrase"].append(paraphrase_len)
-
-            results_per_text.append(
-                {
-                    "filename": filename,
-                    "genre_match": genre_match,
-                    "time_match": time_match,
-                    "topic_match": topic_match,
-                    "original_length": orig_len,
-                    "paraphrase_length": paraphrase_len,
-                    "ground_truth_genre": gt_genre,
-                    "ground_truth_century": gt_century,
-                    "ground_truth_topic": gt_topic,
-                    "extracted_topic": extra,
-                    "extracted_genre": genre,
-                    "extracted_century": century,
-                }
-            )
-
-        # Convert to DataFrame
-        results_df = pd.DataFrame(results_per_text)
-        # Optionally compute total scores
-        summary = {
-            "genre_match": results_df["genre_match"].sum(),
-            "time_match": results_df["time_match"].sum(),
-            "topic_match": results_df["topic_match"].sum(),
-            "total": len(results_df),
-        }
-
-        return results_df, summary, lengths
+    # def _evaluate_model_on_data(
+    #     self
+    # ):
+    #     """
+    #     Evaluate a single paraphraser on different datasets.
+    #     Returns metrics dictionary and length difference list.
+    #     """
+    #     df = self._obtain_complete_paraphrase_df_from_mongodb()
+    #
+    #     results_per_text = []
+    #
+    #
+    #     if "century" not in df.columns and "date" in df.columns:
+    #         # Blog dataset has 'date' column (eg. 12,May,2004), convert to 'century'
+    #         df["century"] = df["date"].apply(
+    #             lambda x: (
+    #                 self._get_century(int(x.split(",")[2]))
+    #                 if len(x.split(",")) > 2
+    #                 else 0
+    #             )
+    #         )
+    #
+    #     lengths = pd.DataFrame()
+    #     for row in tqdm(
+    #         df.itertuples(), total=len(df), desc=f"Evaluating paraphrases"
+    #     ):
+    #         text = str(getattr(row, "text", ""))
+    #         # filename = str(getattr(row, "filename", "unknown"))
+    #         #
+    #         #
+    #         # if str(filename) in data_loaded.keys():
+    #         #     extra, genre, century = (
+    #         #         data_loaded[filename]["extra"],
+    #         #         data_loaded[filename]["genre"],
+    #         #         data_loaded[filename]["century"],
+    #         #     )
+    #         #
+    #         #
+    #         # if (
+    #         #     "current" in str(century).lower()
+    #         #     or "present" in str(century).lower()
+    #         #     or "now" in str(century).lower()
+    #         # ):
+    #         #     century = 21
+    #         # else:
+    #         #     century = self._get_century(century)
+    #         # gt_genre = getattr(row, "genre", "").lower() or ""
+    #         # gt_century = getattr(row, "century", 0) or 0
+    #         # gt_topic = getattr(row, "topic", "") or ""
+    #         #
+    #         # genre_match = np.max(
+    #         #     [
+    #         #         self._semantic_similarity(extr_g.strip().lower(), gt_genre)
+    #         #         for extr_g in re.split(r"[ /,]+", str(genre).lower())
+    #         #     ]
+    #         # )
+    #         # time_match = self._similarity_numbers(
+    #         #     other=century, baseline=gt_century
+    #         # )  # self._similar(century, gt_century)
+    #         # extracted_topic = (
+    #         #     extra.get("topic", extra) if isinstance(extra, dict) else extra
+    #         # )
+    #         # topic_match = np.max(
+    #         #     [
+    #         #         self._semantic_similarity(
+    #         #             gt_sub_topic.strip(), extracted_topic.strip()
+    #         #         )
+    #         #         for gt_sub_topic in str(gt_topic).lower().split(",")
+    #         #     ]
+    #         # )
+    #         lengths["original"].append(row["length_original_text"])
+    #         lengths["paraphrase"].append(row["length_paraphrased_text"])
+    #
+    #         results_per_text.append(
+    #             {
+    #                 "filename": filename,
+    #                 "genre_match": genre_match,
+    #                 "time_match": time_match,
+    #                 "topic_match": topic_match,
+    #                 "original_length": row["length_original_text"],
+    #                 "paraphrase_length": row["length_paraphrased_text"],
+    #                 "ground_truth_genre": gt_genre,
+    #                 "ground_truth_century": gt_century,
+    #                 "ground_truth_topic": gt_topic,
+    #                 "extracted_topic": extra,
+    #                 "extracted_genre": genre,
+    #                 "extracted_century": century,
+    #             }
+    #         )
+    #
+    #     # Convert to DataFrame
+    #     results_df = pd.DataFrame(results_per_text)
+    #     # Optionally compute total scores
+    #     summary = {
+    #         "genre_match": results_df["genre_match"].sum(),
+    #         "time_match": results_df["time_match"].sum(),
+    #         "topic_match": results_df["topic_match"].sum(),
+    #         "total": len(results_df),
+    #     }
+    #
+    #     return results_df, summary, lengths
 
     def plot_metric_radar_per_dataset(
         self,
@@ -884,100 +816,62 @@ class ParaphrasingEvaluator:
         :param save_extremest_paraphr_per_score: If True, saves the worst and best paraphrase per score to a separate CSV file.
         :return: A pandas DataFrame containing the evaluation results.
         """
+        df = self._obtain_complete_paraphrase_df_from_mongodb()
+        logger.info(f"Evaluating {len(df)} paraphrases from df with columns {df.columns}")
+
+        # use for over (1) llm, (2) prompt, (3) temperature
+        group_cols = ["llm", "prompt", "temperature"]
         results = []
-        references = [self.original_text] * self.n_responses
-        original_split = self.original_text.split()
+        print(df["dataset"].value_counts(dropna=False))
+        print(df.head())
 
-        # Non-naive paraphrasers take the same prompt, but are called with different temperatures to introduce variance
-        temperatures = list(np.linspace(0, 1, max(2, len(self.prompts)), endpoint=True))
+        for dataset_name in df["dataset"].unique():
+            df_dataset = df[df["dataset"] == dataset_name]
+            logger.info(f"Evaluating {dataset_name}")
+            for (paraphraser_name, prompt, temperature), df_group in df_dataset.groupby(group_cols):
+                logger.info(f"Evaluating {paraphraser_name}, temperature {temperature}, prompt {prompt}")
+                paraphrases = df_group["paraphrase"].tolist()
+                references = df_group["text"].tolist()
 
-        # Cyclic iterator over temperatures
-        temp_cycle = cycle(temperatures)
+                bert_scores = self._safe_compute_bertscore(paraphrases, references)
+                rouge_scores = self._safe_compute_rouge(paraphrases)
 
-        test_configurations = []
-        for paraphraser_name, paraphraser in self.paraphrasers.items():
-            if isinstance(paraphraser, OneStepParaphraser):
-                # naive paraphrasers: fixed temperature + prompt diversity
-                for prompt_id, prompt in enumerate(self.prompts, start=1):
-                    test_configurations.append(
-                        (
-                            (paraphraser_name, paraphraser),
-                            prompt,
-                            self.temperature,
-                            prompt_id,
+                try:
+                    for i, paraphrase, reference in enumerate(zip(paraphrases, references)):
+                        results.append(
+                            self._build_result_row(
+                                paraphraser_name=paraphraser_name,
+                                prompt=prompt,
+                                paraphrase=paraphrase,
+                                bert_scores=bert_scores,
+                                rouge_scores=rouge_scores[i],
+                                idx=i,
+                                temperature=temperature,
+                                original_text=reference
+                            )
                         )
+
+                except Exception as e:
+                    logging.error(
+                        f"[ERROR] Scoring failed for '{paraphraser_name}' with prompt '{prompt}' for category '{self.data_category}' and paraphrases '{paraphrases}': {e}"
                     )
-            else:
-                # Non-naive: fixed prompt diversity + temperature diversity
-                for _ in self.prompts:
-                    test_configurations.append(
-                        ((paraphraser_name, paraphraser), None, next(temp_cycle), 0)
-                    )
-
-        logging.info(
-            f"[DEBUG] Total configurations to evaluate: {len(test_configurations)}, {test_configurations}"
-        )
-        logger.info(
-            f"[DEBUG] Total configurations to evaluate: {len(test_configurations)}, {test_configurations}"
-        )
-        results = []
-        # load json object with existing paraphrases if available and append new ones
-        paraphrase_file_path = self.paraphrases_save_base_path
-        for (paraphraser_name, paraphraser), prompt, temperature, prompt_id in tqdm(
-            test_configurations,
-            desc="Evaluating Paraphrasers",
-            total=len(test_configurations),
-        ):
-            try:
-                paraphrases = self._load_or_generate_paraphrases(
-                    paraphraser_name,
-                    paraphraser,
-                    prompt,
-                    temperature,
-                    paraphrase_file_path,
-                )
-            except Exception as e:
-                logger.error(
-                    f"Paraphraser '{paraphraser_name}' with prompt '{prompt}' failed: {e}"
-                )
-                paraphrases = [""] * self.n_responses
-
-            bert_scores = self._safe_compute_bertscore(paraphrases, references)
-            rouge_scores = self._safe_compute_rouge(paraphrases)
-
-            try:
-                for i, paraphrase in enumerate(paraphrases):
-                    results.append(
-                        self._build_result_row(
-                            paraphraser_name,
-                            prompt,
-                            paraphrase,
-                            original_split,
-                            bert_scores,
-                            rouge_scores[i],
-                            i,
-                        )
-                    )
-
-            except Exception as e:
-                logging.info(
-                    f"[ERROR] Scoring failed for '{paraphraser_name}' with prompt '{prompt}' for category '{self.data_category}' and paraphrases '{paraphrases}': {e}"
-                )
-                continue
+                    continue
 
         df = pd.DataFrame(results)
+        logger.info("%s", results)
         # drop any columns that are completely empty, i.e. all NaN
         df.dropna(axis=1, how="all", inplace=True)
         if save_to_disk:
             save_path = (
                 self.paraphrases_save_base_path
-                / f"paraphrasing_results_comparison_temp{self.temperature}_maxLength{self.max_length}_dataset_{self.data_category.replace(' ', '_')}.csv"
+                / f"paraphrasing_results_comparison_dataset.csv"
             )
             df.to_csv(save_path, index=False, float_format="%.4f")
             logging.info(f"Results saved to {save_path}")
 
         # Save the worst and best paraphrase per score
         extremest_paraphrases = pd.DataFrame()
+        logger.info("%s", df.columns)
         for metric in self.get_metric_names():
             min_row = df.loc[df[metric].idxmin()].copy()
             max_row = df.loc[df[metric].idxmax()].copy()
@@ -1001,7 +895,7 @@ class ParaphrasingEvaluator:
         if save_extremest_paraphr_per_score:
             extremest_save_path = (
                 self.paraphrases_save_base_path
-                / f"extremest_paraphrases_per_metric_temp{self.temperature}_maxLength{self.max_length}_dataset_{self.data_category.replace(' ', '_')}.csv"
+                / f"extremest_paraphrases_per_metric_dataset.csv"
             )
             extremest_paraphrases.to_csv(extremest_save_path, index=False)
 
@@ -1012,10 +906,11 @@ class ParaphrasingEvaluator:
         paraphraser_name: str,
         prompt: str,
         paraphrase: str,
-        original_split: List[str],
         bert_scores: dict,
         rouge_scores: dict,
         idx: int,
+        original_text:str,
+        temperature: float=1.0,
     ) -> dict:
         """
         Build a result row for the DataFrame.
@@ -1024,14 +919,17 @@ class ParaphrasingEvaluator:
         :param paraphrase: One of the generated paraphrase.
         :param original_split: The original text split into tokens.
         :param bert_scores: BERTScore results.
-        :param rouge_score: ROUGE scores for the paraphrase.
+        :param rouge_scores: ROUGE scores for the paraphrase.
         :param idx: Index of the paraphrase in the list of BERTScores.
+        :param original_text: Original text.
+        :param temperature: The temperature used for generating paraphrases.
         :return: A dictionary representing the result row.
         """
+        original_split = original_text.split(" ")
         # in [-1, 1] range, where 1 is identical, 0 is no similarity, -1 is opposite
         if self.sbert_model:
             cos_sim = torch.cosine_similarity(
-                self.sbert_model.encode(self.original_text, convert_to_tensor=True),
+                self.sbert_model.encode(original_text, convert_to_tensor=True),
                 self.sbert_model.encode(paraphrase, convert_to_tensor=True),
                 dim=0,
             ).item()
@@ -1041,11 +939,9 @@ class ParaphrasingEvaluator:
             "model": paraphraser_name,
             "prompt": f"{prompt} <TEXT>",
             "parameters": {
-                "n_responses": self.n_responses,
-                "max_tokens": self.max_length,
-                "temperature": self.temperature,
+                "temperature": temperature,
             },
-            "original_text": self.original_text,
+            "original_text": original_text,
             "paraphrased_text": paraphrase,
             # avoid division by zero using smoothing
             # bleu averages scores obtained from splits of paraphrase and (one of the) reference(s); here: only one reference (i.e. original text)
@@ -1612,34 +1508,14 @@ class ParaphrasingEvaluator:
 
 
 if __name__ == "__main__":
-    # models
-    ollama_model_id = "zephyr:7b"  # "mistral:7b"  # "default:latest"
-    paraphrasers = {
-        "T5_ChatGPT": T5ChatGPTParaphraser(),
-        # 'T5_Google_PAWS': T5GooglePAWSParaphraser(),
-        "Ollama": OllamaParaphraser(model_id=ollama_model_id),
-        # "TranslationParaphraser": TranslationParaphraser(
-        #     text_extractor=OllamaParaphraser(model_id=ollama_model_id),
-        #     text_generator=OllamaParaphraser(model_id=ollama_model_id),
-        # ),
-    }
-    n_responses = 3  # number of paraphrases to generate
-    max_length = CONFIG.MAX_LENGTH  # Maximum length of the generated paraphrase
-    temperature = (
-        CONFIG.TEMPERATURE
-    )  # Controls the randomness of the output. Lower values make the output more deterministic.
-    evaluator = ParaphrasingEvaluator(
-        paraphrasers=paraphrasers,
-        prompts=[
-            "Paraphrase the following text and output only the paraphrased version:"
-        ],  # use a single prompt for simplicity
-        original_text="This is a sample text to be paraphrased.",
-        n_responses=n_responses,
-        max_length=max_length,
-        temperature=temperature,
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
     )
-    logging.info("Starting evaluation of paraphrasers...")
-    evaluator.evaluate_extractors(save_to_disk=True)
-    logging.info("Evaluation complete.")
-    # paraphrase_evaluator = ParaphrasingEvaluator(paraphrasers=paraphrasers, prompts=prompts, original_text=original_text, n_responses=n_responses, max_length=max_length, temperature=temperature)
-    # paraphrase_evaluator.evaluate()
+    logger = logging.getLogger(__name__)
+    evaluator = ParaphrasingEvaluator()
+    logger.info("Starting evaluation of paraphrasers...")
+    # evaluator.evaluate_extractors(save_to_disk=True)
+
+    evaluator.evaluate()
+    logger.info("Evaluation complete.")
