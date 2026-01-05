@@ -5,7 +5,7 @@ from genai_detection.experiments.reproduction.prec_recall_curves import *
 
 # ray.init()
 
-# ray job submit --address https://ray.srv.webis.de --working-dir . --runtime-env env.yml -- python genai_detection/experiments/reproduction/run_eval.py
+# ray job submit --address https://ray.srv.webis.de --working-dir . --runtime-env env.yml -- python genai_detection/experiments/reproduction/run_acc_diff_n_m_imp_selection.py
 
 if __name__ == "__main__":
     logging.basicConfig(
@@ -81,9 +81,8 @@ if __name__ == "__main__":
         # "mirror_minds",   # raises error
     ]
 
-    # run_prec_recall_curves(
-    #     dataset_name=args.dataset_name, imp_gen_techniques=our_figure_impostor_options
-    # )
-
+    logger.info(f"About to start {CONFIG.BLOG} dataset.")
     run_acc_curves(dataset_name=CONFIG.BLOG,imp_gen_techniques=our_figure_impostor_options)
+    logger.info(f"Finished {CONFIG.BLOG} dataset, about to start {CONFIG.STUDENT_ESSAYS} dataset.")
     run_acc_curves(dataset_name=CONFIG.STUDENT_ESSAYS,imp_gen_techniques=our_figure_impostor_options)
+    logger.info(f"Finished {CONFIG.BLOG} and {CONFIG.STUDENT_ESSAYS} dataset.")
