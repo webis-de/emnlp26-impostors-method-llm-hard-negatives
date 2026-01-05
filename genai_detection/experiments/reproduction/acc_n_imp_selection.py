@@ -93,6 +93,7 @@ def compute_acc_across_n_selected_potential_imps(
             detector = ImpostorDetector(
                 impostor_technique=technique,
                 n_impostors=n_selected,
+                dataset_name=dataset_name,
             )
             results[technique][n_selected] = {}
 
