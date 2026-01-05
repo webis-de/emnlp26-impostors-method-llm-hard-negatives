@@ -786,15 +786,15 @@ class ParaphrasingEvaluator:
         except Exception as e:
             logger.error(f"BERTScore computation failed: {e}")
             return {
-                "precision": [0.0] * self.n_responses,
-                "recall": [0.0] * self.n_responses,
-                "f1": [0.0] * self.n_responses,
+                "precision": [0.0] * 50,#self.n_responses,
+                "recall": [0.0] * 50,#self.n_responses,
+                "f1": [0.0] * 50,#self.n_responses,
                 "hashcode": "",
             }
 
     def _safe_compute_rouge(self, paraphrases: list, references: list = None):
         if references is None:
-            references = [self.original_text]
+            raise ValueError("References are empty.")
         try:
             return [
                 self.rouge_score.compute(predictions=[p], references=references)
@@ -833,11 +833,11 @@ class ParaphrasingEvaluator:
                 paraphrases = df_group["paraphrase"].tolist()
                 references = df_group["text"].tolist()
 
-                bert_scores = self._safe_compute_bertscore(paraphrases, references)
-                rouge_scores = self._safe_compute_rouge(paraphrases)
+                bert_scores = self._safe_compute_bertscore(paraphrases=paraphrases, references=references)
+                rouge_scores = self._safe_compute_rouge(paraphrases=paraphrases, references=references)
 
                 try:
-                    for i, paraphrase, reference in enumerate(zip(paraphrases, references)):
+                    for i, (paraphrase, reference) in enumerate(zip(paraphrases, references)):
                         results.append(
                             self._build_result_row(
                                 paraphraser_name=paraphraser_name,
@@ -855,6 +855,7 @@ class ParaphrasingEvaluator:
                     logging.error(
                         f"[ERROR] Scoring failed for '{paraphraser_name}' with prompt '{prompt}' for category '{self.data_category}' and paraphrases '{paraphrases}': {e}"
                     )
+                    logger.error("Error in evaluate function")
                     continue
 
         df = pd.DataFrame(results)
@@ -1474,7 +1475,7 @@ class ParaphrasingEvaluator:
             )
 
             # Remove unused axes
-            for j in range(i + 1, len(axes)):
+            for j in range(len(metric_names), len(axes)):
                 fig.delaxes(axes[j])
             title = (
                 f"Metric Distributions\non {' '.join(word.capitalize() for word in data_category.split())} Dataset, grouped by {group_by.capitalize()}"
