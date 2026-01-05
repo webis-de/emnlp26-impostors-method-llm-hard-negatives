@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from time import sleep
 
 import bson
 import numpy as np
@@ -367,7 +368,7 @@ class StatisticalAnalysis:
                 translated_labels,
                 title="Impostor generation (# Instances)",
                 loc="upper right",
-                bbox_to_anchor=(1.15, 1),
+                bbox_to_anchor=(0.99, 1.02),
             )
 
             plt.tight_layout()
