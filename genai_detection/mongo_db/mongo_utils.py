@@ -1,7 +1,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from bson import ObjectId
 from pymongo import MongoClient
@@ -48,6 +48,7 @@ class ParaphraseMongoDB:
             CONFIG.MONGO_TEST_PAIRS_COLLECTION,
             CONFIG.MONGO_TRAIN_PAIRS_COLLECTION,
             CONFIG.MONGO_ALL_PAIRS_COLLECTION,
+            CONFIG.MONGO_SUP_BASELINE_CONFIG_PREDS
 
         ]:
             if collection_name not in self.db.list_collection_names():
@@ -70,7 +71,10 @@ class ParaphraseMongoDB:
         # approach
         self.test_pairs_collection = self.db[CONFIG.MONGO_TEST_PAIRS_COLLECTION] # IDs of texts and their ground truth (reproducibility of evaluation)
         self.train_pairs_collection = self.db[CONFIG.MONGO_TRAIN_PAIRS_COLLECTION] # IDs of texts and their ground truth
-        self.all_pairs_collection = self.db[CONFIG.MONGO_ALL_PAIRS_COLLECTION]
+        self.all_pairs_collection = self.db[CONFIG.MONGO_ALL_PAIRS_COLLECTION]  # merge of train and test pairs
+        self.supervised_baseline_diff_config_preds_collection = self.db[CONFIG.MONGO_SUP_BASELINE_CONFIG_PREDS] # predictions of supervised baseline for different configurations
+        self.supervised_baseline_diff_config_scores_collection = self.db[CONFIG.MONGO_SUP_BASELINE_CONFIG_SCORES]
+
 
     def reset_collection(self, collection_name:str):
         self.db.drop_collection(collection_name)
@@ -259,6 +263,49 @@ class ParaphraseMongoDB:
         """
         documents = self.non_naive_paraphrase_collection.find({"text_id": document_id}).sort("_id", 1)
         return documents
+
+    def get_all_data_but_certain_from_original_texts(
+        self,
+        in_args: Dict[str, str]=None,
+        not_in_args: Dict[str, str]=None,
+        batch_size: int = 1000,
+    ):
+        """
+        Single-use generator that yields all but pairs containing any of not_in_args with original texts.
+    Uses batching to minimize MongoDB round-trips and memory usage.
+        """
+        try:
+            query = {}
+            # Include conditions
+            if in_args:
+                query.update({k: {"$in": v if isinstance(v, list) else [v]} for k, v in in_args.items()})
+
+            # Exclude conditions
+            if not_in_args:
+                query.update({k: {"$nin": v if isinstance(v, list) else [v]} for k, v in not_in_args.items()})
+            projection = {"_id": 0, "left_id": 1, "right_id": 1, "same": 1}
+            print(query)
+            pairs_cursor = self.all_pairs_collection.find(
+                query,
+                projection,
+                batch_size=batch_size,
+            ).sort("_id", 1)
+
+            batch = []
+
+            for pair in pairs_cursor:
+                batch.append(pair)
+
+                if len(batch) >= batch_size:
+                    yield from self._process_pair_batch(batch)
+                    batch.clear()
+
+            # process remaining pairs
+            if batch:
+                yield from self._process_pair_batch(batch)
+
+        except PyMongoError as e:
+            logging.error(f"MongoDB error while fetching documents: {e}")
 
     def get_training_data_from_original_texts(
         self,

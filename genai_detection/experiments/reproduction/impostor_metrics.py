@@ -3,15 +3,13 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Iterable, Tuple
 
-import numpy as np
 import pandas as pd
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 
+from genai_detection.config import CONFIG
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 logger = logging.getLogger(__name__)
-
-THRESHOLDS = np.arange(0.0, 1.05, 0.01)
 
 N_PAIRS = 50 # TODO: increase
 
@@ -31,7 +29,7 @@ def _load_input_pairs(dataset_name: str, test_split:bool=True) -> Tuple[List[str
             {"dataset_name": dataset_name,
              "same":True},
         )
-    )[:N_PAIRS//2]
+    )#[:N_PAIRS//2]
     same_pairs =list(
         mongoDB.find_document_by_multiple_fields(
             collection=collection,
@@ -39,7 +37,7 @@ def _load_input_pairs(dataset_name: str, test_split:bool=True) -> Tuple[List[str
             {"dataset_name": dataset_name,
              "same":False},
         )
-    )[:N_PAIRS//2]
+    )#[:N_PAIRS//2]
 
     test_pairs = diff_pairs + same_pairs
 
@@ -49,10 +47,10 @@ def _load_input_pairs(dataset_name: str, test_split:bool=True) -> Tuple[List[str
         for id_ in (pair["left_id"], pair["right_id"])
     ]
     # TODO:
-    output_path = "text_ids.txt"
-
-    with open(output_path, "a", encoding="utf-8") as f:
-        f.write(",".join(text_ids) + "\n")
+    # output_path = "text_ids.txt"
+    #
+    # with open(output_path, "a", encoding="utf-8") as f:
+    #     f.write(",".join(text_ids) + "\n")
     ground_truth = [pair["same"] for pair in test_pairs]
 
     logger.info(
@@ -76,22 +74,13 @@ def load_train_pairs(dataset_name: str) -> Tuple[List[str], List[int]]:
 # Metric computation
 # ---------------------------------------------------------------------
 
-def compute_metrics_for_thresholds(
-    ground_truth: List[int],
-    scores: List[float],
-    thresholds: Iterable[float] = THRESHOLDS,
-) -> pd.DataFrame:
-    """
-    Compute precision, recall, f1, accuracy for a list of thresholds.
-    """
-    rows = []
-
-    for t in thresholds:
-        binary_preds = [1 if s >= t else 0 for s in scores]
-
-        rows.append(
-            {
-                "threshold": t,
+def compute_metrics_for_binary_predictions(
+        ground_truth: List[int],
+        binary_preds: List[int],
+        threshold: float
+):
+    return {
+                "threshold": threshold,
                 "precision": precision_score(
                     ground_truth,
                     binary_preds,
@@ -118,6 +107,22 @@ def compute_metrics_for_thresholds(
                     binary_preds,
                 ),
             }
+
+def compute_metrics_for_thresholds(
+    ground_truth: List[int],
+    scores: List[float],
+    thresholds: Iterable[float] = CONFIG.THRESHOLDS,
+) -> pd.DataFrame:
+    """
+    Compute precision, recall, f1, accuracy for a list of thresholds.
+    """
+    rows = []
+
+    for t in thresholds:
+        binary_preds = [1 if s >= t else 0 for s in scores]
+        rows.append(
+            compute_metrics_for_binary_predictions(
+                ground_truth=ground_truth, binary_preds=binary_preds, threshold=t)
         )
 
     return pd.DataFrame(rows)
@@ -126,7 +131,7 @@ def compute_metrics_for_thresholds(
 def compute_metrics_parallel(
     ground_truth: List[int],
     predictions: Dict[str, List[float]],
-    thresholds: Iterable[float] = THRESHOLDS,
+    thresholds: Iterable[float] = CONFIG.THRESHOLDS,
 ) -> Dict[str, pd.DataFrame]:
     """
     Compute metrics for multiple approaches in parallel.

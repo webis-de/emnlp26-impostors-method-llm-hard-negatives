@@ -1,6 +1,7 @@
 # added to git since no secrets
 import os
 
+import numpy as np
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -68,12 +69,16 @@ class BaseConfig:
         "train_pairs"  # collection (!= db); for IDs of texts and their ground truth
     )
     MONGO_ALL_PAIRS_COLLECTION = "all_pairs"
+    MONGO_SUP_BASELINE_CONFIG_PREDS = "supervised_baseline_diff_config_preds"
+    MONGO_SUP_BASELINE_CONFIG_SCORES = "supervised_baseline_diff_config_scores"
     # TODO: delete
     MONGO_TMP_COLLECTION = "temp_collection"
     MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME")
     MONGO_PASSWORD = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
     MONGO_HOST = "localhost"  # Local, but forwarded to server
     MONGO_PORT = 27018
+
+    THRESHOLDS = np.arange(0.0, 1.05, 0.01)
 
     LABEL_TRANSLATIONS = {
         "in_domain": "In-Domain",
