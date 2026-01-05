@@ -47,6 +47,8 @@ class ParaphraseMongoDB:
             CONFIG.MONGO_NAIVE_PARAPHRASE_COLLECTION,
             CONFIG.MONGO_TEST_PAIRS_COLLECTION,
             CONFIG.MONGO_TRAIN_PAIRS_COLLECTION,
+            CONFIG.MONGO_ALL_PAIRS_COLLECTION,
+
         ]:
             if collection_name not in self.db.list_collection_names():
                 self.db.create_collection(collection_name)
@@ -68,6 +70,7 @@ class ParaphraseMongoDB:
         # approach
         self.test_pairs_collection = self.db[CONFIG.MONGO_TEST_PAIRS_COLLECTION] # IDs of texts and their ground truth (reproducibility of evaluation)
         self.train_pairs_collection = self.db[CONFIG.MONGO_TRAIN_PAIRS_COLLECTION] # IDs of texts and their ground truth
+        self.all_pairs_collection = self.db[CONFIG.MONGO_ALL_PAIRS_COLLECTION]
 
     def reset_collection(self, collection_name:str):
         self.db.drop_collection(collection_name)

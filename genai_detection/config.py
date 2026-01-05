@@ -67,6 +67,7 @@ class BaseConfig:
     MONGO_TRAIN_PAIRS_COLLECTION = (
         "train_pairs"  # collection (!= db); for IDs of texts and their ground truth
     )
+    MONGO_ALL_PAIRS_COLLECTION = "all_pairs"
     # TODO: delete
     MONGO_TMP_COLLECTION = "temp_collection"
     MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME")

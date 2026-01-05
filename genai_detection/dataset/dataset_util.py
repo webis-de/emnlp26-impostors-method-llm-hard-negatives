@@ -130,6 +130,10 @@ def delete_blog_from_mongoDB():
     loader = BlogCorpusDatasetLoader(path="blogtext.csv")
     loader.delete_dataset_from_mongoDB()
 
+def merge_train_test_mongodb_collections():
+    loader = BlogCorpusDatasetLoader(path="blogtext.csv")
+    loader.merge_train_test_mongodb_collections()
+
 def run_gutenberg_corpus():
     base_dir = (
         Path(__file__).resolve().parent.parent / CONFIG.DATA_BASE_PATH / "gutenberg/"
@@ -169,7 +173,8 @@ if __name__ == "__main__":
     # # run_pan25()
     # run_pan20()
     # run_koppel_webis()
-    run_blog_corpus()
+    # run_blog_corpus()
     # delete_blog_from_mongoDB()
     # run_gutenberg_corpus()
     # run_student_essay()
+    merge_train_test_mongodb_collections()

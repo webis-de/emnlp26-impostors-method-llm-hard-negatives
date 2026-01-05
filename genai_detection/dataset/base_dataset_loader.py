@@ -62,6 +62,25 @@ class BaseDatasetLoader(ABC):
             }
         )
 
+    def merge_train_test_mongodb_collections(self):
+        """
+        Merge content of train and test collection into single mongoDB collection.
+        :return: None
+        """
+        def upsert_documents(source_collection):
+            for doc in source_collection.find({}):
+                self.mongoDB.all_pairs_collection.replace_one(
+                    {"_id": doc["_id"]},  # match condition
+                    doc,
+                    upsert=True
+                )
+
+        upsert_documents(self.mongoDB.train_pairs_collection)
+        upsert_documents(self.mongoDB.test_pairs_collection)
+
+        logger.info("Merge with upsert completed")
+
+
     @abstractmethod
     def load(self) -> DatasetDict:
         pass
