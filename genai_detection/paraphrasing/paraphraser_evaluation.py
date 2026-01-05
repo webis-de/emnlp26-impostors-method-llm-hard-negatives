@@ -347,6 +347,8 @@ class ParaphrasingEvaluator:
             right_on="_id",
             how="left"
         )
+        df.rename(columns={"_id_x": "_id"}, inplace=True)    # renamed due to merging; _id is paraphrase ID
+        df.drop(columns=["_id_y"], inplace=True)            # drop _id_y because we have text_id
         return df
 
     # def _evaluate_model_on_data(
@@ -823,33 +825,42 @@ class ParaphrasingEvaluator:
         group_cols = ["llm", "prompt", "temperature"]
         results = []
         print(df["dataset"].value_counts(dropna=False))
-        print(df.head())
 
         for dataset_name in df["dataset"].unique():
             df_dataset = df[df["dataset"] == dataset_name]
-            logger.info(f"Evaluating {dataset_name}")
+            logger.info(f"Evaluating {dataset_name} of length {len(df_dataset)}")
             for (paraphraser_name, prompt, temperature), df_group in df_dataset.groupby(group_cols):
-                logger.info(f"Evaluating {paraphraser_name}, temperature {temperature}, prompt {prompt}")
+                logger.info(f"Evaluating {paraphraser_name}, temperature {temperature}, prompt {prompt} of length {len(df_group)}")
                 paraphrases = df_group["paraphrase"].tolist()
+                paraphrase_ids = df_group["_id"].tolist()
                 references = df_group["text"].tolist()
+                reference_ids = df_group["text_id"].tolist()
 
                 bert_scores = self._safe_compute_bertscore(paraphrases=paraphrases, references=references)
                 rouge_scores = self._safe_compute_rouge(paraphrases=paraphrases, references=references)
 
                 try:
-                    for i, (paraphrase, reference) in enumerate(zip(paraphrases, references)):
-                        results.append(
-                            self._build_result_row(
-                                paraphraser_name=paraphraser_name,
-                                prompt=prompt,
-                                paraphrase=paraphrase,
-                                bert_scores=bert_scores,
-                                rouge_scores=rouge_scores[i],
-                                idx=i,
-                                temperature=temperature,
-                                original_text=reference
-                            )
+                    for i, (paraphrase_id, paraphrase, reference_id, reference) in enumerate(zip(paraphrase_ids, paraphrases, reference_ids, references)):
+                        existing_scores_cursor = self.mongodb.find_document_by_multiple_fields(
+                            collection=self.mongodb.paraphrase_score_collection,
+                            search_args={"paraphrase_id": paraphrase_id, "reference_id": reference_id},
                         )
+                        existing_result = list(existing_scores_cursor)
+                        if not existing_result:
+                            row = self._build_result_row(
+                                    paraphraser_name=paraphraser_name,
+                                    prompt=prompt,
+                                    paraphrase=paraphrase,
+                                    bert_scores=bert_scores,
+                                    rouge_scores=rouge_scores[i],
+                                    idx=i,
+                                    temperature=temperature,
+                                    original_text=reference
+                                )
+                            row["dataset"] = dataset_name
+                        else:
+                            row = existing_result[0]
+                        results.append(row)
 
                 except Exception as e:
                     logging.error(
@@ -1518,5 +1529,12 @@ if __name__ == "__main__":
     logger.info("Starting evaluation of paraphrasers...")
     # evaluator.evaluate_extractors(save_to_disk=True)
 
-    evaluator.evaluate()
+    df, extremest_paraphrases = evaluator.evaluate()
+    logger.info("Finished computing evaluation scores of paraphrasers...")
+    metrics_names = evaluator.get_metric_names()
+    evaluator.plot_metric_radar_per_dataset(df_all=df, dataset_col="dataset_name", display_plot=False, metrics=metrics_names)
+    for dataset_name in df["dataset_name"].unique():
+        evaluator.plot_metric_scatter(df=df, data_category=dataset_name, display_plot=False)
+        evaluator.plot_metric_distributions(df=df, data_category=dataset_name, display_plot=False)
+        evaluator.plot_models_metrics(df=df, data_category=dataset_name, display_plot=False)
     logger.info("Evaluation complete.")
