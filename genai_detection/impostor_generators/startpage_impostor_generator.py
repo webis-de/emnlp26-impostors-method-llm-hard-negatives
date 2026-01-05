@@ -154,7 +154,7 @@ class StartPageSearchImpostorGenerator(SearchImpostorGeneratorBase):
                 return []
 
             tree = HTMLTree.parse_from_bytes(response_bytes, "utf-8")
-            logging.info(f"Fetched results from {query}")
+            logging.info(f"Fetched results from '{query}'")
             result_list = []
             for qr in tree.body.query_selector_all("#main > .w-gl .result"):
                 result_a = qr.query_selector(".result-title.result-link")
@@ -173,16 +173,24 @@ class StartPageSearchImpostorGenerator(SearchImpostorGeneratorBase):
             while not result_list:
                 logger.error(f"No results found. Random changing word order for query '{query}'")
                 words = query.split()
+                words = words[:max(len(words)-1, 0)]   # make finding results easier by reducing query length
                 random.shuffle(words)
-                shuffled_query = " ".join(words)
-                result_list.extend(self.fetch_results(query=shuffled_query))
+                shuffled_query = " ".join(words) if words else query
+                if len(words) == 0 and not result_list:
+                    chatnoir_imp_generator = ChatNoirSearchImpostorGenerator()
+                    # shuffled query is empty by now
+                    result_list.extend(chatnoir_imp_generator.fetch_results(query=query))
+                    logging.info(f"Fetched results from '{query}' using ChatNoirSearchImpostorGenerator because StartPage did not return any results.")
+                else:
+                    result_list.extend(self.fetch_results(query=shuffled_query))
+                    print(f"'{shuffled_query}' has no results. Random changing word order. {len(words)} results and {result_list}")
             logging.info(f"Fetched {len(result_list)} results from {query}")
             return result_list
         except Exception as e:
             logger.error("Connection error while fetching results.")
             logger.exception(e)
             chatnoir_imp_generator = ChatNoirSearchImpostorGenerator()
-            return chatnoir_imp_generator.fetch_results(query=query)#[]
+            return chatnoir_imp_generator.fetch_results(query=query)
 
 
 if __name__ == "__main__":
