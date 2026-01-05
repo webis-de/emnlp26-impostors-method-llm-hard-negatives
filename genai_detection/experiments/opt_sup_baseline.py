@@ -85,8 +85,7 @@ class OptimalSupervisedBaseline(ABC):
         return predictions, gt
 
     def run_experiment(
-            self,
-            thresholds: Iterable[float] = CONFIG.THRESHOLDS,
+            self
     ):
         dataset_names = [CONFIG.STUDENT_ESSAYS, CONFIG.BLOG]
         configs = [None, ["assignment"]]
@@ -95,10 +94,11 @@ class OptimalSupervisedBaseline(ABC):
             for config in configs:
                 preds, gt = self.obtain_loo_preds_gt_for_one_config(config=config, dataset_name=dataset_name)
                 # compute recall, precision, f1, accuracy for different thresholds
+                sup_preds = list(preds.values())
                 df_metrics = compute_metrics_for_thresholds(
                     ground_truth=list(gt.values()),
-                    scores=list(preds.values()),
-                    thresholds=thresholds,
+                    scores=sup_preds,
+                    thresholds=np.arange(np.min(sup_preds), np.max(sup_preds), 0.01),
                 )
                 metrics = ["precision", "recall", "f1", "accuracy"]
                 positive_class_translation = ["Different Author", "Same Author"]
