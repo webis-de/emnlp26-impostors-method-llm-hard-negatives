@@ -1,5 +1,6 @@
 import argparse
 
+from genai_detection.experiments.reproduction.acc_n_imp_selection import run_acc_curves
 from genai_detection.experiments.reproduction.prec_recall_curves import *
 
 # ray.init()
@@ -80,8 +81,9 @@ if __name__ == "__main__":
         # "mirror_minds",   # raises error
     ]
 
-    run_prec_recall_curves(
-        dataset_name=args.dataset_name, imp_gen_techniques=our_figure_impostor_options
-    )
+    # run_prec_recall_curves(
+    #     dataset_name=args.dataset_name, imp_gen_techniques=our_figure_impostor_options
+    # )
 
-    # run_acc_curves(dataset_name=args.dataset_name,imp_gen_techniques=our_figure_impostor_options)
+    run_acc_curves(dataset_name=CONFIG.BLOG,imp_gen_techniques=our_figure_impostor_options)
+    run_acc_curves(dataset_name=CONFIG.STUDENT_ESSAYS,imp_gen_techniques=our_figure_impostor_options)
