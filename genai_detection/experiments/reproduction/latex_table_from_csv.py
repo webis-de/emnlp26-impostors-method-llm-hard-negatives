@@ -5,8 +5,6 @@ from pathlib import Path
 import pandas as pd
 
 from genai_detection.config import CONFIG
-from genai_detection.experiments.reproduction.impostor_metrics import LABEL_TRANSLATIONS
-
 logger = logging.getLogger(__name__)
 
 def csv_to_latex_table(
@@ -52,7 +50,7 @@ def generate_latex_tables_from_dir(
 
         caption = (
             f"Maximum {metric.upper()} scores for "
-            f"{LABEL_TRANSLATIONS.get(technique, technique)}"
+            f"{CONFIG.LABEL_TRANSLATIONS.get(technique, technique)}"
         )
         label = f"tab:{name}"
 

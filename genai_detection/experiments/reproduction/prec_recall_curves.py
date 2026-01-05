@@ -30,7 +30,6 @@ from genai_detection.detectors.impostor_supervised_baseline import SupervisedImp
 from genai_detection.detectors.impostor_unsupervised_baseline import UnSupervisedImpostorBaseline
 from genai_detection.experiments.reproduction.impostor_metrics import (
     compute_metrics_parallel,
-    LABEL_TRANSLATIONS,
     load_test_pairs,
 )
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
@@ -49,37 +48,6 @@ LOCAL_SAVE_PATH = (
     / "reproduction"
 )
 LOCAL_SAVE_PATH.mkdir(parents=True, exist_ok=True)
-
-# ---------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------
-
-# Fixed colors per label (matplotlib-compatible)
-LABEL_COLORS = {
-    "in_domain": "#1f77b4",                 # blue
-    "on_the_fly": "#9467bd",                # purple
-    "one_step_llm": "#8c564b",              # brown
-    "two_step_llm": "#e377c2",              # pink
-    "unsupervised_baseline_min-max": "#ff7f0e", # orange
-    "unsupervised_baseline_cosine": "#2ca02c",  # green
-    "supervised_baseline": "#d62728",       # red
-    "unmasking": "#7f7f7f",                 # gray
-    "ppmd": "#bcbd22",                      # olive
-    "translation": "#17becf",               # cyan
-}
-
-LEGEND_TRANSLATIONS = {
-    "in_domain": "In-Domain",
-    "on_the_fly": "Retrieval-Based",
-    "one_step_llm": "One-Step Paraphraser (LLM)",
-    "two_step_llm": "Two-Step Paraphraser (LLM)",
-    "unsupervised_baseline_min-max": "Unsup. Min-Max (B)",
-    "unsupervised_baseline_cosine": "Unsup. Cosine (B)",
-    "supervised_baseline": "Sup. SVM (B)",
-    "unmasking": "Unmasking",
-    "ppmd": "PPMd",
-    "translation": "Translation",
-}
 
 # ---------------------------------------------------------------------
 # Experiment
@@ -190,8 +158,8 @@ def plot_precision_recall_curve(
         )
 
         for key, df in results.items():
-            label = LABEL_TRANSLATIONS.get(key, key)
-            color = LABEL_COLORS.get(key, "black")
+            label = CONFIG.LABEL_TRANSLATIONS.get(key, key)
+            color = CONFIG.LABEL_COLORS.get(key, "black")
             precisions = df["precision"].apply(
                 lambda x: x[positive_class_id]
             )
@@ -282,7 +250,7 @@ def _extract_best_pr_points_per_impostor(
 
             rows.append({
                 "dataset": dataset_name.replace("_", " ").capitalize(),
-                "impostor_generation": LEGEND_TRANSLATIONS[impostor_method],
+                "impostor_generation": CONFIG.LABEL_TRANSLATIONS[impostor_method],
                 "class": class_name,
 
                 "n_test_samples": 50,   # TODO: adjust

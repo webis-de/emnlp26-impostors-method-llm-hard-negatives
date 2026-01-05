@@ -74,4 +74,31 @@ class BaseConfig:
     MONGO_HOST = "localhost"  # Local, but forwarded to server
     MONGO_PORT = 27018
 
+    LABEL_TRANSLATIONS = {
+        "in_domain": "In-Domain",
+        "on_the_fly": "Retrieval-Based",
+        "one_step_llm": "One-Step Paraphraser (LLM)",
+        "two_step_llm": "Two-Step Paraphraser (LLM)",
+        "unsupervised_baseline_min-max": "Unsup. Min-Max (B)",
+        "unsupervised_baseline_cosine": "Unsup. Cosine (B)",
+        "supervised_baseline": "Sup. SVM (B)",
+        "unmasking": "Unmasking",
+        "ppmd": "PPMd",
+        "translation": "Translation",
+    }
+
+    # Fixed colors per label (matplotlib-compatible)
+    LABEL_COLORS = {
+        "in_domain": "#1f77b4",  # blue
+        "on_the_fly": "#9467bd",  # purple
+        "one_step_llm": "#8c564b",  # brown
+        "two_step_llm": "#e377c2",  # pink
+        "unsupervised_baseline_min-max": "#ff7f0e",  # orange
+        "unsupervised_baseline_cosine": "#2ca02c",  # green
+        "supervised_baseline": "#d62728",  # red
+        "unmasking": "#7f7f7f",  # gray
+        "ppmd": "#bcbd22",  # olive
+        "translation": "#17becf",  # cyan
+    }
+
 CONFIG = BaseConfig()

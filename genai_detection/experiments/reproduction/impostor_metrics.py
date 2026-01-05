@@ -13,19 +13,6 @@ logger = logging.getLogger(__name__)
 
 THRESHOLDS = np.arange(0.0, 1.05, 0.01)
 
-LABEL_TRANSLATIONS = {
-    "in_domain": "In-Domain",
-    "on_the_fly": "On-the-Fly",
-    "one_step_llm": "One-Step Paraphraser (LLM)",
-    "two_step_llm": "Two-Step Paraphraser (LLM)",
-    "unsupervised_baseline_min-max": "Unsup. Min-Max (B)",
-    "unsupervised_baseline_cosine": "Unsup. Cosine (B)",
-    "supervised_baseline": "Sup. SVM (B)",
-    "unmasking": "Unmasking",
-    "ppmd": "PPMd",
-    "translation": "Translation",
-}
-
 N_PAIRS = 50 # TODO: increase
 
 # ---------------------------------------------------------------------

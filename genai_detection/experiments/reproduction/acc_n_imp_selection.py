@@ -28,7 +28,6 @@ from genai_detection.detectors.impostor import ImpostorDetector
 from genai_detection.experiments.reproduction.impostor_metrics import (
     load_test_pairs,
     compute_metrics_for_thresholds,
-    LABEL_TRANSLATIONS,
     extract_best_metric,
 )
 
@@ -139,7 +138,7 @@ def plot_acc_curve(results: Dict, dataset_name: str):
         )
 
         for technique, nested_dict in results.items():
-            tech_name = LABEL_TRANSLATIONS.get(technique, technique)
+            tech_name = CONFIG.LABEL_TRANSLATIONS.get(technique, technique)
 
             n_selected_vals = sorted(nested_dict.keys())
             n_potential_vals = sorted(
