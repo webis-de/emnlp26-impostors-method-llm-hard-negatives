@@ -43,11 +43,29 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
     Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
     """
 
-    def __init__(self, dataset_name: str = CONFIG.STUDENT_ESSAYS):
+    def __init__(self, dataset_name: str = CONFIG.STUDENT_ESSAYS, left_input=None, right_input=None,
+                 additional_in_args=None):
         """
         Initialize the Supervised Impostor Baseline detector.
         """
-        super().__init__(dataset_name=dataset_name)
+        if additional_in_args is None:
+            additional_in_args = []
+        if left_input is None and right_input is None:
+            in_args, not_in_args = None, None
+        else:
+            left_id = left_input["left_id"]
+            right_id = right_input["right_id"]
+            in_args = {
+                "dataset_name": dataset_name,
+            }
+            if additional_in_args:
+                in_args.update({f"left_{arg}": left_input[arg] for arg in additional_in_args})
+                in_args.update({f"right_{arg}": right_input[arg] for arg in additional_in_args})
+            not_in_args = {
+                "left_id": [left_id, right_id],
+                "right_id": [left_id, right_id],
+            }
+        super().__init__(dataset_name=dataset_name, in_args=in_args, not_in_args=not_in_args)
         self.model = self.get_trained_linear_svc()
 
     def _process_pairs_with_func(
@@ -60,8 +78,6 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
         :param score_fn: Function to compute score from vector difference
         :return: List of results from score_fn
         """
-        print("Processing pairs with TF-IDF scoring function", len(text))
-
         if isinstance(text, str):
             raise ValueError("Expected iterable of texts, got a single string")
 
@@ -87,11 +103,8 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
             assert len(vectors) == 2, "Each pair must contain exactly two texts."
 
             diff = abs(vectors[0] - vectors[1])
-            logger.info("TFIDF diff of pair: %s %s %s", diff, np.unique(diff.data), diff.shape)
             diff = diff.reshape(1, -1)  # shape: (1, n_features)
-            # print("TFIDF diff of pair: %s %s", diff, np.unique(diff.data), diff.shape)
             results.append(score_fn(diff))
-            # print("TFIDF score of pair: %s", results[-1])
 
         return results
 
@@ -138,7 +151,6 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
             logger.info(f"Training {len(candidate_texts)} candidate texts")
             disputed_vectors = self.get_tfidf_vector_for_text(texts=disputed_texts)
             candidate_vectors = self.get_tfidf_vector_for_text(texts=candidate_texts)
-            print(f"Training {len(candidate_vectors)} candidate vectors111111")
 
             # Calculate element-wise difference
             X = [abs(d - c) for d, c in zip(disputed_vectors, candidate_vectors)]
@@ -152,5 +164,5 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
                 # pickle.dump(model, open(path2model, "wb"))
                 with open(path2model, "wb") as f:
                     pickle.dump(model, f)
-                    print(f"Saved trained LinearSVC model to {path2model}")
+                    logger.info(f"Saved trained LinearSVC model to {path2model}")
             return model

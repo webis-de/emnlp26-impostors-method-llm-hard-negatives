@@ -88,11 +88,26 @@ class ImpostorBaselineBase(ImpostorBase):
     This class provides the basic structure for scoring and prediction methods.
     """
 
-    def __init__(self, dataset_name: str = CONFIG.STUDENT_ESSAYS):
+    def __init__(self, dataset_name: str = CONFIG.STUDENT_ESSAYS, in_args=None, not_in_args=None):
         super().__init__()
         # get all original texts from mongodb collection whose ID is not in test pairs mongodb collection
         self.dataset_name = dataset_name
-        self.train_dataset = pd.DataFrame(self.mongoDB.get_training_data_from_original_texts(dataset_name=self.dataset_name))
+        logger.info(f"About to use in_args: {in_args} and not_in_args: {not_in_args}")
+        if in_args is None and not_in_args is None:
+            self.train_dataset = pd.DataFrame(self.mongoDB.get_training_data_from_original_texts(
+                dataset_name=self.dataset_name)
+            )
+            logger.info(f"Did not use in_args and not_in_args")
+
+        else:
+            self.train_dataset = pd.DataFrame(
+                self.mongoDB.get_all_data_but_certain_from_original_texts(
+                    in_args=in_args,
+                    not_in_args=not_in_args
+                )
+            )
+            logger.info(f"Used in_args: {in_args} and not_in_args: {not_in_args}")
+
         logger.info("Number of training pairs %d (in-memory)", self.train_dataset.shape[0])
         texts = pd.DataFrame(self.mongoDB.original_collection.find({"dataset":self.dataset_name},projection={
             '_id': False,"text":True}))
