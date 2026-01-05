@@ -22,6 +22,7 @@ import httpx
 from resiliparse.parse.html import HTMLTree
 
 from genai_detection.config import CONFIG
+from genai_detection.impostor_generators.chatnoir_impostor_generator import ChatNoirSearchImpostorGenerator
 from genai_detection.impostor_generators.search_generator_base import SearchImpostorGeneratorBase
 
 logger = logging.getLogger(__name__)
@@ -180,7 +181,8 @@ class StartPageSearchImpostorGenerator(SearchImpostorGeneratorBase):
         except Exception as e:
             logger.error("Connection error while fetching results.")
             logger.exception(e)
-            return self.fetch_results(query=query)#[]
+            chatnoir_imp_generator = ChatNoirSearchImpostorGenerator()
+            return chatnoir_imp_generator.fetch_results(query=query)#[]
 
 
 if __name__ == "__main__":
