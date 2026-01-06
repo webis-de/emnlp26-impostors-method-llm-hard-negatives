@@ -18,7 +18,7 @@ import pandas as pd
 from genai_detection.config import CONFIG
 from genai_detection.detectors.impostor_supervised_baseline import SupervisedImpostorBaseline
 from genai_detection.experiments.reproduction.impostor_metrics import compute_metrics_for_binary_predictions, \
-    compute_metrics_for_thresholds, extract_best_metric
+    compute_metrics_for_thresholds, extract_best_metric, extract_best_metric_and_position
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 # ---------------------------------------------------------------------
@@ -116,9 +116,9 @@ class OptimalSupervisedBaseline(ABC):
                     }
 
                     for metric in metrics:
-                        best_idx = df_metrics[metric].idxmax()
-                        flat[f"{metric}_best_score"] = df_metrics.loc[best_idx, metric]
-                        flat[f"{metric}_best_threshold"] = sup_thresholds[best_idx]
+                        best_score = extract_best_metric_and_position(df=df_metrics, metric=metric, positive_class_id=positive_class_id)
+                        flat[f"{metric}_best_score"] = best_score["best_score"]
+                        flat[f"{metric}_best_threshold"] = sup_thresholds[best_score["best_idx"]]
 
                     rows.append(flat)
 
