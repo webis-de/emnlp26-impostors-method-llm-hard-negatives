@@ -113,6 +113,40 @@ class StartPageSearchImpostorGenerator(SearchImpostorGeneratorBase):
         )
         self.max_page = 1 # page 1 until max_page
 
+    def _obtain_res(self, query, request_headers):
+        resp = httpx.post(
+            "https://www.startpage.com/sp/search",
+            content=urlparse.urlencode(
+                dict(query=query, t="device", lui="english", cat="web")
+            ).encode(),
+            headers=request_headers,
+        )
+        response_bytes = resp.read()
+
+        if not response_bytes:
+            logger.error("Invalid server response")
+            return []
+
+        tree = HTMLTree.parse_from_bytes(response_bytes, "utf-8")
+        logging.info(f"Fetched results from '{query}'")
+        result_list = []
+        for qr in tree.body.query_selector_all("#main > .w-gl .result"):
+            result_a = qr.query_selector(".result-title.result-link")
+            if not result_a:
+                logger.error("Result has no title link.")
+                continue
+            result_url = result_a["href"]
+            snippet = qr.query_selector(".description")
+            result_list.append(
+                dict(
+                    query=query,
+                    target_uri=result_url,
+                    snippet=snippet.text.strip() if snippet else "",
+                )
+            )
+        return result_list
+
+
     def fetch_results(self, query: str) -> List[Dict]:
         """
         Issue HTTP request for a search result page from StartPage using a random user agent string.
@@ -141,57 +175,31 @@ class StartPageSearchImpostorGenerator(SearchImpostorGeneratorBase):
         }
 
         try:
-            resp = httpx.post(
-                "https://www.startpage.com/sp/search",
-                content=urlparse.urlencode(
-                    dict(query=query, t="device", lui="english", cat="web")
-                ).encode(),
-                headers=request_headers,
-            )
-            response_bytes = resp.read()
-
-            if not response_bytes:
-                logger.error("Invalid server response")
-                return []
-
-            tree = HTMLTree.parse_from_bytes(response_bytes, "utf-8")
-            logging.info(f"Fetched results from '{query}'")
-            result_list = []
-            for qr in tree.body.query_selector_all("#main > .w-gl .result"):
-                result_a = qr.query_selector(".result-title.result-link")
-                if not result_a:
-                    logger.error("Result has no title link.")
-                    continue
-                result_url = result_a["href"]
-                snippet = qr.query_selector(".description")
-                result_list.append(
-                    dict(
-                        query=query,
-                        target_uri=result_url,
-                        snippet=snippet.text.strip() if snippet else "",
-                    )
-                )
+            result_list = self._obtain_res(query=query, request_headers=request_headers)
             while not result_list:
                 logger.error(f"No results found. Random changing word order for query '{query}'")
                 words = query.split()
-                words = words[:max(len(words)-1, 0)]   # make finding results easier by reducing query length
-                random.shuffle(words)
-                shuffled_query = " ".join(words) if words else query
-                if len(words) == 0 and not result_list:
-                    # using different impostor generator like ChatNoir can lead to API rate limits
-                    # use random synonym of original query parts instead
-                    shuffled_query = [random.choice(wn.synsets(w)[0].lemma_names()) if wn.synsets(w) else w for w in words]
-                    logging.info(f"Fetching results from synonym-altered query '{query}' because StartPage did not return any results.")
-
-                result_list.extend(self.fetch_results(query=shuffled_query))
-                logger.info(f"'{shuffled_query}' has no results. Random changing word order. {len(words)} results and {result_list}")
+                # random.shuffle(words)
+                # shuffled_query = " ".join(words) if words else query
+                # if len(words) == 0 and not result_list:
+                # using different impostor generator like ChatNoir can lead to API rate limits
+                # use random synonym of original query parts instead
+                shuffled_query = " ".join([
+                    random.choice(random.choice(wn.synsets(w)).lemma_names())
+                    if wn.synsets(w) else w
+                    for w in words
+                ])
+                logging.info(f"Fetching results from synonym-altered query '{query}' to '{shuffled_query}' because StartPage did not return any results.")
+                result_list = self._obtain_res(query=shuffled_query, request_headers=request_headers)
+                logger.info(f"'{query}' had no results. Random changing word with synonyms: '{shuffled_query}'. Let to {len(result_list)} results.")
             logging.info(f"Fetched {len(result_list)} results from {query}")
             return result_list
         except Exception as e:
-            logger.error("Connection error while fetching results.")
+            logger.error(f"Connection error while fetching results (query '{query}', StartPage).")
             logger.exception(e)
-            chatnoir_imp_generator = ChatNoirSearchImpostorGenerator()
-            return chatnoir_imp_generator.fetch_results(query=query)
+            return []
+            # chatnoir_imp_generator = ChatNoirSearchImpostorGenerator()
+            # return chatnoir_imp_generator.fetch_results(query=query)
 
 
 if __name__ == "__main__":
