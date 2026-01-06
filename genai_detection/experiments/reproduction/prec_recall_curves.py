@@ -28,6 +28,8 @@ from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENER
 from genai_detection.detectors.impostor import ImpostorDetector
 from genai_detection.detectors.impostor_supervised_baseline import SupervisedImpostorBaseline
 from genai_detection.detectors.impostor_unsupervised_baseline import UnSupervisedImpostorBaseline
+from genai_detection.detectors.ppmd import PPMdDetector
+from genai_detection.detectors.unmasking import UnmaskingDetector
 from genai_detection.experiments.reproduction.impostor_metrics import (
     compute_metrics_parallel,
     load_test_pairs,
@@ -85,6 +87,9 @@ def compute_prec_recall_f1_acc_dict(
 
     for technique in imp_gen_techniques:
         logger.info("Obtaining impostor scores: %s", technique)
+        if technique == "on_the_fly":
+            # filter such that 50 same and different author pairs are tested; based on ground truth Boolean values
+            sampled_test_ID_pairs, ground_truth = load_test_pairs(dataset_name)
         detector = ImpostorDetector(
             impostor_technique=technique,
             n_impostors=50,
@@ -108,8 +113,8 @@ def compute_prec_recall_f1_acc_dict(
         "supervised_baseline": SupervisedImpostorBaseline(
             dataset_name=dataset_name
         ),
-        # "unmasking": UnmaskingDetector(),
-        # "ppmd": PPMdDetector(),
+        "unmasking": UnmaskingDetector(),
+        "ppmd": PPMdDetector(),
     }
 
     mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
