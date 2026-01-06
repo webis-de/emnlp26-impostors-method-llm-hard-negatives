@@ -798,11 +798,11 @@ class ParaphrasingEvaluator:
         if references is None:
             raise ValueError("References are empty.")
         try:
-            return [
-                self.rouge_score.compute(predictions=[p], references=references)
-                for p in paraphrases
-            ]
+            assert len(paraphrases) == len(references), f"Length of paraphrases {len(paraphrases)} and references {len(references)} not equal."
+            return self.rouge_score.compute(predictions=paraphrases, references=references)
+
         except Exception as e:
+            logger.error(f"ROUGE computation failed: len paraphrases {len(paraphrases)} and len references {len(references)}")
             logger.error(f"ROUGE computation failed: {e}")
             return [
                 {"rouge1": 0.0, "rouge2": 0.0, "rougeL": 0.0, "rougeLsum": 0.0}
@@ -835,6 +835,9 @@ class ParaphrasingEvaluator:
                 paraphrase_ids = df_group["_id"].tolist()
                 references = df_group["text"].tolist()
                 reference_ids = df_group["text_id"].tolist()
+                assert len(paraphrases) == len(paraphrase_ids), f"Length of paraphrases {len(paraphrases)} != Length of references {len(paraphrase_ids)}"
+                logger.info("Number of paraphrases and references found: {}".format(len(paraphrases)))
+
 
                 bert_scores = self._safe_compute_bertscore(paraphrases=paraphrases, references=references)
                 rouge_scores = self._safe_compute_rouge(paraphrases=paraphrases, references=references)
@@ -847,6 +850,7 @@ class ParaphrasingEvaluator:
                         )
                         existing_result = list(existing_scores_cursor)
                         if not existing_result:
+                            logger.info(f"No existing scores for {paraphrase_id} and {reference_id}")
                             row = self._build_result_row(
                                     paraphraser_name=paraphraser_name,
                                     prompt=prompt,
@@ -864,12 +868,13 @@ class ParaphrasingEvaluator:
                             row["reference_id"] = reference_id
                             self.mongodb.insert_document(collection=self.mongodb.paraphrase_score_collection, insert_data=row)
                         else:
+                            logger.info(f"Existing scores for {paraphrase_id} and {reference_id}")
                             row = existing_result[0]
                         results.append(row)
 
                 except Exception as e:
                     logging.error(
-                        f"[ERROR] Scoring failed for '{paraphraser_name}' with prompt '{prompt}' for category '{self.data_category}' and paraphrases '{paraphrases}': {e}"
+                        f"[ERROR] Scoring failed for '{paraphraser_name}' with prompt '{prompt}' for category '{self.data_category}' and paraphrases '{paraphrases}': "# {e}
                     )
                     logger.error("Error in evaluate function")
                     continue
