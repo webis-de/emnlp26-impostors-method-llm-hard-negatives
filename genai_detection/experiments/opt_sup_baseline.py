@@ -95,32 +95,43 @@ class OptimalSupervisedBaseline(ABC):
                 preds, gt = self.obtain_loo_preds_gt_for_one_config(config=config, dataset_name=dataset_name)
                 # compute recall, precision, f1, accuracy for different thresholds
                 sup_preds = list(preds.values())
+                sup_thresholds = np.arange(np.min(sup_preds), np.max(sup_preds), 0.01)
                 df_metrics = compute_metrics_for_thresholds(
                     ground_truth=list(gt.values()),
                     scores=sup_preds,
-                    thresholds=np.arange(np.min(sup_preds), np.max(sup_preds), 0.01),
+                    thresholds=sup_thresholds,
                 )
                 metrics = ["precision", "recall", "f1", "accuracy"]
                 positive_class_translation = ["Different Author", "Same Author"]
 
-                scores_for_config = {
-                    positive_class_translation[positive_class_id]: {
-                        metric: extract_best_metric(
-                            df=df_metrics,
-                            metric=metric,
-                            positive_class_id=positive_class_id
-                        )
-                        for metric in metrics
+                rows = []
+
+                for positive_class_id in [0, 1]:
+                    class_name = positive_class_translation[positive_class_id]
+
+                    flat = {
+                        "dataset": dataset_name,
+                        "config": config if config else "",
+                        "positive_class": class_name
                     }
-                    for positive_class_id in [0, 1]
-                }
-                for positive_class, class_score_config_df in scores_for_config.items():
-                    class_score_config_df[dataset_name] = dataset_name
-                    class_score_config_df["config"] = config if config else ""
+
+                    for metric in metrics:
+                        best_idx = df_metrics[metric].idxmax()
+                        flat[f"{metric}_best_score"] = df_metrics.loc[best_idx, metric]
+                        flat[f"{metric}_best_threshold"] = sup_thresholds[best_idx]
+
+                    rows.append(flat)
+
+                scores_config_df = pd.DataFrame(rows)
+
+                # insert each row separately to satisfy expected dict input
+                for doc in rows:
                     self.mongoDB.insert_document(
                         collection=self.mongoDB.supervised_baseline_diff_config_scores_collection,
-                        insert_data=class_score_config_df)
-                    scores = pd.concat([scores, class_score_config_df])
+                        insert_data=doc
+                    )
+
+                scores = pd.concat([scores, scores_config_df])
                 logger.info(f"Obtained {len(scores)} scores for dataset {dataset_name} and config {config}.")
 
         # save dataframe to disk
