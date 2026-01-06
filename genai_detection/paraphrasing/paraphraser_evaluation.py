@@ -855,9 +855,14 @@ class ParaphrasingEvaluator:
                                     rouge_scores=rouge_scores[i],
                                     idx=i,
                                     temperature=temperature,
-                                    original_text=reference
+                                    original_text=reference,
                                 )
+                            row.pop("paraphrased_text", None)
+                            row.pop("original_text", None)
                             row["dataset"] = dataset_name
+                            row["paraphrase_id"] = paraphrase_id
+                            row["reference_id"] = reference_id
+                            self.mongodb.insert_document(collection=self.mongodb.paraphrase_score_collection,insert_data=row)
                         else:
                             row = existing_result[0]
                         results.append(row)
@@ -929,7 +934,6 @@ class ParaphrasingEvaluator:
         :param paraphraser_name: Name of the paraphraser.
         :param prompt: The prompt used for paraphrasing excluding the text to paraphrase and tailoring whitespaces, but including bulletpoints etc.
         :param paraphrase: One of the generated paraphrase.
-        :param original_split: The original text split into tokens.
         :param bert_scores: BERTScore results.
         :param rouge_scores: ROUGE scores for the paraphrase.
         :param idx: Index of the paraphrase in the list of BERTScores.
