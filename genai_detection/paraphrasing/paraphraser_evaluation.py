@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import difflib
+import logging
 from collections import defaultdict
 from itertools import chain, cycle, zip_longest
 from pathlib import Path
@@ -799,7 +800,7 @@ class ParaphrasingEvaluator:
             raise ValueError("References are empty.")
         try:
             assert len(paraphrases) == len(references), f"Length of paraphrases {len(paraphrases)} and references {len(references)} not equal."
-            return self.rouge_score.compute(predictions=paraphrases, references=references)
+            return [self.rouge_score.compute(predictions=[p], references=[r]) for p, r in zip(paraphrases, references)]
 
         except Exception as e:
             logger.error(f"ROUGE computation failed: len paraphrases {len(paraphrases)} and len references {len(references)}")
@@ -866,15 +867,17 @@ class ParaphrasingEvaluator:
                             row["dataset"] = dataset_name
                             row["paraphrase_id"] = paraphrase_id
                             row["reference_id"] = reference_id
+                            logger.info(f"Computed scores for {paraphrase_id} and {reference_id}: {row}")
                             self.mongodb.insert_document(collection=self.mongodb.paraphrase_score_collection, insert_data=row)
+                            logger.info(f"Inserted {row}")
                         else:
                             logger.info(f"Existing scores for {paraphrase_id} and {reference_id}")
                             row = existing_result[0]
                         results.append(row)
 
                 except Exception as e:
-                    logging.error(
-                        f"[ERROR] Scoring failed for '{paraphraser_name}' with prompt '{prompt}' for category '{self.data_category}' and paraphrases '{paraphrases}': "# {e}
+                    logging.exception(
+                        f"Scoring failed for '{paraphraser_name}' with prompt '{prompt}' for category '{self.data_category}': {e}"
                     )
                     logger.error("Error in evaluate function")
                     continue
