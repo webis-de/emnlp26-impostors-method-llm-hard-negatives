@@ -19,6 +19,7 @@ from typing import List, Dict
 from urllib import parse as urlparse
 
 import httpx
+from nltk.corpus import wordnet as wn
 from resiliparse.parse.html import HTMLTree
 
 from genai_detection.config import CONFIG
@@ -177,13 +178,13 @@ class StartPageSearchImpostorGenerator(SearchImpostorGeneratorBase):
                 random.shuffle(words)
                 shuffled_query = " ".join(words) if words else query
                 if len(words) == 0 and not result_list:
-                    chatnoir_imp_generator = ChatNoirSearchImpostorGenerator()
-                    # shuffled query is empty by now
-                    result_list.extend(chatnoir_imp_generator.fetch_results(query=query))
-                    logging.info(f"Fetched results from '{query}' using ChatNoirSearchImpostorGenerator because StartPage did not return any results.")
-                else:
-                    result_list.extend(self.fetch_results(query=shuffled_query))
-                    print(f"'{shuffled_query}' has no results. Random changing word order. {len(words)} results and {result_list}")
+                    # using different impostor generator like ChatNoir can lead to API rate limits
+                    # use random synonym of original query parts instead
+                    shuffled_query = [random.choice(wn.synsets(w)[0].lemma_names()) if wn.synsets(w) else w for w in words]
+                    logging.info(f"Fetching results from synonym-altered query '{query}' because StartPage did not return any results.")
+
+                result_list.extend(self.fetch_results(query=shuffled_query))
+                logger.info(f"'{shuffled_query}' has no results. Random changing word order. {len(words)} results and {result_list}")
             logging.info(f"Fetched {len(result_list)} results from {query}")
             return result_list
         except Exception as e:
