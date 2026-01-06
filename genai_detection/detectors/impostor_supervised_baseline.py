@@ -59,8 +59,8 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
                 "dataset_name": dataset_name,
             }
             if additional_in_args:
-                in_args.update({f"left_{arg}": left_input[arg] for arg in additional_in_args})
-                in_args.update({f"right_{arg}": right_input[arg] for arg in additional_in_args})
+                in_args.update({f"left_{arg}": left_input[f"left_{arg}"] for arg in additional_in_args})
+                in_args.update({f"right_{arg}": right_input[f"right_{arg}"] for arg in additional_in_args})
             not_in_args = {
                 "left_id": [left_id, right_id],
                 "right_id": [left_id, right_id],
@@ -156,6 +156,8 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
             X = [abs(d - c) for d, c in zip(disputed_vectors, candidate_vectors)]
             # y = train_dataset["same"].astype(int).values
             y = np.array(self.train_dataset["same"], dtype=int)
+            if np.all(y == 0) or np.all(y == 1):
+                raise ValueError("y contains only True or only False values.")
             logger.info(f"Training {len(y)} labels")
             # Train model
             model.fit(X, y)
