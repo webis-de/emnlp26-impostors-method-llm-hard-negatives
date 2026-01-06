@@ -65,7 +65,15 @@ class OptimalSupervisedBaseline(ABC):
             existing_result = list(pred_cursor)
             if not existing_result:
                 assert "left_id" in test_pair and "right_id" in test_pair, f"text IDs of test pair missing; only columns: {test_pair.keys()}"
-                sup_baseline = self.train_svc(dataset_name=test_pair["dataset_name"], test_pair=test_pair, additional_in_args=config)
+                if config:
+                    # logger.info(f"About to use test pair keys: {test_pair.keys()}.")
+                    for config_item in config:
+                        assert f"left_{config_item}" in test_pair and f"right_{config_item}" in test_pair, f"Required keys not found in test pair: {test_pair.keys()}"
+                try:
+                    sup_baseline = self.train_svc(dataset_name=test_pair["dataset_name"], test_pair=test_pair, additional_in_args=config)
+                except ValueError:
+                    logger.error("Skipping this test pair because SVC training data contains only one class.")
+                    continue
                 text_test_pairs = self.mongoDB.get_texts_for_ids(text_ids=[test_pair["left_id"], test_pair["right_id"]])
 
                 preds = sup_baseline.get_score(text_test_pairs)
@@ -132,7 +140,7 @@ class OptimalSupervisedBaseline(ABC):
                     )
 
                 scores = pd.concat([scores, scores_config_df])
-                logger.info(f"Obtained {len(scores)} scores for dataset {dataset_name} and config {config}.")
+                logger.info(f"Obtained (same- and different-author) scores for dataset {dataset_name} and config {config}.")
 
         # save dataframe to disk
         scores.to_csv(LOCAL_SAVE_PATH / "effectiveness_scores.csv", index=False)
