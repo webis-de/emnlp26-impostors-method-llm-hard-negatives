@@ -89,7 +89,11 @@ class OptimalSupervisedBaseline(ABC):
                 )
             else:
                 predictions[pair_id] = existing_result[0]["prediction"]
-        logger.info(f"Obtained {len(predictions)} predictions for pairs of dataset {dataset_name}.")
+                logger.info(f"Obtained prediction of test pair {pair_id} from mongoDB collection.")
+        logger.info(f"Obtained {len(predictions)} predictions for {len(gt)} pairs of dataset {dataset_name}.")
+        if len(predictions) != len(gt):
+            logger.error("Number of predictions does not match number of gt pairs.")
+            logger.error(f"Symmetric key difference: {sorted(set(predictions.keys()) ^ set(gt.keys()))}")
         return predictions, gt
 
     def run_experiment(
@@ -101,6 +105,7 @@ class OptimalSupervisedBaseline(ABC):
         for dataset_name in dataset_names:
             for config in configs:
                 preds, gt = self.obtain_loo_preds_gt_for_one_config(config=config, dataset_name=dataset_name)
+                assert len(preds) == len(gt), f"{len(preds)} != {len(gt)} (length of predictions and ground truths)"
                 # compute recall, precision, f1, accuracy for different thresholds
                 sup_preds = list(preds.values())
                 sup_thresholds = np.arange(np.min(sup_preds), np.max(sup_preds), 0.01)
