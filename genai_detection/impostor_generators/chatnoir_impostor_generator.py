@@ -82,7 +82,7 @@ class ChatNoirSearchImpostorGenerator(SearchImpostorGeneratorBase):
             response.raise_for_status()
             return response.json()["results"]
         except Exception as e:
-            logging.warning(f"Error fetching results for '{query}': {e}")
+            logging.warning(f"Error fetching results for '{query}' with ChatNoir: {e}")
             return []
 
 
