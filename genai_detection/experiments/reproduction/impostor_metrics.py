@@ -174,3 +174,34 @@ def extract_best_metric(
         return 0.0
 
     return float(df[metric].apply(safe_get).max())
+
+def extract_best_metric_and_position(
+        df: pd.DataFrame,
+        metric: str,
+        positive_class_id: int = 1,
+) -> dict:
+    """
+    Extract the maximum metric value for the given class across thresholds
+    and return its position in the DataFrame.
+    """
+    if metric == "accuracy":
+        best_idx = df["accuracy"].idxmax()
+        return {
+            "best_score": float(df.loc[best_idx, "accuracy"]),
+            "best_idx": int(best_idx)
+        }
+
+    def safe_get(arr):
+        if len(arr) > positive_class_id:
+            return float(arr[positive_class_id])
+        return 0.0
+
+    # build scalar series for the selected class
+    class_metric_values = df[metric].apply(safe_get)
+
+    best_idx = class_metric_values.idxmax()
+
+    return {
+        "best_score": float(class_metric_values.loc[best_idx]),
+        "best_idx": int(best_idx)
+    }
