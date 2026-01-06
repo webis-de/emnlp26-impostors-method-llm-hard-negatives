@@ -862,7 +862,7 @@ class ParaphrasingEvaluator:
                             row["dataset"] = dataset_name
                             row["paraphrase_id"] = paraphrase_id
                             row["reference_id"] = reference_id
-                            self.mongodb.insert_document(collection=self.mongodb.paraphrase_score_collection,insert_data=row)
+                            self.mongodb.insert_document(collection=self.mongodb.paraphrase_score_collection, insert_data=row)
                         else:
                             row = existing_result[0]
                         results.append(row)
@@ -875,9 +875,11 @@ class ParaphrasingEvaluator:
                     continue
 
         df = pd.DataFrame(results)
-        logger.info("%s", results)
+        logger.info("%s are complete results.", results)
+        logger.info("Number of evaluated paraphrases: %d", len(results))
         # drop any columns that are completely empty, i.e. all NaN
         df.dropna(axis=1, how="all", inplace=True)
+        logger.info("Number of evaluated paraphrases after dropping NaNs: %d", len(results))
         if save_to_disk:
             save_path = (
                 self.paraphrases_save_base_path
