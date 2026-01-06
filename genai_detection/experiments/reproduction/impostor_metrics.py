@@ -117,6 +117,7 @@ def compute_metrics_for_thresholds(
     Compute precision, recall, f1, accuracy for a list of thresholds.
     """
     rows = []
+    assert len(ground_truth) == len(scores), f"Length of ground_truth and scores do not match: gt {len(ground_truth)}, scores {len(scores)}"
 
     for t in thresholds:
         binary_preds = [1 if s >= t else 0 for s in scores]
