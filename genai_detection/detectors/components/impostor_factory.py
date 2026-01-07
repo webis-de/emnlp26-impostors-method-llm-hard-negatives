@@ -14,7 +14,7 @@ IMPOSTOR_GENERATORS = {
     "one_step_llm": NaiveImpostorGenerator,
     "translation": TranslationImpostorGenerator,
     "in_domain": InDomainImpostorGenerator,
-    "on_the_fly":StartPageSearchImpostorGenerator,
+    "on_the_fly": StartPageSearchImpostorGenerator,
     "on_the_fly_chatnoir": ChatNoirSearchImpostorGenerator,
     "on_the_fly_serpapi": GoogleSearchImpostorGenerator,
     "on_the_fly_startpage": StartPageSearchImpostorGenerator,
