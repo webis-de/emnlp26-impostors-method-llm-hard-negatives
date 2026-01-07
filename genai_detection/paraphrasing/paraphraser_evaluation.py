@@ -864,7 +864,7 @@ class ParaphrasingEvaluator:
                                 )
                             row.pop("paraphrased_text", None)
                             row.pop("original_text", None)
-                            row["dataset"] = dataset_name
+                            row["dataset_name"] = dataset_name
                             row["paraphrase_id"] = paraphrase_id
                             row["reference_id"] = reference_id
                             logger.info(f"Computed scores for {paraphrase_id} and {reference_id}: {row}")
