@@ -56,7 +56,6 @@ class OptimalSupervisedBaseline(ABC):
                 document_value=dataset_name,
         ):
             pair_id = test_pair["_id"]
-            gt[pair_id] = test_pair["same"]
             search_args = {"pair_id": pair_id, "config": config, "dataset_name": dataset_name}
             pred_cursor = self.mongoDB.find_document_by_multiple_fields(
                 collection=self.mongoDB.supervised_baseline_diff_config_preds_collection,
@@ -84,12 +83,13 @@ class OptimalSupervisedBaseline(ABC):
                     insert_data={
                         **search_args,
                         "prediction": predictions[pair_id],
-                        "ground_truth": gt[pair_id],
+                        "ground_truth": test_pair["same"],
                     }
                 )
             else:
                 predictions[pair_id] = existing_result[0]["prediction"]
                 logger.info(f"Obtained prediction of test pair {pair_id} from mongoDB collection.")
+            gt[pair_id] = test_pair["same"] # only called if test pair is not skipped to avoid unequal length of gt and predictions
         logger.info(f"Obtained {len(predictions)} predictions for {len(gt)} pairs of dataset {dataset_name}.")
         if len(predictions) != len(gt):
             logger.error("Number of predictions does not match number of gt pairs.")
