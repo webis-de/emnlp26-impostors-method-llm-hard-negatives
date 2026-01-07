@@ -1544,7 +1544,7 @@ if __name__ == "__main__":
     # evaluator.evaluate_extractors(save_to_disk=True)
 
     df, extremest_paraphrases = evaluator.evaluate()
-    logger.info("Finished computing evaluation scores of paraphrasers...")
+    logger.info(f"Finished computing evaluation scores of paraphrasers... Got columns {df.columns}")
     metrics_names = evaluator.get_metric_names()
     evaluator.plot_metric_radar_per_dataset(df_all=df, dataset_col="dataset_name", display_plot=False, metrics=metrics_names)
     for dataset_name in df["dataset_name"].unique():
