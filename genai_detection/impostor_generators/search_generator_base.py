@@ -305,24 +305,25 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
         queries = self._generate_queries_based_on_candidate_words(
             medium_frequency_words
         )
-        try:
-            # also saves new impostors in the mongoDB collection
-            logger.info("About to fetch results.")
-            new_imps = self._parallel_fetch(queries=queries, text=text, text_id=text_id)
-            impostors.extend(new_imps)
-            logger.info(f"Fetched {len(new_imps)} results (total of {len(impostors)}/{self.n_impostors} impostors), "
-                        f"need to subsample: {len(impostors) > self.n_impostors}.")
-            # list of impostor texts
-            return self._select_random_n_imps_among_best_m_potential_impostors(all_impostors=impostors,
-                                                                               reference_text=text)
 
+        logger.info("About to fetch results.")
+        try:
+            new_imps = self._parallel_fetch(queries=queries, text=text, text_id=text_id)
         except Exception as e:
             enough_generated = len(impostors) >= self.n_impostors
             logging.error(
-                f"Error during fetching results: {e}. Retrying: {not enough_generated}"
+                f"Error during fetching results: {e}. Retrying: {not enough_generated} because obtained {len(impostors)}/{self.n_impostors} impostors."
             )
             if enough_generated:
                 return impostors
             else:
                 # generate impostors again
                 return self.generate_impostors(text=text, text_id=text_id)
+        impostors.extend(new_imps)
+        logger.info(f"Fetched {len(new_imps)} results (total of {len(impostors)}/{self.n_impostors} impostors), "
+                    f"need to subsample: {len(impostors) > self.n_impostors}.")
+        # list of impostor texts
+        return self._select_random_n_imps_among_best_m_potential_impostors(all_impostors=impostors,
+                                                                               reference_text=text)
+
+
