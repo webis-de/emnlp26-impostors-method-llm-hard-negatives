@@ -825,10 +825,11 @@ class ParaphrasingEvaluator:
         # use for over (1) llm, (2) prompt, (3) temperature
         group_cols = ["llm", "prompt", "temperature"]
         results = []
-        print(df["dataset"].value_counts(dropna=False))
+        df.rename(columns={"dataset": "dataset_name"}, inplace=True)
+        print(df["dataset_name"].value_counts(dropna=False))
 
-        for dataset_name in df["dataset"].unique():
-            df_dataset = df[df["dataset"] == dataset_name]
+        for dataset_name in df["dataset_name"].unique():
+            df_dataset = df[df["dataset_name"] == dataset_name]
             logger.info(f"Evaluating {dataset_name} of length {len(df_dataset)}")
             for (paraphraser_name, prompt, temperature), df_group in df_dataset.groupby(group_cols):
                 logger.info(f"Evaluating {paraphraser_name}, temperature {temperature}, prompt {prompt} of length {len(df_group)}")
@@ -873,6 +874,7 @@ class ParaphrasingEvaluator:
                         else:
                             logger.info(f"Existing scores for {paraphrase_id} and {reference_id}")
                             row = existing_result[0]
+                        assert "dataset_name" in row.keys(), f"'dataset_name' not found in row keys: {row.keys()}"
                         results.append(row)
 
                 except Exception as e:
@@ -883,7 +885,7 @@ class ParaphrasingEvaluator:
                     continue
 
         df = pd.DataFrame(results)
-        logger.info("%s are complete results.", results)
+        # logger.info("%s are complete results.", results)
         logger.info("Number of evaluated paraphrases: %d", len(results))
         # drop any columns that are completely empty, i.e. all NaN
         df.dropna(axis=1, how="all", inplace=True)
@@ -896,6 +898,7 @@ class ParaphrasingEvaluator:
             df.to_csv(save_path, index=False, float_format="%.4f")
             logging.info(f"Results saved to {save_path}")
 
+        assert "dataset_name" in df.columns, f"'dataset_name' not in df columns, only found: {df.columns}"
         # Save the worst and best paraphrase per score
         extremest_paraphrases = pd.DataFrame()
         logger.info("%s", df.columns)
