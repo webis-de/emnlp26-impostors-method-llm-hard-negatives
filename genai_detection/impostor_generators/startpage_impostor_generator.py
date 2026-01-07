@@ -174,34 +174,43 @@ class StartPageSearchImpostorGenerator(SearchImpostorGeneratorBase):
             "N1NsuggestionsEEE1N1Nwt_unitEEEcelsius",
         }
 
-        try:
-            result_list = self._obtain_res(query=query, request_headers=request_headers)
-            while not result_list:
-                logger.error(f"No results found. Random changing word order for query '{query}'")
-                words = query.split()
-                # random.shuffle(words)
-                # shuffled_query = " ".join(words) if words else query
-                # if len(words) == 0 and not result_list:
-                # using different impostor generator like ChatNoir can lead to API rate limits
-                # use random synonym of original query parts instead
-                shuffled_query = " ".join([
-                    random.choice(random.choice(wn.synsets(w)).lemma_names())
-                    if wn.synsets(w) else w
-                    for w in words
-                ])
-                logging.info(f"Fetching results from synonym-altered query '{query}' to '{shuffled_query}' because StartPage did not return any results.")
-                result_list = self._obtain_res(query=shuffled_query, request_headers=request_headers)
-                logger.info(f"'{query}' had no results. Random changing word with synonyms: '{shuffled_query}'. Let to {len(result_list)} results.")
-            logging.info(f"Fetched {len(result_list)} results from {query}")
-            return result_list
-        except Exception as e:
-            logger.error(f"Connection error while fetching results (query '{query}', StartPage).")
-            logger.exception(e)
-            return []
+        # try:
+        result_list = self._obtain_res(query=query, request_headers=request_headers)
+        # while not result_list:
+        #     logger.error(f"No results found. Random changing word order for query '{query}'")
+        #     words = query.split()
+        #     # random.shuffle(words)
+        #     # shuffled_query = " ".join(words) if words else query
+        #     # if len(words) == 0 and not result_list:
+        #     # using different impostor generator like ChatNoir can lead to API rate limits
+        #     # use random synonym of original query parts instead
+        #     shuffled_words = [
+        #         random.choice(random.choice(wn.synsets(w)).lemma_names()).replace("_", " ")
+        #         if wn.synsets(w) else w
+        #         for w in words
+        #     ]
+        #     if len(shuffled_words) > len(words):
+        #         shuffled_words = shuffled_words[:len(words)]
+        #     shuffled_query = " ".join(shuffled_words)
+        #     logging.info(f"Fetching results from synonym-altered query '{query}' to '{shuffled_query}' because StartPage did not return any results.")
+        #     result_list = self._obtain_res(query=shuffled_query, request_headers=request_headers)
+        #     logger.info(f"'{query}' had no results. Random changing word with synonyms: '{shuffled_query}'. Let to {len(result_list)} results.")
+        logging.info(f"Fetched {len(result_list)} results from {query}")
+        return result_list
+        # except Exception as e:
+        #     logger.error(f"Connection error while fetching results (query '{query}', StartPage).")
+        #     logger.exception(e)
+        #     return []
             # chatnoir_imp_generator = ChatNoirSearchImpostorGenerator()
             # return chatnoir_imp_generator.fetch_results(query=query)
 
 
 if __name__ == "__main__":
+    # logging.basicConfig(
+    #     level=logging.INFO,
+    #     format="%(asctime)s [%(levelname)s] %(message)s",
+    # )
+    # logger = logging.getLogger(__name__)
+
     startpage_google_retriever = StartPageSearchImpostorGenerator(api_key=CONFIG.CHATNOIR_KEY)
-    logging.info("%s", startpage_google_retriever.fetch_results(query="Hello World"))
+    # logger.info("%s", startpage_google_retriever.fetch_results(query="Hello World"))
