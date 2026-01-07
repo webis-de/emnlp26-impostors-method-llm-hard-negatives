@@ -550,7 +550,7 @@ class ParaphrasingEvaluator:
         plt.tight_layout()
 
         if save_path:
-            for format in ["svg"]:
+            for format in ["svg", "pdf"]:
                 out = save_path / f"radar_extraction_quality_per_dataset.{format}"
                 fig.savefig(out, bbox_inches="tight", transparent=True, format=format)
                 logging.info(f"Saved radar plot to {out}")
@@ -1148,7 +1148,7 @@ class ParaphrasingEvaluator:
         if save_path:
             save_path = Path(save_path)
             save_path.mkdir(parents=True, exist_ok=True)
-            for format in ["svg"]:
+            for format in ["svg", "pdf"]:
                 file_name = (
                     save_path
                     / f"{data_category.replace(' ', '_')}_paraphrasing_metrics_grouped_by_{group_by}_radar_chart.{format}"
@@ -1276,7 +1276,7 @@ class ParaphrasingEvaluator:
         if save_path:
             save_path = Path(save_path)
             save_path.mkdir(parents=True, exist_ok=True)
-            for format in ["svg"]:
+            for format in ["svg", "pdf"]:
                 full_path = (
                     save_path
                     / f"{data_category.replace(' ', '_')}_sem_syn_scatter_grouped_by_{group_by}.{format}"
@@ -1363,7 +1363,7 @@ class ParaphrasingEvaluator:
                 safe_category = (
                     str(data_category).replace(" ", "_") if data_category else "dataset"
                 )
-                file_name = f"{safe_category}_{safe_metric}_grouped_by_{group_by}_{scale}_scale.svg"
+
                 path2dir = (
                     self.paraphrases_save_base_path
                     / "metric_distributions"
@@ -1371,10 +1371,13 @@ class ParaphrasingEvaluator:
                     / f"{scale}_scale"
                 )
                 path2dir.mkdir(parents=True, exist_ok=True)
-                full_path = path2dir / file_name
-                plt.savefig(
-                    full_path, bbox_inches="tight", transparent=True, format="svg"
-                )
+
+                for format in ["svg", "pdf"]:
+                    file_name = f"{safe_category}_{safe_metric}_grouped_by_{group_by}_{scale}_scale.{format}"
+                    full_path = path2dir / file_name
+                    plt.savefig(
+                        full_path, bbox_inches="tight", transparent=True, format=format
+                    )
                 logging.info(f"Plot saved to {full_path}")
 
                 if display_plot:
@@ -1516,7 +1519,7 @@ class ParaphrasingEvaluator:
             if save_path:
                 scale_save_path = Path(save_path) / f"{scale}_scale"
                 scale_save_path.mkdir(parents=True, exist_ok=True)
-                for format in ["svg"]:
+                for format in ["svg", "pdf"]:
                     filenaname = f"{data_category.replace(' ', '_')}_metric_distributions_grouped_by_{group_by}_{scale}_scale.{format}"
                     full_path = scale_save_path / filenaname
                     plt.savefig(
@@ -1549,7 +1552,7 @@ if __name__ == "__main__":
     df, extremest_paraphrases = evaluator.evaluate()
     logger.info(f"Finished computing evaluation scores of paraphrasers... Got columns {df.columns}")
     metrics_names = evaluator.get_metric_names()
-    evaluator.plot_metric_radar_per_dataset(df_all=df, dataset_col="dataset_name", display_plot=False, metrics=metrics_names)
+    evaluator.plot_metric_radar_per_dataset(df_all=df, dataset_col="dataset_name", display_plot=False, metrics=metrics_names, save_path=evaluator.paraphrases_save_base_path)
     for dataset_name in df["dataset_name"].unique():
         evaluator.plot_metric_scatter(df=df, data_category=dataset_name, display_plot=False)
         evaluator.plot_metric_distributions(df=df, data_category=dataset_name, display_plot=False)
