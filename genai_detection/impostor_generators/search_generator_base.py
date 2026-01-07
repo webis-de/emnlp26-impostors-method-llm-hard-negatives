@@ -237,6 +237,8 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
             for future in as_completed(futures):
                 query = futures[future]  # Retrieve which query produced this future
                 new_imps = future.result()
+                if len(new_imps) == 0:
+                    raise ValueError(f"No impostor text found for query {query}. Raising error to try again with different query.")
 
                 for new_imp in new_imps:
                     if ("lang" not in new_imp.keys()) or (new_imp["lang"] == "en"):
