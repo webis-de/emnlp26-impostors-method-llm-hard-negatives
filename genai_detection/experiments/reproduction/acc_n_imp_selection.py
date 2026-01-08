@@ -118,6 +118,7 @@ def compute_acc_across_n_selected_potential_imps(
                 if len(scores) == 0:
                     logger.info(f"No scores existing for {technique}. Need to generate scores.")
                     scores = detector.get_score(text=test_id_pairs)
+                    logger.info(f"Generated {len(scores)} scores for {technique}.")
                 else:
                     # match left_id, right_id pairs with gt
                     scores = [
