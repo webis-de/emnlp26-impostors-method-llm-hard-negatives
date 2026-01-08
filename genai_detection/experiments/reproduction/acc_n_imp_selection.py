@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import csv
 import logging
 import os
 import sys
@@ -20,6 +20,7 @@ from typing import Dict, List
 
 import numpy as np
 import pandas as pd
+from bson import ObjectId, Int64
 from matplotlib import pyplot as plt
 
 from genai_detection.config import CONFIG
@@ -80,10 +81,11 @@ def compute_acc_across_n_selected_potential_imps(
         "n_potential": [100, 250, 500, 1000],
     }
 
-    # Load test data once
-    text_test_pairs, ground_truth = load_test_pairs(dataset_name)
+    # Load test data once (IDs, not text)
+    test_id_pairs, ground_truth = load_test_pairs(dataset_name)
 
     results: Dict[str, Dict[int, Dict[int, pd.DataFrame]]] = {}
+    n_samples_per_config = []
 
     for technique in imp_gen_techniques:
         logger.info("Processing technique: %s", technique)
@@ -102,7 +104,46 @@ def compute_acc_across_n_selected_potential_imps(
                     num_potential_impostors=n_potential
                 )
 
-                scores = detector.get_score(text=text_test_pairs)
+                # load existing scores from mongodb collection and ignore non-existing pairs
+                scores_cursor = detector.mongoDB.find_document_by_multiple_fields(
+                    collection=detector.mongoDB.impostor_output_collection,
+                    search_args={"impostor_generation_technique": technique,
+                                 "n_impostors": n_selected,
+                                "n_potential_impostors": n_potential,
+                                 },
+                )
+                scores = list(scores_cursor)
+                logger.info(f"Found existing {len(scores)} scores for {technique}, n_selected={n_selected}, n_potential={n_potential}.")
+                # TODO: Use MIN_SAMPLES=50 instead of 0
+                if len(scores) == 0:
+                    logger.info(f"No scores existing for {technique}. Need to generate scores.")
+                    scores = detector.get_score(text=test_id_pairs)
+                else:
+                    # match left_id, right_id pairs with gt
+                    pair_filters = [
+                        {"left_id": ObjectId(s["left_id"]), "right_id": ObjectId(s["right_id"])}
+                        for s in scores
+                    ]
+                    gt_cursor = detector.mongoDB.find_document_by_multiple_fields(collection=detector.mongoDB.all_pairs_collection,
+                                                                                  search_args={"$or": pair_filters})
+                    gt = list(gt_cursor)
+                    logger.info(f"Found {len(gt)} gt values for {technique}")
+                    scores_by_pair = {
+                        (doc["left_id"], doc["right_id"]): doc["scores_over_different_rounds"]/100
+                        for doc in scores
+                    }
+
+                    gt_by_pair = {
+                        (doc["left_id"], doc["right_id"]): doc["same"]
+                        for doc in gt
+                    }
+                    assert len(gt_by_pair) == len(scores_by_pair), f"GT and score length are not equal: {len(gt_by_pair)} != {len(scores_by_pair)}"
+                    ground_truth = list(gt_by_pair.values())
+                    scores = list(scores_by_pair.values())
+                n_samples_per_config.append(
+                    {"technique": technique, "n_selected": n_selected, "n_potential": n_potential, "n_samples": len(scores)}
+                )
+
                 assert scores is not None, "Detector returned None scores"
 
                 df_metrics = compute_metrics_for_thresholds(
@@ -118,7 +159,14 @@ def compute_acc_across_n_selected_potential_imps(
                     n_selected,
                     n_potential,
                 )
+    # save number of samples considered per config
+    with open(LOCAL_SAVE_PATH / "n_samples_per_config.csv", "w", newline="", encoding="utf-8") as csvfile:
+        # Field names (columns) — take from keys of first dict
+        fieldnames = n_samples_per_config[0].keys()
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
+        writer.writeheader()  # Write header row
+        writer.writerows(n_samples_per_config)  # Write all rows
     return results
 
 
