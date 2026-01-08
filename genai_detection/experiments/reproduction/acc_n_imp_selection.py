@@ -120,12 +120,16 @@ def compute_acc_across_n_selected_potential_imps(
                     scores = detector.get_score(text=test_id_pairs)
                 else:
                     # match left_id, right_id pairs with gt
+                    scores = [
+                        {**s, "left_id": ObjectId(s["left_id"]), "right_id": ObjectId(s["right_id"])}
+                        for s in scores
+                    ]
                     pair_filters = [
-                        {"left_id": ObjectId(s["left_id"]), "right_id": ObjectId(s["right_id"])}
+                        {"left_id": s["left_id"], "right_id": s["right_id"]}
                         for s in scores
                     ]
                     gt_cursor = detector.mongoDB.find_document_by_multiple_fields(collection=detector.mongoDB.all_pairs_collection,
-                                                                                  search_args={"$or": pair_filters})
+                                                                                  search_args={"dataset_name": dataset_name, "$or": pair_filters})
                     gt = list(gt_cursor)
                     logger.info(f"Found {len(gt)} gt values for {technique}")
                     scores_by_pair = {
@@ -137,18 +141,24 @@ def compute_acc_across_n_selected_potential_imps(
                         (doc["left_id"], doc["right_id"]): doc["same"]
                         for doc in gt
                     }
-                    assert len(gt_by_pair) == len(scores_by_pair), f"GT and score length are not equal: {len(gt_by_pair)} != {len(scores_by_pair)}"
+                    # gt can be filtered by dataset while scores cannot; omit by using filtered gt keys
+                    scores_by_pair = {
+                        pair: score
+                        for pair, score in scores_by_pair.items()
+                        if pair in gt_by_pair
+                    }
                     ground_truth = list(gt_by_pair.values())
                     scores = list(scores_by_pair.values())
+                assert len(ground_truth) == len(scores), f"GT and score length are not equal: {len(ground_truth)} != {len(scores)}"
                 n_samples_per_config.append(
-                    {"technique": technique, "n_selected": n_selected, "n_potential": n_potential, "n_samples": len(scores)}
+                    {"technique": technique, "dataset_name": dataset_name, "n_selected": n_selected, "n_potential": n_potential, "n_samples": len(scores)}
                 )
 
                 assert scores is not None, "Detector returned None scores"
 
                 df_metrics = compute_metrics_for_thresholds(
-                    ground_truth,
-                    scores,
+                    ground_truth=ground_truth,
+                    scores=scores,
                 )
 
                 results[technique][n_selected][n_potential] = df_metrics
@@ -160,7 +170,7 @@ def compute_acc_across_n_selected_potential_imps(
                     n_potential,
                 )
     # save number of samples considered per config
-    with open(LOCAL_SAVE_PATH / "n_samples_per_config.csv", "w", newline="", encoding="utf-8") as csvfile:
+    with open(LOCAL_SAVE_PATH / f"n_samples_per_config_{dataset_name}.csv", "w", newline="", encoding="utf-8") as csvfile:
         # Field names (columns) — take from keys of first dict
         fieldnames = n_samples_per_config[0].keys()
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -246,6 +256,31 @@ def plot_acc_curve(results: Dict, dataset_name: str):
                 df_csv.to_csv(save_path / csv_name)
                 logger.info("Saved %s", csv_name)
 
+def round_scores(technique:str):
+    input_dir = LOCAL_SAVE_PATH / technique
+    assert os.path.isdir(input_dir), f"{input_dir} is not a directory"
+    assert input_dir.exists(), f"{input_dir} does not exist"
+    output_dir = input_dir / "rounded_results"
+    output_dir.mkdir(exist_ok=True)
+
+    # ----------------------------
+    # PROCESS CSV FILES
+    # ----------------------------
+    for csv_file in input_dir.glob("*.csv"):
+        logger.info(f"Processing {csv_file.name}...")
+
+        # Read CSV
+        df = pd.read_csv(csv_file)
+
+        # Round all numeric columns (ignore first column if it's n_selected)
+        numeric_cols = df.columns[1:]  # skip the first column (n_selected)
+        df[numeric_cols] = df[numeric_cols].round(2)
+
+        # Save to output directory
+        df.to_csv(output_dir / csv_file.name, index=False)
+        logger.info(f"Saved rounded CSV to {output_dir / csv_file.name}")
+
+    logger.info("Done!")
 
 def run_acc_curves(dataset_name:str, imp_gen_techniques:List[str]):
     results_dict = compute_acc_across_n_selected_potential_imps(
