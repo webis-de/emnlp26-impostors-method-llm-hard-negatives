@@ -181,7 +181,7 @@ class PairPreprocessor:
             # upsample if set to True (i.e., different to the original texts)
             left, right, skip = self.ensure_min_lengths(original_left, original_right)
             if skip:
-                print("Skipping texts", id_left, "and", id_right, ", because they are not long enough.")
+                logger.error(f"Skipping texts {id_left} and {id_right}, because they are not long enough.")
                 continue
 
             left_tokens, right_tokens = self.preprocess_and_tokenize(left, right)
@@ -189,7 +189,7 @@ class PairPreprocessor:
 
             # Skip empty after matching
             if len(left_tokens) == 0 or len(right_tokens) == 0:
-                print("Skipping texts", id_left, "and", id_right, ", because their token lists are empty.")
+                logger.error(f"Skipping texts {id_left} and {id_right}, because their token lists are empty.")
                 continue
 
             processed.append({
