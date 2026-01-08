@@ -1,6 +1,6 @@
 import argparse
 
-from genai_detection.experiments.reproduction.acc_n_imp_selection import run_acc_curves
+from genai_detection.experiments.reproduction.acc_n_imp_selection import run_acc_curves, round_scores
 from genai_detection.experiments.reproduction.prec_recall_curves import *
 
 # ray.init()
@@ -86,3 +86,6 @@ if __name__ == "__main__":
     logger.info(f"Finished {CONFIG.BLOG} dataset, about to start {CONFIG.STUDENT_ESSAYS} dataset.")
     run_acc_curves(dataset_name=CONFIG.STUDENT_ESSAYS,imp_gen_techniques=our_figure_impostor_options)
     logger.info(f"Finished {CONFIG.BLOG} and {CONFIG.STUDENT_ESSAYS} dataset.")
+
+    round_scores(technique="on_the_fly")
+    round_scores(technique="in_domain")
