@@ -228,9 +228,11 @@ class ImpostorDetector(ImpostorBase):
                     f"Left impostor generator must return a list with at least 2 impostors. Is list {isinstance(impostors_of_left, list)} with {len(impostors_of_left)} impostors."
                 )
             pair["left"]["impostors"] = impostors_of_left
+            # TODO: pre-process also imps
             pair["left"]["processed_impostors"] = [self.text_preprocessor.upsample_to_min_n_tokens(text=imp, min_n_tokens=self.min_n_tokens, upsample=self.upsample) for imp in impostors_of_left]
             logger.info(f"Processed left impostors.")
 
+            # TODO: pre-process also imps
             pair["right"]["impostors"] = impostors_of_right
             pair["right"]["processed_impostors"] = [
                 self.text_preprocessor.upsample_to_min_n_tokens(
@@ -241,7 +243,7 @@ class ImpostorDetector(ImpostorBase):
             logger.info(f"Processed right impostors.")
             # --- 2) Build corpus for TFIDF -----------------------------------------------
             # Compute TFIDF based on the processed text, which is upsampled if upsample is set to true and the original (preprocessed) text otherwise
-            corpus = [pair["left"]["processed_text"], pair["right"]["processed_text"]] +  pair["left"]["processed_impostors"] +  pair["right"]["processed_impostors"]
+            corpus = [pair["left"]["processed_text"], pair["right"]["processed_text"]] + pair["left"]["processed_impostors"] + pair["right"]["processed_impostors"]
 
             feature_extractor = TfidfFeatureExtractor()
             X = feature_extractor.fit_transform(corpus)
