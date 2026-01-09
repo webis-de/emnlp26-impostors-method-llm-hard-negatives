@@ -130,12 +130,12 @@ class PairPreprocessor:
     # -----------------------------------------------------------
     # 3. Validate lengths and optionally upsample
     # -----------------------------------------------------------
-    def ensure_min_lengths(self, text_left:str, text_right:str):
+    def ensure_min_lengths(self, text_left:str, text_right:str) -> bool:
         """
-        Indicates that text pair should be skipped if shorter than certain threshold and optionally upsamples texts.
+        Indicates that text pair should be skipped if shorter than certain threshold.
         :param text_left: String which is left input text.
         :param text_right: String which is right input text.
-        :return: (Optionally) upsampled texts and indication whether input should be skipped.
+        :return: Indication whether input should be skipped.
         """
         w_left = self.text_preprocessor.tokenize_whitespace(text_left)
         w_right = self.text_preprocessor.tokenize_whitespace(text_right)
@@ -143,16 +143,13 @@ class PairPreprocessor:
 
         # Case: too short AND upsample disabled → skip
         if total_len < 2 * self.min_n_tokens and not self.upsample:
-            return text_left, text_right, True   # skip
+            return True   # skip
 
         # Remove empty cases
         if len(w_left) == 0 or len(w_right) == 0:
-            return text_left, text_right, True   # skip
+            return True   # skip
 
-        text_left = self.text_preprocessor.upsample_to_min_n_tokens(text=text_left, min_n_tokens=self.min_n_tokens, upsample=self.upsample)
-        text_right = self.text_preprocessor.upsample_to_min_n_tokens(text=text_right, min_n_tokens=self.min_n_tokens, upsample=self.upsample)
-
-        return text_left, text_right, False   # do not skip
+        return False   # do not skip
 
     # -----------------------------------------------------------
     # 4. Preprocess + tokenize
@@ -188,7 +185,7 @@ class PairPreprocessor:
             original_left, original_right, id_left, id_right = self.obtain_texts_and_idx_from_pair(t)
 
             # upsample if set to True (i.e., different to the original texts)
-            left, right, skip = self.ensure_min_lengths(original_left, original_right)
+            skip = self.ensure_min_lengths(original_left, original_right)
             if skip:
                 logger.error(f"Skipping texts {id_left} and {id_right}, because they are not long enough.")
                 continue
