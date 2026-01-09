@@ -172,7 +172,8 @@ class ImpostorDetector(ImpostorBase):
         :return: score indicating whether the input text is machine-generated, i.e. close 1 means machine-generated, close 0 means human-written
         """
         final_scores = []
-        for pair in self.pair_processor.preprocess_pairs(text_list=text):
+        # consider only pairs long enough & obtain texts for IDs
+        for pair in self.pair_processor.filter_pairs(text_list=text):
             # --- 1) Generate impostors & validate ----------------------------------------
             # Impostors are generated based on the original, not processed (i.e., upsampled), text, to keep semantic content
             # Hence, impostors will be as short as original text
@@ -228,23 +229,30 @@ class ImpostorDetector(ImpostorBase):
                     f"Left impostor generator must return a list with at least 2 impostors. Is list {isinstance(impostors_of_left, list)} with {len(impostors_of_left)} impostors."
                 )
             pair["left"]["impostors"] = impostors_of_left
-            # TODO: pre-process also imps
-            pair["left"]["processed_impostors"] = [self.text_preprocessor.upsample_to_min_n_tokens(text=imp, min_n_tokens=self.min_n_tokens, upsample=self.upsample) for imp in impostors_of_left]
-            logger.info(f"Processed left impostors.")
-
-            # TODO: pre-process also imps
             pair["right"]["impostors"] = impostors_of_right
-            pair["right"]["processed_impostors"] = [
-                self.text_preprocessor.upsample_to_min_n_tokens(
-                    text=imp, min_n_tokens=self.min_n_tokens, upsample=self.upsample
-                )
-                for imp in impostors_of_right
-            ]
-            logger.info(f"Processed right impostors.")
-            # --- 2) Build corpus for TFIDF -----------------------------------------------
-            # Compute TFIDF based on the processed text, which is upsampled if upsample is set to true and the original (preprocessed) text otherwise
-            corpus = [pair["left"]["processed_text"], pair["right"]["processed_text"]] + pair["left"]["processed_impostors"] + pair["right"]["processed_impostors"]
 
+            # --- 2) Build corpus for TFIDF -----------------------------------------------
+            # Compute TFIDF based on the processed text, which is upsampled (and preprocessed) if upsample is set to true
+            # and the original preprocessed text otherwise
+            corpus = []
+            for side in ["left", "right"]:
+                # preprocess impostors and original texts: self.preprocess_text after upsampling
+                pair[side]["processed_impostors"] = [
+                    self.preprocess_text(text=self.text_preprocessor.upsample_to_min_n_tokens(
+                        text=imp, min_n_tokens=self.min_n_tokens, upsample=self.upsample
+                    ))
+                    for imp in pair[side]["impostors"]
+                ]
+                corpus.extend(pair[side]["processed_impostors"])
+
+                pair[side]["processed_text"] = self.preprocess_text(text=self.text_preprocessor.upsample_to_min_n_tokens(
+                        text=pair[side]["original_text"], min_n_tokens=self.min_n_tokens, upsample=self.upsample
+                    ))
+                corpus.append(pair[side]["processed_text"])
+
+                logger.info(f"Preprocessed {side} impostors (first (optionally) upsampled, then preprocessed) and added preprocessed text to TFIDF corpus.")
+
+            assert len(corpus) > 0, f"Length of TFIDF corpus is {len(corpus)}, no preprocessed texts or preprocessed impostors in the corpus."
             feature_extractor = TfidfFeatureExtractor()
             X = feature_extractor.fit_transform(corpus)
             logger.info(f"Feature extractor (i.e., TFIDF) fit-transform done.")
