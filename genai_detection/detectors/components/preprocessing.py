@@ -131,6 +131,12 @@ class PairPreprocessor:
     # 3. Validate lengths and optionally upsample
     # -----------------------------------------------------------
     def ensure_min_lengths(self, text_left:str, text_right:str):
+        """
+        Indicates that text pair should be skipped if shorter than certain threshold and optionally upsamples texts.
+        :param text_left: String which is left input text.
+        :param text_right: String which is right input text.
+        :return: (Optionally) upsampled texts and indication whether input should be skipped.
+        """
         w_left = self.text_preprocessor.tokenize_whitespace(text_left)
         w_right = self.text_preprocessor.tokenize_whitespace(text_right)
         total_len = len(w_left) + len(w_right)
@@ -151,9 +157,12 @@ class PairPreprocessor:
     # -----------------------------------------------------------
     # 4. Preprocess + tokenize
     # -----------------------------------------------------------
+    def _preprocess_and_tokenize_single(self, text:str):
+        return self.tokenizer(self.detector_base.preprocess_text(text=text))
+
     def preprocess_and_tokenize(self, left:str, right:str):
-        left_tokens = self.tokenizer(self.detector_base.preprocess_text(left))
-        right_tokens = self.tokenizer(self.detector_base.preprocess_text(right))
+        left_tokens = self._preprocess_and_tokenize_single(left)
+        right_tokens = self._preprocess_and_tokenize_single(right)
         return left_tokens, right_tokens
 
     # -----------------------------------------------------------
@@ -170,11 +179,11 @@ class PairPreprocessor:
     # -----------------------------------------------------------
     # PUBLIC MAIN ENTRY POINT
     # -----------------------------------------------------------
-    def preprocess_pairs(self, text_list:Iterable[str]):
+    def filter_pairs(self, text_list:Iterable[str]):
         logger.info(f"Preprocessing {len(text_list)} pairs.")
         text_list = self.turn_input_iterable(text_list)
 
-        processed = []
+        filtered = []
         for t in ichunked(text_list, 2):
             original_left, original_right, id_left, id_right = self.obtain_texts_and_idx_from_pair(t)
 
@@ -184,21 +193,14 @@ class PairPreprocessor:
                 logger.error(f"Skipping texts {id_left} and {id_right}, because they are not long enough.")
                 continue
 
-            left_tokens, right_tokens = self.preprocess_and_tokenize(left, right)
-            left_tokens, right_tokens = self.match_lengths(left_tokens, right_tokens)
-
-            # Skip empty after matching
-            if len(left_tokens) == 0 or len(right_tokens) == 0:
-                logger.error(f"Skipping texts {id_left} and {id_right}, because their token lists are empty.")
-                continue
-
-            processed.append({
+            # left, right are of at least minimal required length
+            filtered.append({
                 "left": {
-                    "processed_text": left, "tokens": left_tokens, "id": id_left, "original_text": original_left
+                   "id": id_left, "original_text": original_left
                },
                 "right": {
-                    "processed_text": right, "tokens": right_tokens,"id": id_right, "original_text": original_right
+                   "id": id_right, "original_text": original_right
                 }
             })
 
-        return processed
+        return filtered
