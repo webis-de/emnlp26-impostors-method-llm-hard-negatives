@@ -75,8 +75,8 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
         n_imp_to_generate -= len(impostors)
         if n_imp_to_generate <= 0:
             logging.info(
-                "Number of impostors in mongodb collection: {} for text with ID: {}. No need to generate more impostors, just returning {} impostors.".format(
-                    len(impostors), text_id, self.n_impostors
+                "Number of impostors in mongodb collection: {}/{} for text with ID: {}. No need to generate more impostors, just returning {} impostors.".format(
+                    len(impostors), self.n_impostors, text_id, self.n_impostors
                 )
             )
             return impostors[: self.n_impostors]
