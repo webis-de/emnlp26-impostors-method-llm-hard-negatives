@@ -140,6 +140,39 @@ class ImpostorDetector(ImpostorBase):
             path2imp=self.dataset_name
         )
 
+    def _generate_impostors_for_single_input(self, input_dict: t.Dict[str, str]) -> List[str]:
+        """
+
+        :param input_dict: Dictionary of input text with keys "id"
+        :return: impostors
+        """
+        # --- 1) Generate impostors & validate ----------------------------------------
+        # Impostors are generated based on the original, not processed (i.e., upsampled), text, to keep semantic content
+        # Hence, impostors will be as short as original text
+        # Check if the impostor generator supports "generate_impostors_by_text_id"
+        if hasattr(self.impostor_generator, "generate_impostors_by_text_id") and callable(self.impostor_generator.generate_impostors_by_text_id):
+            # check if result has already been computed and stored in the mongoDB collection
+            assert "id" in input_dict.keys(), f"The 'id' key must be provided in input_dict. Only found {input_dict.keys()}."
+            text_id = input_dict["id"]
+            assert isinstance(text_id, str), f"input IDs must be strings, but are {type(text_id)}."
+            impostors = (
+                self.impostor_generator.generate_impostors_by_text_id(
+                    text_id=text_id
+                )
+            )
+        else:
+            assert "original_text" in input_dict.keys(), f"The 'original_text' key must be provided in input_dict. Only found {input_dict.keys()}."
+            impostors = self.impostor_generator.generate_impostors(
+                text=input_dict["original_text"]
+            )
+
+        if not isinstance(impostors, list) or len(impostors) < 2:
+            raise ValueError(
+                f"Impostor generator must return a list with at least 2 impostors. Is list {isinstance(impostors, list)} with {len(impostors)} impostors."
+            )
+
+        return impostors
+
     def _get_score_impl(
         self, text: Iterable[str]
     ) -> t.Union[torch.Tensor, np.ndarray, t.Iterable[float]]:
@@ -174,62 +207,21 @@ class ImpostorDetector(ImpostorBase):
         final_scores = []
         # consider only pairs long enough & obtain texts for IDs
         for pair in self.pair_processor.filter_pairs(text_list=text):
-            # --- 1) Generate impostors & validate ----------------------------------------
-            # Impostors are generated based on the original, not processed (i.e., upsampled), text, to keep semantic content
-            # Hence, impostors will be as short as original text
-            # Check if the impostor generator supports "generate_impostors_by_text_id"
-            if hasattr(
-                self.impostor_generator, "generate_impostors_by_text_id"
-            ) and callable(self.impostor_generator.generate_impostors_by_text_id):
-                # check if result has already been computed and stored in the mongoDB collection
-                assert isinstance(pair["left"]["id"], str) and isinstance(
-                    pair["right"]["id"], str
-                ), f"Both input IDs must be strings, but are {type(pair['left']['id'])} and {type(pair['left']['id'])}"
-
-                cursor = list(self.mongoDB.find_document_by_multiple_fields(
-                    collection=self.mongoDB.impostor_output_collection, search_args={"impostor_generation_technique":
-                       self.impostor_technique, "left_id":pair["left"]["id"], "right_id":pair["right"]["id"],"n_impostors":self.n_impostors, "n_potential_impostors":self.impostor_generator.num_potential_impostors}))
-                if len(cursor) > 0:
-                    final_scores.append(cursor[0]["scores_over_different_rounds"])
-                    logger.info(f"Found pre-computed scores for {pair['left']['id']}, {pair['right']['id']} in mongoDB collection. Using pre-computed scores.")
-                    continue
-
-                impostors_of_left = (
-                    self.impostor_generator.generate_impostors_by_text_id(
-                        text_id=pair["left"]["id"]
-                    )
-                )
+            cursor = list(self.mongoDB.find_document_by_multiple_fields(
+                collection=self.mongoDB.impostor_output_collection,
+                search_args={"impostor_generation_technique": self.impostor_technique, "left_id": pair["left"]["id"],
+                             "right_id": pair["right"]["id"], "n_impostors": self.n_impostors,
+                             "n_potential_impostors": self.impostor_generator.num_potential_impostors})
+            )
+            if len(cursor) > 0:
+                final_scores.append(cursor[0]["scores_over_different_rounds"])
                 logger.info(
-                    f"Obtained {len(impostors_of_left)} impostors by text ID for left text with text ID {pair['left']['id']}. Type of "
-                    f"impostors is {type(impostors_of_left)}."
-                )
-                impostors_of_right = (
-                    self.impostor_generator.generate_impostors_by_text_id(
-                        text_id=pair["right"]["id"]
-                    )
-                )
-                logger.info(f"Obtained {len(impostors_of_right)} impostors by text ID for right text with text ID {pair['right']['id']}. Type "
-                             f"of impostors is {type(impostors_of_right)}.")
+                    f"Found pre-computed scores for {pair['left']['id']}, {pair['right']['id']} in mongoDB collection. Using pre-computed scores.")
+                continue
 
-            else:
-                impostors_of_left = self.impostor_generator.generate_impostors(
-                    text=pair["left"]["original_text"]
-                )
-                logger.info(f"Obtained impostors by text for left text.")
-                impostors_of_right = self.impostor_generator.generate_impostors(
-                    text=pair["right"]["original_text"]
-                )
-                logger.info(f"Obtained impostors by text for right text.")
-            if not isinstance(impostors_of_right, list) or len(impostors_of_right) < 2:
-                raise ValueError(
-                    f"Right impostor generator must return a list with at least 2 impostors. Is list {isinstance(impostors_of_right, list)} with {len(impostors_of_right)} impostors."
-                )
-            if not isinstance(impostors_of_left, list) or len(impostors_of_left) < 2:
-                raise ValueError(
-                    f"Left impostor generator must return a list with at least 2 impostors. Is list {isinstance(impostors_of_left, list)} with {len(impostors_of_left)} impostors."
-                )
-            pair["left"]["impostors"] = impostors_of_left
-            pair["right"]["impostors"] = impostors_of_right
+            for side in ["left", "right"]:
+                pair[side]["impostors"] = self._generate_impostors_for_single_input(input_dict=pair[side])
+                logger.info(f"Obtained {len(pair[side]['impostors'])} impostors for {side} input text. Type of impostors is {type(pair[side]['impostors'])}.")
 
             # --- 2) Build corpus for TFIDF -----------------------------------------------
             # Compute TFIDF based on the processed text, which is upsampled (and preprocessed) if upsample is set to true
@@ -265,10 +257,10 @@ class ImpostorDetector(ImpostorBase):
             idx_left = 0
             idx_right = 1
             idx_left_impostors_start = 2
-            idx_left_impostors_end = 2 + len(impostors_of_left)
+            idx_left_impostors_end = 2 + len(pair["left"]["impostors"])
             idx_right_impostors_start = idx_left_impostors_end
             idx_right_impostors_end = idx_right_impostors_start + len(
-                impostors_of_right
+                pair["right"]["impostors"]
             )
 
             pair["left"]["tfidf"] = dense_vector(X[idx_left])
