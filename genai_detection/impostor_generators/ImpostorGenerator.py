@@ -69,9 +69,6 @@ class BaseImpostorGenerator(ABC):
         all_impostors.append(reference_text)
         tfidf_vectorizer = TfidfFeatureExtractor()
         vectors = tfidf_vectorizer.fit_transform(all_impostors)
-        logging.info(
-            f"Impostor selection: Vectorized {vectors.shape[0]} documents with {vectors.shape[1]} features."
-        )
 
         # Separate original text vector
         original_vector = vectors[-1]  # last one
@@ -84,11 +81,16 @@ class BaseImpostorGenerator(ABC):
         impostors_sorted = [all_impostors[i] for i in np.argsort(similarities)]
 
         # Take top M impostors, "potential" in Koppel et al. (2014)
-        num_to_select = min(self.num_potential_impostors, len(impostors_sorted))
-        selected_impostors = impostors_sorted[:num_to_select]
+        n_potential = min(self.num_potential_impostors, len(impostors_sorted))
+        selected_impostors = impostors_sorted[:n_potential]
+
+        n_sample = min(len(selected_impostors), self.n_impostors)
+        logging.info(
+            f"Impostor selection: Vectorized {vectors.shape[0]} documents with {vectors.shape[1]} features to select {n_sample} among top {n_potential} most similar impostors."
+        )
 
         # Sample n_impostors randomly from selected impostors
-        return random.sample(selected_impostors, min(len(selected_impostors), self.n_impostors))
+        return random.sample(selected_impostors, n_sample)
 
 
 class MongoDBSavedGenerator(BaseImpostorGenerator):
