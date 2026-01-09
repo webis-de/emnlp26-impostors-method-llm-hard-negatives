@@ -236,6 +236,7 @@ class ImpostorDetector(ImpostorBase):
                     upsample=self.upsample,
                 )
                 return self.preprocess_text(text=upsampled_text)
+
             for side in ["left", "right"]:
                 # preprocess impostors and original texts: (1) upsampling, (2) self.preprocess_text
                 pair[side]["processed_impostors"] = [upsample_then_preprocess(input_text=imp) for imp in pair[side]["impostors"]]
