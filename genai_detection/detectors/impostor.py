@@ -205,8 +205,9 @@ class ImpostorDetector(ImpostorBase):
         :return: score indicating whether the input text is machine-generated, i.e. close 1 means machine-generated, close 0 means human-written
         """
         final_scores = []
-        # consider only pairs long enough & obtain texts for IDs
+        # consider only pairs long enough & obtain texts for IDs; no preprocessing so far
         for pair in self.pair_processor.filter_pairs(text_list=text):
+            # query for existing score in mongodb collection
             cursor = list(self.mongoDB.find_document_by_multiple_fields(
                 collection=self.mongoDB.impostor_output_collection,
                 search_args={"impostor_generation_technique": self.impostor_technique, "left_id": pair["left"]["id"],
@@ -227,19 +228,20 @@ class ImpostorDetector(ImpostorBase):
             # Compute TFIDF based on the processed text, which is upsampled (and preprocessed) if upsample is set to true
             # and the original preprocessed text otherwise
             corpus = []
+
+            def upsample_then_preprocess(input_text: str) -> str:
+                upsampled_text = self.text_preprocessor.upsample_to_min_n_tokens(
+                    text=input_text,
+                    min_n_tokens=self.min_n_tokens,
+                    upsample=self.upsample,
+                )
+                return self.preprocess_text(text=upsampled_text)
             for side in ["left", "right"]:
-                # preprocess impostors and original texts: self.preprocess_text after upsampling
-                pair[side]["processed_impostors"] = [
-                    self.preprocess_text(text=self.text_preprocessor.upsample_to_min_n_tokens(
-                        text=imp, min_n_tokens=self.min_n_tokens, upsample=self.upsample
-                    ))
-                    for imp in pair[side]["impostors"]
-                ]
+                # preprocess impostors and original texts: (1) upsampling, (2) self.preprocess_text
+                pair[side]["processed_impostors"] = [upsample_then_preprocess(input_text=imp) for imp in pair[side]["impostors"]]
                 corpus.extend(pair[side]["processed_impostors"])
 
-                pair[side]["processed_text"] = self.preprocess_text(text=self.text_preprocessor.upsample_to_min_n_tokens(
-                        text=pair[side]["original_text"], min_n_tokens=self.min_n_tokens, upsample=self.upsample
-                    ))
+                pair[side]["processed_text"] = upsample_then_preprocess(input_text=pair[side]["original_text"])
                 corpus.append(pair[side]["processed_text"])
 
                 logger.info(f"Preprocessed {side} impostors and input texts (first (optionally) upsampled, then preprocessed) and added preprocessed text to TFIDF corpus.")
