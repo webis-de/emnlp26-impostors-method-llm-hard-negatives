@@ -250,7 +250,7 @@ class ImpostorDetector(ImpostorBase):
                     ))
                 corpus.append(pair[side]["processed_text"])
 
-                logger.info(f"Preprocessed {side} impostors (first (optionally) upsampled, then preprocessed) and added preprocessed text to TFIDF corpus.")
+                logger.info(f"Preprocessed {side} impostors and input texts (first (optionally) upsampled, then preprocessed) and added preprocessed text to TFIDF corpus.")
 
             assert len(corpus) > 0, f"Length of TFIDF corpus is {len(corpus)}, no preprocessed texts or preprocessed impostors in the corpus."
             feature_extractor = TfidfFeatureExtractor()
