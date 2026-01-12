@@ -7,6 +7,8 @@ from typing import Iterable, List, Literal
 
 import numpy as np
 import torch
+from statsmodels.stats.multitest import multipletests
+from statsmodels.stats.proportion import proportion_effectsize
 
 from genai_detection.detectors.components.feature_extractor import TfidfFeatureExtractor
 from genai_detection.detectors.components.impostor_factory import create_impostor_generator
@@ -216,8 +218,8 @@ class ImpostorDetector(ImpostorBase):
             )
             if len(cursor) > 0:
                 final_scores.append(cursor[0]["scores_over_different_rounds"])
-                logger.info(
-                    f"Found pre-computed scores for {pair['left']['id']}, {pair['right']['id']} in mongoDB collection. Using pre-computed scores.")
+                # logger.info(
+                #     f"Found pre-computed scores for {pair['left']['id']}, {pair['right']['id']} in mongoDB collection. Using pre-computed scores.")
                 continue
 
             for side in ["left", "right"]:
@@ -293,14 +295,33 @@ class ImpostorDetector(ImpostorBase):
             }
             document2insert["scores_over_different_rounds"], p_values = self.scorer.score_pair(pair=pair, vectorizer=feature_extractor.vectorizer)
             # compare corrected p-value (times 2, since two tests) to alpha for statistical significance
+            # preds = {
+            #     f"{key}_pred": bool(2 * p_val < self.significance_level)
+            #     for key, p_val in p_values.items()
+            # }
+            # https://www.statsmodels.org/stable/generated/statsmodels.stats.multitest.multipletests.html#statsmodels.stats.multitest.multipletests (09.01.2026)
+            rejects, pvals_corrected, _, alphacBonf = multipletests(pvals=list(p_values.values()), alpha=self.significance_level, method="bonferroni")
+            logger.info(f"Corrected p-values: {pvals_corrected} and uncorrected p-values: {p_values.values()}, "
+                        f"left_id: {pair['left']['id']} and right_id: {pair['right']['id']}")
+            # reject null hypothesis means texts were written by same author
             preds = {
-                f"{key}_pred": bool(2 * p_val < self.significance_level)
-                for key, p_val in p_values.items()
+                f"{key}_pred": bool(reject)
+                for key, reject in zip(p_values.keys(), rejects)
             }
+            corrected_pval = {
+                key.replace("uncorrected", "corrected"): c_pval
+                for key, c_pval in zip(p_values.keys(), pvals_corrected)
+            }
+
+            # based on corrected p-values ????? # TODO: are they corrected from bonferroni correction or only
+            effect_size = {f"effect_size_{'_'.join(k.split('_')[:3])}": proportion_effectsize(prop1=corrected_pval, prop2=1 / (1 + len(pair[k.split('_')[2]]["impostors_tfidf"])), method='normal') for k, corrected_pval in zip(p_values.keys(), pvals_corrected)}
 
             # Update the document dictionary
             document2insert.update(preds)
             document2insert.update(p_values)
+            document2insert.update(effect_size)
+            document2insert.update(corrected_pval)
+            document2insert.update({"bonferroni_corrected_alph": alphacBonf})
 
             document2insert["impostor_generation_technique"] = self.impostor_technique
             document2insert["n_impostors"] = self.n_impostors
