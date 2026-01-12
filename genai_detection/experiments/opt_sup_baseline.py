@@ -36,58 +36,6 @@ LOCAL_SAVE_PATH = (
 )
 LOCAL_SAVE_PATH.mkdir(parents=True, exist_ok=True)
 
-# ray does not work with self (i.e., function)
-@ray.remote(num_cpus=4)
-def loo_worker(
-        test_pair: dict,
-        dataset_name: str,
-        config: List[str] | None = None,
-):
-    mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
-
-    assert isinstance(test_pair, dict), f"'test_pair' should be a dict; got {type(test_pair)}. 'test_pair': {test_pair}"
-    assert "_id" in test_pair, f"Did not find test pair id, only these keys: {test_pair.keys()}"
-
-    pair_id = test_pair["_id"]
-    search_args = {"pair_id": pair_id, "config": config, "dataset_name": dataset_name}
-
-    existing = list(
-        mongoDB.find_document_by_multiple_fields(
-            collection=mongoDB.supervised_baseline_diff_config_preds_collection,
-            search_args=search_args,
-        )
-    )
-    if existing:
-        return pair_id, existing[0]["prediction"], test_pair["same"]
-
-    try:
-        sup_baseline = SupervisedImpostorBaseline(
-            dataset_name=test_pair["dataset_name"],
-            left_input={k: v for k, v in test_pair.items() if "left" in k},
-            right_input={k: v for k, v in test_pair.items() if "right" in k},
-            additional_in_args=config,
-        )
-    except ValueError:
-        return None  # skip invalid pair
-
-    texts = mongoDB.get_texts_for_ids(
-        text_ids=[test_pair["left_id"], test_pair["right_id"]]
-    )
-
-    pred = sup_baseline.get_score(texts)
-    pred = float(np.asarray(pred).ravel()[0])
-
-    mongoDB.insert_document(
-        collection=mongoDB.supervised_baseline_diff_config_preds_collection,
-        insert_data={
-            **search_args,
-            "prediction": pred,
-            "ground_truth": test_pair["same"],
-        }
-    )
-
-    return pair_id, pred, test_pair["same"]
-
 class OptimalSupervisedBaseline:
     def __init__(self):
         self.mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
@@ -106,32 +54,6 @@ class OptimalSupervisedBaseline:
 
 
     def obtain_loo_preds_gt_for_one_config(self, config:List[str], dataset_name:str=CONFIG.STUDENT_ESSAYS,):
-        test_pairs = list(
-            self.mongoDB.find_document_by_non_id_field(
-                collection=self.all_pairs_collection,
-                document_field_name="dataset_name",
-                document_value=dataset_name,
-            )
-        )
-
-        MAX_IN_FLIGHT = 1  # number of workers to run at once
-
-        results = []
-        for i in range(0, len(test_pairs), MAX_IN_FLIGHT):
-            batch = test_pairs[i:i + MAX_IN_FLIGHT]
-            futures = [loo_worker.remote(tp, dataset_name, config) for tp in batch]
-            results.extend(ray.get(futures))
-
-
-        predictions, gt = {}, {}
-        for r in results:
-            if r is None:
-                continue
-            pair_id, pred, truth = r
-            predictions[pair_id] = pred
-            gt[pair_id] = truth
-
-        return predictions, gt
         predictions = {}
         gt = {}
         for test_pair in self.mongoDB.find_document_by_non_id_field(
