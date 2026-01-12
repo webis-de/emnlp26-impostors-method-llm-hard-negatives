@@ -4,6 +4,8 @@ from typing import Dict, Any, List, DefaultDict
 
 import numpy as np
 from scipy.stats import binomtest
+from statsmodels.stats.proportion import proportion_effectsize, binom_test
+from statsmodels.stats.multitest import multipletests
 
 
 class Scorer:
@@ -83,9 +85,12 @@ class Scorer:
             # right-tail binomial test
             # (https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.binomtest.html 20.12.2025)
             p_feat_name = f"{disputed}_disputed_{candidate}_candidate_uncorrected_p_value"
-            result = binomtest(int(round_score), n=self.rounds, p=1/(1 + len(pair[candidate]["impostors_tfidf"])),
-                                              alternative='greater')
-            p_values[p_feat_name] = result.pvalue
+            # result = binomtest(int(round_score), n=self.rounds, p=1/(1 + len(pair[candidate]["impostors_tfidf"])),
+            #                                   alternative='greater')
+            # p_values[p_feat_name] = result.pvalue
+            pvalue = binom_test(count=int(round_score), nobs=self.rounds, prop=1 / (1 + len(pair[candidate]["impostors_tfidf"])),
+                               alternative='larger')
+            p_values[p_feat_name] = pvalue
             total_score /= j + 1
 
         return total_score, p_values
