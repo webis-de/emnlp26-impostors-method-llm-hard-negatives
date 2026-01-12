@@ -8,18 +8,22 @@ Training data should be balanced.
 """
 import logging
 import os
-from abc import ABC
 from pathlib import Path
-from typing import List, Iterable
+from typing import List
 
 import numpy as np
 import pandas as pd
+import ray
 
 from genai_detection.config import CONFIG
 from genai_detection.detectors.impostor_supervised_baseline import SupervisedImpostorBaseline
-from genai_detection.experiments.reproduction.impostor_metrics import compute_metrics_for_binary_predictions, \
-    compute_metrics_for_thresholds, extract_best_metric, extract_best_metric_and_position
+from genai_detection.experiments.reproduction.impostor_metrics import compute_metrics_for_thresholds, \
+    extract_best_metric_and_position
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
+
+ray.init()
+
+# ray job submit --address https://ray.srv.webis.de --working-dir . --runtime-env env.yml -- python genai_detection/experiments/opt_sup_baseline.py
 
 # ---------------------------------------------------------------------
 # Paths
@@ -32,13 +36,14 @@ LOCAL_SAVE_PATH = (
 )
 LOCAL_SAVE_PATH.mkdir(parents=True, exist_ok=True)
 
-class OptimalSupervisedBaseline(ABC):
+class OptimalSupervisedBaseline:
     def __init__(self):
         self.mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
         self.all_pairs_collection = self.mongoDB.all_pairs_collection
         logger.info(f"Obtained pairs from mongoDB.")
 
-    def train_svc(self, dataset_name, test_pair, additional_in_args:List[str]):
+    @staticmethod
+    def train_svc(dataset_name, test_pair, additional_in_args:List[str]):
         return SupervisedImpostorBaseline(
             dataset_name=dataset_name,
             left_input={key:val for key, val in test_pair.items() if "left" in key},
