@@ -83,6 +83,7 @@ def compute_acc_across_n_selected_potential_imps(
 
     # Load test data once (IDs, not text)
     test_id_pairs, ground_truth = load_test_pairs(dataset_name)
+    assert len(ground_truth) == len(test_id_pairs), f"GT and test-ID pairs length are not equal: {len(ground_truth)} != {len(test_id_pairs)}"
 
     results: Dict[str, Dict[int, Dict[int, pd.DataFrame]]] = {}
     n_samples_per_config = []
@@ -118,7 +119,8 @@ def compute_acc_across_n_selected_potential_imps(
                 if len(scores) == 0:
                     logger.info(f"No scores existing for {technique}. Need to generate scores.")
                     scores = detector.get_score(text=test_id_pairs)
-                    logger.info(f"Generated {len(scores)} scores for {technique}.")
+                    gt = ground_truth
+                    logger.info(f"Generated {len(scores)} scores for {technique} (while original len of gt is kept (i.e., {len(gt)})).")
                 else:
                     # match left_id, right_id pairs with gt
                     scores = [
@@ -148,9 +150,9 @@ def compute_acc_across_n_selected_potential_imps(
                         for pair, score in scores_by_pair.items()
                         if pair in gt_by_pair
                     }
-                    ground_truth = list(gt_by_pair.values())
+                    gt = list(gt_by_pair.values())
                     scores = list(scores_by_pair.values())
-                assert len(ground_truth) == len(scores), f"GT and score length are not equal: {len(ground_truth)} != {len(scores)}"
+                assert len(gt) == len(scores), f"GT and score length are not equal: {len(gt)} != {len(scores)}"
                 n_samples_per_config.append(
                     {"technique": technique, "dataset_name": dataset_name, "n_selected": n_selected, "n_potential": n_potential, "n_samples": len(scores)}
                 )
@@ -158,7 +160,7 @@ def compute_acc_across_n_selected_potential_imps(
                 assert scores is not None, "Detector returned None scores"
 
                 df_metrics = compute_metrics_for_thresholds(
-                    ground_truth=ground_truth,
+                    ground_truth=gt,
                     scores=scores,
                 )
 
