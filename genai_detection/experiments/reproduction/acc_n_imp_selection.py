@@ -83,7 +83,7 @@ def compute_acc_across_n_selected_potential_imps(
 
     # Load test data once (IDs, not text)
     test_id_pairs, ground_truth = load_test_pairs(dataset_name)
-    assert len(ground_truth) == len(test_id_pairs), f"GT and test-ID pairs length are not equal: {len(ground_truth)} != {len(test_id_pairs)}"
+    assert len(ground_truth) == len(test_id_pairs)/2, f"GT and test-ID pairs length are not equal: {len(ground_truth)} != {len(test_id_pairs)/2}"
 
     results: Dict[str, Dict[int, Dict[int, pd.DataFrame]]] = {}
     n_samples_per_config = []
