@@ -32,7 +32,7 @@ from genai_detection.detectors.ppmd import PPMdDetector
 from genai_detection.detectors.unmasking import UnmaskingDetector
 from genai_detection.experiments.reproduction.impostor_metrics import (
     compute_metrics_parallel,
-    load_test_pairs,
+    load_test_pairs, load_all_pairs,
 )
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
@@ -76,7 +76,7 @@ def compute_prec_recall_f1_acc_dict(
     # Load test data
     # -----------------------------------------------------------------
 
-    text_test_ID_pairs, ground_truth = load_test_pairs(dataset_name)
+    text_test_ID_pairs, ground_truth = load_all_pairs(dataset_name)
     logger.info("Number of texts used %d, number of pairs %d",len(text_test_ID_pairs), len(text_test_ID_pairs)//2)
 
     # -----------------------------------------------------------------

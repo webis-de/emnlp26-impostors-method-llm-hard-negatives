@@ -4,7 +4,7 @@ import ray
 
 from genai_detection.experiments.reproduction.prec_recall_curves import *
 
-ray.init()
+# ray.init()
 
 # ray job submit --address https://ray.srv.webis.de --working-dir . --runtime-env env.yml -- python genai_detection/experiments/reproduction/run_prec_recall_curves.py
 

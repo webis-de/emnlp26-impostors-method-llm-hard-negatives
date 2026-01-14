@@ -16,12 +16,12 @@ N_PAIRS = 50 # TODO: increase
 # ---------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------
-def _load_input_pairs(dataset_name: str, test_split:bool=True) -> Tuple[List[str], List[int]]:
+def _load_input_pairs(dataset_name: str, split:str="all", balanced:bool=True) -> Tuple[List[str], List[int]]:
     """
     Load text-pair IDs and ground-truth labels from MongoDB.
     """
     mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
-    collection = mongoDB.test_pairs_collection if test_split else mongoDB.train_pairs_collection
+    collection = mongoDB.all_pairs_collection if split == "all" else mongoDB.test_pairs_collection if split == "test" else mongoDB.train_pairs_collection
     diff_pairs = list(
         mongoDB.find_document_by_multiple_fields(
             collection=collection,
@@ -39,7 +39,11 @@ def _load_input_pairs(dataset_name: str, test_split:bool=True) -> Tuple[List[str
         )
     )#[:N_PAIRS//2]
 
-    test_pairs = diff_pairs + same_pairs
+    if balanced:
+        min_len = min(len(same_pairs), len(diff_pairs))
+        test_pairs = diff_pairs[:min_len] + same_pairs[:min_len]
+    else:
+        test_pairs = diff_pairs + same_pairs
 
     text_ids = [
         str(id_)
@@ -65,10 +69,13 @@ def load_test_pairs(dataset_name: str) -> Tuple[List[str], List[int]]:
     """
     Load text-pair IDs and ground-truth labels from MongoDB.
     """
-    return _load_input_pairs(dataset_name, test_split=True)
+    return _load_input_pairs(dataset_name, split="test")
 
 def load_train_pairs(dataset_name: str) -> Tuple[List[str], List[int]]:
-    return _load_input_pairs(dataset_name, test_split=False)
+    return _load_input_pairs(dataset_name, split="train")
+
+def load_all_pairs(dataset_name: str) -> Tuple[List[str], List[int]]:
+    return _load_input_pairs(dataset_name, split="all")
 
 # ---------------------------------------------------------------------
 # Metric computation
