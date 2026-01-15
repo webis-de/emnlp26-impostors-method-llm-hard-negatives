@@ -45,5 +45,7 @@ class TfidfFeatureExtractor:
         :return: The sparse matrix with shape (len(corpus), len(feature_extractor.vectorizer.vocabulary_)) with tfidf features.
         """
         assert len(corpus) > 0, "The corpus cannot be empty."
-        assert all([type(doc)==str for doc in corpus]), "The corpus cannot contain non-string."
+        assert all(
+            [type(doc) == str for doc in corpus]
+        ), "The corpus cannot contain non-string."
         return self.vectorizer.fit_transform(corpus)

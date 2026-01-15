@@ -24,6 +24,7 @@ __all__ = ["ImpostorDetector"]
 
 logger = logging.getLogger(__name__)
 
+
 class ImpostorDetector(ImpostorBase):
     """
     The Impostor method extends the ngram-unmasking method.
@@ -45,14 +46,14 @@ class ImpostorDetector(ImpostorBase):
 
     def __init__(
         self,
-        rounds:int=100,
-        top_n:int=100000,
-        portion_delete:float=0.5,
-        n_impostors:int=25,
-        threshold:float=0.1,
+        rounds: int = 100,
+        top_n: int = 100000,
+        portion_delete: float = 0.5,
+        n_impostors: int = 25,
+        threshold: float = 0.1,
         impostor_technique: Literal[
             "translation",
-            "on-the-fly",   # Startpage by default
+            "on-the-fly",  # Startpage by default
             "on_the_fly_chatnoir",
             "on_the_fly_serpapi",
             "on_the_fly_startpage",
@@ -100,12 +101,24 @@ class ImpostorDetector(ImpostorBase):
         self._training_mode = True  # set to True if you are in training mode, False for validation of model
 
         self.impostor_generator = create_impostor_generator(
-            impostor_technique=impostor_technique, n_impostors=self.n_impostors, dataset_name=self.dataset_name, top_n_freq_words=self.top_n
+            impostor_technique=impostor_technique,
+            n_impostors=self.n_impostors,
+            dataset_name=self.dataset_name,
+            top_n_freq_words=self.top_n,
         )
         self.text_preprocessor = Preprocessor()
         self.feature_extractor = TfidfFeatureExtractor(top_n_freq_words=self.top_n)
-        self.pair_processor = PairPreprocessor(mongoDB=self.mongoDB, tokenizer=self.feature_extractor._space_free_char_ngrams, min_n_tokens=self.min_n_tokens, upsample=self.upsample)
-        self.scorer = Scorer(rounds=self.rounds, portion_delete=self.portion_delete, similarity_fn=minmax_similarity)
+        self.pair_processor = PairPreprocessor(
+            mongoDB=self.mongoDB,
+            tokenizer=self.feature_extractor._space_free_char_ngrams,
+            min_n_tokens=self.min_n_tokens,
+            upsample=self.upsample,
+        )
+        self.scorer = Scorer(
+            rounds=self.rounds,
+            portion_delete=self.portion_delete,
+            similarity_fn=minmax_similarity,
+        )
         self.significance_level = 0.05
 
     def set_treshold(self, threshold: float):
@@ -130,10 +143,12 @@ class ImpostorDetector(ImpostorBase):
             impostor_technique=self.impostor_technique,
             n_impostors=self.n_impostors,
             split="test" if self._training_mode else "train",
-            path2imp=self.dataset_name
+            path2imp=self.dataset_name,
         )
 
-    def _generate_impostors_for_single_input(self, input_dict: t.Dict[str, str]) -> List[str]:
+    def _generate_impostors_for_single_input(
+        self, input_dict: t.Dict[str, str]
+    ) -> List[str]:
         """
 
         :param input_dict: Dictionary of input text with keys "id"
@@ -143,18 +158,24 @@ class ImpostorDetector(ImpostorBase):
         # Impostors are generated based on the original, not processed (i.e., upsampled), text, to keep semantic content
         # Hence, impostors will be as short as original text
         # Check if the impostor generator supports "generate_impostors_by_text_id"
-        if hasattr(self.impostor_generator, "generate_impostors_by_text_id") and callable(self.impostor_generator.generate_impostors_by_text_id):
+        if hasattr(
+            self.impostor_generator, "generate_impostors_by_text_id"
+        ) and callable(self.impostor_generator.generate_impostors_by_text_id):
             # check if result has already been computed and stored in the mongoDB collection
-            assert "id" in input_dict.keys(), f"The 'id' key must be provided in input_dict. Only found {input_dict.keys()}."
+            assert (
+                "id" in input_dict.keys()
+            ), f"The 'id' key must be provided in input_dict. Only found {input_dict.keys()}."
             text_id = input_dict["id"]
-            assert isinstance(text_id, str), f"input IDs must be strings, but are {type(text_id)}."
-            impostors = (
-                self.impostor_generator.generate_impostors_by_text_id(
-                    text_id=text_id
-                )
+            assert isinstance(
+                text_id, str
+            ), f"input IDs must be strings, but are {type(text_id)}."
+            impostors = self.impostor_generator.generate_impostors_by_text_id(
+                text_id=text_id
             )
         else:
-            assert "original_text" in input_dict.keys(), f"The 'original_text' key must be provided in input_dict. Only found {input_dict.keys()}."
+            assert (
+                "original_text" in input_dict.keys()
+            ), f"The 'original_text' key must be provided in input_dict. Only found {input_dict.keys()}."
             impostors = self.impostor_generator.generate_impostors(
                 text=input_dict["original_text"]
             )
@@ -201,11 +222,17 @@ class ImpostorDetector(ImpostorBase):
         # consider only pairs long enough & obtain texts for IDs; no preprocessing so far
         for pair in self.pair_processor.filter_pairs(text_list=text):
             # query for existing score in mongodb collection
-            cursor = list(self.mongoDB.find_document_by_multiple_fields(
-                collection=self.mongoDB.impostor_output_collection,
-                search_args={"impostor_generation_technique": self.impostor_technique, "left_id": pair["left"]["id"],
-                             "right_id": pair["right"]["id"], "n_impostors": self.n_impostors,
-                             "n_potential_impostors": self.impostor_generator.num_potential_impostors})
+            cursor = list(
+                self.mongoDB.find_document_by_multiple_fields(
+                    collection=self.mongoDB.impostor_output_collection,
+                    search_args={
+                        "impostor_generation_technique": self.impostor_technique,
+                        "left_id": pair["left"]["id"],
+                        "right_id": pair["right"]["id"],
+                        "n_impostors": self.n_impostors,
+                        "n_potential_impostors": self.impostor_generator.num_potential_impostors,
+                    },
+                )
             )
             if len(cursor) > 0:
                 final_scores.append(cursor[0]["scores_over_different_rounds"])
@@ -214,8 +241,12 @@ class ImpostorDetector(ImpostorBase):
                 continue
 
             for side in ["left", "right"]:
-                pair[side]["impostors"] = self._generate_impostors_for_single_input(input_dict=pair[side])
-                logger.info(f"Obtained {len(pair[side]['impostors'])} impostors for {side} input text. Type of impostors is {type(pair[side]['impostors'])}.")
+                pair[side]["impostors"] = self._generate_impostors_for_single_input(
+                    input_dict=pair[side]
+                )
+                logger.info(
+                    f"Obtained {len(pair[side]['impostors'])} impostors for {side} input text. Type of impostors is {type(pair[side]['impostors'])}."
+                )
 
             # --- 2) Build corpus for TFIDF -----------------------------------------------
             # Compute TFIDF based on the processed text, which is upsampled (and preprocessed) if upsample is set to true
@@ -244,7 +275,10 @@ class ImpostorDetector(ImpostorBase):
                     for imp in pair[side]["impostors"]
                 ]
                 index_map[f"{side}_impostors"] = list(
-                    range(len(corpus), len(corpus) + len(pair[side]["processed_impostors"]))
+                    range(
+                        len(corpus),
+                        len(corpus) + len(pair[side]["processed_impostors"]),
+                    )
                 )
                 corpus.extend(pair[side]["processed_impostors"])
 
@@ -253,8 +287,10 @@ class ImpostorDetector(ImpostorBase):
                     side,
                 )
 
-            assert len(corpus) > 0, f"Length of TFIDF corpus is {len(corpus)}, no preprocessed texts or preprocessed impostors in the corpus."
-            
+            assert (
+                len(corpus) > 0
+            ), f"Length of TFIDF corpus is {len(corpus)}, no preprocessed texts or preprocessed impostors in the corpus."
+
             X = self.feature_extractor.fit_transform(corpus)
             logger.info(f"Feature extractor (i.e., TFIDF) fit-transform done.")
 
@@ -275,7 +311,9 @@ class ImpostorDetector(ImpostorBase):
             ]
             pair["left"]["impostors_tfidf"] = left_impostors_tfidf
             pair["right"]["impostors_tfidf"] = right_impostors_tfidf
-            logger.info("Obtained TFIDF vector for candidate and disputed text, as well as impostors.")
+            logger.info(
+                "Obtained TFIDF vector for candidate and disputed text, as well as impostors."
+            )
 
             # --- 4) Final store structure ------------------------------------------------
             # TFIDF is too big to be saved (BSON error during mongodb upload)
@@ -283,22 +321,47 @@ class ImpostorDetector(ImpostorBase):
                 f"{old_key}_{new_key}": pair[old_key][new_key]
                 for old_key in ["left", "right"]
                 for new_key in pair[old_key]
-                if new_key  not in ["tfidf", "processed_text", "tokens", "processed_impostors", "impostors",
-                                    "original_text", "impostors_tfidf"]
+                if new_key
+                not in [
+                    "tfidf",
+                    "processed_text",
+                    "tokens",
+                    "processed_impostors",
+                    "impostors",
+                    "original_text",
+                    "impostors_tfidf",
+                ]
             }
 
-            document2insert["scores_over_different_rounds"], p_values = self.scorer.score_pair(pair=pair, vectorizer=self.feature_extractor.vectorizer)
+            document2insert["scores_over_different_rounds"], p_values = (
+                self.scorer.score_pair(
+                    pair=pair, vectorizer=self.feature_extractor.vectorizer
+                )
+            )
 
             # aggregated score over different rounds (due to overlap in vocabularies, scores are not independent over different rounds and this test thus, lacks correctness)
-            document2insert["uncorr_p_val_over_different_rounds"] = binom_test(count=2 * document2insert["scores_over_different_rounds"], nobs=self.rounds * 2, prop=1 / (1 + len(pair["left"]["impostors_tfidf"])),
-                               alternative='larger')
-            document2insert["corr_pred_over_different_rounds"] = bool(document2insert["uncorr_p_val_over_different_rounds"] < 2*self.significance_level)
-            
+            document2insert["uncorr_p_val_over_different_rounds"] = binom_test(
+                count=2 * document2insert["scores_over_different_rounds"],
+                nobs=self.rounds * 2,
+                prop=1 / (1 + len(pair["left"]["impostors_tfidf"])),
+                alternative="larger",
+            )
+            document2insert["corr_pred_over_different_rounds"] = bool(
+                document2insert["uncorr_p_val_over_different_rounds"]
+                < 2 * self.significance_level
+            )
+
             # compare corrected p-value (times 2, since two tests) to alpha for statistical significance
             # https://www.statsmodels.org/stable/generated/statsmodels.stats.multitest.multipletests.html#statsmodels.stats.multitest.multipletests (09.01.2026)
-            rejects, pvals_corrected, _, alphacBonf = multipletests(pvals=list(p_values.values()), alpha=self.significance_level, method="bonferroni")
-            logger.info(f"Corrected p-values: {pvals_corrected} and uncorrected p-values: {p_values.values()}, "
-                        f"left_id: {pair['left']['id']} and right_id: {pair['right']['id']}")
+            rejects, pvals_corrected, _, alphacBonf = multipletests(
+                pvals=list(p_values.values()),
+                alpha=self.significance_level,
+                method="bonferroni",
+            )
+            logger.info(
+                f"Corrected p-values: {pvals_corrected} and uncorrected p-values: {p_values.values()}, "
+                f"left_id: {pair['left']['id']} and right_id: {pair['right']['id']}"
+            )
             # reject null hypothesis means texts were written by same author
             preds = {
                 f"{key}_pred": bool(reject)
@@ -310,7 +373,14 @@ class ImpostorDetector(ImpostorBase):
             }
 
             # based on corrected p-values
-            effect_size = {f"effect_size_{'_'.join(k.split('_')[:3])}": proportion_effectsize(prop1=corr_pval, prop2=1 / (1 + len(pair[k.split('_')[2]]["impostors_tfidf"])), method='normal') for k, corr_pval in zip(p_values.keys(), pvals_corrected)}
+            effect_size = {
+                f"effect_size_{'_'.join(k.split('_')[:3])}": proportion_effectsize(
+                    prop1=corr_pval,
+                    prop2=1 / (1 + len(pair[k.split("_")[2]]["impostors_tfidf"])),
+                    method="normal",
+                )
+                for k, corr_pval in zip(p_values.keys(), pvals_corrected)
+            }
 
             # Update the document dictionary
             document2insert.update(preds)
@@ -321,12 +391,21 @@ class ImpostorDetector(ImpostorBase):
 
             document2insert["impostor_generation_technique"] = self.impostor_technique
             document2insert["n_impostors"] = self.n_impostors
-            document2insert["n_potential_impostors"] = self.impostor_generator.num_potential_impostors
-            document2insert["created_at"] = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            logger.info(f"Obtained final score of {document2insert['scores_over_different_rounds']} for text input "
-                         f"pair. About to insert instance with following keys: {document2insert.keys()}.")
+            document2insert["n_potential_impostors"] = (
+                self.impostor_generator.num_potential_impostors
+            )
+            document2insert["created_at"] = datetime.datetime.now().strftime(
+                "%Y-%m-%d_%H-%M-%S"
+            )
+            logger.info(
+                f"Obtained final score of {document2insert['scores_over_different_rounds']} for text input "
+                f"pair. About to insert instance with following keys: {document2insert.keys()}."
+            )
             try:
-                self.mongoDB.insert_document(collection=self.mongoDB.impostor_output_collection, insert_data=document2insert)
+                self.mongoDB.insert_document(
+                    collection=self.mongoDB.impostor_output_collection,
+                    insert_data=document2insert,
+                )
                 logger.info(
                     f"Inserted score into MongoDB collection {CONFIG.MONGO_IMPOSTOR_OUTPUT_COLLECTION}."
                 )
@@ -334,7 +413,9 @@ class ImpostorDetector(ImpostorBase):
                 logger.error(f"Failed to insert document: {document2insert}\n\n{e}")
 
             final_scores.append(document2insert["scores_over_different_rounds"])
-            logger.info(f"Finished computing score for texts with ID {pair['left']['id']} and ID {pair['right']['id']}.")
+            logger.info(
+                f"Finished computing score for texts with ID {pair['left']['id']} and ID {pair['right']['id']}."
+            )
 
         # one element = averaged score of X,Y and Y,X pair (score=number of rounds where the candidate was the most similar)
         # threshold is in [0,1], hence: normalized by rounds

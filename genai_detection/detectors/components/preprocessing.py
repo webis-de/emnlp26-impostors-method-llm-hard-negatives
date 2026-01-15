@@ -11,6 +11,7 @@ from genai_detection.detectors.detector_base import DetectorBase
 
 logger = logging.getLogger(__name__)
 
+
 class Preprocessor:
     def __init__(self):
         pass
@@ -58,7 +59,7 @@ class Preprocessor:
         return text.split()
 
     @staticmethod
-    def normalize_text(text:str):
+    def normalize_text(text: str):
         """
         Normalize input text by lowercasing and stemming.
         Koppel et al. (2014) do (explicitly) not normalize text pairs, but without normalization, the results are terrible.
@@ -67,7 +68,7 @@ class Preprocessor:
         stemmer = SnowballStemmer("english")
         return " ".join(stemmer.stem(w) for w in text.lower().split())
 
-    def upsample_to_min_n_tokens(self, text:str, min_n_tokens:int, upsample:bool):
+    def upsample_to_min_n_tokens(self, text: str, min_n_tokens: int, upsample: bool):
         whitespace_tokens = self.tokenize_whitespace(text)
         if (len(whitespace_tokens) < min_n_tokens) and upsample:
             return " ".join(
@@ -88,7 +89,9 @@ class Preprocessor:
 
 
 class PairPreprocessor:
-    def __init__(self, mongoDB, tokenizer, min_n_tokens:int=500, upsample:bool=False):
+    def __init__(
+        self, mongoDB, tokenizer, min_n_tokens: int = 500, upsample: bool = False
+    ):
         self.mongoDB = mongoDB
         self.text_preprocessor = Preprocessor()
         self.tokenizer = tokenizer
@@ -100,8 +103,9 @@ class PairPreprocessor:
     # 1. Validate & turn input into iterable
     # -----------------------------------------------------------
     def turn_input_iterable(self, text):
-        assert isinstance(text, Iterable), \
-            f"Input text must be iterable. But got: {type(text)}"
+        assert isinstance(
+            text, Iterable
+        ), f"Input text must be iterable. But got: {type(text)}"
         return list(text)
 
     # -----------------------------------------------------------
@@ -130,7 +134,7 @@ class PairPreprocessor:
     # -----------------------------------------------------------
     # 3. Validate lengths and optionally upsample
     # -----------------------------------------------------------
-    def ensure_min_lengths(self, text_left:str, text_right:str) -> bool:
+    def ensure_min_lengths(self, text_left: str, text_right: str) -> bool:
         """
         Indicates that text pair should be skipped if shorter than certain threshold.
         :param text_left: String which is left input text.
@@ -141,15 +145,17 @@ class PairPreprocessor:
         w_right = self.text_preprocessor.tokenize_whitespace(text_right)
 
         # Case: too short AND upsample disabled → skip
-        return (len(w_left) < self.min_n_tokens or len(w_right) < self.min_n_tokens) and not self.upsample
+        return (
+            len(w_left) < self.min_n_tokens or len(w_right) < self.min_n_tokens
+        ) and not self.upsample
 
     # -----------------------------------------------------------
     # 4. Preprocess + tokenize
     # -----------------------------------------------------------
-    def _preprocess_and_tokenize_single(self, text:str):
+    def _preprocess_and_tokenize_single(self, text: str):
         return self.tokenizer(self.detector_base.preprocess_text(text=text))
 
-    def preprocess_and_tokenize(self, left:str, right:str):
+    def preprocess_and_tokenize(self, left: str, right: str):
         left_tokens = self._preprocess_and_tokenize_single(left)
         right_tokens = self._preprocess_and_tokenize_single(right)
         return left_tokens, right_tokens
@@ -168,28 +174,30 @@ class PairPreprocessor:
     # -----------------------------------------------------------
     # PUBLIC MAIN ENTRY POINT
     # -----------------------------------------------------------
-    def filter_pairs(self, text_list:Iterable[str]):
+    def filter_pairs(self, text_list: Iterable[str]):
         logger.info(f"Filtering {len(text_list)} pairs.")
         text_list = self.turn_input_iterable(text_list)
 
         filtered = []
         for t in ichunked(text_list, 2):
-            original_left, original_right, id_left, id_right = self.obtain_texts_and_idx_from_pair(t)
+            original_left, original_right, id_left, id_right = (
+                self.obtain_texts_and_idx_from_pair(t)
+            )
 
             # upsample if set to True (i.e., different to the original texts)
             skip = self.ensure_min_lengths(original_left, original_right)
             if skip:
-                logger.error(f"Skipping texts {id_left} and {id_right}, because they are not long enough.")
+                logger.error(
+                    f"Skipping texts {id_left} and {id_right}, because they are not long enough."
+                )
                 continue
 
             # left, right are of at least minimal required length
-            filtered.append({
-                "left": {
-                   "id": id_left, "original_text": original_left
-               },
-                "right": {
-                   "id": id_right, "original_text": original_right
+            filtered.append(
+                {
+                    "left": {"id": id_left, "original_text": original_left},
+                    "right": {"id": id_right, "original_text": original_right},
                 }
-            })
+            )
 
         return filtered

@@ -82,9 +82,15 @@ class Scorer:
             # 5) Running mean over permutations
             total_score += round_score
             # right-tail binomial test
-            p_feat_name = f"{disputed}_disputed_{candidate}_candidate_uncorrected_p_value"
-            pvalue = binom_test(count=int(round_score), nobs=self.rounds, prop=1 / (1 + len(pair[candidate]["impostors_tfidf"])),
-                               alternative='larger')
+            p_feat_name = (
+                f"{disputed}_disputed_{candidate}_candidate_uncorrected_p_value"
+            )
+            pvalue = binom_test(
+                count=int(round_score),
+                nobs=self.rounds,
+                prop=1 / (1 + len(pair[candidate]["impostors_tfidf"])),
+                alternative="larger",
+            )
             p_values[p_feat_name] = pvalue
             total_score /= j + 1
 
