@@ -8,7 +8,7 @@ from typing import Iterable, List, Literal
 import numpy as np
 import torch
 from statsmodels.stats.multitest import multipletests
-from statsmodels.stats.proportion import proportion_effectsize
+from statsmodels.stats.proportion import proportion_effectsize, binom_test
 
 from genai_detection.detectors.components.feature_extractor import TfidfFeatureExtractor
 from genai_detection.detectors.components.impostor_factory import create_impostor_generator
@@ -286,7 +286,14 @@ class ImpostorDetector(ImpostorBase):
                 if new_key  not in ["tfidf", "processed_text", "tokens", "processed_impostors", "impostors",
                                     "original_text", "impostors_tfidf"]
             }
+
             document2insert["scores_over_different_rounds"], p_values = self.scorer.score_pair(pair=pair, vectorizer=self.feature_extractor.vectorizer)
+
+            # aggregated score over different rounds (due to overlap in vocabularies, scores are not independent over different rounds and this test thus, lacks correctness)
+            document2insert["uncorr_p_val_over_different_rounds"] = binom_test(count=2 * document2insert["scores_over_different_rounds"], nobs=self.rounds * 2, prop=1 / (1 + len(pair["left"]["impostors_tfidf"])),
+                               alternative='larger')
+            document2insert["corr_pred_over_different_rounds"] = document2insert["uncorr_p_val_over_different_rounds"] < 2*self.significance_level
+            
             # compare corrected p-value (times 2, since two tests) to alpha for statistical significance
             # https://www.statsmodels.org/stable/generated/statsmodels.stats.multitest.multipletests.html#statsmodels.stats.multitest.multipletests (09.01.2026)
             rejects, pvals_corrected, _, alphacBonf = multipletests(pvals=list(p_values.values()), alpha=self.significance_level, method="bonferroni")
@@ -303,7 +310,7 @@ class ImpostorDetector(ImpostorBase):
             }
 
             # based on corrected p-values ????? # TODO: are they corrected from bonferroni correction or only
-            effect_size = {f"effect_size_{'_'.join(k.split('_')[:3])}": proportion_effectsize(prop1=corrected_pval, prop2=1 / (1 + len(pair[k.split('_')[2]]["impostors_tfidf"])), method='normal') for k, corrected_pval in zip(p_values.keys(), pvals_corrected)}
+            effect_size = {f"effect_size_{'_'.join(k.split('_')[:3])}": proportion_effectsize(prop1=corr_pval, prop2=1 / (1 + len(pair[k.split('_')[2]]["impostors_tfidf"])), method='normal') for k, corr_pval in zip(p_values.keys(), pvals_corrected)}
 
             # Update the document dictionary
             document2insert.update(preds)
