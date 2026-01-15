@@ -42,7 +42,7 @@ class InDomainImpostorGenerator(MongoDBSavedGenerator):
         logging.info(f"InDomainImpostorGenerator: Dataset name: {self.dataset_name}")
 
     def generate_impostors(
-        self, Optional[str]=None, text_id: Optional[str]=None
+        self, text: Optional[str]=None, text_id: Optional[str]=None
     ) -> List[str]:
         """
         Generates in-domain impostors from a pre-defined dataset.
