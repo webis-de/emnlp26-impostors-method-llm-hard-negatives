@@ -42,7 +42,7 @@ class InDomainImpostorGenerator(MongoDBSavedGenerator):
         logging.info(f"InDomainImpostorGenerator: Dataset name: {self.dataset_name}")
 
     def generate_impostors(
-        self, text: str, text_id: Optional[str]=None
+        self, Optional[str]=None, text_id: Optional[str]=None
     ) -> List[str]:
         """
         Generates in-domain impostors from a pre-defined dataset.
@@ -50,12 +50,14 @@ class InDomainImpostorGenerator(MongoDBSavedGenerator):
         :param text_id: Optional text ID of the text for which the impostors should be generated.
         :return: Dictionary of impostors with keys as ids and values as texts.
         """
+        assert isinstance(text_id, str), f"Input text is not of type str, but {type(text_id)}."
         text_id = ObjectId(text_id)
-        print("Run in-domain impostors generator with text_id", text_id, type(text_id))
+        logger.info("Run in-domain impostors generator with text_id %s %s", text_id, type(text_id))
         original_text = self.mongoDB.original_collection.find_one({"_id": text_id})
+        assert original_text, "original text obtained from mongoDB is None."
         # ensure text ID not same
-        search_args = {"dataset": self.dataset_name, ASSIGNMENT_COL_NAME:original_text[ASSIGNMENT_COL_NAME], "id": {"$ne": text_id}}
-        print(f"InDomainImpostorGenerator: Search arguments: {search_args}")
+        search_args = {"dataset": self.dataset_name, ASSIGNMENT_COL_NAME: original_text[ASSIGNMENT_COL_NAME], "id": {"$ne": text_id}}
+        logger.info(f"InDomainImpostorGenerator: Search arguments: {search_args}")
 
         # use this, if the returned impostors should be completely random in-domain texts
         # cursor = self.mongoDB.get_random_matching_documents_from_collection(collection=self.mongoDB.original_collection, search_args=search_args, num_samples=self.n_impostors)
@@ -65,5 +67,5 @@ class InDomainImpostorGenerator(MongoDBSavedGenerator):
         # use this, if the returned impostors should be random among the most similar in-domain texts
         cursor = self.mongoDB.find_document_by_multiple_fields(collection=self.mongoDB.original_collection,search_args=search_args).limit(self.num_potential_impostors)
         impostors = [doc["text"] for doc in cursor]
-        print("Num imps", len(impostors))
+        logger.info("Num imps", len(impostors))
         return self._select_random_n_imps_among_best_m_potential_impostors(all_impostors=impostors, reference_text=text)
