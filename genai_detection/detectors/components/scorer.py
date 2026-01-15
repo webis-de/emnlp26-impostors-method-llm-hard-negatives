@@ -1,3 +1,4 @@
+import collections
 import itertools
 from random import sample
 from typing import Dict, Any, List, DefaultDict
@@ -49,7 +50,7 @@ class Scorer:
 
         feature_count = len(vectorizer.vocabulary_)
         total_score = 0.0
-        p_values = DefaultDict(float)
+        p_values = collections.defaultdict(float)
 
         # iterate over the permutations ("left" as disputed, "right" as candidate, and vice versa)
         for j, (disputed, candidate) in enumerate(
