@@ -48,7 +48,6 @@ class ImpostorDetector(ImpostorBase):
         rounds:int=100,
         top_n:int=100000,
         portion_delete:float=0.5,
-        tokenizer=None,
         n_impostors:int=25,
         threshold:float=0.1,
         impostor_technique: Literal[
@@ -71,8 +70,6 @@ class ImpostorDetector(ImpostorBase):
         :param top_n: Number of top space-free character 4-grams to consider, Koppel et al. (2014) use 100,000
         :param portion_delete: Portion of features to eliminate in each round (reset in each round); Koppel et al. (
         2014) use 50% of features
-        :param tokenizer: Custom tokenizer function (must accept exactly one parameter, defaults to space-free
-        character 4-grams cf. Koppel et al. (2014))
         :param n_impostors: Number of impostors to use for each candidate; Koppel et al. (2014) use 25 impostors
         :param threshold: Threshold for the minimum similarity score to consider two texts same-author, Koppel et al. (2014) use 0.1
         :param impostor_technique: Technique to use to generate impostors. Options are:
@@ -95,7 +92,6 @@ class ImpostorDetector(ImpostorBase):
         self.top_n = top_n
         self.portion_delete = portion_delete
         self.n_impostors = n_impostors
-        self.tokenizer = tokenizer or self.tokenize_char_ngrams
         self.threshold = threshold
         self.dataset_name = dataset_name
         self.min_n_tokens = min_n_tokens
@@ -107,7 +103,8 @@ class ImpostorDetector(ImpostorBase):
             impostor_technique=impostor_technique, n_impostors=self.n_impostors, dataset_name=self.dataset_name, top_n_freq_words=self.top_n
         )
         self.text_preprocessor = Preprocessor()
-        self.pair_processor = PairPreprocessor(mongoDB=self.mongoDB, tokenizer=self.tokenizer, min_n_tokens=self.min_n_tokens, upsample=self.upsample)
+        self.feature_extractor = TfidfFeatureExtractor(top_n_freq_words=self.top_n)
+        self.pair_processor = PairPreprocessor(mongoDB=self.mongoDB, tokenizer=self.feature_extractor._space_free_char_ngrams, min_n_tokens=self.min_n_tokens, upsample=self.upsample)
         self.scorer = Scorer(rounds=self.rounds, portion_delete=self.portion_delete, similarity_fn=minmax_similarity)
         self.significance_level = 0.05
 
@@ -257,8 +254,8 @@ class ImpostorDetector(ImpostorBase):
                 )
 
             assert len(corpus) > 0, f"Length of TFIDF corpus is {len(corpus)}, no preprocessed texts or preprocessed impostors in the corpus."
-            feature_extractor = TfidfFeatureExtractor(top_n_freq_words=self.top_n)
-            X = feature_extractor.fit_transform(corpus)
+            
+            X = self.feature_extractor.fit_transform(corpus)
             logger.info(f"Feature extractor (i.e., TFIDF) fit-transform done.")
 
             # --- 3) Slice TF-IDF vectors cleanly -----------------------------------------
@@ -289,7 +286,7 @@ class ImpostorDetector(ImpostorBase):
                 if new_key  not in ["tfidf", "processed_text", "tokens", "processed_impostors", "impostors",
                                     "original_text", "impostors_tfidf"]
             }
-            document2insert["scores_over_different_rounds"], p_values = self.scorer.score_pair(pair=pair, vectorizer=feature_extractor.vectorizer)
+            document2insert["scores_over_different_rounds"], p_values = self.scorer.score_pair(pair=pair, vectorizer=self.feature_extractor.vectorizer)
             # compare corrected p-value (times 2, since two tests) to alpha for statistical significance
             # preds = {
             #     f"{key}_pred": bool(2 * p_val < self.significance_level)

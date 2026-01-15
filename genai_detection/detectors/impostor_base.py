@@ -36,52 +36,6 @@ class ImpostorBase(DetectorBase):
         super().__init__()
         self.mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
 
-    # TODO: obsolete? TFIDF vectorizer has this built-in
-    @staticmethod
-    def tokenize_char_ngrams(
-        text: str, n: int = 4, normalize_ws: bool = True, space_free: bool = True
-    ):
-        """
-        Tokenize input text into character n-grams.
-        Koppel et al. (2014) use space-free character 4-grams tfidf values to represent each document as a numerical vector.
-        A space-free n-grams is a (1) sequence of n characters without any whitespace in it, (2) a sequence of <= n characters surrounded by spaces.
-
-        References:
-        ===========
-        Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’.
-        Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
-
-        :param text: input text
-        :param n: n-gram order
-        :param normalize_ws: collapse whitespace before tokenization
-        :return: list of n-gram tokens
-        """
-        # remove first and last whitespace
-        try:
-            text = text.strip()
-        except AttributeError as e:
-            logging.warning(f"Input text is not a string. Text: {text}...\nError: {e}")
-            raise e
-        if normalize_ws:
-            text = re.sub(r"\s+", " ", text)
-        if space_free:
-            # of size n without spaces
-            n_grams = [
-                text[i : i + n]
-                for i in range(0, len(text) - n + 1)
-                if " " not in text[i : i + n]
-            ]
-            # add m-grams with spaces, where m < n
-            # >2 whitespaces in character sequence are not paded, those are excluded. Otherwise, we include: 'to  ', '  to'
-            for token in text.split():
-                if (len(token) < n) and ((n - 2) <= len(token)):
-                    n_grams.append(token + " " * (n - len(token)))
-            return n_grams
-
-        else:
-            return [text[i : i + n] for i in range(0, len(text) - n + 1)]
-
-
 class ImpostorBaselineBase(ImpostorBase):
     """
     Base class for impostor Baseline detectors.
