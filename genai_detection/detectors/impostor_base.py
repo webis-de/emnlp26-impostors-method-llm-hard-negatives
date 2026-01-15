@@ -21,6 +21,7 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from genai_detection.config import CONFIG
+from genai_detection.detectors.components.feature_extractor import TfidfFeatureExtractor
 from genai_detection.detectors.detector_base import DetectorBase
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
@@ -65,12 +66,10 @@ class ImpostorBaselineBase(ImpostorBase):
         logger.info("Number of training pairs %d (in-memory)", self.train_dataset.shape[0])
         texts = pd.DataFrame(self.mongoDB.original_collection.find({"dataset":self.dataset_name},projection={
             '_id': False,"text":True}))
+        
+        tfidf_extractor = TfidfFeatureExtractor(top_n_freq_words=100000, ngram_n=4, min_df=2)
 
-        self._vectorizer = TfidfVectorizer(
-            max_features=100000,
-            dtype=np.float32,
-            ngram_range=(4, 4), analyzer="char_wb", min_df=2
-        )
+        self._vectorizer = tfidf_extractor.vectorizer
 
         self._vectorizer = self._vectorizer.fit(texts["text"])
         logger.info("Fitted vectorizer.")
