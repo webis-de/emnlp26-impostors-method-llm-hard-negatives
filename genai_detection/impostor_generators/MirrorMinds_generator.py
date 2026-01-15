@@ -37,9 +37,9 @@ class MirrorMindsGenerator(MongoDBSavedGenerator):
     """
 
     def __init__(
-        self, model_id: str = "MirrorMinds/mirror_minds", n_impostors: int = 1
+        self, model_id: str = "MirrorMinds/mirror_minds", n_impostors: int = 1, top_n_freq_words:int=100000
     ):
-        super().__init__(n_impostors=n_impostors)
+        super().__init__(n_impostors=n_impostors, top_n_freq_words=top_n_freq_words)
         torch.cuda.empty_cache()
         self.model_id = model_id
         self.model_path = snapshot_download(repo_id="google/flan-t5-small")

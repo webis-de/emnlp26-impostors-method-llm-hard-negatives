@@ -25,6 +25,7 @@ class GoogleSearchImpostorGenerator(SearchImpostorGeneratorBase):
 
     def __init__(
         self,
+        top_n_freq_words:int,
         api_key: str=CONFIG.SERPAPI_KEY,
         num_queries: int = 1,
         results_per_query: int = 25,
@@ -52,6 +53,7 @@ class GoogleSearchImpostorGenerator(SearchImpostorGeneratorBase):
         """
         super().__init__(
             n_impostors=num_queries * results_per_query,
+            top_n_freq_words=top_n_freq_words,
             api_key=api_key,
             results_per_query=results_per_query,
             max_workers=max_workers,

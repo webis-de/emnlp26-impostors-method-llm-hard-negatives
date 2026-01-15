@@ -24,7 +24,7 @@ from genai_detection.impostor_generators.ImpostorGenerator import (
 logger = logging.getLogger(__name__)
 
 class InDomainImpostorGenerator(MongoDBSavedGenerator):
-    def __init__(self, n_impostors: int, dataset_name: str):
+    def __init__(self, n_impostors: int, dataset_name: str, top_n_freq_words:int):
         """
         This impostor generator gets in-domain impostors from the dataset the input texts originate from.
 
@@ -35,7 +35,7 @@ class InDomainImpostorGenerator(MongoDBSavedGenerator):
         ===========
         Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’. Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
         """
-        super().__init__(n_impostors=n_impostors)
+        super().__init__(n_impostors=n_impostors, top_n_freq_words=top_n_freq_words)
         unique_dataset_names_saved = self.mongoDB.original_collection.distinct("dataset")
         assert dataset_name in unique_dataset_names_saved, f"{dataset_name} not in {unique_dataset_names_saved}"
         self.dataset_name=dataset_name

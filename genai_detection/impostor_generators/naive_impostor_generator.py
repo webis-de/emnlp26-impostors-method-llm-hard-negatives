@@ -25,9 +25,9 @@ from genai_detection.paraphrasing.paraphraser import Paraphraser
 
 class NaiveImpostorGenerator(LLMImpostorGenerator):
     def __init__(
-        self, n_impostors: int, paraphrasers: Optional[List[Paraphraser]] = None
+        self, n_impostors: int, top_n_freq_words:int, paraphrasers: Optional[List[Paraphraser]] = None
     ):
-        super().__init__(n_impostors=n_impostors)
+        super().__init__(n_impostors=n_impostors, top_n_freq_words=top_n_freq_words)
         if paraphrasers is None:
             # self.t5_chatgpt_paraphraser = T5ChatGPTParaphraser()
             # self.t5_google_paws_paraphraser = T5GooglePAWSParaphraser()

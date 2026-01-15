@@ -36,6 +36,7 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
         api_key: str,
         index_name:str,
         n_impostors: int = 50,
+        top_n_freq_words: int = 100000,
         results_per_query: int = 25,
         max_workers: int = 2,
         n_min_words: int = 3,
@@ -57,7 +58,7 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
         :param n_max_words: Maximum number of words in a query (default: 5)
 
         """
-        super().__init__(n_impostors=n_impostors)
+        super().__init__(n_impostors=n_impostors, top_n_freq_words=top_n_freq_words)
         self.api_key = api_key
         self.results_per_query = results_per_query
         assert isinstance(results_per_query, int) and results_per_query > 1, f"results_per_query must be a positive integer: {results_per_query}"

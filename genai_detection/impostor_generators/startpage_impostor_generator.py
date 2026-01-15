@@ -79,6 +79,7 @@ class StartPageSearchImpostorGenerator(SearchImpostorGeneratorBase):
 
     def __init__(
         self,
+        top_n_freq_words:int,
         api_key: str=CONFIG.CHATNOIR_KEY,
         n_impostors: int = 50,
         results_per_query: int = 25,
@@ -104,6 +105,7 @@ class StartPageSearchImpostorGenerator(SearchImpostorGeneratorBase):
         """
         super().__init__(
             n_impostors=n_impostors,
+            top_n_freq_words=top_n_freq_words,
             api_key=api_key,
             results_per_query=results_per_query,
             max_workers=max_workers,

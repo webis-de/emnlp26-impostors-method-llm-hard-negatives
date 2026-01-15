@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 class BaseImpostorGenerator(ABC):
     """Abstract base class for generating impostors."""
 
-    def __init__(self, n_impostors: int):
+    def __init__(self, n_impostors: int, top_n_freq_words:int):
         """
         :param n_impostors: number of impostors to generate
         """
@@ -44,6 +44,7 @@ class BaseImpostorGenerator(ABC):
         # optional; Koppel et al. (2014) select N random impostors among top M impostors with on-the-fly and in-data
         # impostors generation method
         self.num_potential_impostors = int(n_impostors * 1.5)
+        self.top_n_freq_words = top_n_freq_words
 
     def set_num_potential_impostors(self, num_potential_impostors: int):
         assert isinstance(num_potential_impostors, int), (f"num_potential_impostors must an integer, "
@@ -67,7 +68,7 @@ class BaseImpostorGenerator(ABC):
             return all_impostors
         # Add original text at the end
         all_impostors.append(reference_text)
-        tfidf_vectorizer = TfidfFeatureExtractor()
+        tfidf_vectorizer = TfidfFeatureExtractor(top_n_freq_words=self.top_n_freq_words)
         vectors = tfidf_vectorizer.fit_transform(all_impostors)
 
         # Separate original text vector
@@ -95,9 +96,9 @@ class BaseImpostorGenerator(ABC):
 
 class MongoDBSavedGenerator(BaseImpostorGenerator):
     def __init__(
-        self, n_impostors: int
+        self, n_impostors: int, top_n_freq_words:int
     ):
-        super().__init__(n_impostors)
+        super().__init__(n_impostors=n_impostors, top_n_freq_words=top_n_freq_words)
         self.mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
         self.text_processor = Preprocessor()
 
@@ -115,8 +116,8 @@ class MongoDBSavedGenerator(BaseImpostorGenerator):
         return self.generate_impostors(text=text, text_id=text_id)
 
 class GenerativeImpostorGenerator(MongoDBSavedGenerator):
-    def __init__(self, n_impostors: int):
-        super().__init__(n_impostors)
+    def __init__(self, n_impostors: int, top_n_freq_words:int):
+        super().__init__(n_impostors=n_impostors, top_n_freq_words=top_n_freq_words)
 
     def obtain_existing_paraphrases(self, collection, search_args: dict):
         if "text_id" not in search_args.keys():
@@ -136,24 +137,24 @@ class GenerativeImpostorGenerator(MongoDBSavedGenerator):
 
 class LLMImpostorGenerator(GenerativeImpostorGenerator):
     def __init__(
-        self, n_impostors: int
+        self, n_impostors: int, top_n_freq_words:int
     ):
-        super().__init__(n_impostors)
+        super().__init__(n_impostors=n_impostors, top_n_freq_words=top_n_freq_words)
 
 
 class NonNaiveLLMImpostorGenerator(LLMImpostorGenerator):
-    def __init__(self, n_impostors: int):
+    def __init__(self, n_impostors: int, top_n_freq_words:int):
         """
         Naive LLM-based impostor generator that uses no naive paraphrasers (i.e. only two-step paraphrasers).
         :param n_impostors: number of impostors to generate
         """
         super().__init__(
-            n_impostors=n_impostors,
+            n_impostors=n_impostors, top_n_freq_words=top_n_freq_words
         )
 
 
 if __name__ == "__main__":
-    llm_paraphraser = LLMImpostorGenerator(n_impostors=4)
+    llm_paraphraser = LLMImpostorGenerator(n_impostors=4, top_n_freq_words=100000)
     for i in range(3):
         text, text_id = llm_paraphraser.mongoDB.get_text_or_id_from_orginal_collection(
             text=None, text_id="68f50029edacdf3d5c0279ea"
