@@ -79,7 +79,8 @@ class BaseImpostorGenerator(ABC):
         similarities = [
             minmax_similarity(original_vector, vec) for vec in impostor_vectors
         ]
-        impostors_sorted = [all_impostors[i] for i in np.argsort(similarities)]
+        # argsort is ascending (i.e., least similar is at first position)
+        impostors_sorted = [all_impostors[i] for i in np.argsort(similarities)[::-1]]
 
         # Take top M impostors, "potential" in Koppel et al. (2014)
         n_potential = min(self.num_potential_impostors, len(impostors_sorted))
@@ -105,7 +106,7 @@ class MongoDBSavedGenerator(BaseImpostorGenerator):
     def generate_impostors(
             self, text: Optional[str], text_id: Optional[str]
     ) -> List[str]:
-        pass
+        raise NotImplementedError
 
     def generate_impostors_by_text_id(
             self, text_id: str
