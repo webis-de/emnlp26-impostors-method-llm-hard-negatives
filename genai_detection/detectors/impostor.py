@@ -309,7 +309,7 @@ class ImpostorDetector(ImpostorBase):
                 for key, c_pval in zip(p_values.keys(), pvals_corrected)
             }
 
-            # based on corrected p-values ????? # TODO: are they corrected from bonferroni correction or only
+            # based on corrected p-values
             effect_size = {f"effect_size_{'_'.join(k.split('_')[:3])}": proportion_effectsize(prop1=corr_pval, prop2=1 / (1 + len(pair[k.split('_')[2]]["impostors_tfidf"])), method='normal') for k, corr_pval in zip(p_values.keys(), pvals_corrected)}
 
             # Update the document dictionary
