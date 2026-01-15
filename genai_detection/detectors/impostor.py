@@ -288,10 +288,6 @@ class ImpostorDetector(ImpostorBase):
             }
             document2insert["scores_over_different_rounds"], p_values = self.scorer.score_pair(pair=pair, vectorizer=self.feature_extractor.vectorizer)
             # compare corrected p-value (times 2, since two tests) to alpha for statistical significance
-            # preds = {
-            #     f"{key}_pred": bool(2 * p_val < self.significance_level)
-            #     for key, p_val in p_values.items()
-            # }
             # https://www.statsmodels.org/stable/generated/statsmodels.stats.multitest.multipletests.html#statsmodels.stats.multitest.multipletests (09.01.2026)
             rejects, pvals_corrected, _, alphacBonf = multipletests(pvals=list(p_values.values()), alpha=self.significance_level, method="bonferroni")
             logger.info(f"Corrected p-values: {pvals_corrected} and uncorrected p-values: {p_values.values()}, "
