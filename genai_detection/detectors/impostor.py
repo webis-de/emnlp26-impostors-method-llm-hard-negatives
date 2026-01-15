@@ -49,8 +49,6 @@ class ImpostorDetector(ImpostorBase):
         top_n:int=100000,
         portion_delete:float=0.5,
         tokenizer=None,
-        shared_vocab_only:bool=True,
-        tfidf_freqs:bool=True,
         n_impostors:int=25,
         threshold:float=0.1,
         impostor_technique: Literal[
@@ -75,8 +73,6 @@ class ImpostorDetector(ImpostorBase):
         2014) use 50% of features
         :param tokenizer: Custom tokenizer function (must accept exactly one parameter, defaults to space-free
         character 4-grams cf. Koppel et al. (2014))
-        :param shared_vocab_only: Restrict analysis to shared vocabulary across pairs of texts (Koppel et al. (2014): all texts in the corpus, i.e. shared)
-        :param tfidf_freqs: Use tfidf term frequencies (Koppel et al. (2014) use tfidf)
         :param n_impostors: Number of impostors to use for each candidate; Koppel et al. (2014) use 25 impostors
         :param threshold: Threshold for the minimum similarity score to consider two texts same-author, Koppel et al. (2014) use 0.1
         :param impostor_technique: Technique to use to generate impostors. Options are:
@@ -97,10 +93,8 @@ class ImpostorDetector(ImpostorBase):
 
         self.rounds = rounds
         self.top_n = top_n
-        self.shared_vocab_only = shared_vocab_only
         self.portion_delete = portion_delete
         self.n_impostors = n_impostors
-        self.tfidf_freqs = tfidf_freqs
         self.tokenizer = tokenizer or self.tokenize_char_ngrams
         self.threshold = threshold
         self.dataset_name = dataset_name
@@ -110,7 +104,7 @@ class ImpostorDetector(ImpostorBase):
         self._training_mode = True  # set to True if you are in training mode, False for validation of model
 
         self.impostor_generator = create_impostor_generator(
-            impostor_technique=impostor_technique, n_impostors=self.n_impostors, dataset_name=self.dataset_name,
+            impostor_technique=impostor_technique, n_impostors=self.n_impostors, dataset_name=self.dataset_name, top_n_freq_words=self.top_n
         )
         self.text_preprocessor = Preprocessor()
         self.pair_processor = PairPreprocessor(mongoDB=self.mongoDB, tokenizer=self.tokenizer, min_n_tokens=self.min_n_tokens, upsample=self.upsample)
@@ -239,18 +233,31 @@ class ImpostorDetector(ImpostorBase):
                 )
                 return self.preprocess_text(text=upsampled_text)
 
+            index_map = {}  # save indices parallel to corpus construction
             for side in ["left", "right"]:
-                # preprocess impostors and original texts: (1) upsampling, (2) self.preprocess_text
-                pair[side]["processed_impostors"] = [upsample_then_preprocess(input_text=imp) for imp in pair[side]["impostors"]]
-                corpus.extend(pair[side]["processed_impostors"])
-
-                pair[side]["processed_text"] = upsample_then_preprocess(input_text=pair[side]["original_text"])
+                # preprocess original texts and impostors: (1) upsampling, (2) self.preprocess_text
+                pair[side]["processed_text"] = upsample_then_preprocess(
+                    input_text=pair[side]["original_text"]
+                )
+                index_map[f"{side}_text"] = len(corpus)
                 corpus.append(pair[side]["processed_text"])
 
-                logger.info(f"Preprocessed {side} impostors and input texts (first (optionally) upsampled, then preprocessed) and added preprocessed text to TFIDF corpus.")
+                pair[side]["processed_impostors"] = [
+                    upsample_then_preprocess(input_text=imp)
+                    for imp in pair[side]["impostors"]
+                ]
+                index_map[f"{side}_impostors"] = list(
+                    range(len(corpus), len(corpus) + len(pair[side]["processed_impostors"]))
+                )
+                corpus.extend(pair[side]["processed_impostors"])
+
+                logger.info(
+                    "Preprocessed %s impostors and input texts (first (optionally) upsampled, then preprocessed) and added preprocessed text to TFIDF corpus.",
+                    side,
+                )
 
             assert len(corpus) > 0, f"Length of TFIDF corpus is {len(corpus)}, no preprocessed texts or preprocessed impostors in the corpus."
-            feature_extractor = TfidfFeatureExtractor()
+            feature_extractor = TfidfFeatureExtractor(top_n_freq_words=self.top_n)
             X = feature_extractor.fit_transform(corpus)
             logger.info(f"Feature extractor (i.e., TFIDF) fit-transform done.")
 
@@ -259,26 +266,15 @@ class ImpostorDetector(ImpostorBase):
                 """Helper to convert sparse TF-IDF row to a dense list."""
                 return row.toarray().flatten().tolist()
 
-            idx_left = 0
-            idx_right = 1
-            idx_left_impostors_start = 2
-            idx_left_impostors_end = 2 + len(pair["left"]["impostors"])
-            idx_right_impostors_start = idx_left_impostors_end
-            idx_right_impostors_end = idx_right_impostors_start + len(
-                pair["right"]["impostors"]
-            )
-
-            pair["left"]["tfidf"] = dense_vector(X[idx_left])
-            pair["right"]["tfidf"] = dense_vector(X[idx_right])
+            pair["left"]["tfidf"] = dense_vector(X[index_map["left_text"]])
+            pair["right"]["tfidf"] = dense_vector(X[index_map["right_text"]])
 
             left_impostors_tfidf = [
-                dense_vector(X[i])
-                for i in range(idx_left_impostors_start, idx_left_impostors_end)
+                dense_vector(X[i]) for i in index_map["left_impostors"]
             ]
 
             right_impostors_tfidf = [
-                dense_vector(X[i])
-                for i in range(idx_right_impostors_start, idx_right_impostors_end)
+                dense_vector(X[i]) for i in index_map["right_impostors"]
             ]
             pair["left"]["impostors_tfidf"] = left_impostors_tfidf
             pair["right"]["impostors_tfidf"] = right_impostors_tfidf
