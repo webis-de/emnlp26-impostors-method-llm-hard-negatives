@@ -292,7 +292,7 @@ class ImpostorDetector(ImpostorBase):
             # aggregated score over different rounds (due to overlap in vocabularies, scores are not independent over different rounds and this test thus, lacks correctness)
             document2insert["uncorr_p_val_over_different_rounds"] = binom_test(count=2 * document2insert["scores_over_different_rounds"], nobs=self.rounds * 2, prop=1 / (1 + len(pair["left"]["impostors_tfidf"])),
                                alternative='larger')
-            document2insert["corr_pred_over_different_rounds"] = document2insert["uncorr_p_val_over_different_rounds"] < 2*self.significance_level
+            document2insert["corr_pred_over_different_rounds"] = bool(document2insert["uncorr_p_val_over_different_rounds"] < 2*self.significance_level)
             
             # compare corrected p-value (times 2, since two tests) to alpha for statistical significance
             # https://www.statsmodels.org/stable/generated/statsmodels.stats.multitest.multipletests.html#statsmodels.stats.multitest.multipletests (09.01.2026)
