@@ -139,17 +139,9 @@ class PairPreprocessor:
         """
         w_left = self.text_preprocessor.tokenize_whitespace(text_left)
         w_right = self.text_preprocessor.tokenize_whitespace(text_right)
-        total_len = len(w_left) + len(w_right)
 
         # Case: too short AND upsample disabled → skip
-        if total_len < 2 * self.min_n_tokens and not self.upsample:
-            return True   # skip
-
-        # Remove empty cases
-        if len(w_left) == 0 or len(w_right) == 0:
-            return True   # skip
-
-        return False   # do not skip
+        return (len(w_left) < self.min_n_tokens or len(w_right) < self.min_n_tokens) and not self.upsample
 
     # -----------------------------------------------------------
     # 4. Preprocess + tokenize
