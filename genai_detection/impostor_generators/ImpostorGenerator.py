@@ -104,7 +104,7 @@ class MongoDBSavedGenerator(BaseImpostorGenerator):
         self.text_processor = Preprocessor()
 
     def generate_impostors(
-            self, text: Optional[str], text_id: Optional[str]
+            self, text: Optional[str]=None, text_id: Optional[str]=None
     ) -> List[str]:
         raise NotImplementedError
 
