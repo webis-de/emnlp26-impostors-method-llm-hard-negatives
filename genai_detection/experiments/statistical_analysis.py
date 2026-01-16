@@ -210,7 +210,7 @@ class StatisticalAnalysis:
                     .agg(["count", "nunique", "min", "max"])
                 )
 
-                print(summary)
+                print("Summary:\n",summary)
 
                 if tech_df.empty:
                     continue
@@ -243,7 +243,7 @@ class StatisticalAnalysis:
                 )
 
                 ax.set_title(
-                    f"P-value distribution – {dataset_name}\n"
+                    f"P-value distribution – {dataset_name} ({len(tech_df)//2} pairs)\n"
                     f"Impostor generation: {technique}"
                 )
                 ax.set_ylabel("Uncorrected p-value")
@@ -358,7 +358,7 @@ class StatisticalAnalysis:
 
             # Translate labels + append counts
             translated_labels = [
-                f"{LEGEND_TRANSLATIONS.get(label, label)} ({total_counts.get(label, 0)})"
+                f"{LEGEND_TRANSLATIONS.get(label, label)} ({total_counts.get(label, 0)//2})"
                 for label in labels
             ]
 
@@ -366,7 +366,7 @@ class StatisticalAnalysis:
             fig.legend(
                 handles,
                 translated_labels,
-                title="Impostor generation (# Instances)",
+                title="Impostor generation (# Pairs)",
                 loc="upper right",
                 bbox_to_anchor=(0.99, 1.02),
             )
