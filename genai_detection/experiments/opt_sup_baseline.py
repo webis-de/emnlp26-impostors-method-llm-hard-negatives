@@ -21,7 +21,7 @@ from genai_detection.experiments.reproduction.impostor_metrics import compute_me
     extract_best_metric_and_position
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
-ray.init()
+# ray.init()
 
 # ray job submit --address https://ray.srv.webis.de --working-dir . --runtime-env env.yml -- python genai_detection/experiments/opt_sup_baseline.py
 
