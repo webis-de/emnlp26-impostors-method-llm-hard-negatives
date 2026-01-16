@@ -12,9 +12,7 @@ original_collection = mongoDB.original_collection
 paraphrase_collection = mongoDB.non_naive_paraphrase_collection
 paraphrase_score_collection = mongoDB.paraphrase_score_collection
 
-paraphrase_evaluator = paraphraser_evaluation.ParaphrasingEvaluator(
-    paraphrasers={}, prompts=[], original_text="dummy"
-)
+paraphrase_evaluator = paraphraser_evaluation.ParaphrasingEvaluator()
 
 # Iterate over all paraphrases
 for paraphrase_doc in paraphrase_collection.find():
