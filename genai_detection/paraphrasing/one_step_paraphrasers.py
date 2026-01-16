@@ -241,7 +241,13 @@ class SAIAParaphraser(OneStepParaphraser):
         self.model_id = model_id
 
     def paraphrase(
-        self, text: str, prompt: str, max_length: float = CONFIG.MAX_LENGTH
+        self,
+        text: str,
+        prompt: str,
+        max_length: float = CONFIG.MAX_LENGTH,
+        temperature: float | None = None,
+        top_p: float | None = None,
+        frequency_penalty: float | None = None,
     ) -> str:
         """
         Generate paraphrased versions of the input text.
@@ -262,8 +268,12 @@ class SAIAParaphraser(OneStepParaphraser):
                 },
                 {"role": "user", "content": f"{text[:30000]}\n{prompt.strip()}"},
             ],
-            "temperature": CONFIG.TEMPERATURE,
+            "temperature": CONFIG.TEMPERATURE if temperature is None else temperature,
         }
+        if top_p is not None:
+            body["top_p"] = top_p
+        if frequency_penalty is not None:
+            body["frequency_penalty"] = frequency_penalty
         try:
             response = self.client.chat.completions.create(**body)
             resp = response.choices[0].message.content
