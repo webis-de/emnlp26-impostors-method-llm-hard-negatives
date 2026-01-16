@@ -372,7 +372,7 @@ class ImpostorDetector(ImpostorBase):
                 for key, c_pval in zip(p_values.keys(), pvals_corrected)
             }
 
-            # based on corrected p-values
+            # compute Cohen's H based on corrected p-values
             effect_size = {
                 f"effect_size_{'_'.join(k.split('_')[:3])}": proportion_effectsize(
                     prop1=corr_pval,
