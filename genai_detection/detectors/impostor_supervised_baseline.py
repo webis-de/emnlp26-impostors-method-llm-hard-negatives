@@ -144,11 +144,20 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
             print(f"Loading trained LinearSVC model from {path2model}")
             return pickle.load(path2model)
         else:
-            # OOM error
+            # avoid OOM by subsampling (# positive = # negative samples) training data if too large
             if self.train_dataset.shape[0] > 5000:
-                return None
+                labels = np.array(self.train_dataset["same"], dtype=bool)
+                pos_idx = np.flatnonzero(labels)
+                neg_idx = np.flatnonzero(~labels)
+                if pos_idx.size == 0 or neg_idx.size == 0:
+                    raise ValueError("y contains only True or only False values.")
+                target_per_class = min(pos_idx.size, neg_idx.size, 2500)
+                rng = np.random.default_rng(0)
+                pos_sample = rng.choice(pos_idx, size=target_per_class, replace=False)
+                neg_sample = rng.choice(neg_idx, size=target_per_class, replace=False)
+                sample_idx = np.concatenate((pos_sample, neg_sample))
+                self.train_dataset = self.train_dataset.iloc[sample_idx]
             model = LinearSVC()
-            # TODO: list comprehension?
             disputed_texts = self.train_dataset["left_text"]
             candidate_texts = self.train_dataset["right_text"]
             logger.info(f"Training {len(candidate_texts)} candidate texts")
@@ -156,7 +165,7 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
             candidate_vectors = self.get_tfidf_vector_for_text(texts=candidate_texts)
 
             # Calculate element-wise difference
-            X = [abs(d - c) for d, c in zip(disputed_vectors, candidate_vectors)]
+            X = np.abs(disputed_vectors - candidate_vectors)
             # y = train_dataset["same"].astype(int).values
             y = np.array(self.train_dataset["same"], dtype=int)
             if np.all(y == 0) or np.all(y == 1):
