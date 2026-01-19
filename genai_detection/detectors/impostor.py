@@ -241,13 +241,20 @@ class ImpostorDetector(ImpostorBase):
                 continue
 
             for side in ["left", "right"]:
-                pair[side]["impostors"] = self._generate_impostors_for_single_input(
-                    input_dict=pair[side]
-                )
-                logger.info(
-                    f"Obtained {len(pair[side]['impostors'])} impostors for {side} input text. Type of impostors is {type(pair[side]['impostors'])}."
-                )
-
+                try:
+                    pair[side]["impostors"] = self._generate_impostors_for_single_input(
+                        input_dict=pair[side]
+                    )
+                    logger.info(
+                        f"Obtained {len(pair[side]['impostors'])} impostors for {side} input text. Type of impostors is {type(pair[side]['impostors'])}."
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to generate impostors for text with ID {pair[side]['id']} and text: {pair[side]['original_text'][:200]} -> Return 0.5. Error: {e}"
+                    )
+                    final_scores.append(0.5) 
+                    continue
+                
             # --- 2) Build corpus for TFIDF -----------------------------------------------
             # Compute TFIDF based on the processed text, which is upsampled (and preprocessed) if upsample is set to true
             # and the original preprocessed text otherwise
