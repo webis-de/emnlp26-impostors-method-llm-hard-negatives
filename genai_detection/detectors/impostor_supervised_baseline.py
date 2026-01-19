@@ -144,6 +144,9 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
             print(f"Loading trained LinearSVC model from {path2model}")
             return pickle.load(path2model)
         else:
+            # OOM error
+            if self.train_dataset.shape[0] > 5000:
+                return None
             model = LinearSVC()
             # TODO: list comprehension?
             disputed_texts = self.train_dataset["left_text"]
