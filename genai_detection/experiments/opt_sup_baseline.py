@@ -76,6 +76,10 @@ class OptimalSupervisedBaseline:
                         assert f"left_{config_item}" in test_pair and f"right_{config_item}" in test_pair, f"Required keys not found in test pair: {test_pair.keys()}"
                 try:
                     sup_baseline = self.train_svc(dataset_name=test_pair["dataset_name"], test_pair=test_pair, additional_in_args=config)
+                    if sup_baseline is None:
+                        logger.error(f"Could not obtain prediction for test pair {pair_id} due to OOM when training.")
+                        # avoid OOM
+                        continue
                 except ValueError:
                     logger.error("Skipping this test pair because SVC training data contains only one class.")
                     continue
