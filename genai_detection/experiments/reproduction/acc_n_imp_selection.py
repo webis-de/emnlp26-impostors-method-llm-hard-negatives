@@ -115,14 +115,10 @@ def compute_acc_across_n_selected_potential_imps(
                 )
                 scores = list(scores_cursor)
                 logger.info(f"Found existing {len(scores)} scores for {technique}, n_selected={n_selected}, n_potential={n_potential}.")
-                # TODO: Use MIN_SAMPLES=50 instead of 0
-                if len(scores) == 0:
-                    logger.info(f"No scores existing for {technique}. Need to generate scores.")
-                    scores = detector.get_score(text=test_id_pairs)
-                    gt = ground_truth
-                    logger.info(f"Generated {len(scores)} scores for {technique} (while original len of gt is kept (i.e., {len(gt)})).")
-                else:
-                    # match left_id, right_id pairs with gt
+                # match left_id, right_id pairs with gt
+                # scores can also be from different dataset -> leading to len(scores) > 0 but no matches
+                gt = []
+                if len(scores) > 0:
                     scores = [
                         {**s, "left_id": ObjectId(s["left_id"]), "right_id": ObjectId(s["right_id"])}
                         for s in scores
@@ -134,24 +130,31 @@ def compute_acc_across_n_selected_potential_imps(
                     gt_cursor = detector.mongoDB.find_document_by_multiple_fields(collection=detector.mongoDB.all_pairs_collection,
                                                                                   search_args={"dataset_name": dataset_name, "$or": pair_filters})
                     gt = list(gt_cursor)
-                    logger.info(f"Found {len(gt)} gt values for {technique}")
-                    scores_by_pair = {
-                        (doc["left_id"], doc["right_id"]): doc["scores_over_different_rounds"]/100
-                        for doc in scores
-                    }
 
-                    gt_by_pair = {
-                        (doc["left_id"], doc["right_id"]): doc["same"]
-                        for doc in gt
-                    }
-                    # gt can be filtered by dataset while scores cannot; omit by using filtered gt keys
-                    scores_by_pair = {
-                        pair: score
-                        for pair, score in scores_by_pair.items()
-                        if pair in gt_by_pair
-                    }
-                    gt = list(gt_by_pair.values())
-                    scores = list(scores_by_pair.values())
+                if (len(gt) == 0) or len(scores) == 0:
+                    logger.info(f"No scores existing for {technique} on dataset {dataset_name}. Need to generate scores.")
+                    scores = detector.get_score(text=test_id_pairs)
+                    gt = ground_truth
+                    logger.info(
+                        f"Generated {len(scores)} scores for {technique} (while original len of gt is kept (i.e., {len(gt)})).")
+                logger.info(f"Found {len(gt)} gt values for {technique}")
+                scores_by_pair = {
+                    (doc["left_id"], doc["right_id"]): doc["scores_over_different_rounds"]/100
+                    for doc in scores
+                }
+
+                gt_by_pair = {
+                    (doc["left_id"], doc["right_id"]): doc["same"]
+                    for doc in gt
+                }
+                # gt can be filtered by dataset while scores cannot; omit by using filtered gt keys
+                scores_by_pair = {
+                    pair: score
+                    for pair, score in scores_by_pair.items()
+                    if pair in gt_by_pair
+                }
+                gt = list(gt_by_pair.values())
+                scores = list(scores_by_pair.values())
                 assert len(gt) == len(scores), f"GT and score length are not equal: {len(gt)} != {len(scores)}"
                 n_samples_per_config.append(
                     {"technique": technique, "dataset_name": dataset_name, "n_selected": n_selected, "n_potential": n_potential, "n_samples": len(scores)}
