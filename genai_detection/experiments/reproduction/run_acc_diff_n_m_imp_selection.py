@@ -81,8 +81,8 @@ if __name__ == "__main__":
         # "mirror_minds",   # raises error
     ]
 
-    logger.info(f"About to start {CONFIG.BLOG} dataset.")
-    run_acc_curves(dataset_name=CONFIG.BLOG,imp_gen_techniques=our_figure_impostor_options)
+    # logger.info(f"About to start {CONFIG.BLOG} dataset.")
+    # run_acc_curves(dataset_name=CONFIG.BLOG,imp_gen_techniques=our_figure_impostor_options)
     logger.info(f"Finished {CONFIG.BLOG} dataset, about to start {CONFIG.STUDENT_ESSAYS} dataset.")
     run_acc_curves(dataset_name=CONFIG.STUDENT_ESSAYS,imp_gen_techniques=our_figure_impostor_options)
     logger.info(f"Finished {CONFIG.BLOG} and {CONFIG.STUDENT_ESSAYS} dataset.")
