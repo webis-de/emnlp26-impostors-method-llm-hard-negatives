@@ -67,5 +67,5 @@ class InDomainImpostorGenerator(MongoDBSavedGenerator):
         # use this, if the returned impostors should be random among the most similar in-domain texts
         cursor = self.mongoDB.find_document_by_multiple_fields(collection=self.mongoDB.original_collection,search_args=search_args).limit(self.num_potential_impostors)
         impostors = [doc["text"] for doc in cursor]
-        logger.info("Num imps", len(impostors))
+        logger.info("Num imps %s", len(impostors))
         return self._select_random_n_imps_among_best_m_potential_impostors(all_impostors=impostors, reference_text=text)
