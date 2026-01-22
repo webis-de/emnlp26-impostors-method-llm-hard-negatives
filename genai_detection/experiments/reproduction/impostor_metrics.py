@@ -20,6 +20,7 @@ def _load_input_pairs(dataset_name: str, split:str="all", balanced:bool=True) ->
     """
     Load text-pair IDs and ground-truth labels from MongoDB.
     """
+    logger.info(f"Loading input pairs for dataset '{dataset_name}'")
     mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
     collection = mongoDB.all_pairs_collection if split == "all" else mongoDB.test_pairs_collection if split == "test" else mongoDB.train_pairs_collection
     diff_pairs = list(
@@ -27,7 +28,7 @@ def _load_input_pairs(dataset_name: str, split:str="all", balanced:bool=True) ->
             collection=collection,
             search_args=
             {"dataset_name": dataset_name,
-             "same":True},
+             "same":False},
         )
     )#[:N_PAIRS//2]
     same_pairs =list(
@@ -35,7 +36,7 @@ def _load_input_pairs(dataset_name: str, split:str="all", balanced:bool=True) ->
             collection=collection,
             search_args=
             {"dataset_name": dataset_name,
-             "same":False},
+             "same":True},
         )
     )#[:N_PAIRS//2]
 
@@ -50,11 +51,6 @@ def _load_input_pairs(dataset_name: str, split:str="all", balanced:bool=True) ->
         for pair in test_pairs
         for id_ in (pair["left_id"], pair["right_id"])
     ]
-    # TODO:
-    # output_path = "text_ids.txt"
-    #
-    # with open(output_path, "a", encoding="utf-8") as f:
-    #     f.write(",".join(text_ids) + "\n")
     ground_truth = [pair["same"] for pair in test_pairs]
 
     logger.info(
