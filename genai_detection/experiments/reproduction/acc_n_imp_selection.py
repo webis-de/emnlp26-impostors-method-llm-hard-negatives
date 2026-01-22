@@ -156,6 +156,8 @@ def compute_acc_across_n_selected_potential_imps(
                 n_samples_per_config.append(
                     {"technique": technique, "dataset_name": dataset_name, "n_selected": n_selected, "n_potential": n_potential, "n_samples": len(scores)}
                 )
+                if len(scores) == 0:
+                    logger.error(f"No scores for {technique}/ technique {technique}/ n selected {n_selected}/ n_potential {n_potential}.")
 
                 assert scores is not None, "Detector returned None scores"
 
@@ -290,5 +292,5 @@ def run_acc_curves(dataset_name:str, imp_gen_techniques:List[str]):
         dataset_name=dataset_name, imp_gen_techniques=imp_gen_techniques
     )
 
-    logging.info(f"results_dict: {results_dict}")
+    logging.info(f"{dataset_name} | results_dict: {results_dict}")
     plot_acc_curve(results=results_dict, dataset_name=dataset_name)
