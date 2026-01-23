@@ -22,7 +22,6 @@ We also exvaluate the absolute difference in scores between maximal number of ch
 """
 
 import argparse
-import os
 from pathlib import Path
 from typing import Dict
 
@@ -41,7 +40,7 @@ nltk.download("punkt")
 from nltk.tokenize import word_tokenize
 from genai_detection.paraphrasing.one_step_paraphrasers import *
 from genai_detection.paraphrasing.two_step_paraphrasers import *
-from genai_detection.paraphrasing.paraphraser_evaluation import ParaphrasingEvaluator
+from genai_detection.experiments.paraphrases.paraphraser_evaluation import ParaphrasingEvaluator
 
 CATEGORIES = [
     "Blog",
