@@ -172,15 +172,19 @@ class ParaphraseDataLoader:
         return df
 
     def obtain_complete_paraphrase_df_from_mongodb(self) -> pd.DataFrame:
-        paraphrases_cursor = self.mongodb.non_naive_paraphrase_collection.find({})
-        paraphrases = pd.DataFrame(paraphrases_cursor)
+        non_naive_paraphrases_cursor = self.mongodb.non_naive_paraphrase_collection.find({})
+        non_naive_paraphrases = pd.DataFrame(non_naive_paraphrases_cursor)
+        naive_paraphrases_cursor = self.mongodb.naive_paraphrase_collection.find({})
+        naive_paraphrases = pd.DataFrame(naive_paraphrases_cursor)
+
+        paraphrases = pd.concat([non_naive_paraphrases, naive_paraphrases], axis=0, ignore_index=True)
         extracted_df = pd.json_normalize(paraphrases["extracted_info"])
 
         paraphrases = pd.concat(
-            [paraphrases.drop(columns=["extracted_info"]), extracted_df],
+            [paraphrases.drop(columns=["extracted_info"]), extracted_df.drop(columns=["prompt"], errors="ignore")],
             axis=1,
         )
-
+        dup_cols = paraphrases.columns[paraphrases.columns.duplicated()].tolist()
         paraphrases["text_id"] = paraphrases["text_id"].map(ObjectId)
         original_texts_cursor = self.mongodb.original_collection.find(
             {"_id": {"$in": paraphrases["text_id"].tolist()}},
