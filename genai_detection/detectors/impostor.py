@@ -240,6 +240,7 @@ class ImpostorDetector(ImpostorBase):
                 #     f"Found pre-computed scores for {pair['left']['id']}, {pair['right']['id']} in mongoDB collection. Using pre-computed scores.")
                 continue
 
+            generation_failed = False
             for side in ["left", "right"]:
                 try:
                     pair[side]["impostors"] = self._generate_impostors_for_single_input(
@@ -252,8 +253,12 @@ class ImpostorDetector(ImpostorBase):
                     logger.error(
                         f"Failed to generate impostors for text with ID {pair[side]['id']} and text: {pair[side]['original_text'][:200]} -> Return 0.5. Error: {e}"
                     )
-                    final_scores.append(0.5) 
-                    continue
+                    generation_failed = True
+                    break  # exit for loop over sides
+
+            if generation_failed:
+                final_scores.append(0.5) 
+                continue  # skip to next pair and save nothing to mongoDB
                 
             # --- 2) Build corpus for TFIDF -----------------------------------------------
             # Compute TFIDF based on the processed text, which is upsampled (and preprocessed) if upsample is set to true
