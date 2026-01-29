@@ -76,11 +76,11 @@ def save_paraphrase(doc_n: int, paraphrase: str):
     with open(save_dir / paraphrase_filename, "w", encoding="utf-8") as f:
         f.write(paraphrase)
 
-def save_overview_file(original_text:str, paraphrases:List[str], extracted_info_dict:dict, doc_id: str) -> None:
+def save_overview_file(original_text:str, paraphrases:List[str], extracted_info_dict:dict, file_name: str) -> None:
     save_dir.mkdir(parents=True, exist_ok=True)
 
     paraphrase_filename = (
-        f"{doc_id}_overview_{CONFIG.OPENAI_MODEL.replace('/', '_')}.txt"
+        f"{file_name}_overview_{CONFIG.OPENAI_MODEL.replace('/', '_')}.txt"
     )
     file_path = save_dir / paraphrase_filename
 
@@ -120,6 +120,6 @@ for i, doc in enumerate(original_collection.find(limit=max_docs)):
         (doc["extracted_info"] for doc in docs if "extracted_info" in doc), {}
     )
     save_overview_file(original_text=original_text, paraphrases=paraphrased_texts,
-                       extracted_info_dict=extracted_info, doc_id=f"{original_text_id}_{i}")
+                       extracted_info_dict=extracted_info, file_name=f"{original_text_id}_{i}")
 
 logging.info(f"Paraphrasing complete. Inserted/Updated {max_docs} documents.")
