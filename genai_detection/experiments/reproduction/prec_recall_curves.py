@@ -96,8 +96,6 @@ def compute_prec_recall_f1_acc_dict(
             dataset_name=dataset_name,
         )
         scores = detector.get_score(text=text_test_ID_pairs)
-        print(technique)
-        print(len(scores), scores)
         assert scores is not None
         predictions[technique] = scores
 
