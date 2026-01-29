@@ -193,6 +193,7 @@ class BaseDatasetLoader(ABC):
         }
         batch_size = 5000
         # they do not have a dataset column, hence we have to manually compare IDs to still existing entries
+        # FIXME: just deletes complete collection, maybe str vs ObjectID mismatch
         old_collections = [
             mongodb.naive_paraphrase_collection,
             mongodb.on_the_fly_collection,
