@@ -119,7 +119,7 @@ class PairPreprocessor:
             try:
                 ObjectId(value)
                 return self.mongoDB.get_text_or_id_from_orginal_collection(
-                    text_id=value, text=None
+                    text_id=ObjectId(value), text=None
                 )
             except Exception as e:
                 return self.mongoDB.get_text_or_id_from_orginal_collection(
