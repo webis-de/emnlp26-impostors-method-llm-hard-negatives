@@ -185,6 +185,7 @@ class ParaphraseDataLoader:
             axis=1,
         )
         dup_cols = paraphrases.columns[paraphrases.columns.duplicated()].tolist()
+        assert len(dup_cols) < 1, f"It exits {len(dup_cols)} duplicated columns after merging."
         paraphrases["text_id"] = paraphrases["text_id"].map(ObjectId)
         original_texts_cursor = self.mongodb.original_collection.find(
             {"_id": {"$in": paraphrases["text_id"].tolist()}},
