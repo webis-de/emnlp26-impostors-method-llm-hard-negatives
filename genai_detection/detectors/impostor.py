@@ -7,6 +7,7 @@ from typing import Iterable, List, Literal
 
 import numpy as np
 import torch
+from bson import ObjectId
 from statsmodels.stats.multitest import multipletests
 from statsmodels.stats.proportion import proportion_effectsize, binom_test
 
@@ -227,8 +228,8 @@ class ImpostorDetector(ImpostorBase):
                     collection=self.mongoDB.impostor_output_collection,
                     search_args={
                         "impostor_generation_technique": self.impostor_technique,
-                        "left_id": pair["left"]["id"],
-                        "right_id": pair["right"]["id"],
+                        "left_id": ObjectId(pair["left"]["id"]),
+                        "right_id": ObjectId(pair["right"]["id"]),
                         "n_impostors": self.n_impostors,
                         "n_potential_impostors": self.impostor_generator.num_potential_impostors,
                     },
