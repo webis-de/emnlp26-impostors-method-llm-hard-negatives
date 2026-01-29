@@ -145,7 +145,7 @@ class StartPageSearchImpostorGenerator(SearchImpostorGeneratorBase):
                 )
             )
         if not result_list:
-            raise ValueError("StartPageSearchImpostorGenerator: No results found.")
+            raise ValueError(f"StartPageSearchImpostorGenerator: No results found for query '{query}'. Resulting tree is '{tree}'")
         return result_list
 
 
