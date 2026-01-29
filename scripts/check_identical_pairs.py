@@ -1,5 +1,7 @@
 # scripts/check_identical_pairs.py (or run in a python shell)
 import os
+from pathlib import Path
+
 from bson import ObjectId
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 from genai_detection.config import CONFIG
@@ -34,5 +36,8 @@ for p in pairs:
 if len(identical_text_pairs) > 0:
     print(f"{len(identical_text_pairs)} pairs with identical text:")
     print("Pairs with identical text:", identical_text_pairs)
+    dataset_name = CONFIG.BLOG
+    mongo.delete_identical_text_pairs(dataset_name=dataset_name, output_path=Path(CONFIG.SAVE_PATH) / "datasets" / dataset_name / "duplicate_texts.csv", batch_size=1000)
 else:
     print(f"No pairs with identical text.")
+
