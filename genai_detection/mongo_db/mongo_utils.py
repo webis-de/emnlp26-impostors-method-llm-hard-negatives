@@ -1,7 +1,8 @@
+import csv
 import logging
 import os
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Iterable, Tuple
 
 from bson import ObjectId
 from pymongo import MongoClient
@@ -359,3 +360,105 @@ class ParaphraseMongoDB:
                 "left_text": text_map.get(p["left_id"]),
                 "right_text": text_map.get(p["right_id"]),
             }
+
+    def delete_identical_text_pairs(
+        self,
+        dataset_name: str,
+        output_path: str,
+        batch_size: int = 1000,
+    ) -> Dict[str, int]:
+        """
+        Delete pairs where left and right texts are identical from
+        all_pairs, test_pairs, and train_pairs for the given dataset.
+        Writes affected pair IDs to a CSV file so originals can be reviewed.
+        """
+        collections = {
+            "all_pairs": self.all_pairs_collection,
+            "test_pairs": self.test_pairs_collection,
+            "train_pairs": self.train_pairs_collection,
+        }
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        total_deleted = 0
+        total_flagged = 0
+
+        with output_path.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["collection", "dataset_name", "left_id", "right_id"])
+
+            for name, collection in collections.items():
+                logger.info("Scanning %s for dataset %s", name, dataset_name)
+                cursor = collection.find(
+                    {"dataset_name": dataset_name},
+                    {"_id": 0, "left_id": 1, "right_id": 1},
+                    batch_size=batch_size,
+                ).sort("_id", 1)
+
+                batch = []
+                pairs_to_delete: List[Tuple[ObjectId, ObjectId]] = []
+
+                for pair in cursor:
+                    batch.append(pair)
+                    if len(batch) >= batch_size:
+                        pairs_to_delete.extend(
+                            self._find_identical_text_pairs(batch)
+                        )
+                        batch.clear()
+
+                if batch:
+                    pairs_to_delete.extend(self._find_identical_text_pairs(batch))
+
+                if not pairs_to_delete:
+                    continue
+
+                total_flagged += len(pairs_to_delete)
+                for left_id, right_id in pairs_to_delete:
+                    writer.writerow([name, dataset_name, str(left_id), str(right_id)])
+
+                # Delete in manageable chunks
+                for delete_batch in _iter_batches_pairs(pairs_to_delete, batch_size):
+                    or_conditions = [
+                        {"left_id": l, "right_id": r} for l, r in delete_batch
+                    ]
+                    result = collection.delete_many(
+                        {"dataset_name": dataset_name, "$or": or_conditions}
+                    )
+                    total_deleted += result.deleted_count
+
+        logger.info(
+            "Deleted %d identical-text pairs (flagged %d). File: %s",
+            total_deleted,
+            total_flagged,
+            output_path,
+        )
+        return {"deleted": total_deleted, "flagged": total_flagged}
+
+    def _find_identical_text_pairs(
+        self,
+        pairs: List[Dict[str, ObjectId]],
+    ) -> List[Tuple[ObjectId, ObjectId]]:
+        text_ids = {pid for p in pairs for pid in (p["left_id"], p["right_id"])}
+        texts_cursor = self.original_collection.find(
+            {"_id": {"$in": list(text_ids)}},
+            {"text": 1},
+        )
+        text_map = {doc["_id"]: doc["text"] for doc in texts_cursor}
+
+        identical_pairs = []
+        for p in pairs:
+            left_text = text_map.get(p["left_id"])
+            right_text = text_map.get(p["right_id"])
+            if left_text is None or right_text is None:
+                continue
+            if left_text == right_text:
+                identical_pairs.append((p["left_id"], p["right_id"]))
+        return identical_pairs
+
+
+def _iter_batches_pairs(
+    items: List[Tuple[ObjectId, ObjectId]],
+    batch_size: int,
+) -> Iterable[List[Tuple[ObjectId, ObjectId]]]:
+    for i in range(0, len(items), batch_size):
+        yield items[i:i + batch_size]
