@@ -182,7 +182,7 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
         """
         pass
 
-    def _save_on_the_fly_in_mongodb(self, original_text_id:str, original_text:str, impostor_text:str, query:str, uri:str) -> None:
+    def _save_on_the_fly_in_mongodb(self, original_text_id:ObjectId, original_text:str, impostor_text:str, query:str, uri:str) -> None:
         """
         Save the paraphrase to the MongoDB database collection called "paraphrase".
         :param original_text_id: The id of the original text in the original_text collection.
@@ -228,7 +228,8 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
         Impostor texts are crawled websites, stripped of HTML tags if possible and provided snippets by search engine if crawling was not possible.
         :param queries: List of search queries to fetch results for
         :param text: Text of the original text (used to derive the query from), only used as metadata when storing result in mongoDB collection.
-        :param text_id: Id of the original text (used to derive the query from), only used as metadata when storing result in mongoDB collection.
+        :param text_id: ID of the original text (used to derive the query from), only used as metadata when storing
+        result in mongoDB collection.
         :return: List of impostor texts.
         """
         all_results = []

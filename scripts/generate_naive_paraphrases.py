@@ -6,11 +6,12 @@ import logging
 import os
 from typing import Iterable, Optional
 
+from bson import ObjectId
+
 from genai_detection.impostor_generators.naive_impostor_generator import (
     NaiveImpostorGenerator,
 )
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
-
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +20,14 @@ def iter_original_text_ids(
     mongo: ParaphraseMongoDB,
     dataset_name: Optional[str],
     limit: Optional[int],
-) -> Iterable[str]:
+) -> Iterable[ObjectId]:
     query = {}
     if dataset_name:
         query["dataset"] = dataset_name
     cursor = mongo.original_collection.find(query, {"_id": 1}).sort("_id", 1)
     count = 0
     for doc in cursor:
-        yield str(doc["_id"])
+        yield ObjectId(doc["_id"])
         count += 1
         if limit is not None and count >= limit:
             break

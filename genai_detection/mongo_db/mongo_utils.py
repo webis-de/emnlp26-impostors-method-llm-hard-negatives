@@ -84,18 +84,18 @@ class ParaphraseMongoDB:
         return self.db[collection_name]
 
     @staticmethod
-    def update_document(collection, _id: str, update_data: dict) -> int:
+    def update_document(collection, _id: ObjectId, update_data: dict) -> int:
         """
         Update an entry in the specified collection by its ID.
         If no document with _id exists, no action is taken.
         If update_data contains fields that already exist, they will be overwritten, if fields are non-existent, they will be created.
         :param collection: The MongoDB collection to update.
-        :param text_id: The ID of the text document to update.
+        :param _id: The ID of the text document to update.
         :param update_data: A dictionary containing the fields to update.
         :return: The number of documents modified (0 or 1).
         """
         assert isinstance(update_data, dict), "update_data must be a dictionary"
-        result = collection.update_one({"_id": _id}, {"$set": update_data})
+        result = collection.update_one({"_id": ObjectId(_id)}, {"$set": update_data})
         return result.modified_count
 
     @staticmethod
@@ -120,7 +120,7 @@ class ParaphraseMongoDB:
         collection.insert_many(insert_data)
 
     @staticmethod
-    def find_document_by_id(collection, document_id: str):
+    def find_document_by_id(collection, document_id: ObjectId):
         """
         Find an entry in the specified collection by its text ID.
         :param collection: The MongoDB collection to search.
@@ -201,7 +201,7 @@ class ParaphraseMongoDB:
         if not text:
             # Should only contain one element because _id is the primary key
             text = self.find_document_by_id(
-                collection=self.original_collection, document_id=text_id
+                collection=self.original_collection, document_id=ObjectId(text_id)
             )[0]["text"]
             assert (
                 (text is not None) and type(text) == str and len(text) > 0
@@ -214,17 +214,13 @@ class ParaphraseMongoDB:
         # Save text in mongoDB if not yet present
         if text and text_id:
             existing = self.find_document_by_id(
-                collection=self.original_collection, document_id=text_id
+                collection=self.original_collection, document_id=ObjectId(text_id)
             )
             if existing is None:
                 raise Exception(f"Document ID {text_id} not found.")
-                self.mongoDB.insert_document(
-                    collection=self.original_collection,
-                    insert_data={"text": text},
-                )
         return text, text_id
 
-    def get_texts_for_ids(self, text_ids: List[str]) -> List[str]:
+    def get_texts_for_ids(self, text_ids: List[ObjectId]) -> List[str]:
         """
         Retrieve texts for a list of IDs from the original collection in bulk in order.
         :param text_ids: List of MongoDB document IDs
@@ -232,8 +228,7 @@ class ParaphraseMongoDB:
         """
         if not text_ids:
             return []
-        if isinstance(text_ids[0], str):
-            text_ids = [ObjectId(text_id) for text_id in text_ids]
+        text_ids = [ObjectId(text_id) for text_id in text_ids]
 
         # Bulk query: _id in text_ids
         cursor = self.original_collection.find(
@@ -248,12 +243,12 @@ class ParaphraseMongoDB:
 
         # Optional sanity check
         if len(texts) != len(text_ids):
-            missing = set(text_ids) - {doc["_id"] for doc in cursor}
+            missing = set(text_ids) - {doc["_id"] for doc in docs}
             logging.warning("Some IDs not found in MongoDB: %s", missing)
 
         return texts
 
-    def find_paraphrases(self, document_id: str):
+    def find_paraphrases(self, document_id: ObjectId):
         """
         Find an entry in the specified collection by its text ID.
         :param document_id: The ID of the original document. Paraphrases have different _id.
@@ -261,7 +256,7 @@ class ParaphraseMongoDB:
 
         https://www.mongodb.com/docs/manual/reference/method/db.collection.find/ (06.11.2025)
         """
-        documents = self.non_naive_paraphrase_collection.find({"text_id": document_id}).sort("_id", 1)
+        documents = self.non_naive_paraphrase_collection.find({"text_id": ObjectId(document_id)}).sort("_id", 1)
         return documents
 
     def get_all_data_but_certain_from_original_texts(
@@ -284,7 +279,6 @@ class ParaphraseMongoDB:
             if not_in_args:
                 query.update({k: {"$nin": v if isinstance(v, list) else [v]} for k, v in not_in_args.items()})
             projection = {"_id": 0, "left_id": 1, "right_id": 1, "same": 1}
-            print(query)
             pairs_cursor = self.all_pairs_collection.find(
                 query,
                 projection,
@@ -342,7 +336,7 @@ class ParaphraseMongoDB:
             logging.exception("Unexpected error while fetching training data")
 
     def _process_pair_batch(self, pairs):
-        text_ids = {pid for p in pairs for pid in (p["left_id"], p["right_id"])}
+        text_ids = {ObjectId(pid) for p in pairs for pid in (p["left_id"], p["right_id"])}
 
         texts_cursor = self.original_collection.find(
             {"_id": {"$in": list(text_ids)}},
@@ -352,10 +346,12 @@ class ParaphraseMongoDB:
         text_map = {doc["_id"]: doc["text"] for doc in texts_cursor}
 
         for p in pairs:
+            l_id = ObjectId(p["left_id"])
+            r_id = ObjectId(p["right_id"])
             yield {
-                "left_id": p["left_id"],
-                "right_id": p["right_id"],
+                "left_id": l_id,
+                "right_id": r_id,
                 "same": p["same"],
-                "left_text": text_map.get(p["left_id"]),
-                "right_text": text_map.get(p["right_id"]),
+                "left_text": text_map.get(l_id),
+                "right_text": text_map.get(r_id),
             }
