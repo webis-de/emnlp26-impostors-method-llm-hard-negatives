@@ -189,7 +189,7 @@ class ParaphraseMongoDB:
         # Use aggregation to avoid materializing huge collections
         return collection.aggregate(pipeline)
 
-    def get_text_or_id_from_orginal_collection(self, text: Optional[str], text_id: Optional[str]):
+    def get_text_or_id_from_orginal_collection(self, text: Optional[str], text_id: Optional[ObjectId]):
         """
         Returns text and text_id from a document in the original collection.
         :param text: input text to generate impostors for (i.e., the candidate text)
