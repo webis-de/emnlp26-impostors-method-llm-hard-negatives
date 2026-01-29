@@ -16,10 +16,11 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+from bson import ObjectId
 from matplotlib import pyplot as plt
 from sklearn.metrics import auc
 
@@ -54,6 +55,57 @@ LOCAL_SAVE_PATH.mkdir(parents=True, exist_ok=True)
 # ---------------------------------------------------------------------
 # Experiment
 # ---------------------------------------------------------------------
+
+def _build_baselines(dataset_name: str):
+    return {
+        "unsupervised_baseline_min-max": UnSupervisedImpostorBaseline(
+            use_cosine_simiarity=False,
+            dataset_name=dataset_name,
+        ),
+        "unsupervised_baseline_cosine": UnSupervisedImpostorBaseline(
+            use_cosine_simiarity=True,
+            dataset_name=dataset_name,
+        ),
+        "supervised_baseline": SupervisedImpostorBaseline(
+            dataset_name=dataset_name
+        ),
+        "unmasking": UnmaskingDetector(),
+        "ppmd": PPMdDetector(),
+    }
+
+def _iter_batches(items: List, batch_size: int):
+    for i in range(0, len(items), batch_size):
+        yield items[i:i + batch_size]
+
+def _score_baselines_for_pair_batches(
+    baselines: Dict[str, object],
+    pair_batches: Iterable[List[Tuple[str, str]]],
+) -> Dict[str, List[float]]:
+    predictions: Dict[str, List[float]] = {name: [] for name in baselines.keys()}
+
+    for batch in pair_batches:
+        if not batch:
+            continue
+        flat_texts = [text for pair in batch for text in pair]
+        for name, baseline in baselines.items():
+            preds = baseline.get_score(flat_texts)
+            preds = preds.tolist() if hasattr(preds, "tolist") else preds
+            predictions[name].extend(np.asarray(preds).ravel().tolist())
+
+    return predictions
+
+def _compute_metrics_for_predictions(
+    ground_truth: List[int],
+    predictions: Dict[str, List[float]],
+) -> Dict[str, pd.DataFrame]:
+    logger.info(
+        "Computing metrics for %d approaches",
+        len(predictions),
+    )
+    return compute_metrics_parallel(
+        ground_truth,
+        predictions,
+    )
 
 def compute_prec_recall_f1_acc_dict(
     dataset_name: str,
@@ -99,48 +151,179 @@ def compute_prec_recall_f1_acc_dict(
         assert scores is not None
         predictions[technique] = scores
 
-    baselines = {
-        "unsupervised_baseline_min-max": UnSupervisedImpostorBaseline(
-            use_cosine_simiarity=False,
-            dataset_name=dataset_name,
-        ),
-        "unsupervised_baseline_cosine": UnSupervisedImpostorBaseline(
-            use_cosine_simiarity=True,
-            dataset_name=dataset_name,
-        ),
-        "supervised_baseline": SupervisedImpostorBaseline(
-            dataset_name=dataset_name
-        ),
-        "unmasking": UnmaskingDetector(),
-        "ppmd": PPMdDetector(),
-    }
+    baselines = _build_baselines(dataset_name=dataset_name)
 
     mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
     text_test_pairs = mongoDB.get_texts_for_ids(text_ids=text_test_ID_pairs)
 
-    for name, baseline in baselines.items():
-        # baselines assume text is raw text, not text ID
-        print(name)
-
-        preds = baseline.get_score(text_test_pairs)
-        preds = preds.tolist() if hasattr(preds, "tolist") else preds
-        predictions[name] = np.asarray(preds).ravel().tolist()
-        print(predictions[name])
+    text_pairs = list(zip(text_test_pairs[0::2], text_test_pairs[1::2]))
+    baseline_predictions = _score_baselines_for_pair_batches(
+        baselines=baselines,
+        pair_batches=[text_pairs],
+    )
+    predictions.update(baseline_predictions)
     # -----------------------------------------------------------------
     # Metric computation (shared implementation)
     # -----------------------------------------------------------------
 
-    logger.info(
-        "Computing metrics for %d approaches",
-        len(predictions),
-    )
-
-    results = compute_metrics_parallel(
-        ground_truth,
-        predictions,
+    results = _compute_metrics_for_predictions(
+        ground_truth=ground_truth,
+        predictions=predictions,
     )
 
     return results
+
+def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
+    dataset_name: str,
+    imp_gen_techniques: List[str],
+    *,
+    n_impostors: int = 50,
+    n_potential_impostors: Optional[int] = None,
+    rounds: int = 100,
+    batch_size: int = 250,
+) -> Dict[str, pd.DataFrame]:
+    """
+    Same as compute_prec_recall_f1_acc_dict, but loads precomputed
+    impostor scores from the MongoDB impostor_outputs collection instead of active computation.
+    Baselines are computed on the fly.
+    """
+    logger.info(
+        "Reproducing Figure 4 from stored impostor outputs for %s",
+        imp_gen_techniques,
+    )
+
+    assert all(
+        t in IMPOSTOR_GENERATORS for t in imp_gen_techniques
+    ), f"Unsupported impostor generator in {imp_gen_techniques}"
+    if not imp_gen_techniques:
+        raise ValueError("imp_gen_techniques must not be empty.")
+
+    mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
+
+    def _normalize_object_id(value):
+        if isinstance(value, ObjectId):
+            return value
+        return ObjectId(value)
+
+    def _load_scores_for_technique(technique: str) -> Dict[Tuple[ObjectId, ObjectId], float]:
+        query = {
+            "impostor_generation_technique": technique,
+            "n_impostors": n_impostors,
+        }
+        if n_potential_impostors is not None:
+            query["n_potential_impostors"] = n_potential_impostors
+        cursor = mongoDB.impostor_output_collection.find(
+            query,
+            {"left_id": 1, "right_id": 1, "scores_over_different_rounds": 1},
+            batch_size=batch_size,
+        ).sort("_id", 1)
+        scores_by_pair: Dict[Tuple[ObjectId, ObjectId], float] = {}
+        for doc in cursor:
+            left_id = _normalize_object_id(doc["left_id"])
+            right_id = _normalize_object_id(doc["right_id"])
+            pair = (left_id, right_id)
+            if pair not in scores_by_pair:
+                scores_by_pair[pair] = doc["scores_over_different_rounds"] / rounds
+        logger.info(
+            "Loaded %d scores for technique %s",
+            len(scores_by_pair),
+            technique,
+        )
+        return scores_by_pair
+
+    scores_by_technique: Dict[str, Dict[Tuple[ObjectId, ObjectId], float]] = {}
+    for technique in imp_gen_techniques:
+        loaded_scores_by_technique = _load_scores_for_technique(technique)
+        if len(loaded_scores_by_technique) > 0:
+            scores_by_technique[technique] = loaded_scores_by_technique
+        else:
+            logger.warning(f"No scores for technique {technique} found in mongoDB.")
+
+    if not scores_by_technique:
+        raise ValueError("No impostor scores found for any technique.")
+
+    base_pairs_order = list(scores_by_technique[imp_gen_techniques[0]].keys())
+    common_pairs = None
+    for scores_by_pair in scores_by_technique.values():
+        pairs = set(scores_by_pair.keys())
+        common_pairs = pairs if common_pairs is None else common_pairs & pairs
+
+    if not common_pairs:
+        raise ValueError("No common pairs across impostor techniques.")
+
+    ordered_pairs = [p for p in base_pairs_order if p in common_pairs]
+
+    def _load_ground_truth_for_pairs(
+        pairs: List[Tuple[ObjectId, ObjectId]],
+    ) -> Dict[Tuple[ObjectId, ObjectId], int]:
+        gt_by_pair: Dict[Tuple[ObjectId, ObjectId], int] = {}
+        for batch in _iter_batches(pairs, batch_size):
+            or_conditions = [{"left_id": l, "right_id": r} for l, r in batch]
+            cursor = mongoDB.all_pairs_collection.find(
+                {"dataset_name": dataset_name, "$or": or_conditions},
+                {"left_id": 1, "right_id": 1, "same": 1},
+                batch_size=batch_size,
+            )
+            for doc in cursor:
+                gt_by_pair[(doc["left_id"], doc["right_id"])] = int(doc["same"])
+        return gt_by_pair
+
+    gt_by_pair = _load_ground_truth_for_pairs(ordered_pairs)
+    pairs_with_gt = [p for p in ordered_pairs if p in gt_by_pair]
+    if len(pairs_with_gt) != len(ordered_pairs):
+        logger.warning(
+            "Missing ground-truth for %d pairs; dropping them.",
+            len(ordered_pairs) - len(pairs_with_gt),
+        )
+
+    baselines = _build_baselines(dataset_name=dataset_name)
+
+    used_pairs: List[Tuple[ObjectId, ObjectId]] = []
+    baseline_predictions: Dict[str, List[float]] = {name: [] for name in baselines.keys()}
+    for batch_pairs in _iter_batches(pairs_with_gt, batch_size):
+        text_ids = {pid for pair in batch_pairs for pid in pair}
+        texts_cursor = mongoDB.original_collection.find(
+            {"_id": {"$in": list(text_ids)}},
+            {"text": 1},
+        )
+        text_map = {doc["_id"]: doc["text"] for doc in texts_cursor}
+        batch_text_pairs = []
+        batch_used_pairs = []
+        for left_id, right_id in batch_pairs:
+            left_text = text_map.get(left_id)
+            right_text = text_map.get(right_id)
+            if left_text is None or right_text is None:
+                logger.warning(
+                    "Missing text for pair (%s, %s); skipping.",
+                    left_id,
+                    right_id,
+                )
+                continue
+            batch_text_pairs.append((left_text, right_text))
+            batch_used_pairs.append((left_id, right_id))
+        if not batch_text_pairs:
+            continue
+        batch_preds = _score_baselines_for_pair_batches(
+            baselines=baselines,
+            pair_batches=[batch_text_pairs],
+        )
+        for name, preds in batch_preds.items():
+            baseline_predictions[name].extend(preds)
+        used_pairs.extend(batch_used_pairs)
+
+    if not used_pairs:
+        raise ValueError("No usable pairs after text lookup; aborting.")
+
+    ground_truth = [gt_by_pair[p] for p in used_pairs]
+    predictions: Dict[str, List[float]] = {}
+    for technique in imp_gen_techniques:
+        predictions[technique] = [scores_by_technique[technique][p] for p in used_pairs]
+    predictions.update(baseline_predictions)
+
+    return _compute_metrics_for_predictions(
+        ground_truth=ground_truth,
+        predictions=predictions,
+    )
 
 
 # ---------------------------------------------------------------------
@@ -275,8 +458,8 @@ def _extract_best_pr_points_per_impostor(
 
     return pd.DataFrame(rows)
 
-def run_prec_recall_curves(dataset_name:str, imp_gen_techniques:List[str]):
-    results_dict = compute_prec_recall_f1_acc_dict(dataset_name=dataset_name, imp_gen_techniques=imp_gen_techniques)
+def run_prec_recall_curves(dataset_name:str, imp_gen_techniques:List[str], compute_score_fn=compute_prec_recall_f1_acc_dict):
+    results_dict = compute_score_fn(dataset_name=dataset_name, imp_gen_techniques=imp_gen_techniques)
     logger.info("Obtained scores for approaches %s", results_dict.keys())
 
     # results_dict: {approach_name: DataFrame}
