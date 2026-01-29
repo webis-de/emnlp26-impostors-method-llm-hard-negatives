@@ -85,7 +85,7 @@ class ImpostorBaselineBase(ImpostorBase):
             # pandas Series or generator
             texts = list(texts)
         if texts[0] == texts[1]:
-            logger.warning("Texts are identical %s", texts[0])
+            logger.warning("Texts are identical '%s'", texts[0])
         tfidf_matrix = self._vectorizer.transform(texts)  # format: (n_samples=1, n_features=self.top_n)
         n_zero = [np.count_nonzero(vector) == 0 for vector in tfidf_matrix.toarray()]
         assert sum(n_zero) == 0, f"Found all-zero tfidf vector, number of non-zero tfidf vector: {sum(n_zero)}"
