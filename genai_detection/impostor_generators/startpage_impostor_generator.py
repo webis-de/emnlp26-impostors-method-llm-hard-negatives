@@ -126,11 +126,9 @@ class StartPageSearchImpostorGenerator(SearchImpostorGeneratorBase):
         response_bytes = resp.read()
 
         if not response_bytes:
-            logger.error("Invalid server response")
-            return []
+            raise ValueError("StartPageSearchImpostorGenerator: Invalid server response")
 
         tree = HTMLTree.parse_from_bytes(response_bytes, "utf-8")
-        logging.info(f"Fetched results from '{query}'")
         result_list = []
         for qr in tree.body.query_selector_all("#main > .w-gl .result"):
             result_a = qr.query_selector(".result-title.result-link")
@@ -146,6 +144,8 @@ class StartPageSearchImpostorGenerator(SearchImpostorGeneratorBase):
                     snippet=snippet.text.strip() if snippet else "",
                 )
             )
+        if not result_list:
+            raise ValueError("StartPageSearchImpostorGenerator: No results found.")
         return result_list
 
 
@@ -175,36 +175,9 @@ class StartPageSearchImpostorGenerator(SearchImpostorGeneratorBase):
             "N1Nlanguage_uiEEEenglishN1Nnum_of_resultsEEE20N1Nsearch_results_regionEEEall"
             "N1NsuggestionsEEE1N1Nwt_unitEEEcelsius",
         }
-
-        # try:
         result_list = self._obtain_res(query=query, request_headers=request_headers)
-        # while not result_list:
-        #     logger.error(f"No results found. Random changing word order for query '{query}'")
-        #     words = query.split()
-        #     # random.shuffle(words)
-        #     # shuffled_query = " ".join(words) if words else query
-        #     # if len(words) == 0 and not result_list:
-        #     # using different impostor generator like ChatNoir can lead to API rate limits
-        #     # use random synonym of original query parts instead
-        #     shuffled_words = [
-        #         random.choice(random.choice(wn.synsets(w)).lemma_names()).replace("_", " ")
-        #         if wn.synsets(w) else w
-        #         for w in words
-        #     ]
-        #     if len(shuffled_words) > len(words):
-        #         shuffled_words = shuffled_words[:len(words)]
-        #     shuffled_query = " ".join(shuffled_words)
-        #     logging.info(f"Fetching results from synonym-altered query '{query}' to '{shuffled_query}' because StartPage did not return any results.")
-        #     result_list = self._obtain_res(query=shuffled_query, request_headers=request_headers)
-        #     logger.info(f"'{query}' had no results. Random changing word with synonyms: '{shuffled_query}'. Let to {len(result_list)} results.")
-        logging.info(f"Fetched {len(result_list)} results from {query}")
+        logging.info(f"Fetched {len(result_list)} results from '{query}'")
         return result_list
-        # except Exception as e:
-        #     logger.error(f"Connection error while fetching results (query '{query}', StartPage).")
-        #     logger.exception(e)
-        #     return []
-            # chatnoir_imp_generator = ChatNoirSearchImpostorGenerator()
-            # return chatnoir_imp_generator.fetch_results(query=query)
 
 
 if __name__ == "__main__":
