@@ -68,7 +68,9 @@ class OptimalSupervisedBaseline:
                 search_args= search_args,
             )
             existing_result = list(pred_cursor)
-            if not existing_result:
+            pred_doc = existing_result[0] if existing_result else None
+            pred_val = pred_doc.get("prediction") if pred_doc else None
+            if pred_val is None or (isinstance(pred_val, float) and np.isnan(pred_val)):
                 assert "left_id" in test_pair and "right_id" in test_pair, f"text IDs of test pair missing; only columns: {test_pair.keys()}"
                 if config:
                     # logger.info(f"About to use test pair keys: {test_pair.keys()}.")
@@ -87,7 +89,11 @@ class OptimalSupervisedBaseline:
 
                 preds = sup_baseline.get_score(text_test_pairs)
                 preds = preds.tolist() if hasattr(preds, "tolist") else preds
-                predictions[pair_id] = np.asarray(preds).ravel().tolist()[0]
+                pred_scalar = np.asarray(preds).ravel().tolist()[0]
+                if pred_scalar is None or (isinstance(pred_scalar, float) and np.isnan(pred_scalar)):
+                    logger.error(f"Obtained invalid prediction for test pair {pair_id}; skipping insert.")
+                    continue
+                predictions[pair_id] = pred_scalar
                 self.mongoDB.insert_document(
                     collection=self.mongoDB.supervised_baseline_diff_config_preds_collection,
                     insert_data={
@@ -97,7 +103,7 @@ class OptimalSupervisedBaseline:
                     }
                 )
             else:
-                predictions[pair_id] = existing_result[0]["prediction"]
+                predictions[pair_id] = pred_val
                 logger.info(f"Obtained prediction of test pair {pair_id} from mongoDB collection.")
             gt[pair_id] = test_pair["same"] # only called if test pair is not skipped to avoid unequal length of gt and predictions
         logger.info(f"Obtained {len(predictions)} predictions for {len(gt)} pairs of dataset {dataset_name}.")
@@ -115,8 +121,20 @@ class OptimalSupervisedBaseline:
         for dataset_name in dataset_names:
             for config in configs:
                 preds, gt = self.obtain_loo_preds_gt_for_one_config(config=config, dataset_name=dataset_name)
-                assert len(preds) == len(gt), f"{len(preds)} != {len(gt)} (length of predictions and ground truths)"
                 # compute recall, precision, f1, accuracy for different thresholds
+                invalid_pred_keys = [
+                    k for k, v in preds.items()
+                    if v is None or (isinstance(v, float) and np.isnan(v))
+                ]
+                if invalid_pred_keys:
+                    logger.warning(f"Found {len(invalid_pred_keys)} invalid predictions; excluding from metrics.")
+                    for k in invalid_pred_keys:
+                        preds.pop(k, None)
+                        gt.pop(k, None)
+                assert len(preds) == len(gt), f"{len(preds)} != {len(gt)} (length of predictions and ground truths)"
+                if not preds:
+                    logger.error(f"No valid predictions for dataset {dataset_name} and config {config}; skipping.")
+                    continue
                 sup_preds = list(preds.values())
                 sup_thresholds = np.arange(np.min(sup_preds), np.max(sup_preds), 0.01)
                 df_metrics = compute_metrics_for_thresholds(
@@ -171,5 +189,4 @@ if __name__ == "__main__":
 
     optimal_sup_baseline = OptimalSupervisedBaseline()
     optimal_sup_baseline.run_experiment()
-
 
