@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 from typing import List
 
+from bson import ObjectId
+
 from genai_detection.config import CONFIG
 from genai_detection.impostor_generators.two_step_impostor_generator import TwoStepImpostorGenerator
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
@@ -102,7 +104,7 @@ def save_overview_file(original_text:str, paraphrases:List[str], extracted_info_
 
 
 for i, doc in enumerate(original_collection.find(limit=max_docs)):
-    original_text_id = doc["_id"]
+    original_text_id = ObjectId(doc["_id"])
     original_text = doc["text"]
     logging.info(f"Original text id: {original_text_id}")
 

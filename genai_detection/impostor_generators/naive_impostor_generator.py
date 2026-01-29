@@ -16,6 +16,8 @@ import random
 import re
 from typing import Optional, List, Dict, Iterable
 
+from bson import ObjectId
+
 from genai_detection.config import CONFIG
 from genai_detection.impostor_generators.ImpostorGenerator import LLMImpostorGenerator
 from genai_detection.paraphrasing.one_step_paraphrasers import (
@@ -168,7 +170,7 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
         return best
 
     def generate_impostors(
-        self, text: Optional[str], text_id: Optional[str]
+        self, text: Optional[str], text_id: Optional[ObjectId]
     ) -> List[str]:
         n_imp_to_generate = self.n_impostors
         if text is None:

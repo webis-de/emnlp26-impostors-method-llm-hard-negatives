@@ -23,6 +23,7 @@ import numpy as np
 import requests
 import spacy
 from bs4 import BeautifulSoup
+from bson import ObjectId
 from nltk import download
 
 from genai_detection.impostor_generators.ImpostorGenerator import GenerativeImpostorGenerator
@@ -220,7 +221,7 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
 
 
     def _parallel_fetch(
-        self, queries: List[str], text: Optional[str], text_id: Optional[str]
+        self, queries: List[str], text: Optional[str], text_id: Optional[ObjectId]
     ) -> List[Dict]:
         """
         Fetches results for multiple queries in parallel using a thread pool.
@@ -262,7 +263,7 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
         return all_results
 
     def generate_impostors(
-        self, text: Optional[str], text_id:Optional[str]
+        self, text: Optional[str], text_id:Optional[ObjectId]
     ) -> List[str]:
         """
         Generates impostors for the given input text using Google search results.
