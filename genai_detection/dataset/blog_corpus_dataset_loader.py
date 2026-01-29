@@ -54,38 +54,37 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
 
     def load_texts(self) -> pd.DataFrame:
         # return already indexed documents if existent
-        df = self._return_existing_original_mongodb_collection()
-        if not df.empty:
-            return df
-        else:
-            raise RuntimeError("No existing original MongoDB collection found.")
-        df = pd.read_csv(self.path)
-        logging.info("Initial number of entries: %d", len(df))
-        df["text"] = df["text"].apply(lambda x: self.preprocess(x))
-        df = df[
-            df["text"].apply(lambda x: len(x.split()) >= MIN_NUM_WORDS)
-        ]  # filter out text with less than MIN_NUM_WORDS words (not characters, bc there are 501 characters one-word entries)
+        try:
+            return self._return_existing_original_mongodb_collection()
+        except RuntimeError as e:
+            logger.warning(f"No existing original MongoDB collection found. Reading from disk and inserting into MongoDB. {e}")
+            df = pd.read_csv(self.path)
+            logging.info("Initial number of entries: %d", len(df))
+            df["text"] = df["text"].apply(lambda x: self.preprocess(x))
+            df = df[
+                df["text"].apply(lambda x: len(x.split()) >= MIN_NUM_WORDS)
+            ]  # filter out text with less than MIN_NUM_WORDS words (not characters, bc there are 501 characters one-word entries)
+            df = df.drop_duplicates(subset=["text"], keep="first")  # blogs dataset contains text duplications
+            df["year"] = pd.to_datetime(
+                df["date"], format="mixed", dayfirst=True, errors="coerce"
+            ).dt.year
+            logging.info("number of entries after filtering: %d", len(df))
 
-        df["year"] = pd.to_datetime(
-            df["date"], format="mixed", dayfirst=True, errors="coerce"
-        ).dt.year
-        logging.info("number of entries after filtering: %d", len(df))
+            topics = df[TOPIC_COL_NAME].unique().tolist()
+            random.shuffle(topics)
 
-        topics = df[TOPIC_COL_NAME].unique().tolist()
-        random.shuffle(topics)
+            df = df.rename(
+                columns={
+                    "id": AUTHOR_COL_NAME,
+                    TOPIC_COL_NAME: ASSIGNMENT_COL_NAME,
+                }
+            )
 
-        df = df.rename(
-            columns={
-                "id": AUTHOR_COL_NAME,
-                TOPIC_COL_NAME: ASSIGNMENT_COL_NAME,
-            }
-        )
+            # save obtained data in mongoDB collection
+            self._save_df2original_mongoDB_collection(df=df, id_col_name=AUTHOR_COL_NAME)
 
-        # save obtained data in mongoDB collection
-        self._save_df2original_mongoDB_collection(df=df, id_col_name=AUTHOR_COL_NAME)
-
-        logger.info("Entries after filtering: %d", len(df))
-        return self._return_existing_original_mongodb_collection()
+            logger.info("Entries after filtering: %d", len(df))
+            return self._return_existing_original_mongodb_collection()
 
     def load(self) -> DatasetDict[str | NamedSplit, Dataset]:
 
@@ -197,6 +196,8 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
                             or right["year"] - left["year"] < min_year_gap
                     ):
                         continue
+                    if left["text"] == right["text"]:   # duplication of entries in blogs dataset should have already happened
+                        raise ValueError(f"Author '{author}' has same text (Blogs corpus).")
 
                     same_author_pairs.append(
                         self._make_pair_dict(left, right, same=True)
