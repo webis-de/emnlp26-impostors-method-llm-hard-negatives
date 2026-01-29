@@ -161,24 +161,99 @@ class BaseDatasetLoader(ABC):
             logger.info("No new documents to insert.")
 
     def delete_dataset_from_mongoDB(self):
+        """
+        Deletes dataset entries from all collections.
+        :return:
+        """
         mongodb = ParaphraseMongoDB()
         for collection in [
             mongodb.original_collection,
             mongodb.train_pairs_collection,
             mongodb.test_pairs_collection,
+            mongodb.all_pairs_collection,
+            mongodb.supervised_baseline_diff_config_scores_collection,
+            mongodb.supervised_baseline_diff_config_preds_collection
         ]:
             n_deleted = mongodb.delete_documents_by_non_id_field(
                 collection=collection,
                 document_field_name="dataset",
                 document_value=self.name,
             )
+            if n_deleted == 0:
+                n_deleted = mongodb.delete_documents_by_non_id_field(
+                    collection=collection,
+                    document_field_name="dataset_name",
+                    document_value=self.name,
+                )
             logger.info(
                 f"Deleted {n_deleted} documents from collection {collection.name} for dataset {self.name}."
             )
+        existing_original_ids = {
+            doc["_id"] for doc in mongodb.original_collection.find({}, {"_id": 1})
+        }
+        batch_size = 5000
+        # they do not have a dataset column, hence we have to manually compare IDs to still existing entries
+        old_collections = [
+            mongodb.naive_paraphrase_collection,
+            mongodb.on_the_fly_collection,
+            mongodb.impostor_output_collection,
+            mongodb.translation_collection,
+            mongodb.non_naive_paraphrase_collection,
+        ]
+        for collection in old_collections:
+            to_delete = []
+            for doc in collection.find({}, {"_id": 1, "text_id": 1}):
+                if doc.get("text_id") not in existing_original_ids:
+                    to_delete.append(doc["_id"])
+                    if len(to_delete) >= batch_size:
+                        n_deleted = collection.delete_many(
+                            {"_id": {"$in": to_delete}}
+                        ).deleted_count
+                        if n_deleted:
+                            logger.info(
+                                f"Deleted {n_deleted} documents from collection {collection.name} for dataset {self.name}."
+                            )
+                        to_delete.clear()
+            if to_delete:
+                n_deleted = collection.delete_many(
+                    {"_id": {"$in": to_delete}}
+                ).deleted_count
+                if n_deleted:
+                    logger.info(
+                        f"Deleted {n_deleted} documents from collection {collection.name} for dataset {self.name}."
+                    )
+
+        to_delete = []
+        for doc in mongodb.impostor_output_collection.find(
+            {}, {"_id": 1, "left_id": 1, "right_id": 1}
+        ):
+            if (
+                doc.get("left_id") not in existing_original_ids
+                or doc.get("right_id") not in existing_original_ids
+            ):
+                to_delete.append(doc["_id"])
+                if len(to_delete) >= batch_size:
+                    n_deleted = mongodb.impostor_output_collection.delete_many(
+                        {"_id": {"$in": to_delete}}
+                    ).deleted_count
+                    if n_deleted:
+                        logger.info(
+                            f"Deleted {n_deleted} documents from collection {mongodb.impostor_output_collection.name} for dataset {self.name}."
+                        )
+                    to_delete.clear()
+        if to_delete:
+            n_deleted = mongodb.impostor_output_collection.delete_many(
+                {"_id": {"$in": to_delete}}
+            ).deleted_count
+            if n_deleted:
+                logger.info(
+                    f"Deleted {n_deleted} documents from collection {mongodb.impostor_output_collection.name} for dataset {self.name}."
+                )
 
     def _return_existing_original_mongodb_collection(self):
         """
         Return already existing MongoDB collection if exists.
+        De-duplicate documents with same text (can happen for the Blogs dataset).
         """
         cursor = self.mongoDB.find_document_by_non_id_field(collection=self.mongoDB.original_collection,
                                                             document_field_name="dataset", document_value=self.name)
@@ -187,8 +262,7 @@ class BaseDatasetLoader(ABC):
             logger.info(f"Found {len(records)} documents in {CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION}")
             return pd.DataFrame(records)
         else:
-            logger.warning(f"No existing documents found in {CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION} for dataset {self.name}.")
-            return pd.DataFrame()
+            raise RuntimeError(f"No existing documents found in {CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION} for dataset {self.name}.")
 
     def _make_pair_dict(self, left_text: dict, right_text: dict, same: bool = True):
         """
