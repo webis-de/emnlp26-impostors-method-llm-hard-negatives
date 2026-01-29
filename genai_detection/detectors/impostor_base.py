@@ -13,12 +13,10 @@
 # limitations under the License.
 import logging
 import os
-import re
 from typing import List
 
 import numpy as np
 import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
 
 from genai_detection.config import CONFIG
 from genai_detection.detectors.components.feature_extractor import TfidfFeatureExtractor
@@ -64,7 +62,7 @@ class ImpostorBaselineBase(ImpostorBase):
             logger.info(f"Used in_args: {in_args} and not_in_args: {not_in_args}")
 
         logger.info("Number of training pairs %d (in-memory)", self.train_dataset.shape[0])
-        texts = pd.DataFrame(self.mongoDB.original_collection.find({"dataset":self.dataset_name},projection={
+        texts = pd.DataFrame(self.mongoDB.original_collection.find({"dataset_name":self.dataset_name},projection={
             '_id': False,"text":True}))
         
         tfidf_extractor = TfidfFeatureExtractor(top_n_freq_words=100000, ngram_n=4, min_df=2)

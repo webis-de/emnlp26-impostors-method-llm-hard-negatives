@@ -37,11 +37,10 @@ def _obtain_complete_paraphrase_df_from_mongodb():
     paraphrases["text_id"] = paraphrases["text_id"].map(ObjectId)
     original_texts_cursor = mongodb.original_collection.find(
         {"_id": {"$in": paraphrases["text_id"].tolist()}},  # $in matches any ID in the list
-        {"_id": True, "text": True, "dataset": True},
+        {"_id": True, "text": True, "dataset_name": True},
     )
     original_texts = pd.DataFrame(original_texts_cursor)
     logger.info(f"Obtained {len(original_texts)} original texts from df with columns {original_texts.columns}")
-    print(original_texts["dataset"].value_counts(dropna=False))
 
     # merge data on paraphrases' text_id and original_texts_cursor's _id field
     df = paraphrases.merge(
@@ -68,14 +67,14 @@ def save_to_disk(df):
     # Save unique original texts
     # -----------------------------
     unique_originals = (
-        df[["text_id", "text", "dataset"]]
+        df[["text_id", "text", "dataset_name"]]
         .drop_duplicates(subset=["text_id"])
     )
 
     for _, row in unique_originals.iterrows():
         text_id = str(row["text_id"])
         text = row["text"]
-        dataset = row["dataset"]
+        dataset = row["dataset_name"]
 
         file_path = original_dir / f"{dataset}_{text_id}.txt"
         file_path.write_text(text, encoding="utf-8")
@@ -88,7 +87,7 @@ def save_to_disk(df):
     for idx, row in df.iterrows():
         text_id = str(row["text_id"])
         paraphrase = row["paraphrase"]
-        dataset = row["dataset"]
+        dataset = row["dataset_name"]
 
         # use row index as guaranteed-unique suffix
         file_name = f"{dataset}_{text_id}_{idx}.txt"

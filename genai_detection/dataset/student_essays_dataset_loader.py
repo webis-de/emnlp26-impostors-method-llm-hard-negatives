@@ -15,7 +15,6 @@ import hashlib
 import random
 from itertools import product, combinations
 from pathlib import Path
-from typing import Any
 
 import chardet
 import numpy as np
@@ -24,10 +23,7 @@ import pyreadstat
 from datasets import (
     Dataset,
     DatasetDict,
-    Features,
-    Value,
 )
-from pymongo import errors
 
 from genai_detection.dataset.base_dataset_loader import BaseDatasetLoader, AUTHOR_COL_NAME, MIN_NUM_WORDS, \
     ASSIGNMENT_COL_NAME
@@ -120,7 +116,8 @@ class StudentEssayDatasetLoader(BaseDatasetLoader):
         self._save_df2original_mongoDB_collection(df=df)
 
         # obtain data from mongodb collection for correct text IDs
-        return pd.DataFrame(list(self.mongoDB.find_document_by_non_id_field(collection=self.mongoDB.original_collection, document_field_name="dataset", document_value=self.name)))
+        return pd.DataFrame(list(self.mongoDB.find_document_by_non_id_field(
+            collection=self.mongoDB.original_collection, document_field_name="dataset_name", document_value=self.name)))
 
 
 

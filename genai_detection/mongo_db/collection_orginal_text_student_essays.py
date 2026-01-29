@@ -63,7 +63,7 @@ def main():
             "author": r.pop("author_id"),
             "assignment": r.pop("task"),
             **r,
-            "dataset": dataset_name,
+            "dataset_name": dataset_name,
         }
         for r in records
         if r["text_hash"] not in existing_hashes

@@ -123,7 +123,7 @@ class BaseDatasetVisualization(ABC):
         text_lengths = np.array(text_lengths)
         num_words = np.array(num_words)
         stats = {
-            "dataset": self.name,
+            "dataset_name": self.name,
             "num_pairs": len(dataset),
             "num_authors": len(all_authors),
             "num_same_pairs": dataset["same"].sum(),

@@ -36,7 +36,7 @@ class InDomainImpostorGenerator(MongoDBSavedGenerator):
         Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’. Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954.
         """
         super().__init__(n_impostors=n_impostors, top_n_freq_words=top_n_freq_words)
-        unique_dataset_names_saved = self.mongoDB.original_collection.distinct("dataset")
+        unique_dataset_names_saved = self.mongoDB.original_collection.distinct("dataset_name")
         assert dataset_name in unique_dataset_names_saved, f"{dataset_name} not in {unique_dataset_names_saved}"
         self.dataset_name=dataset_name
         logging.info(f"InDomainImpostorGenerator: Dataset name: {self.dataset_name}")
@@ -56,7 +56,7 @@ class InDomainImpostorGenerator(MongoDBSavedGenerator):
         original_text = self.mongoDB.original_collection.find_one({"_id": text_id})
         assert original_text, "original text obtained from mongoDB is None."
         # ensure text ID not same
-        search_args = {"dataset": self.dataset_name, ASSIGNMENT_COL_NAME: original_text[ASSIGNMENT_COL_NAME], "id": {"$ne": text_id}}
+        search_args = {"dataset_name": self.dataset_name, ASSIGNMENT_COL_NAME: original_text[ASSIGNMENT_COL_NAME], "id": {"$ne": text_id}}
         logger.info(f"InDomainImpostorGenerator: Search arguments: {search_args}")
 
         # use this, if the returned impostors should be completely random in-domain texts

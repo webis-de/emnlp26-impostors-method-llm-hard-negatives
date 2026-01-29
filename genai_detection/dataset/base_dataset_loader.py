@@ -140,7 +140,7 @@ class BaseDatasetLoader(ABC):
             {
                 "author": r.pop(id_col_name),
                 **r,
-                "dataset": self.name,
+                "dataset_name": self.name,
             }
             for r in records
         ]
@@ -169,7 +169,7 @@ class BaseDatasetLoader(ABC):
         ]:
             n_deleted = mongodb.delete_documents_by_non_id_field(
                 collection=collection,
-                document_field_name="dataset",
+                document_field_name="dataset_name",
                 document_value=self.name,
             )
             logger.info(
@@ -181,7 +181,7 @@ class BaseDatasetLoader(ABC):
         Return already existing MongoDB collection if exists.
         """
         cursor = self.mongoDB.find_document_by_non_id_field(collection=self.mongoDB.original_collection,
-                                                            document_field_name="dataset", document_value=self.name)
+                                                            document_field_name="dataset_name", document_value=self.name)
         records = list(cursor)
         if records and len(records) > 0:
             logger.info(f"Found {len(records)} documents in {CONFIG.MONGO_ORIGINAL_TEXT_COLLECTION}")

@@ -254,7 +254,7 @@ def _extract_best_pr_points_per_impostor(
             best_auc_idx = pr_product.argmax()
 
             rows.append({
-                "dataset": dataset_name.replace("_", " ").capitalize(),
+                "dataset_name": dataset_name.replace("_", " ").capitalize(),
                 "impostor_generation": CONFIG.LABEL_TRANSLATIONS[impostor_method],
                 "class": class_name,
 

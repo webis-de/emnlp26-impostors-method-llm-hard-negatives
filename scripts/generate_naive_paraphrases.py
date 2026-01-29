@@ -23,7 +23,7 @@ def iter_original_text_ids(
 ) -> Iterable[ObjectId]:
     query = {}
     if dataset_name:
-        query["dataset"] = dataset_name
+        query["dataset_name"] = dataset_name
     cursor = mongo.original_collection.find(query, {"_id": 1}).sort("_id", 1)
     count = 0
     for doc in cursor:

@@ -13,9 +13,8 @@
 # limitations under the License.
 
 import difflib
-import logging
 from collections import defaultdict
-from itertools import chain, cycle, zip_longest
+from itertools import chain, zip_longest
 from pathlib import Path
 
 import chardet
@@ -30,7 +29,6 @@ from bson import ObjectId
 from matplotlib import pyplot as plt
 from nltk.translate import bleu_score, meteor_score
 from sentence_transformers import SentenceTransformer
-from tqdm import tqdm
 from word_mover_distance import model  # https://pypi.org/project/word-mover-distance/
 
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
@@ -335,11 +333,10 @@ class ParaphrasingEvaluator:
         paraphrases["text_id"] = paraphrases["text_id"].map(ObjectId)
         original_texts_cursor = self.mongodb.original_collection.find(
             {"_id": {"$in": paraphrases["text_id"].tolist()}},  # $in matches any ID in the list
-            {"_id": True, "text": True, "dataset": True},
+            {"_id": True, "text": True, "dataset_name": True},
         )
         original_texts = pd.DataFrame(original_texts_cursor)
         logger.info(f"Obtained {len(original_texts)} original texts from df with columns {original_texts.columns}")
-        print(original_texts["dataset"].value_counts(dropna=False))
 
         # merge data on paraphrases' text_id and original_texts_cursor's _id field
         df = paraphrases.merge(
@@ -459,7 +456,7 @@ class ParaphrasingEvaluator:
         df_all: pd.DataFrame,
         metrics: list[str],
         save_path: Path | None = None,
-        dataset_col: str = "dataset",
+        dataset_col: str = "dataset_name",
         display_plot: bool = True,
     ):
         metrics = [
@@ -692,7 +689,7 @@ class ParaphrasingEvaluator:
                     for o, p in zip(df["original_length"], df["paraphrase_length"])
                 ]  # between 0 and 1
 
-                df["dataset"] = dataset
+                df["dataset_name"] = dataset
                 dfs[dataset] = df
 
             # Long / tidy combined DataFrame
@@ -825,7 +822,7 @@ class ParaphrasingEvaluator:
         # use for over (1) llm, (2) prompt, (3) temperature
         group_cols = ["llm", "prompt", "temperature"]
         results = []
-        df.rename(columns={"dataset": "dataset_name"}, inplace=True)
+        df.rename(columns={"dataset_name": "dataset_name"}, inplace=True)
         print(df["dataset_name"].value_counts(dropna=False))
 
         for dataset_name in df["dataset_name"].unique():
@@ -1361,7 +1358,7 @@ class ParaphrasingEvaluator:
                 # Save with unique name
                 safe_metric = str(metric).replace(" ", "_").replace("/", "_")
                 safe_category = (
-                    str(data_category).replace(" ", "_") if data_category else "dataset"
+                    str(data_category).replace(" ", "_") if data_category else "dataset_name"
                 )
 
                 path2dir = (
