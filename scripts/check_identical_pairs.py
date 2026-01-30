@@ -33,11 +33,14 @@ for p in pairs:
     rt = text_map.get(r_id)
     if lt is not None and rt is not None and lt == rt:
         identical_text_pairs.append([l_id, r_id, p["dataset_name"]])
+
 if len(identical_text_pairs) > 0:
     print(f"{len(identical_text_pairs)} pairs with identical text:")
     print("Pairs with identical text:", identical_text_pairs)
     dataset_name = CONFIG.BLOG
-    mongo.delete_identical_text_pairs(dataset_name=dataset_name, output_path=Path(CONFIG.SAVE_PATH) / "datasets" / dataset_name / "duplicate_texts.csv", batch_size=1000)
+    save_path = Path.cwd().parent / CONFIG.SAVE_PATH / "datasets" / dataset_name / "duplicate_texts.csv"
+    print(f"Saving duplicate texts to {save_path}")
+    mongo.delete_identical_text_pairs(dataset_name=dataset_name, output_path=save_path, batch_size=1000)
 else:
     print(f"No pairs with identical text.")
 
