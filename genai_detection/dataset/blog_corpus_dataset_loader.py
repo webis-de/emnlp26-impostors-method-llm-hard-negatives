@@ -64,11 +64,12 @@ class BlogCorpusDatasetLoader(BaseDatasetLoader):
             df = df[
                 df["text"].apply(lambda x: len(x.split()) >= MIN_NUM_WORDS)
             ]  # filter out text with less than MIN_NUM_WORDS words (not characters, bc there are 501 characters one-word entries)
+            logging.info("number of entries before dropping text duplicates: %d", len(df))
             df = df.drop_duplicates(subset=["text"], keep="first")  # blogs dataset contains text duplications
             df["year"] = pd.to_datetime(
                 df["date"], format="mixed", dayfirst=True, errors="coerce"
             ).dt.year
-            logging.info("number of entries after filtering: %d", len(df))
+            logging.info("number of entries after filtering (incl. de-duplication): %d", len(df))
 
             topics = df[TOPIC_COL_NAME].unique().tolist()
             random.shuffle(topics)
