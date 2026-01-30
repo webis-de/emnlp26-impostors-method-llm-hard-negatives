@@ -28,7 +28,6 @@ class ParaphraseMongoDB:
         self.client = MongoClient(self.mongodb_uri)
         try:
             self.client.admin.command("ping")
-            logging.info("Successfully connected as MongoDB root user!")
         except Exception as e:
             logging.warning("Connection failed: %s", e)
             raise e
