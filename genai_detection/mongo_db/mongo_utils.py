@@ -55,10 +55,10 @@ class ParaphraseMongoDB:
             if collection_name not in self.db.list_collection_names():
                 self.db.create_collection(collection_name)
                 logging.info(f"Created collection: {collection_name}")
-            else:
-                logging.info(
-                    f"Collection '{collection_name}' already exists. Skipping creation."
-                )
+            # else:
+                # logging.info(
+                #     f"Collection '{collection_name}' already exists. Skipping creation."
+                # )
 
         self.non_naive_paraphrase_collection = self.db[CONFIG.MONGO_PARAPHRASE_COLLECTION]    # two-step/ non-naive llm
         # paraphrases
