@@ -114,6 +114,8 @@ def compute_prec_recall_f1_acc_dict(
     """
     Reproduction of Figures 4a and 4b from Koppel et al. (2014).
     """
+    PAIR_BATCH_SIZE = 256  # number of PAIRS per batch (must be int)
+    TEXT_BATCH_SIZE = PAIR_BATCH_SIZE * 2
 
     logger.info(
         "Reproducing Figure 4 with techniques: %s",
@@ -128,30 +130,66 @@ def compute_prec_recall_f1_acc_dict(
     # Load test data
     # -----------------------------------------------------------------
 
-    text_test_ID_pairs, ground_truth = load_all_pairs(dataset_name)
-    logger.info("Number of texts used %d, number of pairs %d",len(text_test_ID_pairs), len(text_test_ID_pairs)//2)
+    text_id_pairs, ground_truth = load_all_pairs(dataset_name)
+    text_id_pairs_len = len(text_id_pairs)
+    assert text_id_pairs_len % 2 == 0, "Flattened text list must contain even number of elements but length is {}".format(text_id_pairs_len)
+    logger.info("Number of texts used %d, number of pairs %d",text_id_pairs_len, text_id_pairs_len//2)
 
     # -----------------------------------------------------------------
-    # Collect predictions
+    # Collect predictions (batched over texts, but compute all techniques per batch)
     # -----------------------------------------------------------------
 
-    predictions: Dict[str, List[float]] = {}
-
-    for technique in imp_gen_techniques:
-        logger.info("Obtaining impostor scores: %s", technique)
-        detector = ImpostorDetector(
+    predictions: Dict[str, List[float]] = {tech: [] for tech in imp_gen_techniques}
+    # Build detectors once (avoid re-instantiating each batch)
+    detectors = {
+        technique: ImpostorDetector(
             impostor_technique=technique,
             n_impostors=50,
             dataset_name=dataset_name,
         )
-        scores = detector.get_score(text=text_test_ID_pairs)
-        assert scores is not None
-        predictions[technique] = scores
+        for technique in imp_gen_techniques
+    }
+
+    for start in range(0, text_id_pairs_len, TEXT_BATCH_SIZE):
+        batch_texts = text_id_pairs[start: start + TEXT_BATCH_SIZE]
+
+        # Ensure we never split a pair (should be guaranteed by TEXT_BATCH_SIZE, but keep safe)
+        if len(batch_texts) % 2 != 0:
+            raise ValueError(
+                f"Batch starting at {start} has odd number of texts ({len(batch_texts)}), would break pairing."
+            )
+
+        batch_pair_count = len(batch_texts) // 2
+        logger.info(
+            "Scoring batch: texts [%d:%d] -> %d pairs",
+            start,
+            min(start + TEXT_BATCH_SIZE, text_id_pairs_len),
+            batch_pair_count,
+        )
+
+        for technique in imp_gen_techniques:
+            detector = detectors[technique]
+            batch_scores = detector.get_score(text=batch_texts)
+            assert batch_scores is not None
+            if len(batch_scores) != batch_pair_count:
+                raise ValueError(
+                    f"Technique {technique}: expected {batch_pair_count} scores, got {len(batch_scores)}"
+                )
+
+            predictions[technique].extend(batch_scores)
+
+    # Sanity check: all techniques produced full-length results
+    total_pairs = text_id_pairs_len // 2
+    for technique in imp_gen_techniques:
+        if len(predictions[technique]) != total_pairs:
+            raise ValueError(
+                f"Technique {technique}: expected {total_pairs} total scores, got {len(predictions[technique])}"
+            )
 
     baselines = _build_baselines(dataset_name=dataset_name)
 
     mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
-    text_test_pairs = mongoDB.get_texts_for_ids(text_ids=text_test_ID_pairs)
+    text_test_pairs = mongoDB.get_texts_for_ids(text_ids=text_id_pairs)
 
     text_pairs = list(zip(text_test_pairs[0::2], text_test_pairs[1::2]))
     baseline_predictions = _score_baselines_for_pair_batches(
