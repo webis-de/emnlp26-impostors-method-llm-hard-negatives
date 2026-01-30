@@ -103,7 +103,6 @@ class OptimalSupervisedBaseline:
                 )
             else:
                 predictions[pair_id] = pred_val
-                logger.info(f"Obtained prediction of test pair {pair_id} from mongoDB collection.")
             gt[pair_id] = test_pair["same"] # only called if test pair is not skipped to avoid unequal length of gt and predictions
         logger.info(f"Obtained {len(predictions)} predictions for {len(gt)} pairs of dataset {dataset_name}.")
         if len(predictions) != len(gt):
