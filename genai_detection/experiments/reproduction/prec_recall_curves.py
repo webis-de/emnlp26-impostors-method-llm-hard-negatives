@@ -139,9 +139,6 @@ def compute_prec_recall_f1_acc_dict(
 
     for technique in imp_gen_techniques:
         logger.info("Obtaining impostor scores: %s", technique)
-        if technique == "on_the_fly":
-            # filter such that 50 same and different author pairs are tested; based on ground truth Boolean values
-            sampled_test_ID_pairs, ground_truth = load_test_pairs(dataset_name)
         detector = ImpostorDetector(
             impostor_technique=technique,
             n_impostors=50,
