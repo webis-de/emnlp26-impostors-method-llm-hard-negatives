@@ -179,77 +179,10 @@ class BaseDatasetLoader(ABC):
                 document_field_name="dataset_name",
                 document_value=self.name,
             )
-            if n_deleted == 0:
-                n_deleted = mongodb.delete_documents_by_non_id_field(
-                    collection=collection,
-                    document_field_name="dataset_name",
-                    document_value=self.name,
-                )
             logger.info(
                 f"Deleted {n_deleted} documents from collection {collection.name} for dataset {self.name}."
             )
-        existing_original_ids = {
-            doc["_id"] for doc in mongodb.original_collection.find({}, {"_id": 1})
-        }
-        batch_size = 5000
-        # they do not have a dataset column, hence we have to manually compare IDs to still existing entries
-        # FIXME: just deletes complete collection, maybe str vs ObjectID mismatch
-        old_collections = [
-            mongodb.naive_paraphrase_collection,
-            mongodb.on_the_fly_collection,
-            mongodb.impostor_output_collection,
-            mongodb.translation_collection,
-            mongodb.non_naive_paraphrase_collection,
-        ]
-        for collection in old_collections:
-            to_delete = []
-            for doc in collection.find({}, {"_id": 1, "text_id": 1}):
-                if doc.get("text_id") not in existing_original_ids:
-                    to_delete.append(doc["_id"])
-                    if len(to_delete) >= batch_size:
-                        n_deleted = collection.delete_many(
-                            {"_id": {"$in": to_delete}}
-                        ).deleted_count
-                        if n_deleted:
-                            logger.info(
-                                f"Deleted {n_deleted} documents from collection {collection.name} for dataset {self.name}."
-                            )
-                        to_delete.clear()
-            if to_delete:
-                n_deleted = collection.delete_many(
-                    {"_id": {"$in": to_delete}}
-                ).deleted_count
-                if n_deleted:
-                    logger.info(
-                        f"Deleted {n_deleted} documents from collection {collection.name} for dataset {self.name}."
-                    )
-
-        to_delete = []
-        for doc in mongodb.impostor_output_collection.find(
-            {}, {"_id": 1, "left_id": 1, "right_id": 1}
-        ):
-            if (
-                doc.get("left_id") not in existing_original_ids
-                or doc.get("right_id") not in existing_original_ids
-            ):
-                to_delete.append(doc["_id"])
-                if len(to_delete) >= batch_size:
-                    n_deleted = mongodb.impostor_output_collection.delete_many(
-                        {"_id": {"$in": to_delete}}
-                    ).deleted_count
-                    if n_deleted:
-                        logger.info(
-                            f"Deleted {n_deleted} documents from collection {mongodb.impostor_output_collection.name} for dataset {self.name}."
-                        )
-                    to_delete.clear()
-        if to_delete:
-            n_deleted = mongodb.impostor_output_collection.delete_many(
-                {"_id": {"$in": to_delete}}
-            ).deleted_count
-            if n_deleted:
-                logger.info(
-                    f"Deleted {n_deleted} documents from collection {mongodb.impostor_output_collection.name} for dataset {self.name}."
-                )
+        logger.warning("You need to delete entries in other collections which do not have dataset_name column using mongoDB queries in the mongo shell.")
 
     def _return_existing_original_mongodb_collection(self):
         """
