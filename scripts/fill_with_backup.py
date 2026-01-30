@@ -116,6 +116,8 @@ def _select_csvs(downloads_dir: Path) -> Dict[str, Path]:
             selected["non_naive_paraphrases"] = csv_path
         elif "on_the_fly_paraphrases" in name:
             selected["on_the_fly_paraphrases"] = csv_path
+        elif "naive_paraphrases" in name:
+            selected["naive_paraphrases"] = csv_path
     return selected
 
 
@@ -141,14 +143,23 @@ def main() -> int:
 
     mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
 
-    if "non_naive_paraphrases" in csv_map:
-        print("Non Naive Paraphrases:")
+    # if "non_naive_paraphrases" in csv_map:
+    #     print("Non Naive Paraphrases:")
+    #     _insert_csv(
+    #         mongoDB.non_naive_paraphrase_collection,
+    #         csv_map["non_naive_paraphrases"],
+    #         args.batch_size,
+    #     )
+    #     print("finished non naive paraphrases.")
+
+    if "naive_paraphrases" in csv_map:
+        print("Naive Paraphrases:")
         _insert_csv(
-            mongoDB.non_naive_paraphrase_collection,
-            csv_map["non_naive_paraphrases"],
+            mongoDB.naive_paraphrase_collection,
+            csv_map["naive_paraphrases"],
             args.batch_size,
         )
-        print("finished non naive paraphrases.")
+        print("Finished Naive Paraphrases.")
 
     if "on_the_fly_paraphrases" in csv_map:
         print("on_the_fly_paraphrases")
