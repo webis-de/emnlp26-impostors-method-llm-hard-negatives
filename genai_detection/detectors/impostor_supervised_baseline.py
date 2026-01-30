@@ -157,6 +157,12 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
                 neg_sample = rng.choice(neg_idx, size=target_per_class, replace=False)
                 sample_idx = np.concatenate((pos_sample, neg_sample))
                 self.train_dataset = self.train_dataset.iloc[sample_idx]
+
+            y = np.array(self.train_dataset["same"], dtype=int)
+            if np.all(y == 0) or np.all(y == 1):
+                raise ValueError(f"y contains only True {np.all(y == 1)} or only False values ({np.all(y == 0)}).")
+            logger.info(f"Training {len(y)} labels")
+
             model = LinearSVC()
             disputed_texts = self.train_dataset["left_text"]
             candidate_texts = self.train_dataset["right_text"]
@@ -166,11 +172,7 @@ class SupervisedImpostorBaseline(ImpostorBaselineBase):
 
             # Calculate element-wise difference
             X = np.abs(disputed_vectors - candidate_vectors)
-            # y = train_dataset["same"].astype(int).values
-            y = np.array(self.train_dataset["same"], dtype=int)
-            if np.all(y == 0) or np.all(y == 1):
-                raise ValueError("y contains only True or only False values.")
-            logger.info(f"Training {len(y)} labels")
+
             # Train model
             model.fit(X, y)
             logger.info(f"Saving trained LinearSVC model to {path2model}")

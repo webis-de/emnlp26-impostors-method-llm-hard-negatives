@@ -81,8 +81,8 @@ class OptimalSupervisedBaseline:
                         logger.error(f"Could not obtain prediction for test pair {pair_id} due to OOM when training.")
                         # avoid OOM
                         continue
-                except ValueError:
-                    logger.error("Skipping this test pair because SVC training data contains only one class.")
+                except ValueError as e:
+                    logger.error(f"Skipping this test pair because SVC training data contains only one class. Error: {e}")
                     continue
                 text_test_pairs = self.mongoDB.get_texts_for_ids(text_ids=[test_pair["left_id"], test_pair["right_id"]])
 
