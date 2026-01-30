@@ -14,6 +14,8 @@
 import logging
 from typing import Optional, List
 
+from bson import ObjectId
+
 from genai_detection.impostor_generators.ImpostorGenerator import NonNaiveLLMImpostorGenerator
 from genai_detection.paraphrasing.two_step_paraphrasers import TwoStepParaphraser
 
@@ -31,7 +33,7 @@ class TwoStepImpostorGenerator(NonNaiveLLMImpostorGenerator):
         self.two_step_paraphraser = TwoStepParaphraser()
 
     def generate_impostors(
-        self, text: Optional[str], text_id: Optional[str]
+        self, text: Optional[str], text_id: Optional[ObjectId]
     ) -> List[str]:
         n_imp_to_generate = self.n_impostors
 

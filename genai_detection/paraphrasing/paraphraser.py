@@ -19,6 +19,7 @@ from datetime import datetime
 from typing import Optional
 
 import nltk
+from bson import ObjectId
 
 from genai_detection.config import CONFIG
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
@@ -53,7 +54,7 @@ class Paraphraser(ABC):
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
-    def save_paraphrase_in_mongodb(self, original_text_id:str, original_text:str, paraphrased_text:str,
+    def save_paraphrase_in_mongodb(self, original_text_id:ObjectId, original_text:str, paraphrased_text:str,
                                    extracted_info:Optional[dict], total_costs:Optional[float],
                                    collection, temperature:float=1.0,
                                    prompt:str="bullet points dspy", intermediate_prompt:str="bullet points dspy",) -> None:
@@ -75,7 +76,7 @@ class Paraphraser(ABC):
         # Build the new document
         paraphrase_doc = {
             # Do not use text_id as _id since a text will be paraphrased multiple times with different settings
-            "text_id": original_text_id,  # ID of the original text document
+            "text_id": ObjectId(original_text_id),  # ID of the original text document
             "length_original_text": len(original_text.split()),
             "length_paraphrased_text": len(paraphrased_text.split()),
             "intermediate_prompt": intermediate_prompt,

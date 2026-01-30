@@ -23,6 +23,7 @@ import numpy as np
 import requests
 import spacy
 from bs4 import BeautifulSoup
+from bson import ObjectId
 from nltk import download
 
 from genai_detection.impostor_generators.ImpostorGenerator import GenerativeImpostorGenerator
@@ -181,7 +182,7 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
         """
         pass
 
-    def _save_on_the_fly_in_mongodb(self, original_text_id:str, original_text:str, impostor_text:str, query:str, uri:str) -> None:
+    def _save_on_the_fly_in_mongodb(self, original_text_id:ObjectId, original_text:str, impostor_text:str, query:str, uri:str) -> None:
         """
         Save the paraphrase to the MongoDB database collection called "paraphrase".
         :param original_text_id: The id of the original text in the original_text collection.
@@ -220,14 +221,15 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
 
 
     def _parallel_fetch(
-        self, queries: List[str], text: Optional[str], text_id: Optional[str]
+        self, queries: List[str], text: Optional[str], text_id: Optional[ObjectId]
     ) -> List[Dict]:
         """
         Fetches results for multiple queries in parallel using a thread pool.
         Impostor texts are crawled websites, stripped of HTML tags if possible and provided snippets by search engine if crawling was not possible.
         :param queries: List of search queries to fetch results for
         :param text: Text of the original text (used to derive the query from), only used as metadata when storing result in mongoDB collection.
-        :param text_id: Id of the original text (used to derive the query from), only used as metadata when storing result in mongoDB collection.
+        :param text_id: ID of the original text (used to derive the query from), only used as metadata when storing
+        result in mongoDB collection.
         :return: List of impostor texts.
         """
         all_results = []
@@ -262,7 +264,7 @@ class SearchImpostorGeneratorBase(GenerativeImpostorGenerator):
         return all_results
 
     def generate_impostors(
-        self, text: Optional[str], text_id:Optional[str]
+        self, text: Optional[str], text_id:Optional[ObjectId]
     ) -> List[str]:
         """
         Generates impostors for the given input text using Google search results.

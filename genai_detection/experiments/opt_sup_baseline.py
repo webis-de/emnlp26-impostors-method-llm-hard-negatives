@@ -13,7 +13,6 @@ from typing import List
 
 import numpy as np
 import pandas as pd
-import ray
 
 from genai_detection.config import CONFIG
 from genai_detection.detectors.impostor_supervised_baseline import SupervisedImpostorBaseline
@@ -151,7 +150,7 @@ class OptimalSupervisedBaseline:
                     class_name = positive_class_translation[positive_class_id]
 
                     flat = {
-                        "dataset": dataset_name,
+                        "dataset_name": dataset_name,
                         "config": config if config else "",
                         "positive_class": class_name
                     }

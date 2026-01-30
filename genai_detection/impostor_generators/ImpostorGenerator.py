@@ -20,6 +20,7 @@ from abc import ABC
 from typing import Optional, List, Union, Dict
 
 import numpy as np
+from bson import ObjectId
 from dotenv import load_dotenv
 
 from genai_detection.detectors.components.feature_extractor import TfidfFeatureExtractor
@@ -104,12 +105,12 @@ class MongoDBSavedGenerator(BaseImpostorGenerator):
         self.text_processor = Preprocessor()
 
     def generate_impostors(
-            self, text: Optional[str]=None, text_id: Optional[str]=None
+            self, text: Optional[str]=None, text_id: Optional[ObjectId]=None
     ) -> List[str]:
         raise NotImplementedError
 
     def generate_impostors_by_text_id(
-            self, text_id: str
+            self, text_id: ObjectId
     )-> List[str]:
         text, text_id = self.mongoDB.get_text_or_id_from_orginal_collection(
             text=None, text_id=text_id

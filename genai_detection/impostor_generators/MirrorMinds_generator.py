@@ -19,6 +19,7 @@ from typing import List, Optional
 
 import pandas as pd
 import torch
+from bson import ObjectId
 from huggingface_hub import snapshot_download
 from llm_question_generator.parser import apply_extraction
 from llm_question_generator.question_config import QuestionGeneratorConfig
@@ -45,7 +46,7 @@ class MirrorMindsGenerator(MongoDBSavedGenerator):
         self.model_path = snapshot_download(repo_id="google/flan-t5-small")
 
     def generate_impostors(
-        self, text: Optional[str], text_id: Optional[str]
+        self, text: Optional[str], text_id: Optional[ObjectId]
     ) -> List[str]:
         """
         Generate an impostor text by mirroring the structure of the input text.

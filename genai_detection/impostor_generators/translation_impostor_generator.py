@@ -14,6 +14,8 @@
 import logging
 from typing import Optional, List
 
+from bson import ObjectId
+
 from genai_detection.impostor_generators.ImpostorGenerator import NonNaiveLLMImpostorGenerator
 from genai_detection.paraphrasing.one_step_paraphrasers import SAIAParaphraser
 from genai_detection.paraphrasing.translation_paraphraser import TranslationParaphraser
@@ -31,7 +33,7 @@ class TranslationImpostorGenerator(NonNaiveLLMImpostorGenerator):
             )
 
     def generate_impostors(
-            self, text: Optional[str], text_id: Optional[str]
+            self, text: Optional[str], text_id: Optional[ObjectId]
     )-> List[str]:
         # TODO: Update translation generator logic
         impostors, _ = self.obtain_existing_paraphrases(
