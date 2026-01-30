@@ -71,8 +71,6 @@ class BaseConfig:
     MONGO_ALL_PAIRS_COLLECTION = "all_pairs"
     MONGO_SUP_BASELINE_CONFIG_PREDS = "supervised_baseline_diff_config_preds"
     MONGO_SUP_BASELINE_CONFIG_SCORES = "supervised_baseline_diff_config_scores"
-    # TODO: delete
-    MONGO_TMP_COLLECTION = "temp_collection"
     MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME")
     MONGO_PASSWORD = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
     MONGO_HOST = "localhost"  # Local, but forwarded to server
