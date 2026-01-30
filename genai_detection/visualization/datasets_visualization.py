@@ -380,8 +380,8 @@ class ArtificialStudentEssaysVisualization(BaseDatasetVisualization):
         super().__init__(name=name)
 
 if __name__ == "__main__":
-    # student_essays_visualization = StudentEssaysVisualization()
-    # student_essays_visualization.dataset_stats()
+    student_essays_visualization = StudentEssaysVisualization()
+    student_essays_visualization.dataset_stats()
 
     blog_visualization = BlogVisualization()
     blog_visualization.dataset_stats()
