@@ -282,6 +282,8 @@ class ASGALFImpostorDetector(ImpostorDetector):
             portion_delete=self.portion_delete,
             similarity_fn=minmax_similarity,
         )
+        # save outputs to extra ablation output collection
+        self.impostor_output_collection = self.mongoDB.impostor_ablation_output_collection
 
 
 __all__ = ["ASGALFImpostorDetector"]

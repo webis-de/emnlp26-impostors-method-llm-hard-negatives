@@ -121,6 +121,8 @@ class ImpostorDetector(ImpostorBase):
             similarity_fn=minmax_similarity,
         )
         self.significance_level = 0.05
+        self.impostor_output_collection = self.mongoDB.impostor_output_collection
+
 
     def set_treshold(self, threshold: float):
         """
@@ -221,18 +223,21 @@ class ImpostorDetector(ImpostorBase):
         """
         final_scores = []
         # consider only pairs long enough & obtain texts for IDs; no preprocessing so far
+        search_args = {
+            "impostor_generation_technique": self.impostor_technique,
+            "n_impostors": self.n_impostors,
+            "n_potential_impostors": self.impostor_generator.num_potential_impostors,
+        }
         for pair in self.pair_processor.filter_pairs(text_list=text):
             # query for existing score in mongodb collection
+            search_args.update({
+                "left_id": ObjectId(pair["left"]["id"]),
+                "right_id": ObjectId(pair["right"]["id"]),
+            })
             cursor = list(
                 self.mongoDB.find_document_by_multiple_fields(
-                    collection=self.mongoDB.impostor_output_collection,
-                    search_args={
-                        "impostor_generation_technique": self.impostor_technique,
-                        "left_id": ObjectId(pair["left"]["id"]),
-                        "right_id": ObjectId(pair["right"]["id"]),
-                        "n_impostors": self.n_impostors,
-                        "n_potential_impostors": self.impostor_generator.num_potential_impostors,
-                    },
+                    collection=self.impostor_output_collection,
+                    search_args=search_args,
                 )
             )
             if len(cursor) > 0:
@@ -416,11 +421,12 @@ class ImpostorDetector(ImpostorBase):
             )
             try:
                 self.mongoDB.insert_document(
-                    collection=self.mongoDB.impostor_output_collection,
+                    collection=self.impostor_output_collection,
                     insert_data=document2insert,
                 )
                 logger.info(
-                    f"Inserted score into MongoDB collection {CONFIG.MONGO_IMPOSTOR_OUTPUT_COLLECTION}."
+                    "Inserted score into MongoDB collection %s.",
+                    self.impostor_output_collection.name,
                 )
             except Exception as e:
                 logger.error(f"Failed to insert document: {document2insert}\n\n{e}")

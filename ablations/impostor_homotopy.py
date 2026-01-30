@@ -295,6 +295,8 @@ class HBCImpostorDetector(ImpostorDetector):
             impostor_keep_ratio=impostor_keep_ratio,
             alpha=homotopy_alpha,
         )
+        # save outputs to extra ablation output collection
+        self.impostor_output_collection = self.mongoDB.impostor_ablation_output_collection
 
 
 __all__ = ["HBCImpostorDetector"]

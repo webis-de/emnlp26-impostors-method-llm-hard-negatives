@@ -42,6 +42,7 @@ class ParaphraseMongoDB:
             CONFIG.MONGO_PARAPHRASE_COLLECTION,
             CONFIG.MONGO_PARAPHRASE_SCORE_COLLECTION,
             CONFIG.MONGO_IMPOSTOR_OUTPUT_COLLECTION,
+            CONFIG.MONGO_IMPOSTOR_ABLATION_OUTPUT_COLLECTION,
             CONFIG.MONGO_ON_THE_FLY_COLLECTION,
             CONFIG.MONGO_TRANSLATION_COLLECTION,
             CONFIG.MONGO_NAIVE_PARAPHRASE_COLLECTION,
@@ -68,6 +69,9 @@ class ParaphraseMongoDB:
         # naive llm paraphrases
         self.paraphrase_score_collection = self.db[CONFIG.MONGO_PARAPHRASE_SCORE_COLLECTION]  # paraphrase scores
         self.impostor_output_collection = self.db[CONFIG.MONGO_IMPOSTOR_OUTPUT_COLLECTION]  # output of impostor
+        self.impostor_ablation_output_collection = self.db[
+            CONFIG.MONGO_IMPOSTOR_ABLATION_OUTPUT_COLLECTION
+        ]
         # approach
         self.test_pairs_collection = self.db[CONFIG.MONGO_TEST_PAIRS_COLLECTION] # IDs of texts and their ground truth (reproducibility of evaluation)
         self.train_pairs_collection = self.db[CONFIG.MONGO_TRAIN_PAIRS_COLLECTION] # IDs of texts and their ground truth

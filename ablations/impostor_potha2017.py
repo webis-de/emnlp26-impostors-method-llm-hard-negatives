@@ -163,6 +163,8 @@ class Potha2017ImpostorDetector(ImpostorDetector):
             impostors_per_problem=impostors_per_problem,
             impostors_per_round=impostors_per_round,
         )
+        # save outputs to extra ablation output collection
+        self.impostor_output_collection = self.mongoDB.impostor_ablation_output_collection
 
 
 __all__ = ["Potha2017ImpostorDetector"]
