@@ -146,11 +146,12 @@ def compute_acc_across_n_selected_potential_imps(
                 ]
                 if missing_pairs:
                     logger.info(
-                        "Missing %d scores for %s, n_selected=%d, n_potential=%d. Generating missing scores.",
+                        "Missing %d scores for %s, n_selected=%d, n_potential=%d, dataset_name=%s. Generating missing scores.",
                         len(missing_pairs),
                         technique,
                         n_selected,
                         n_potential,
+                        dataset_name,
                     )
                     missing_text_ids = []
                     for pair in missing_pairs:
