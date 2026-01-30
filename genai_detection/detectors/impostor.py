@@ -168,8 +168,8 @@ class ImpostorDetector(ImpostorBase):
             ), f"The 'id' key must be provided in input_dict. Only found {input_dict.keys()}."
             text_id = input_dict["id"]
             assert isinstance(
-                text_id, str
-            ), f"input IDs must be strings, but are {type(text_id)}."
+                text_id, ObjectId
+            ), f"input IDs must be ObjectID, but are {type(text_id)}."
             impostors = self.impostor_generator.generate_impostors_by_text_id(
                 text_id=text_id
             )
