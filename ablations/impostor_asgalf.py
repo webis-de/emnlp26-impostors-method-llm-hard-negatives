@@ -4,6 +4,8 @@ Slightly modified GI-based impostor method (ASGALF-style scoring).
 This module provides a drop-in variant of the existing ImpostorDetector that
 only changes the per-round scoring aggregation, as described by
 Khonji & Iraqi (2014).
+
+The paper’s larger feature set, body richness feature, and score correction offsets remain unimplemented here
 """
 from __future__ import annotations
 
