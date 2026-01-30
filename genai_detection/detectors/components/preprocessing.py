@@ -175,7 +175,7 @@ class PairPreprocessor:
     # PUBLIC MAIN ENTRY POINT
     # -----------------------------------------------------------
     def filter_pairs(self, text_list: Iterable[str]):
-        logger.info(f"Filtering {len(text_list)} pairs.")
+        logger.info(f"Filtering {len(text_list)} texts.")
         text_list = self.turn_input_iterable(text_list)
 
         filtered = []
