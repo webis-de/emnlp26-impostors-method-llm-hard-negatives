@@ -50,9 +50,7 @@ class InDomainImpostorGenerator(MongoDBSavedGenerator):
         :param text_id: Optional text ID of the text for which the impostors should be generated.
         :return: Dictionary of impostors with keys as ids and values as texts.
         """
-        assert isinstance(text_id, str), f"Input text is not of type str, but {type(text_id)}."
-        text_id = ObjectId(text_id)
-        logger.info("Run in-domain impostors generator with text_id %s %s", text_id, type(text_id))
+        assert isinstance(text_id, ObjectId), f"Input text is not of type str, but {type(text_id)}."
         original_text = self.mongoDB.original_collection.find_one({"_id": text_id})
         assert original_text, "original text obtained from mongoDB is None."
         # ensure text ID not same
