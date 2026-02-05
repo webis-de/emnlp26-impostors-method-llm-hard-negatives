@@ -18,18 +18,116 @@ from typing import Any, Dict, Iterable, List
 import nltk
 import numpy as np
 
-nltk.download('averaged_perceptron_tagger_eng', quiet=True)
-from nltk import pos_tag
-
 import scipy.sparse as sp
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
 
-from genai_detection.detectors.components.scorer import Scorer
+from genai_detection.detectors.components.scorer import Scorer, ScoreResult
 from genai_detection.detectors.components.vector_similarity import (
     extended_minmax_similarity, )
 from genai_detection.detectors.impostor import ImpostorDetector
 
 logger = logging.getLogger(__name__)
+
+
+class NltkPosTagger:
+    """
+    Lazy POS tagger wrapper to avoid downloads at import time.
+
+    This class checks for the tagger resource only when tagging is requested.
+    """
+
+    _resource_candidates = (
+        "taggers/averaged_perceptron_tagger_eng",
+        "taggers/averaged_perceptron_tagger",
+    )
+
+    @classmethod
+    def _ensure_available(cls) -> None:
+        for resource in cls._resource_candidates:
+            try:
+                nltk.data.find(resource)
+                return
+            except LookupError:
+                continue
+        raise RuntimeError(
+            "Missing NLTK tagger data. Install one of: "
+            "'averaged_perceptron_tagger_eng' or 'averaged_perceptron_tagger'."
+        )
+
+    @classmethod
+    def tag(cls, tokens: List[str]) -> List[str]:
+        """
+        Tag tokens with POS labels using NLTK.
+
+        Inputs:
+            tokens: List of word tokens.
+
+        Returns:
+            List of POS tags aligned with tokens.
+        """
+        cls._ensure_available()
+        from nltk import pos_tag
+
+        return [tag for _word, tag in pos_tag(tokens)]
+
+
+class ASGALFTokenizer:
+    """
+    Tokenization utilities used by ASGALF feature extraction.
+
+    This wrapper centralizes token, shape, and POS tagging logic and isolates
+    NLTK usage from the feature extractor.
+    """
+
+    @staticmethod
+    def word_tokens(text: str) -> List[str]:
+        """
+        Tokenize into word-like units (letters/digits with optional apostrophes).
+
+        Inputs:
+            text: Raw document text.
+
+        Returns:
+            List of token strings.
+        """
+        # Wordpunct tokenization without external resources.
+        return re.findall(r"[A-Za-z0-9]+(?:'[A-Za-z0-9]+)?", text)
+
+    @staticmethod
+    def word_shapes(tokens: List[str]) -> List[str]:
+        """
+        Convert tokens into simplified shape patterns (C/c/N).
+
+        Inputs:
+            tokens: List of word tokens.
+
+        Returns:
+            List of shape strings aligned to tokens.
+        """
+        shapes = []
+        for token in tokens:
+            # Uppercase -> C, lowercase -> c, digits -> N.
+            t1 = re.sub("[A-Z]", "C", token)
+            t2 = re.sub("[a-z]", "c", t1)
+            t3 = re.sub("[0-9]", "N", t2)
+            shapes.append(t3)
+        return shapes
+
+    @staticmethod
+    def pos_tags(tokens: List[str]) -> List[str]:
+        """
+        Compute POS tags for tokens using NLTK.
+
+        Inputs:
+            tokens: List of word tokens.
+
+        Returns:
+            List of POS tag strings.
+
+        Raises:
+            RuntimeError: If required NLTK tagger data is missing.
+        """
+        return NltkPosTagger.tag(tokens)
 
 class ASGALFScorer(Scorer):
     """
@@ -42,7 +140,7 @@ class ASGALFScorer(Scorer):
     - more features
     """
 
-    def score_pair(self, pair: Dict[str, Any], vectorizer) -> [float, Dict]:
+    def score_pair(self, pair: Dict[str, Any], vectorizer) -> ScoreResult:
         """
         Score a single pair using ASGALF aggregation.
 
@@ -83,7 +181,7 @@ class ASGALFScorer(Scorer):
             total_score /= j + 1
 
         empty_pvals: Dict[str, float] = {}
-        return total_score, empty_pvals
+        return ScoreResult(score=total_score, p_values=empty_pvals)
 
 
 class ASGALFFeatureExtractor:
@@ -104,6 +202,7 @@ class ASGALFFeatureExtractor:
         ngram_min: int = 1,
         min_token_count: int = 5,
         function_words: Iterable[str] | None = None,
+        tokenizer: ASGALFTokenizer | None = None,
     ):
         """
         Initialize feature extraction configuration.
@@ -113,11 +212,16 @@ class ASGALFFeatureExtractor:
             ngram_min: Minimum n-gram size used for feature generation.
             min_token_count: Minimum per-document token count to keep a feature.
             function_words: Optional custom function-word list, defaults to sklearn's ENGLISH_STOP_WORDS.
+            tokenizer: Optional tokenizer implementation for tokens, shapes, and POS tags.
 
         Side effects:
             Initializes an internal TF-IDF vectorizer placeholder and vocabulary.
         """
-        assert 0 < ngram_max <= ngram_min, f"Requirement {ngram_max} <= {ngram_min} not true."
+        if ngram_min <= 0 or ngram_min > ngram_max:
+            raise ValueError(
+                f"Invalid n-gram bounds: ngram_min={ngram_min}, ngram_max={ngram_max}. "
+                "Expected 0 < ngram_min <= ngram_max."
+            )
         self.ngram_max = ngram_max
         self.ngram_min = ngram_min
         self.min_token_count = min_token_count
@@ -128,6 +232,7 @@ class ASGALFFeatureExtractor:
         )
         self._tfidf_vectorizer: TfidfVectorizer | None = None
         self.vectorizer = SimpleNamespace(vocabulary_={})
+        self.tokenizer = tokenizer or ASGALFTokenizer()
 
     @staticmethod
     def _letters_only(text: str) -> str:
@@ -153,8 +258,8 @@ class ASGALFFeatureExtractor:
         Returns:
             List of token strings.
         """
-        # Wordpunct tokenization without external resources.
-        return re.findall(r"[A-Za-z0-9]+(?:'[A-Za-z0-9]+)?", text)
+        # Deprecated: kept for backward compatibility; use ASGALFTokenizer instead.
+        return ASGALFTokenizer.word_tokens(text)
 
     @staticmethod
     def _word_shapes(tokens: List[str]) -> List[str]:
@@ -167,14 +272,8 @@ class ASGALFFeatureExtractor:
         Returns:
             List of shape strings aligned to tokens.
         """
-        shapes = []
-        for token in tokens:
-            # Uppercase -> C, lowercase -> c, digits -> N.
-            t1 = re.sub("[A-Z]", "C", token)
-            t2 = re.sub("[a-z]", "c", t1)
-            t3 = re.sub("[0-9]", "N", t2)
-            shapes.append(t3)
-        return shapes
+        # Deprecated: kept for backward compatibility; use ASGALFTokenizer instead.
+        return ASGALFTokenizer.word_shapes(tokens)
 
     @staticmethod
     def _pos_tags(tokens: List[str]) -> List[str]:
@@ -187,12 +286,8 @@ class ASGALFFeatureExtractor:
         Returns:
             List of POS tag strings.
         """
-        try:
-            return [tag for _word, tag in pos_tag(tokens)]
-        except LookupError as exc:
-            raise RuntimeError(
-                "NLTK tagger error: {}".format(exc)
-            ) from exc
+        # Deprecated: kept for backward compatibility; use ASGALFTokenizer instead.
+        return ASGALFTokenizer.pos_tags(tokens)
 
     @staticmethod
     def _ngrams(tokens: List[str], n: int) -> List[str]:
@@ -220,7 +315,7 @@ class ASGALFFeatureExtractor:
         Returns:
             List of feature strings for TF-IDF.
         """
-        tokens = self._word_tokens(text)
+        tokens = self.tokenizer.word_tokens(text)
         features: List[str] = []
 
         # char n-grams.
@@ -230,30 +325,41 @@ class ASGALFFeatureExtractor:
                 features.append(f"{letters[i:i+n]}")
 
         # Word n-grams.
-        self._add_ngrams(features=features, tokens=tokens)
+        features.extend(self._add_ngrams(tokens=tokens))
 
         # Function word n-grams.
         func_tokens = [t.lower() for t in tokens if t.lower() in self.function_words]
-        self._add_ngrams(features=features, tokens=func_tokens)
+        features.extend(self._add_ngrams(tokens=func_tokens))
 
         # Word shape n-grams.
-        shapes = self._word_shapes(tokens)
-        self._add_ngrams(features=features, tokens=shapes)
+        shapes = self.tokenizer.word_shapes(tokens)
+        features.extend(self._add_ngrams(tokens=shapes))
 
         # POS tag n-grams.
-        pos_tags = self._pos_tags(tokens)
-        self._add_ngrams(features=features, tokens=pos_tags)
+        pos_tags = self.tokenizer.pos_tags(tokens)
+        features.extend(self._add_ngrams(tokens=pos_tags))
 
         # POS-word n-grams.
         pos_words = [f"{w}-{t}" for w, t in zip(tokens, pos_tags)]
-        self._add_ngrams(features=features, tokens=pos_words)
+        features.extend(self._add_ngrams(tokens=pos_words))
 
         return features
 
-    def _add_ngrams(self, features: list[str], tokens: list[str]):
+    def _add_ngrams(self, tokens: list[str]) -> list[str]:
+        """
+        Build n-gram features (from ngram_min..ngram_max) for the token sequence.
+
+        Inputs:
+            tokens: Token sequence to generate n-grams from.
+
+        Returns:
+            List of n-gram feature strings.
+        """
+        ngrams: list[str] = []
         for n in range(self.ngram_min, self.ngram_max + 1):
             for gram in self._ngrams(tokens, n):
-                features.append(f"{gram}")
+                ngrams.append(f"{gram}")
+        return ngrams
 
     def _build_vocabulary(self, corpus: List[str]) -> Dict[str, int]:
         """
@@ -291,7 +397,7 @@ class ASGALFFeatureExtractor:
         """
         values = []
         for doc in corpus:
-            tokens = self._word_tokens(doc)
+            tokens = self.tokenizer.word_tokens(doc)
             if not tokens:
                 values.append(0.0)
             else:
