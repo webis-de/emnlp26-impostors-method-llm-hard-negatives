@@ -2,7 +2,7 @@
 Improved Impostors method (Potha & Stamatatos, 2017).
 
 This module provides a drop-in variant of the existing ImpostorDetector with
-two targeted changes:
+three targeted changes:
   1) Impostor selection: keep the most similar impostors to the known document in terms of min-max similarity.
   2) Only consider candidate + impostor - disputed document (omit role swap)
   3) Ranking-based scoring: use the rank position of the known document among
