@@ -137,7 +137,7 @@ def compute_metrics_parallel(
     predictions: Dict[str, List[float]],
     thresholds: Iterable[float] = CONFIG.THRESHOLDS,
 ) -> Dict[str, pd.DataFrame]:
-    """
+    """compute_metrics_parallel
     Compute metrics for multiple approaches in parallel.
     """
 

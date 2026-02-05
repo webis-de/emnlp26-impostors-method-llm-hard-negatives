@@ -31,10 +31,7 @@ from genai_detection.detectors.impostor_supervised_baseline import SupervisedImp
 from genai_detection.detectors.impostor_unsupervised_baseline import UnSupervisedImpostorBaseline
 from genai_detection.detectors.ppmd import PPMdDetector
 from genai_detection.detectors.unmasking import UnmaskingDetector
-from genai_detection.experiments.reproduction.impostor_metrics import (
-    compute_metrics_parallel,
-    load_test_pairs, load_all_pairs,
-)
+from genai_detection.experiments.reproduction.impostor_metrics import (compute_metrics_parallel, load_all_pairs, )
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
