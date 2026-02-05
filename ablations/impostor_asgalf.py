@@ -17,8 +17,9 @@ import re
 
 import nltk
 import numpy as np
+
+nltk.download('averaged_perceptron_tagger_eng')
 from nltk import pos_tag
-nltk.download('averaged_perceptron_tagger')
 
 import scipy.sparse as sp
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
@@ -131,7 +132,7 @@ class ASGALFFeatureExtractor:
             return [tag for _word, tag in pos_tag(tokens)]
         except LookupError as exc:
             raise RuntimeError(
-                "Missing NLTK tagger data: download 'averaged_perceptron_tagger'."
+                "NLTK tagger error: {}".format(exc)
             ) from exc
 
     @staticmethod
