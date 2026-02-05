@@ -60,7 +60,8 @@ def extended_minmax_similarity(candidate, disputed, candidate_fillers):
         reference=disputed, fillers=candidate_fillers
     )
     candidate_disputed_min_max = minmax_similarity(candidate, disputed)
-    denominator = max_sim_imp_to_candidate*max_sim_imp_to_disputed
+    denominator = minmax_similarity(candidate, max_sim_imp_to_candidate)*minmax_similarity(disputed, max_sim_imp_to_disputed)
+
     if denominator == 0:
         return 0.0
     return candidate_disputed_min_max**2/denominator
