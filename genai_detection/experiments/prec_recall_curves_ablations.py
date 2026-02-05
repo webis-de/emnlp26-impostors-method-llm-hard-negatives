@@ -14,6 +14,7 @@ from typing import Dict, Iterable, List
 import numpy as np
 import pandas as pd
 
+from ablations.caesar import CaesarProblem
 from genai_detection.config import CONFIG
 from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENERATORS
 from genai_detection.experiments.reproduction.impostor_metrics import (compute_metrics_parallel, load_all_pairs, )
@@ -29,6 +30,7 @@ ABLATION_DETECTORS = {
     "asgalf": ASGALFImpostorDetector,
     # "potha2017": Potha2017ImpostorDetector,
     # "homotopy": HBCImpostorDetector,
+    #     "caesar": CaesarProblem,
 }
 
 ABLATION_ARGS = {
@@ -73,10 +75,12 @@ def _build_ablation_detectors(
     """
     detectors: Dict[str, object] = {}
     for name, detector_cls in ABLATION_DETECTORS.items():
+        args = ABLATION_ARGS[name]
+        if ("n_impostors" not in args) and ("impostors_per_round" not in args):
+            args[n_impostors] = n_impostors
         detector = detector_cls(
             impostor_technique=impostor_technique,
-            # n_impostors=n_impostors,
-            **ABLATION_ARGS[name],
+            **args,
             dataset_name=dataset_name,
         )
         _configure_ablation_detector(detector, variant=name)
