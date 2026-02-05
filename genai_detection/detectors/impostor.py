@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 import typing as t
-from typing import Iterable, List, Literal
+from typing import Any, Iterable, List, Literal
 
 import numpy as np
 import torch
@@ -122,7 +122,6 @@ class ImpostorDetector(ImpostorBase):
         )
         self.significance_level = 0.05
         self.impostor_output_collection = self.mongoDB.impostor_output_collection
-
 
     def set_treshold(self, threshold: float):
         """
@@ -246,26 +245,12 @@ class ImpostorDetector(ImpostorBase):
                 #     f"Found pre-computed scores for {pair['left']['id']}, {pair['right']['id']} in mongoDB collection. Using pre-computed scores.")
                 continue
 
-            generation_failed = False
-            for side in ["left", "right"]:
-                try:
-                    pair[side]["impostors"] = self._generate_impostors_for_single_input(
-                        input_dict=pair[side]
-                    )
-                    logger.info(
-                        f"Obtained {len(pair[side]['impostors'])} impostors for {side} input text. Type of impostors is {type(pair[side]['impostors'])}."
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Failed to generate impostors for text with ID {pair[side]['id']} and text: {pair[side]['original_text'][:200]} -> Return 0.5. Error: {e}"
-                    )
-                    generation_failed = True
-                    break  # exit for loop over sides
+            generation_failed, pair = self._build_impostor_pair_datastructure(pair=pair)
 
             if generation_failed:
                 final_scores.append(0.5) 
                 continue  # skip to next pair and save nothing to mongoDB
-                
+
             # --- 2) Build corpus for TFIDF -----------------------------------------------
             # Compute TFIDF based on the processed text, which is upsampled (and preprocessed) if upsample is set to true
             # and the original preprocessed text otherwise
@@ -288,17 +273,18 @@ class ImpostorDetector(ImpostorBase):
                 index_map[f"{side}_text"] = len(corpus)
                 corpus.append(pair[side]["processed_text"])
 
-                pair[side]["processed_impostors"] = [
-                    upsample_then_preprocess(input_text=imp)
-                    for imp in pair[side]["impostors"]
-                ]
-                index_map[f"{side}_impostors"] = list(
-                    range(
-                        len(corpus),
-                        len(corpus) + len(pair[side]["processed_impostors"]),
+                if "impostors" in pair[side]:
+                    pair[side]["processed_impostors"] = [
+                        upsample_then_preprocess(input_text=imp)
+                        for imp in pair[side]["impostors"]
+                    ]
+                    index_map[f"{side}_impostors"] = list(
+                        range(
+                            len(corpus),
+                            len(corpus) + len(pair[side]["processed_impostors"]),
+                        )
                     )
-                )
-                corpus.extend(pair[side]["processed_impostors"])
+                    corpus.extend(pair[side]["processed_impostors"])
 
                 logger.info(
                     "Preprocessed %s impostors and input texts (first (optionally) upsampled, then preprocessed) and added preprocessed text to TFIDF corpus.",
@@ -317,18 +303,13 @@ class ImpostorDetector(ImpostorBase):
                 """Helper to convert sparse TF-IDF row to a dense list."""
                 return row.toarray().flatten().tolist()
 
-            pair["left"]["tfidf"] = dense_vector(X[index_map["left_text"]])
-            pair["right"]["tfidf"] = dense_vector(X[index_map["right_text"]])
+            for side in ["left", "right"]:
+                pair[side]["tfidf"] = dense_vector(X[index_map[f"{side}_text"]])
+                if f"{side}_impostors" in index_map:
+                    pair[side]["impostors_tfidf"] = [
+                        dense_vector(X[i]) for i in index_map[f"{side}_impostors"]
+                    ]
 
-            left_impostors_tfidf = [
-                dense_vector(X[i]) for i in index_map["left_impostors"]
-            ]
-
-            right_impostors_tfidf = [
-                dense_vector(X[i]) for i in index_map["right_impostors"]
-            ]
-            pair["left"]["impostors_tfidf"] = left_impostors_tfidf
-            pair["right"]["impostors_tfidf"] = right_impostors_tfidf
             logger.info(
                 "Obtained TFIDF vector for candidate and disputed text, as well as impostors."
             )
@@ -356,56 +337,8 @@ class ImpostorDetector(ImpostorBase):
                     pair=pair, vectorizer=self.feature_extractor.vectorizer
                 )
             )
-
-            # aggregated score over different rounds (due to overlap in vocabularies, scores are not independent over different rounds and this test thus, lacks correctness)
-            document2insert["uncorr_p_val_over_different_rounds"] = binom_test(
-                count=2 * document2insert["scores_over_different_rounds"],
-                nobs=self.rounds * 2,
-                prop=1 / (1 + len(pair["left"]["impostors_tfidf"])),
-                alternative="larger",
-            )
-            document2insert["corr_pred_over_different_rounds"] = bool(
-                document2insert["uncorr_p_val_over_different_rounds"]
-                < 2 * self.significance_level
-            )
-
-            # compare corrected p-value (times 2, since two tests) to alpha for statistical significance
-            # https://www.statsmodels.org/stable/generated/statsmodels.stats.multitest.multipletests.html#statsmodels.stats.multitest.multipletests (09.01.2026)
-            rejects, pvals_corrected, _, alphacBonf = multipletests(
-                pvals=list(p_values.values()),
-                alpha=self.significance_level,
-                method="bonferroni",
-            )
-            logger.info(
-                f"Corrected p-values: {pvals_corrected} and uncorrected p-values: {p_values.values()}, "
-                f"left_id: {pair['left']['id']} and right_id: {pair['right']['id']}"
-            )
-            # reject null hypothesis means texts were written by same author
-            preds = {
-                f"{key}_pred": bool(reject)
-                for key, reject in zip(p_values.keys(), rejects)
-            }
-            corrected_pval = {
-                key.replace("uncorrected", "corrected"): c_pval
-                for key, c_pval in zip(p_values.keys(), pvals_corrected)
-            }
-
-            # compute Cohen's H based on corrected p-values
-            effect_size = {
-                f"effect_size_{'_'.join(k.split('_')[:3])}": proportion_effectsize(
-                    prop1=corr_pval,
-                    prop2=1 / (1 + len(pair[k.split("_")[2]]["impostors_tfidf"])),
-                    method="normal",
-                )
-                for k, corr_pval in zip(p_values.keys(), pvals_corrected)
-            }
-
-            # Update the document dictionary
-            document2insert.update(preds)
-            document2insert.update(p_values)
-            document2insert.update(effect_size)
-            document2insert.update(corrected_pval)
-            document2insert.update({"bonferroni_corrected_alph": alphacBonf})
+            if p_values:    # ablations inherit from this method, but do not return p-values
+                document2insert = self._handle_statistical_test(document2insert, p_values, pair)
 
             document2insert["impostor_generation_technique"] = self.impostor_technique
             document2insert["n_impostors"] = self.n_impostors
@@ -439,6 +372,54 @@ class ImpostorDetector(ImpostorBase):
         # one element = averaged score of X,Y and Y,X pair (score=number of rounds where the candidate was the most similar)
         # threshold is in [0,1], hence: normalized by rounds
         return [v / self.rounds for v in final_scores]
+
+    def _build_impostor_pair_datastructure(self, pair: t.Dict[str, str], keys: List[str] = ["left", "right"]) -> (
+                bool, t.Dict[str, str]):
+        generation_failed = False
+        for key in keys:
+            try:
+                pair[key]["impostors"] = self._generate_impostors_for_single_input(input_dict=pair[key])
+                logger.info(
+                        f"Obtained {len(pair[key]['impostors'])} impostors for {key} input text. Type of impostors is {type(pair[key]['impostors'])}.")
+            except Exception as e:
+                logger.error(
+                        f"Failed to generate impostors for text with ID {pair[key]['id']} and text: {pair[key]['original_text'][:200]} -> Return 0.5. Error: {e}")
+                generation_failed = True
+                break  # exit for loop over sides
+        return generation_failed, pair
+
+    def _handle_statistical_test(self, document2insert: dict[str, Any], p_values, pair):
+        # aggregated score over different rounds (due to overlap in vocabularies, scores are not independent over different rounds and this test thus, lacks correctness)
+        document2insert["uncorr_p_val_over_different_rounds"] = binom_test(
+                count=2 * document2insert["scores_over_different_rounds"], nobs=self.rounds * 2,
+                prop=1 / (1 + len(pair["left"]["impostors_tfidf"])), alternative="larger", )
+        document2insert["corr_pred_over_different_rounds"] = bool(
+                document2insert["uncorr_p_val_over_different_rounds"] < 2 * self.significance_level)
+
+        # compare corrected p-value (times 2, since two tests) to alpha for statistical significance
+        # https://www.statsmodels.org/stable/generated/statsmodels.stats.multitest.multipletests.html#statsmodels.stats.multitest.multipletests (09.01.2026)
+        rejects, pvals_corrected, _, alphacBonf = multipletests(pvals=list(p_values.values()),
+                alpha=self.significance_level, method="bonferroni", )
+        logger.info(f"Corrected p-values: {pvals_corrected} and uncorrected p-values: {p_values.values()}, "
+                    f"left_id: {pair['left']['id']} and right_id: {pair['right']['id']}")
+
+        # reject null hypothesis means texts were written by same author
+        preds = {f"{key}_pred": bool(reject) for key, reject in zip(p_values.keys(), rejects)}
+        corrected_pval = {key.replace("uncorrected", "corrected"): c_pval for key, c_pval in
+                zip(p_values.keys(), pvals_corrected)}
+
+        # compute Cohen's H based on corrected p-values
+        effect_size = {f"effect_size_{'_'.join(k.split('_')[:3])}": proportion_effectsize(prop1=corr_pval,
+                prop2=1 / (1 + len(pair[k.split("_")[2]]["impostors_tfidf"])), method="normal", ) for k, corr_pval in
+                zip(p_values.keys(), pvals_corrected)}
+
+        # Update the document dictionary
+        document2insert.update(preds)
+        document2insert.update(p_values)
+        document2insert.update(effect_size)
+        document2insert.update(corrected_pval)
+        document2insert.update({"bonferroni_corrected_alph": alphacBonf})
+        return document2insert
 
     def get_prediction(self, text: Iterable[str]) -> List[bool]:
         """
