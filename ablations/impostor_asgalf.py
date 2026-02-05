@@ -5,34 +5,43 @@ This module provides a drop-in variant of the existing ImpostorDetector that
 only changes the per-round scoring aggregation, as described by
 Khonji & Iraqi (2014).
 
-The paper’s larger feature set, body richness feature, and score correction offsets remain unimplemented here
+The paper's larger impostor selection grouped on languages remain unimplemented here.
 """
 from __future__ import annotations
 
+import itertools
 from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List
 
 import re
 
+import nltk
 import numpy as np
+from nltk import pos_tag
+nltk.download('averaged_perceptron_tagger')
+
 import scipy.sparse as sp
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
 
 from statsmodels.stats.proportion import binom_test
 
 from genai_detection.detectors.components.scorer import Scorer
-from genai_detection.detectors.components.vector_similarity import minmax_similarity
+from genai_detection.detectors.components.vector_similarity import (
+    extended_minmax_similarity,
+    minmax_similarity,
+)
 from genai_detection.detectors.impostor import ImpostorDetector
 
 
 class ASGALFScorer(Scorer):
     """
-    Scorer that replaces the binary win-count with a ratio-based score.
+    Scorer implementing the extended min-max score from Khonji & Iraqi (2014).
 
-    The ratio follows the "slightly modified" GI-based verification method:
-        score += sim(v1, v2)^2 / (sim(v1, x1) * sim(v2, x2))
-
-    where x1 and x2 are the most similar impostors to v1 and v2, respectively.
+    - Scorer that replaces the binary win-count with a ratio-based score.
+        The ratio follows the "slightly modified" GI-based verification method:
+            score += sim(v1, v2)^2 / (sim(v1, x1) * sim(v2, x2))
+        where x1 and x2 are the most similar impostors to v1 and v2, respectively.
+    - more features
     """
 
     def score_pair(self, pair: Dict[str, Any], vectorizer) -> [float, Dict]:
@@ -43,58 +52,30 @@ class ASGALFScorer(Scorer):
         feature_count = len(vectorizer.vocabulary_)
         total_score = 0.0
 
-        # Keep boolean counts for downstream p-value logic (compatibility only).
-        left_round_hits = 0
-        right_round_hits = 0
+        # iterate over the permutations ("left" as disputed, "right" as candidate, and vice versa)
+        for j, (disputed, candidate) in enumerate(
+            itertools.permutations(pair.keys(), 2)
+        ):
+            round_score = 0
+            for _ in range(self.rounds):
+                # 1) Select random features
+                keep_idxs = self._select_random_features(feature_count)
 
-        for _ in range(self.rounds):
-            # 1) Select random features
-            keep_idxs = self._select_random_features(feature_count)
+                # 2) Reduce TF-IDF vectors
+                disputed_vec = self._reduce_vector(pair[disputed]["tfidf"], keep_idxs)
+                candidate_vec = self._reduce_vector(pair[candidate]["tfidf"], keep_idxs)
+                candidate_impostor_vecs = [
+                    self._reduce_vector(vec, keep_idxs)
+                    for vec in pair[candidate]["impostors_tfidf"]
+                ]
 
-            # 2) Reduce TF-IDF vectors
-            left_vec = self._reduce_vector(pair["left"]["tfidf"], keep_idxs)
-            right_vec = self._reduce_vector(pair["right"]["tfidf"], keep_idxs)
-            left_impostor_vecs = [
-                self._reduce_vector(vec, keep_idxs)
-                for vec in pair["left"]["impostors_tfidf"]
-            ]
-            right_impostor_vecs = [
-                self._reduce_vector(vec, keep_idxs)
-                for vec in pair["right"]["impostors_tfidf"]
-            ]
+                # 3) Compute similarities
+                round_score += self.similarity_fn(disputed_vec, candidate_vec, candidate_impostor_vecs)
+            total_score += round_score
+            total_score /= j + 1
 
-            # 3) Compute similarities
-            sim_lr = self.similarity_fn(left_vec, right_vec)
-            max_left = max(self.similarity_fn(left_vec, iv) for iv in left_impostor_vecs)
-            max_right = max(
-                self.similarity_fn(right_vec, iv) for iv in right_impostor_vecs
-            )
-
-            # 4) Ratio-based score update (guard against divide-by-zero)
-            denom = max_left * max_right
-            if denom > 0:
-                total_score += (sim_lr * sim_lr) / denom
-
-            # Compatibility counters for the existing binomial significance logic
-            left_round_hits += sim_lr > max_left
-            right_round_hits += sim_lr > max_right
-
-        p_values = {
-            "left_disputed_right_candidate_uncorrected_p_value": binom_test(
-                count=int(left_round_hits),
-                nobs=self.rounds,
-                prop=1 / (1 + len(pair["left"]["impostors_tfidf"])),
-                alternative="larger",
-            ),
-            "right_disputed_left_candidate_uncorrected_p_value": binom_test(
-                count=int(right_round_hits),
-                nobs=self.rounds,
-                prop=1 / (1 + len(pair["right"]["impostors_tfidf"])),
-                alternative="larger",
-            ),
-        }
-
-        return total_score, p_values
+        empty_pvals: Dict[str, float] = {}
+        return total_score, empty_pvals
 
 
 class ASGALFFeatureExtractor:
@@ -138,29 +119,14 @@ class ASGALFFeatureExtractor:
     def _word_shapes(tokens: List[str]) -> List[str]:
         shapes = []
         for token in tokens:
-            shape = []
-            for ch in token:
-                if ch.isupper():
-                    shape.append("C")
-                elif ch.islower():
-                    shape.append("c")
-                elif ch.isdigit():
-                    shape.append("N")
-                else:
-                    shape.append("x")
-            shapes.append("".join(shape))
+            t1 = re.sub("[A-Z]", "C", token)
+            t2 = re.sub("[a-z]", "c", t1)
+            t3 = re.sub("[0-9]", "N", t2)
+            shapes.append(t3)
         return shapes
 
     @staticmethod
     def _pos_tags(tokens: List[str]) -> List[str]:
-        try:
-            import nltk
-            from nltk import pos_tag
-        except Exception as exc:
-            raise RuntimeError(
-                "NLTK is required for POS features. Install nltk and its tagger data "
-                "(averaged_perceptron_tagger)."
-            ) from exc
         try:
             return [tag for _word, tag in pos_tag(tokens)]
         except LookupError as exc:
@@ -280,7 +246,7 @@ class ASGALFImpostorDetector(ImpostorDetector):
         self.scorer = ASGALFScorer(
             rounds=self.rounds,
             portion_delete=self.portion_delete,
-            similarity_fn=minmax_similarity,
+            similarity_fn=extended_minmax_similarity,
         )
         # save outputs to extra ablation output collection
         self.impostor_output_collection = self.mongoDB.impostor_ablation_output_collection
