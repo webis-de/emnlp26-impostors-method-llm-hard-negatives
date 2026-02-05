@@ -65,3 +65,16 @@ def extended_minmax_similarity(candidate, disputed, candidate_fillers):
     if denominator == 0:
         return 0.0
     return candidate_disputed_min_max**2/denominator
+
+def manhattan_distance(a: np.ndarray, b: np.ndarray) -> float:
+    """
+    Compute Manhattan (L1) distance between two vectors.
+
+    Inputs:
+        a: np.ndarray A.
+        b: np.ndarray B.
+
+    Returns:
+        L1 distance as a float.
+    """
+    return float(np.abs(a - b).sum())

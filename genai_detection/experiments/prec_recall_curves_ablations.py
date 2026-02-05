@@ -14,7 +14,7 @@ from typing import Dict, Iterable, List
 import numpy as np
 import pandas as pd
 
-from ablations.caesar import CaesarProblem
+from ablations.std_impostor import StdImpostor
 from genai_detection.config import CONFIG
 from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENERATORS
 from genai_detection.experiments.reproduction.impostor_metrics import (compute_metrics_parallel, load_all_pairs, )
@@ -27,10 +27,10 @@ logger = logging.getLogger(__name__)
 
 
 ABLATION_DETECTORS = {
-    "asgalf": ASGALFImpostorDetector,
+    # "asgalf": ASGALFImpostorDetector,
     # "potha2017": Potha2017ImpostorDetector,
     # "homotopy": HBCImpostorDetector,
-    #     "caesar": CaesarProblem,
+    "std_impostor": StdImpostor,
 }
 
 ABLATION_ARGS = {
@@ -39,6 +39,11 @@ ABLATION_ARGS = {
             "portion_delete": 0.6,
             "n_impostors": 20,
             },
+        "std_impostor": {
+            "rounds": 50,
+            "portion_delete": 0.6,
+            "n_impostors": 20,
+                },
         "potha2017": {
                 "rounds": 10,
                 "portion_delete": 0.5,
