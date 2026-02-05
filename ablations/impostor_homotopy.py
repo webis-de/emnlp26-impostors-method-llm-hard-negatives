@@ -1,4 +1,5 @@
 """
+# TODO: check validity
 Homotopy-based classification (HBC) impostor variant.
 
 This module adapts the ImpostorDetector to the Homotopy-based Classification
