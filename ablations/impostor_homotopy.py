@@ -24,6 +24,7 @@ from sklearn.linear_model import LassoLars
 from sklearn.preprocessing import normalize
 from statsmodels.stats.proportion import binom_test
 
+from genai_detection.detectors.components.scorer import ScoreResult
 from genai_detection.detectors.impostor import ImpostorDetector
 
 
@@ -199,7 +200,7 @@ class HBCScorer:
         recon = A @ masked
         return float(np.linalg.norm(y - recon))
 
-    def score_pair(self, pair: Dict[str, Any], vectorizer) -> [float, Dict]:
+    def score_pair(self, pair: Dict[str, Any], vectorizer) -> ScoreResult:
         total_score = 0.0
         p_values: Dict[str, float] = {}
 
@@ -260,7 +261,7 @@ class HBCScorer:
             )
             total_score /= j + 1
 
-        return total_score, p_values
+        return ScoreResult(score=total_score, p_values=p_values)
 
 
 class HBCImpostorDetector(ImpostorDetector):

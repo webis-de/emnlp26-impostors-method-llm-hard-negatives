@@ -22,7 +22,7 @@ import typing as t
 
 from bson import ObjectId
 
-from genai_detection.detectors.components.scorer import Scorer
+from genai_detection.detectors.components.scorer import Scorer, ScoreResult
 from genai_detection.detectors.components.vector_similarity import minmax_similarity
 from genai_detection.detectors.impostor import ImpostorDetector
 
@@ -93,7 +93,7 @@ class Potha2017Scorer(Scorer):
             return impostor_vecs
         return random.sample(impostor_vecs, self.impostors_per_round)
 
-    def score_pair(self, pair: Dict[str, Any], vectorizer) -> [float, Dict]:
+    def score_pair(self, pair: Dict[str, Any], vectorizer) -> ScoreResult:
         assert (
             vectorizer.vocabulary_ is not None
         ), "Vectorizer must be fitted before scoring."
@@ -152,7 +152,7 @@ class Potha2017Scorer(Scorer):
             total_score += 1.0 / (self.rounds * pos)
 
         empty_pvals: Dict[str, float] = {}
-        return total_score, empty_pvals
+        return ScoreResult(score=total_score, p_values=empty_pvals)
 
 
 class Potha2017ImpostorDetector(ImpostorDetector):

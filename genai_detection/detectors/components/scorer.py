@@ -1,5 +1,6 @@
 import collections
 import itertools
+from dataclasses import dataclass
 from random import sample
 from typing import Dict, Any, List
 
@@ -7,6 +8,14 @@ import numpy as np
 from statsmodels.stats.proportion import binom_test
 
 from genai_detection.detectors.components.vector_similarity import minmax_similarity
+
+
+@dataclass(frozen=True)
+class ScoreResult:
+    """Container for a pairwise score and its p-values."""
+
+    score: float
+    p_values: Dict[str, float]
 
 
 class Scorer:
@@ -33,7 +42,7 @@ class Scorer:
         """Reduce vector to the selected feature indices."""
         return np.asarray(v)[idx]
 
-    def score_pair(self, pair: Dict[str, Any], vectorizer) -> [float, Dict]:
+    def score_pair(self, pair: Dict[str, Any], vectorizer) -> ScoreResult:
         """
         Compute a score between left/right texts using the impostor method.
 
@@ -96,4 +105,4 @@ class Scorer:
             p_values[p_feat_name] = pvalue
             total_score /= j + 1
 
-        return total_score, p_values
+        return ScoreResult(score=total_score, p_values=p_values)

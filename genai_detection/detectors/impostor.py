@@ -14,7 +14,7 @@ from statsmodels.stats.proportion import binom_test, proportion_effectsize
 from genai_detection.detectors.components.feature_extractor import TfidfFeatureExtractor
 from genai_detection.detectors.components.impostor_factory import create_impostor_generator
 from genai_detection.detectors.components.preprocessing import PairPreprocessor, Preprocessor
-from genai_detection.detectors.components.scorer import Scorer
+from genai_detection.detectors.components.scorer import Scorer, ScoreResult
 from genai_detection.detectors.components.vector_similarity import minmax_similarity
 from genai_detection.detectors.impostor_base import ImpostorBase
 
@@ -331,11 +331,15 @@ class ImpostorDetector(ImpostorBase):
                     "impostors_tfidf",
                 }
             }
-            document2insert["scores_over_different_rounds"], p_values = (
-                self.scorer.score_pair(
-                    pair=pair, vectorizer=self.feature_extractor.vectorizer
-                )
+            score_result = self.scorer.score_pair(
+                pair=pair, vectorizer=self.feature_extractor.vectorizer
             )
+            if not isinstance(score_result, ScoreResult):
+                raise TypeError(
+                    f"score_pair must return ScoreResult, got {type(score_result)}."
+                )
+            document2insert["scores_over_different_rounds"] = score_result.score
+            p_values = score_result.p_values
             if p_values:    # ablations inherit from this method, but do not return p-values
                 document2insert = self._handle_statistical_test(document2insert, p_values, pair)
 
