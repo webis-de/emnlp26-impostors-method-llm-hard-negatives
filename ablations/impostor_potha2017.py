@@ -7,14 +7,20 @@ two targeted changes:
   2) Only consider candidate + impostor - disputed document (omit role swap)
   3) Ranking-based scoring: use the rank position of the known document among
      impostors when comparing to the disputed document instead of only considering the first rank.
+
+ High scores correspond to a higher likelihood of the input texts being authored by the same person.
 """
 from __future__ import annotations
 
 import logging
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 import numpy as np
+import torch
+import typing as t
+
+from bson import ObjectId
 
 from genai_detection.detectors.components.scorer import Scorer
 from genai_detection.detectors.components.vector_similarity import minmax_similarity
@@ -36,6 +42,7 @@ class Potha2017Scorer(Scorer):
 
     def __init__(
         self,
+        impostor_generator,
         rounds: int=10,
         portion_delete: float=0.5,
         similarity_fn=minmax_similarity,
@@ -43,6 +50,7 @@ class Potha2017Scorer(Scorer):
         impostors_per_round: Optional[int] = 5,
     ):
         """
+        :param impostor_generator: Can generate impostors.
         :param rounds: Number of repetitions. Paper defaults to impostors_per_problem/5.
         :param portion_delete: Proportion of impostors to be deleted. Paper defaults to 0.5.
         :param similarity_fn: Similarity function. Paper defaults to minmax_similarity.
@@ -56,6 +64,7 @@ class Potha2017Scorer(Scorer):
                                                              f" {impostors_per_round}")
         self.impostors_per_problem = impostors_per_problem
         self.impostors_per_round = impostors_per_round
+        self.impostor_generator = impostor_generator
 
     def _select_problem_impostors(
         self,
@@ -78,6 +87,7 @@ class Potha2017Scorer(Scorer):
         """
         Randomly sample impostors for a single repetition (if requested).
         According to the original paper, the number of impostors should remain the same.
+        High scores correspond to a higher likelihood of the texts being authored by the same individuum.
         """
         if len(impostor_vecs) <= self.impostors_per_round:
             return impostor_vecs
@@ -95,14 +105,25 @@ class Potha2017Scorer(Scorer):
         disputed, candidate = "left", "right"
 
         # Select the most similar impostors to the candidate document once per direction.
-        problem_impostors = self._select_problem_impostors(
-            candidate_vec=pair[candidate]["tfidf"],
-            impostor_vecs=pair[candidate]["impostors_tfidf"],
-        )
+        # in domain and search-based impostor generation does this automatically
+        problem_impostors_texts = self.impostor_generator._select_random_n_imps_among_best_m_potential_impostors(
+                all_impostors=pair[candidate]["impostors"],
+                reference_text=pair[candidate]["original_text"],
+                )
+        def dense_vector(row):
+            """Helper to convert sparse TF-IDF row to a dense list."""
+            return row.toarray().flatten().tolist()
 
-        for _ in range(self.rounds):
+        problem_impostors = [
+                        dense_vector(imp_tfidf) for imp_tfidf in vectorizer.transform(problem_impostors_texts)
+                    ]
+        # Since neither TFIDF, nor original texts are saved to mongodb, we do not need to update pair dictionary
+        logger.info(f"Selected {len(problem_impostors)} most similar impostors")
+
+        for r in range(self.rounds):
             # 1) Select random features
             keep_idxs = self._select_random_features(feature_count)
+            # logger.info(f"Keeping {len(keep_idxs)} features")
 
             # 2) Reduce TF-IDF vectors
             disputed_vec = self._reduce_vector(pair[disputed]["tfidf"], keep_idxs)
@@ -110,22 +131,28 @@ class Potha2017Scorer(Scorer):
             impostor_vecs = [
                 self._reduce_vector(vec, keep_idxs) for vec in problem_impostors
             ]
+            # logger.info(f"Selected {len(candidate_vec)} features")
 
             # 3) Optionally sample impostors for this round
             round_impostors = self._sample_impostors_for_round(impostor_vecs)
+            logger.info(f"Selected {len(round_impostors)} random impostors for this round.")
 
             # 4) Compute similarities (impostor -> disputed only)
             impostor_scores = [
                 self.similarity_fn(disputed_vec, iv) for iv in round_impostors
             ]
             sim_known = self.similarity_fn(disputed_vec, candidate_vec)
+            # logger.info("Computed similarity scores.")
 
             # 5) Rank candidate similarity among impostors (descending)
             pos = 1 + sum(score > sim_known for score in impostor_scores)
-            logger.info(f"Rounds {self.rounds} impostor scored {pos} impostors ")
+            # logger.info(f"Round {r}/{self.rounds}: impostor scored on position {len(impostor_scores)+ 2 - pos}"
+            #             f"/{len(impostor_scores)+1}")
+            # big score means likely same author
             total_score += 1.0 / (self.rounds * pos)
 
-        return total_score, {}
+        empty_pvals: Dict[str, float] = {}
+        return total_score, empty_pvals
 
 
 class Potha2017ImpostorDetector(ImpostorDetector):
@@ -143,14 +170,17 @@ class Potha2017ImpostorDetector(ImpostorDetector):
         impostors_per_round: Optional[int] = None,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        logger.info(f"Initializing Potha2017ImpostorDetector with args: {args}")
+        super().__init__(*args, **kwargs, n_impostors=impostors_per_round)
+        self.impostor_generator.set_num_potential_impostors(impostors_per_problem)
+        logger.info(f"Initializing Potha2017ImpostorDetector with args: {args}, kwargs: {kwargs}, "
+                    f"impostors_per_problem: {impostors_per_problem}, impostors_per_round: {impostors_per_round}")
 
         # Default to selecting up to the configured number of impostors per problem.
         if impostors_per_problem is None:
             impostors_per_problem = self.n_impostors
 
         self.scorer = Potha2017Scorer(
+            impostor_generator=self.impostor_generator,
             rounds=self.rounds,
             portion_delete=self.portion_delete,
             similarity_fn=minmax_similarity,
@@ -160,5 +190,12 @@ class Potha2017ImpostorDetector(ImpostorDetector):
         # save outputs to extra ablation output collection
         self.impostor_output_collection = self.mongoDB.impostor_ablation_output_collection
 
+    def _build_impostor_pair_datastructure(self, pair: t.Dict[str, str], keys: List[str] = ["right"]) -> (
+                bool, t.Dict[str, str]):
+        """
+        Overwrites parent method to avoid computing unrequired impostors.
+        The candidate text is saved under the 'right' key.
+        """
+        return super()._build_impostor_pair_datastructure(pair=pair, keys=keys)
 
 __all__ = ["Potha2017ImpostorDetector"]
