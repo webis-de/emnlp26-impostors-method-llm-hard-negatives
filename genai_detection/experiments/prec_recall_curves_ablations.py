@@ -12,31 +12,37 @@ from pathlib import Path
 from typing import Dict, Iterable, List
 
 import numpy as np
+import pandas as pd
 
 from genai_detection.config import CONFIG
 from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENERATORS
 from genai_detection.experiments.reproduction.impostor_metrics import (compute_metrics_parallel, load_all_pairs, )
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
-from ablations import (Potha2017ImpostorDetector,
-)
+from ablations import (ASGALFImpostorDetector, Potha2017ImpostorDetector,
+                       )
 
 logger = logging.getLogger(__name__)
 
 
 ABLATION_DETECTORS = {
-    # "asgalf": ASGALFImpostorDetector,
-    "potha2017": Potha2017ImpostorDetector,
+    "asgalf": ASGALFImpostorDetector,
+    # "potha2017": Potha2017ImpostorDetector,
     # "homotopy": HBCImpostorDetector,
 }
 
 ABLATION_ARGS = {
-    "potha2017": {
-            "rounds": 10,
-            "portion_delete": 0.5,
-            "impostors_per_problem": 50,
-            "impostors_per_round": 5,
-            }
+        "asgalf":{
+            "rounds": 50,
+            "portion_delete": 0.6,
+            "n_impostors": 20,
+            },
+        "potha2017": {
+                "rounds": 10,
+                "portion_delete": 0.5,
+                "impostors_per_problem": 50,
+                "impostors_per_round": 5,
+                }
         }
 
 LOCAL_SAVE_PATH = (
@@ -157,7 +163,7 @@ if __name__ == "__main__":
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
     logger = logging.getLogger(__name__)
-    metics_df = compute_prec_recall_curves_ablations(dataset_name=CONFIG.BLOG)
+    metics_df = pd.DataFrame(compute_prec_recall_curves_ablations(dataset_name=CONFIG.BLOG))
     logger.info(metics_df)
 
     metics_df.to_csv(LOCAL_SAVE_PATH / "effectiveness_scores.csv", index=False)
