@@ -344,7 +344,7 @@ class ImpostorDetector(ImpostorBase):
             document2insert["n_potential_impostors"] = (
                 self.impostor_generator.num_potential_impostors
             )
-            if self.impostor_output_collection == CONFIG.MONGO_IMPOSTOR_ABLATION_OUTPUT_COLLECTION:
+            if self.impostor_output_collection.name == CONFIG.MONGO_IMPOSTOR_ABLATION_OUTPUT_COLLECTION:
                 # ablations inherit from this method and need to specify their approach type
                 document2insert["ablation"] = (
                     self.__class__.__name__
