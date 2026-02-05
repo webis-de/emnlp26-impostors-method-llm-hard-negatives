@@ -9,11 +9,11 @@ import numpy as np
 import torch
 from bson import ObjectId
 from statsmodels.stats.multitest import multipletests
-from statsmodels.stats.proportion import proportion_effectsize, binom_test
+from statsmodels.stats.proportion import binom_test, proportion_effectsize
 
 from genai_detection.detectors.components.feature_extractor import TfidfFeatureExtractor
 from genai_detection.detectors.components.impostor_factory import create_impostor_generator
-from genai_detection.detectors.components.preprocessing import Preprocessor, PairPreprocessor
+from genai_detection.detectors.components.preprocessing import PairPreprocessor, Preprocessor
 from genai_detection.detectors.components.scorer import Scorer
 from genai_detection.detectors.components.vector_similarity import minmax_similarity
 from genai_detection.detectors.impostor_base import ImpostorBase
@@ -316,12 +316,12 @@ class ImpostorDetector(ImpostorBase):
 
             # --- 4) Final store structure ------------------------------------------------
             # TFIDF is too big to be saved (BSON error during mongodb upload)
+            assert isinstance(pair["left"], dict) and isinstance(pair["right"], dict)
             document2insert = {
-                f"{old_key}_{new_key}": pair[old_key][new_key]
+                f"{old_key}_{new_key}": value
                 for old_key in ["left", "right"]
-                for new_key in pair[old_key]
-                if new_key
-                not in [
+                for new_key, value in pair[old_key].items()
+                if new_key not in {
                     "tfidf",
                     "processed_text",
                     "tokens",
@@ -329,9 +329,8 @@ class ImpostorDetector(ImpostorBase):
                     "impostors",
                     "original_text",
                     "impostors_tfidf",
-                ]
+                }
             }
-
             document2insert["scores_over_different_rounds"], p_values = (
                 self.scorer.score_pair(
                     pair=pair, vectorizer=self.feature_extractor.vectorizer
@@ -350,6 +349,7 @@ class ImpostorDetector(ImpostorBase):
                 document2insert["ablation"] = (
                     self.__class__.__name__
                 )
+                logger.info(f"Ablation {self.__class__.__name__} will be inserted into MongoDB collection.")
             document2insert["created_at"] = datetime.datetime.now().strftime(
                 "%Y-%m-%d_%H-%M-%S"
             )
