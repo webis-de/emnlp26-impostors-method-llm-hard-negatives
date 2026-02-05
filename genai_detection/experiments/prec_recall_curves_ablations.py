@@ -15,28 +15,36 @@ import numpy as np
 
 from genai_detection.config import CONFIG
 from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENERATORS
-from genai_detection.experiments.reproduction.impostor_metrics import (
-    compute_metrics_parallel,
-    load_all_pairs,
-)
+from genai_detection.experiments.reproduction.impostor_metrics import (compute_metrics_parallel, load_all_pairs, )
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
-from ablations import (
-    ASGALFImpostorDetector,
-    HBCImpostorDetector,
-    OriginalImpostorDetector,
-    Potha2017ImpostorDetector,
+from ablations import (Potha2017ImpostorDetector,
 )
 
 logger = logging.getLogger(__name__)
 
 
 ABLATION_DETECTORS = {
-    "original": OriginalImpostorDetector,
-    "asgalf": ASGALFImpostorDetector,
+    # "asgalf": ASGALFImpostorDetector,
     "potha2017": Potha2017ImpostorDetector,
-    "homotopy": HBCImpostorDetector,
+    # "homotopy": HBCImpostorDetector,
 }
+
+ABLATION_ARGS = {
+    "potha2017": {
+            "rounds": 10,
+            "portion_delete": 0.5,
+            "impostors_per_problem": 50,
+            "impostors_per_round": 5,
+            }
+        }
+
+LOCAL_SAVE_PATH = (
+    Path(__file__).resolve().parents[3]
+    / CONFIG.SAVE_PATH
+    / "ablations"
+)
+LOCAL_SAVE_PATH.mkdir(parents=True, exist_ok=True)
 
 
 def _configure_ablation_detector(detector, variant: str) -> None:
@@ -61,7 +69,8 @@ def _build_ablation_detectors(
     for name, detector_cls in ABLATION_DETECTORS.items():
         detector = detector_cls(
             impostor_technique=impostor_technique,
-            n_impostors=n_impostors,
+            # n_impostors=n_impostors,
+            **ABLATION_ARGS[name],
             dataset_name=dataset_name,
         )
         _configure_ablation_detector(detector, variant=name)
@@ -140,3 +149,11 @@ def compute_prec_recall_curves_ablations(
 
 
 __all__ = ["compute_prec_recall_curves_ablations"]
+
+
+if __name__ == "__main__":
+    metics_df = compute_prec_recall_curves_ablations(dataset_name=CONFIG.BLOG)
+    logger.info(metics_df)
+
+    metics_df.to_csv(LOCAL_SAVE_PATH / "effectiveness_scores.csv", index=False)
+    logger.info(f"Saved effectiveness scores as csv to {LOCAL_SAVE_PATH}/effectiveness_scores.csv.")

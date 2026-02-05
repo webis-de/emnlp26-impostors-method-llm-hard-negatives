@@ -3,45 +3,59 @@ Improved Impostors method (Potha & Stamatatos, 2017).
 
 This module provides a drop-in variant of the existing ImpostorDetector with
 two targeted changes:
-  1) Impostor selection: keep the most similar impostors to the known document.
-  2) Ranking-based scoring: use the rank position of the known document among
-     impostors when comparing to the disputed document.
+  1) Impostor selection: keep the most similar impostors to the known document in terms of min-max similarity.
+  2) Only consider candidate + impostor - disputed document (omit role swap)
+  3) Ranking-based scoring: use the rank position of the known document among
+     impostors when comparing to the disputed document instead of only considering the first rank.
 """
 from __future__ import annotations
 
+import logging
 import random
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from statsmodels.stats.proportion import binom_test
 
 from genai_detection.detectors.components.scorer import Scorer
 from genai_detection.detectors.components.vector_similarity import minmax_similarity
 from genai_detection.detectors.impostor import ImpostorDetector
 
+logger = logging.getLogger(__name__)
 
 class Potha2017Scorer(Scorer):
     """
     Scorer implementing the ranking-based aggregation from Potha & Stamatatos (2017).
 
+    - compute similarity of impostors to the disputed document & keep most similar impostors.
     For each repetition:
-      - select a random subset of features,
-      - optionally sample a subset of impostors,
-      - compute similarity of impostors to the disputed document,
-      - rank candidate similarity among impostors and update the score by 1/pos.
+      - sample random subset of most similar impostors (cardinality stays the same),
+      - select a random subset of features (cardinality stays the same),
+      - rank candidate similarity among impostors and update the score by 1/(position * repetition).
+    Only consider one direction (i.e., generate impostors of the candidate document) and do not do role swap.
     """
 
     def __init__(
         self,
-        rounds: int,
-        portion_delete: float,
-        similarity_fn,
-        impostors_per_problem: Optional[int] = None,
-        impostors_per_round: Optional[int] = None,
+        rounds: int=10,
+        portion_delete: float=0.5,
+        similarity_fn=minmax_similarity,
+        impostors_per_problem: Optional[int] = 50,
+        impostors_per_repetition: Optional[int] = 5,
     ):
+        """
+        :param rounds: Number of repetitions. Paper defaults to impostors_per_problem/5.
+        :param portion_delete: Proportion of impostors to be deleted. Paper defaults to 0.5.
+        :param similarity_fn: Similarity function. Paper defaults to minmax_similarity.
+        :param impostors_per_problem: Number of impostors per problem. Paper does not specify a default value.
+        :param impostors_per_repetition: Number of impostors per round. Paper defaults to impostors_per_problem/10.
+        """
         super().__init__(rounds=rounds, portion_delete=portion_delete, similarity_fn=similarity_fn)
+        assert impostors_per_problem >= impostors_per_repetition, (f"# Impostors selected due to max similarity to "
+                                                             f"candidate text ({impostors_per_problem}) "
+                                                             f"needs to be greater than number chosen"
+                                                             f" {impostors_per_repetition}")
         self.impostors_per_problem = impostors_per_problem
-        self.impostors_per_round = impostors_per_round
+        self.impostors_per_repetition = impostors_per_repetition
 
     def _select_problem_impostors(
         self,
@@ -51,7 +65,7 @@ class Potha2017Scorer(Scorer):
         """
         Keep the most similar impostors to the candidate document (min-max similarity).
         """
-        if self.impostors_per_problem is None or len(impostor_vecs) <= self.impostors_per_problem:
+        if len(impostor_vecs) <= self.impostors_per_problem:
             return impostor_vecs
 
         scores = [self.similarity_fn(candidate_vec, vec) for vec in impostor_vecs]
@@ -63,8 +77,9 @@ class Potha2017Scorer(Scorer):
     ) -> List[List[float]]:
         """
         Randomly sample impostors for a single repetition (if requested).
+        According to the original paper, the number of impostors should remain the same.
         """
-        if self.impostors_per_round is None or len(impostor_vecs) <= self.impostors_per_round:
+        if len(impostor_vecs) <= self.impostors_per_round:
             return impostor_vecs
         return random.sample(impostor_vecs, self.impostors_per_round)
 
@@ -77,62 +92,42 @@ class Potha2017Scorer(Scorer):
         total_score = 0.0
         p_values: Dict[str, float] = {}
 
-        # Iterate over permutations ("left" as disputed, "right" as candidate, and vice versa)
-        for j, (disputed, candidate) in enumerate(
-            [("left", "right"), ("right", "left")]
-        ):
-            direction_score = 0.0
-            round_hits = 0
+        # Only consider "left" as disputed, "right" as candidate
+        disputed, candidate = "left", "right"
+        round_hits = 0
+        total_score = 0.0
 
-            # Select the most similar impostors to the candidate document once per direction.
-            problem_impostors = self._select_problem_impostors(
-                candidate_vec=pair[candidate]["tfidf"],
-                impostor_vecs=pair[candidate]["impostors_tfidf"],
-            )
+        # Select the most similar impostors to the candidate document once per direction.
+        problem_impostors = self._select_problem_impostors(
+            candidate_vec=pair[candidate]["tfidf"],
+            impostor_vecs=pair[candidate]["impostors_tfidf"],
+        )
 
-            for _ in range(self.rounds):
-                # 1) Select random features
-                keep_idxs = self._select_random_features(feature_count)
+        for _ in range(self.rounds):
+            # 1) Select random features
+            keep_idxs = self._select_random_features(feature_count)
 
-                # 2) Reduce TF-IDF vectors
-                disputed_vec = self._reduce_vector(pair[disputed]["tfidf"], keep_idxs)
-                candidate_vec = self._reduce_vector(pair[candidate]["tfidf"], keep_idxs)
-                impostor_vecs = [
-                    self._reduce_vector(vec, keep_idxs) for vec in problem_impostors
-                ]
+            # 2) Reduce TF-IDF vectors
+            disputed_vec = self._reduce_vector(pair[disputed]["tfidf"], keep_idxs)
+            candidate_vec = self._reduce_vector(pair[candidate]["tfidf"], keep_idxs)
+            impostor_vecs = [
+                self._reduce_vector(vec, keep_idxs) for vec in problem_impostors
+            ]
 
-                # 3) Optionally sample impostors for this round
-                round_impostors = self._sample_impostors_for_round(impostor_vecs)
+            # 3) Optionally sample impostors for this round
+            round_impostors = self._sample_impostors_for_round(impostor_vecs)
 
-                # 4) Compute similarities (impostor -> disputed only)
-                impostor_scores = [
-                    self.similarity_fn(disputed_vec, iv) for iv in round_impostors
-                ]
-                sim_known = self.similarity_fn(disputed_vec, candidate_vec)
+            # 4) Compute similarities (impostor -> disputed only)
+            impostor_scores = [
+                self.similarity_fn(disputed_vec, iv) for iv in round_impostors
+            ]
+            sim_known = self.similarity_fn(disputed_vec, candidate_vec)
 
-                # 5) Rank candidate similarity among impostors (descending)
-                pos = 1 + sum(score > sim_known for score in impostor_scores)
-                direction_score += 1.0 / (self.rounds * pos)
+            # 5) Rank candidate similarity among impostors (descending)
+            pos = 1 + sum(score > sim_known for score in impostor_scores)
+            total_score += 1.0 / (self.rounds * pos)
 
-                # Compatibility counter for downstream binomial p-values
-                if impostor_scores:
-                    round_hits += sim_known > max(impostor_scores)
-
-            p_feat_name = f"{disputed}_disputed_{candidate}_candidate_uncorrected_p_value"
-            effective_impostors = len(problem_impostors)
-            if self.impostors_per_round is not None:
-                effective_impostors = min(effective_impostors, self.impostors_per_round)
-            p_values[p_feat_name] = binom_test(
-                count=int(round_hits),
-                nobs=self.rounds,
-                prop=1 / (1 + effective_impostors),
-                alternative="larger",
-            )
-
-            total_score += direction_score
-            total_score /= j + 1
-
-        return total_score, p_values
+        return total_score, {}
 
 
 class Potha2017ImpostorDetector(ImpostorDetector):
@@ -140,7 +135,7 @@ class Potha2017ImpostorDetector(ImpostorDetector):
     Impostor detector variant matching Potha & Stamatatos (2017).
 
     This class keeps the full impostor pipeline intact and only swaps the scoring
-    logic to incorporate (1) impostor selection and (2) rank-based aggregation.
+    logic to incorporate (1) impostor selection, (2) rank-based aggregation and (3) one-way comparison.
     """
 
     def __init__(
@@ -151,6 +146,7 @@ class Potha2017ImpostorDetector(ImpostorDetector):
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
+        logger.info(f"Initializing Potha2017ImpostorDetector with args: {args}")
 
         # Default to selecting up to the configured number of impostors per problem.
         if impostors_per_problem is None:
@@ -161,7 +157,7 @@ class Potha2017ImpostorDetector(ImpostorDetector):
             portion_delete=self.portion_delete,
             similarity_fn=minmax_similarity,
             impostors_per_problem=impostors_per_problem,
-            impostors_per_round=impostors_per_round,
+            impostors_per_repetition=impostors_per_round,
         )
         # save outputs to extra ablation output collection
         self.impostor_output_collection = self.mongoDB.impostor_ablation_output_collection
