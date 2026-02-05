@@ -40,22 +40,22 @@ class Potha2017Scorer(Scorer):
         portion_delete: float=0.5,
         similarity_fn=minmax_similarity,
         impostors_per_problem: Optional[int] = 50,
-        impostors_per_repetition: Optional[int] = 5,
+        impostors_per_round: Optional[int] = 5,
     ):
         """
         :param rounds: Number of repetitions. Paper defaults to impostors_per_problem/5.
         :param portion_delete: Proportion of impostors to be deleted. Paper defaults to 0.5.
         :param similarity_fn: Similarity function. Paper defaults to minmax_similarity.
         :param impostors_per_problem: Number of impostors per problem. Paper does not specify a default value.
-        :param impostors_per_repetition: Number of impostors per round. Paper defaults to impostors_per_problem/10.
+        :param impostors_per_round: Number of impostors per round. Paper defaults to impostors_per_problem/10.
         """
         super().__init__(rounds=rounds, portion_delete=portion_delete, similarity_fn=similarity_fn)
-        assert impostors_per_problem >= impostors_per_repetition, (f"# Impostors selected due to max similarity to "
+        assert impostors_per_problem >= impostors_per_round, (f"# Impostors selected due to max similarity to "
                                                              f"candidate text ({impostors_per_problem}) "
                                                              f"needs to be greater than number chosen"
-                                                             f" {impostors_per_repetition}")
+                                                             f" {impostors_per_round}")
         self.impostors_per_problem = impostors_per_problem
-        self.impostors_per_repetition = impostors_per_repetition
+        self.impostors_per_round = impostors_per_round
 
     def _select_problem_impostors(
         self,
@@ -90,12 +90,9 @@ class Potha2017Scorer(Scorer):
 
         feature_count = len(vectorizer.vocabulary_)
         total_score = 0.0
-        p_values: Dict[str, float] = {}
 
         # Only consider "left" as disputed, "right" as candidate
         disputed, candidate = "left", "right"
-        round_hits = 0
-        total_score = 0.0
 
         # Select the most similar impostors to the candidate document once per direction.
         problem_impostors = self._select_problem_impostors(
@@ -125,6 +122,7 @@ class Potha2017Scorer(Scorer):
 
             # 5) Rank candidate similarity among impostors (descending)
             pos = 1 + sum(score > sim_known for score in impostor_scores)
+            logger.info(f"Rounds {self.rounds} impostor scored {pos} impostors ")
             total_score += 1.0 / (self.rounds * pos)
 
         return total_score, {}
@@ -157,7 +155,7 @@ class Potha2017ImpostorDetector(ImpostorDetector):
             portion_delete=self.portion_delete,
             similarity_fn=minmax_similarity,
             impostors_per_problem=impostors_per_problem,
-            impostors_per_repetition=impostors_per_round,
+            impostors_per_round=impostors_per_round,
         )
         # save outputs to extra ablation output collection
         self.impostor_output_collection = self.mongoDB.impostor_ablation_output_collection
