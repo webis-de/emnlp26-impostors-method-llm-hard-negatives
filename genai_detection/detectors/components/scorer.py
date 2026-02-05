@@ -6,13 +6,15 @@ from typing import Dict, Any, List
 import numpy as np
 from statsmodels.stats.proportion import binom_test
 
+from genai_detection.detectors.components.vector_similarity import minmax_similarity
+
 
 class Scorer:
     """
     Performs repeated random-feature deletion scoring (Impostor Method scoring).
     """
 
-    def __init__(self, rounds: int, portion_delete: float, similarity_fn):
+    def __init__(self, rounds: int=50, portion_delete: float=0.4, similarity_fn=minmax_similarity):
         """
         :param rounds: number of random-deletion scoring passes
         :param portion_delete: Portion of features to delete (0–1)
