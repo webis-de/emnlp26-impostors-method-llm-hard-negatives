@@ -152,6 +152,11 @@ __all__ = ["compute_prec_recall_curves_ablations"]
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+    )
+    logger = logging.getLogger(__name__)
     metics_df = compute_prec_recall_curves_ablations(dataset_name=CONFIG.BLOG)
     logger.info(metics_df)
 
