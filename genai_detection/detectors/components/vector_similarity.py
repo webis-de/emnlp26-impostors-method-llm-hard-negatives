@@ -1,4 +1,5 @@
 import numpy as np
+from more_itertools import argmax
 from scipy.sparse import csr_matrix
 from sklearn.metrics.pairwise import cosine_similarity as cs
 
@@ -43,3 +44,23 @@ def minmax_similarity(vec1, vec2):
     numerator = np.minimum(vec1, vec2).sum()
     denominator = np.maximum(vec1, vec2).sum()
     return 0.0 if denominator == 0 else numerator / denominator
+
+def extended_minmax_similarity(candidate, disputed, candidate_fillers):
+    """
+    Calculate extended min-max similarity between two vectors in TFIDF format given a background set of fillers.
+    Khonji & Iraqi (2014) use this version of the min-max similarity.
+    """
+    def get_most_similar_to_reference(reference, fillers):
+        filler_similarities = [
+            minmax_similarity(reference, filler) for filler in fillers
+        ]
+        return fillers[argmax(filler_similarities)]
+    max_sim_imp_to_candidate = get_most_similar_to_reference(reference=candidate, fillers=candidate_fillers)
+    max_sim_imp_to_disputed = get_most_similar_to_reference(
+        reference=disputed, fillers=candidate_fillers
+    )
+    candidate_disputed_min_max = minmax_similarity(candidate, disputed)
+    denominator = max_sim_imp_to_candidate*max_sim_imp_to_disputed
+    if denominator == 0:
+        return 0.0
+    return candidate_disputed_min_max**2/denominator
