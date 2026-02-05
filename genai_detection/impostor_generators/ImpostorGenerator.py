@@ -17,7 +17,7 @@ import os
 import random
 import sys
 from abc import ABC
-from typing import Optional, List, Union, Dict
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 from bson import ObjectId
@@ -59,11 +59,10 @@ class BaseImpostorGenerator(ABC):
         :param reference_text: Reference text
         :return: List of random impostor texts among most similar texts
         """
-        # TODO: tfidf already fitted?
-        if len(all_impostors) <= self.n_impostors:
+        if len(all_impostors) < self.n_impostors:
             logging.info(
                 f"Impostor selection: Number of available impostors ({len(all_impostors)}) "
-                f"is less than or equal to number of requested impostors ({self.n_impostors}). "
+                f"is less than number of requested impostors ({self.n_impostors}). "
                 f"Returning all available impostors."
             )
             return all_impostors
@@ -89,7 +88,8 @@ class BaseImpostorGenerator(ABC):
 
         n_sample = min(len(selected_impostors), self.n_impostors)
         logging.info(
-            f"Impostor selection: Vectorized {vectors.shape[0]} documents with {vectors.shape[1]} features to select {n_sample} among top {n_potential} most similar impostors."
+            f"Impostor selection: Vectorized {vectors.shape[0]} documents with {vectors.shape[1]} features to select "
+            f"{n_sample} among top {n_potential} most similar impostors."
         )
 
         # Sample n_impostors randomly from selected impostors
