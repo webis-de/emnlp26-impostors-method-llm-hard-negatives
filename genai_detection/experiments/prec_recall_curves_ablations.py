@@ -27,10 +27,10 @@ logger = logging.getLogger(__name__)
 
 
 ABLATION_DETECTORS = {
-    # "asgalf": ASGALFImpostorDetector,
-    # "potha2017": Potha2017ImpostorDetector,
-    # "homotopy": HBCImpostorDetector,
+    "potha2017": Potha2017ImpostorDetector,
+    "asgalf": ASGALFImpostorDetector,
     "std_impostor": StdImpostor,
+    # "homotopy": HBCImpostorDetector,
 }
 
 ABLATION_ARGS = {
