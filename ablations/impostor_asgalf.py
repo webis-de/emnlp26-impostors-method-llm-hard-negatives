@@ -10,29 +10,26 @@ The paper's larger impostor selection grouped on languages remain unimplemented 
 from __future__ import annotations
 
 import itertools
+import logging
+import re
 from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List
-
-import re
 
 import nltk
 import numpy as np
 
-nltk.download('averaged_perceptron_tagger_eng')
+nltk.download('averaged_perceptron_tagger_eng', quiet=True)
 from nltk import pos_tag
 
 import scipy.sparse as sp
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
 
-from statsmodels.stats.proportion import binom_test
-
 from genai_detection.detectors.components.scorer import Scorer
 from genai_detection.detectors.components.vector_similarity import (
-    extended_minmax_similarity,
-    minmax_similarity,
-)
+    extended_minmax_similarity, )
 from genai_detection.detectors.impostor import ImpostorDetector
 
+logger = logging.getLogger(__name__)
 
 class ASGALFScorer(Scorer):
     """
