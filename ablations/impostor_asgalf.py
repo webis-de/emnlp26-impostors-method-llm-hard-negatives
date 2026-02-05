@@ -248,48 +248,6 @@ class ASGALFFeatureExtractor:
         return re.sub(r"[^A-Za-z]", "", text)
 
     @staticmethod
-    def _word_tokens(text: str) -> List[str]:
-        """
-        Tokenize into word-like units (letters/digits with optional apostrophes).
-
-        Inputs:
-            text: Raw document text.
-
-        Returns:
-            List of token strings.
-        """
-        # Deprecated: kept for backward compatibility; use ASGALFTokenizer instead.
-        return ASGALFTokenizer.word_tokens(text)
-
-    @staticmethod
-    def _word_shapes(tokens: List[str]) -> List[str]:
-        """
-        Convert tokens into simplified shape patterns (C/c/N).
-
-        Inputs:
-            tokens: List of word tokens.
-
-        Returns:
-            List of shape strings aligned to tokens.
-        """
-        # Deprecated: kept for backward compatibility; use ASGALFTokenizer instead.
-        return ASGALFTokenizer.word_shapes(tokens)
-
-    @staticmethod
-    def _pos_tags(tokens: List[str]) -> List[str]:
-        """
-        Compute POS tags for tokens using NLTK.
-
-        Inputs:
-            tokens: List of word tokens.
-
-        Returns:
-            List of POS tag strings.
-        """
-        # Deprecated: kept for backward compatibility; use ASGALFTokenizer instead.
-        return ASGALFTokenizer.pos_tags(tokens)
-
-    @staticmethod
     def _ngrams(tokens: List[str], n: int) -> List[str]:
         """
         Build contiguous n-grams from a token sequence.
