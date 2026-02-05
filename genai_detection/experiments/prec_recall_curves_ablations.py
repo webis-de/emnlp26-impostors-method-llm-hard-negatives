@@ -18,6 +18,7 @@ from ablations.std_impostor import StdImpostor
 from genai_detection.config import CONFIG
 from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENERATORS
 from genai_detection.experiments.reproduction.impostor_metrics import (compute_metrics_parallel, load_all_pairs, )
+from genai_detection.experiments.reproduction.prec_recall_curves import plot_precision_recall_curve
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 from ablations import (ASGALFImpostorDetector, Potha2017ImpostorDetector,
@@ -172,8 +173,20 @@ if __name__ == "__main__":
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
     logger = logging.getLogger(__name__)
-    metics_df = pd.DataFrame(compute_prec_recall_curves_ablations(dataset_name=CONFIG.BLOG))
-    logger.info(metics_df)
 
-    metics_df.to_csv(LOCAL_SAVE_PATH / "effectiveness_scores.csv", index=False)
-    logger.info(f"Saved effectiveness scores as csv to {LOCAL_SAVE_PATH}/effectiveness_scores.csv.")
+    for dataset_name in [CONFIG.BLOG, CONFIG.STUDENT_ESSAYS]:
+        results_dict = compute_prec_recall_curves_ablations(dataset_name=dataset_name, impostor_technique="in_domain")
+
+        # optional: flatten to a single DataFrame for CSV
+        metrics_df = (
+            pd.concat(
+                {name: df.assign(method=name) for name, df in results_dict.items()},
+                names=["method", "row"],
+            )
+            .reset_index(level=0)
+            .reset_index(drop=True)
+        )
+
+        metrics_df.to_csv(LOCAL_SAVE_PATH / "effectiveness_scores.csv", index=False)
+
+        plot_precision_recall_curve(results=results_dict, dataset_name=dataset_name, save_path=LOCAL_SAVE_PATH)

@@ -365,6 +365,7 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
 def plot_precision_recall_curve(
     results: Dict[str, pd.DataFrame],
     dataset_name: str,
+    save_path: Path = None,
 ):
     """
     Precision–Recall curves (Figures 4a, 4b in Koppel et al., 2014).
@@ -426,6 +427,8 @@ def plot_precision_recall_curve(
                 f"roc_prec_recall_curve_{dataset_name.replace(' ', '_')}_"
                 f"{positive_class.lower().replace(' ', '_')}.{format}"
             )
+            if not save_path:
+                save_path = LOCAL_SAVE_PATH
             plt.savefig(
                 LOCAL_SAVE_PATH / fname,
                 bbox_inches="tight",
