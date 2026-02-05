@@ -118,7 +118,7 @@ class Potha2017Scorer(Scorer):
                         dense_vector(imp_tfidf) for imp_tfidf in vectorizer.transform(problem_impostors_texts)
                     ]
         # Since neither TFIDF, nor original texts are saved to mongodb, we do not need to update pair dictionary
-        logger.info(f"Selected {len(problem_impostors)} most similar impostors")
+        # logger.info(f"Selected {len(problem_impostors)} most similar impostors")
 
         for r in range(self.rounds):
             # 1) Select random features
