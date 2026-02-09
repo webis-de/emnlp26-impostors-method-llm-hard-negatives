@@ -22,13 +22,14 @@ from genai_detection.paraphrasing.two_step_paraphrasers import TwoStepParaphrase
 logger = logging.getLogger(__name__)
 
 class TwoStepImpostorGenerator(NonNaiveLLMImpostorGenerator):
-    def __init__(self, n_impostors: int):
+    def __init__(self, n_impostors: int, top_n_freq_words:int):
         """
         Naive LLM-based impostor generator that uses no naive paraphrasers (i.e. only two-step paraphrasers).
         :param n_impostors: number of impostors to generate
         """
         super().__init__(
             n_impostors=n_impostors,
+            top_n_freq_words = top_n_freq_words
         )
         self.two_step_paraphraser = TwoStepParaphraser()
 
