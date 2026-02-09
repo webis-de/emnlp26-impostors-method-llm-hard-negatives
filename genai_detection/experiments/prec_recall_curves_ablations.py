@@ -54,7 +54,7 @@ ABLATION_ARGS = {
         }
 
 LOCAL_SAVE_PATH = (
-    Path(__file__).resolve().parents[3]
+    Path(__file__).resolve().parents[2]
     / CONFIG.SAVE_PATH
     / "ablations"
 )
