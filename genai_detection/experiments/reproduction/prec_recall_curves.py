@@ -428,12 +428,13 @@ def plot_precision_recall_curve(
                 f"{positive_class.lower().replace(' ', '_')}.{format}"
             )
             if not save_path:
+                logger.warning(f"No save path for {fname}, using default save path: {LOCAL_SAVE_PATH}")
                 save_path = LOCAL_SAVE_PATH
             plt.savefig(
                 LOCAL_SAVE_PATH / fname,
                 bbox_inches="tight",
             )
-            logger.info("Saved %s to %s", fname, LOCAL_SAVE_PATH)
+            logger.info("Saved plot to %s", fname, LOCAL_SAVE_PATH/fname)
 
         fig.clear()
 
