@@ -113,4 +113,6 @@ class BaseConfig:
         "std_impostor": "#98df8a",                 # light green
     }
 
+    DATASET_TRANSLATIONS = {BLOG:"Blog", STUDENT_ESSAYS: "Student Essays"}
+
 CONFIG = BaseConfig()
