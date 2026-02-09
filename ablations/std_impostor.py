@@ -1,5 +1,5 @@
 """
-Caesar (O2-only) variant aligned with the ImpostorDetector pipeline.
+Caesar (O2-only by Kestemont et al., 2016) variant aligned with the ImpostorDetector pipeline.
 
 This keeps the original Impostor logic intact and only swaps the feature
 representation to TF-STD (Burrows, 2002) with Caesar-style word/char n-grams.
