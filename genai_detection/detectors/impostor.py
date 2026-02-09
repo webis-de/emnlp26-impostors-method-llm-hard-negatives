@@ -227,6 +227,12 @@ class ImpostorDetector(ImpostorBase):
             "n_impostors": self.n_impostors,
             "n_potential_impostors": self.impostor_generator.num_potential_impostors,
         }
+        if (
+            self.impostor_output_collection.name
+            == CONFIG.MONGO_IMPOSTOR_ABLATION_OUTPUT_COLLECTION
+        ):
+            # ablations inherit from this method and need to specify their approach type
+            search_args["ablation"] = self.__class__.__name__
         for pair in self.pair_processor.filter_pairs(text_list=text):
             # query for existing score in mongodb collection
             search_args.update({
