@@ -176,10 +176,14 @@ if __name__ == "__main__":
 
     for dataset_name in [CONFIG.BLOG, CONFIG.STUDENT_ESSAYS]:
         results_dict = compute_prec_recall_curves_ablations(dataset_name=dataset_name, impostor_technique="in_domain")
+        logger.info("Results for dataset %s as dictionary:", dataset_name)
         logger.info(results_dict)
         # optional: flatten to a single DataFrame for CSV
         metrics_df = pd.concat(results_dict, names=["method"]).reset_index(level=0)
+        logger.info("Dataframe of results:")
+        logger.info(metrics_df)
 
         metrics_df.to_csv(LOCAL_SAVE_PATH / "effectiveness_scores.csv", index=False)
+        logger.info(f"Saved effectiveness scores to {LOCAL_SAVE_PATH / 'effectiveness_scores.csv'}")
 
         plot_precision_recall_curve(results=results_dict, dataset_name=dataset_name, save_path=LOCAL_SAVE_PATH)
