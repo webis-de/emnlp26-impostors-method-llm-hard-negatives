@@ -90,6 +90,10 @@ class BaseConfig:
         "unmasking": "Unmasking",
         "ppmd": "PPMd",
         "translation": "Translation",
+        "Potha2017ImpostorDetector": "Potha et al., 2017",
+        "ASGALFImpostorDetector": "Khonji & Iraqi, 2014",
+        "StdImpostor": "Kestemont et al., 2016"
+
     }
 
     # Fixed colors per label (matplotlib-compatible)
