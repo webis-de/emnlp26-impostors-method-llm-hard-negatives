@@ -90,9 +90,9 @@ class BaseConfig:
         "unmasking": "Unmasking",
         "ppmd": "PPMd",
         "translation": "Translation",
-        "Potha2017ImpostorDetector": "Potha et al., 2017",
-        "ASGALFImpostorDetector": "Khonji & Iraqi, 2014",
-        "StdImpostor": "Kestemont et al., 2016"
+        "potha2017": "Potha et al., 2017",
+        "asgalf": "Khonji & Iraqi, 2014",
+        "std_impostor": "Kestemont et al., 2016"
 
     }
 
@@ -108,9 +108,9 @@ class BaseConfig:
         "unmasking": "#7f7f7f",  # gray
         "ppmd": "#bcbd22",  # olive
         "translation": "#17becf",  # cyan
-        "Potha2017ImpostorDetector": "#aec7e8",   # light blue
-        "ASGALFImpostorDetector": "#ffbb78",      # light orange
-        "StdImpostor": "#98df8a",                 # light green
+        "potha2017": "#aec7e8",   # light blue
+        "asgalf": "#ffbb78",      # light orange
+        "std_impostor": "#98df8a",                 # light green
     }
 
 CONFIG = BaseConfig()
