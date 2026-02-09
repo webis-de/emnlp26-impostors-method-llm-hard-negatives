@@ -108,6 +108,9 @@ class BaseConfig:
         "unmasking": "#7f7f7f",  # gray
         "ppmd": "#bcbd22",  # olive
         "translation": "#17becf",  # cyan
+        "Potha2017ImpostorDetector": "#aec7e8",   # light blue
+        "ASGALFImpostorDetector": "#ffbb78",      # light orange
+        "StdImpostor": "#98df8a",                 # light green
     }
 
 CONFIG = BaseConfig()
