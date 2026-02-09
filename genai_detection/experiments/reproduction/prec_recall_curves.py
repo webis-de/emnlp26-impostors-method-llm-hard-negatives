@@ -232,10 +232,9 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
 
     mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
 
-    def _normalize_object_id(value):
-        if isinstance(value, ObjectId):
-            return value
-        return ObjectId(value)
+    def _check_id_type(value):
+        assert isinstance(value, ObjectId), f"{value} is not an ObjectId, but of type {type(value)}"
+        return value
 
     def _load_scores_for_technique(technique: str) -> Dict[Tuple[ObjectId, ObjectId], float]:
         query = {
@@ -251,8 +250,8 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
         ).sort("_id", 1)
         scores_by_pair: Dict[Tuple[ObjectId, ObjectId], float] = {}
         for doc in cursor:
-            left_id = _normalize_object_id(doc["left_id"])
-            right_id = _normalize_object_id(doc["right_id"])
+            left_id = _check_id_type(doc["left_id"])
+            right_id = _check_id_type(doc["right_id"])
             pair = (left_id, right_id)
             if pair not in scores_by_pair:
                 scores_by_pair[pair] = doc["scores_over_different_rounds"] / rounds
@@ -265,6 +264,7 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
 
     scores_by_technique: Dict[str, Dict[Tuple[ObjectId, ObjectId], float]] = {}
     for technique in imp_gen_techniques:
+        # key: (left_id, right_id)
         loaded_scores_by_technique = _load_scores_for_technique(technique)
         if len(loaded_scores_by_technique) > 0:
             scores_by_technique[technique] = loaded_scores_by_technique
@@ -274,22 +274,23 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
     if not scores_by_technique:
         raise ValueError("No impostor scores found for any technique.")
 
-    base_pairs_order = list(scores_by_technique[imp_gen_techniques[0]].keys())
-    common_pairs = None
+    # list of keys of type: (left_id, right_id)
+    ordered_keys = list(scores_by_technique[imp_gen_techniques[0]].keys())
+    common_keys_across_techniques = None
     for scores_by_pair in scores_by_technique.values():
-        pairs = set(scores_by_pair.keys())
-        common_pairs = pairs if common_pairs is None else common_pairs & pairs
+        pair_keys = set(scores_by_pair.keys())
+        common_keys_across_techniques = pair_keys if common_keys_across_techniques is None else common_keys_across_techniques & pair_keys
 
-    if not common_pairs:
+    if not common_keys_across_techniques:
         raise ValueError("No common pairs across impostor techniques.")
 
-    ordered_pairs = [p for p in base_pairs_order if p in common_pairs]
+    ordered_keys = [key for key in ordered_keys if key in common_keys_across_techniques]
 
     def _load_ground_truth_for_pairs(
-        pairs: List[Tuple[ObjectId, ObjectId]],
+        keys: List[Tuple[ObjectId, ObjectId]],
     ) -> Dict[Tuple[ObjectId, ObjectId], int]:
         gt_by_pair: Dict[Tuple[ObjectId, ObjectId], int] = {}
-        for batch in _iter_batches(pairs, batch_size):
+        for batch in _iter_batches(keys, batch_size):
             or_conditions = [{"left_id": l, "right_id": r} for l, r in batch]
             cursor = mongoDB.all_pairs_collection.find(
                 {"dataset_name": dataset_name, "$or": or_conditions},
@@ -300,20 +301,26 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
                 gt_by_pair[(doc["left_id"], doc["right_id"])] = int(doc["same"])
         return gt_by_pair
 
-    gt_by_pair = _load_ground_truth_for_pairs(ordered_pairs)
-    pairs_with_gt = [p for p in ordered_pairs if p in gt_by_pair]
-    if len(pairs_with_gt) != len(ordered_pairs):
+    # key of gt_by_pair: (left_id, right_id)
+    gt_by_pair = _load_ground_truth_for_pairs(ordered_keys)
+
+    # (left_id, right_id): value
+    pairs_with_gt = {key:value for key,value in gt_by_pair.items() if key in ordered_keys}
+    if len(pairs_with_gt) != len(ordered_keys):
         logger.warning(
             "Missing ground-truth for %d pairs; dropping them.",
-            len(ordered_pairs) - len(pairs_with_gt),
+            len(ordered_keys) - len(pairs_with_gt),
         )
 
     baselines = _build_baselines(dataset_name=dataset_name)
 
     used_pairs: List[Tuple[ObjectId, ObjectId]] = []
     baseline_predictions: Dict[str, List[float]] = {name: [] for name in baselines.keys()}
-    for batch_pairs in _iter_batches(pairs_with_gt, batch_size):
-        text_ids = {pid for pair in batch_pairs for pid in pair}
+    pairs_items = list(pairs_with_gt.items())   # dict is not hashable -> hence iteration error
+
+    for batch_items in _iter_batches(pairs_items, batch_size):
+        batch_pairs = dict(batch_items)  # back to dict
+        text_ids = {pid for pair in batch_pairs.keys() for pid in pair}
         texts_cursor = mongoDB.original_collection.find(
             {"_id": {"$in": list(text_ids)}},
             {"text": 1},
@@ -349,7 +356,8 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
     ground_truth = [gt_by_pair[p] for p in used_pairs]
     predictions: Dict[str, List[float]] = {}
     for technique in imp_gen_techniques:
-        predictions[technique] = [scores_by_technique[technique][p] for p in used_pairs]
+        if technique in scores_by_technique.keys():
+            predictions[technique] = [scores_by_technique[technique][p] for p in used_pairs]
     predictions.update(baseline_predictions)
 
     return _compute_metrics_for_predictions(
@@ -431,13 +439,12 @@ def plot_precision_recall_curve(
                 logger.warning(f"No save path for {fname}, using default save path: {LOCAL_SAVE_PATH}")
                 save_path = LOCAL_SAVE_PATH
             plt.savefig(
-                LOCAL_SAVE_PATH / fname,
+                save_path / fname,
                 bbox_inches="tight",
             )
-            logger.info("Saved plot to %s", fname, LOCAL_SAVE_PATH/fname)
+            logger.info("Saved plot to %s", save_path/fname)
 
         fig.clear()
-
 
 
 def _extract_best_pr_points_per_impostor(
