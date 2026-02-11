@@ -285,6 +285,7 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
         raise ValueError("No common pairs across impostor techniques.")
 
     ordered_keys = [key for key in ordered_keys if key in common_keys_across_techniques]
+    logger.info(f"Loaded {len(ordered_keys)} common text pairs across different impostor techniques.")
 
     def _load_ground_truth_for_pairs(
         keys: List[Tuple[ObjectId, ObjectId]],
@@ -317,6 +318,7 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
     used_pairs: List[Tuple[ObjectId, ObjectId]] = []
     baseline_predictions: Dict[str, List[float]] = {name: [] for name in baselines.keys()}
     pairs_items = list(pairs_with_gt.items())   # dict is not hashable -> hence iteration error
+    logger.info(f"Found {len(pairs_items)} pairs with ground truth.")
 
     for batch_items in _iter_batches(pairs_items, batch_size):
         batch_pairs = dict(batch_items)  # back to dict
@@ -326,6 +328,9 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
             {"text": 1},
         )
         text_map = {doc["_id"]: doc["text"] for doc in texts_cursor}
+        if len(text_map) == 0:
+            logger.warning(f"No text for texts with IDs %s; skipping.", text_ids)
+            continue
         batch_text_pairs = []
         batch_used_pairs = []
         for left_id, right_id in batch_pairs:
