@@ -81,6 +81,9 @@ class OptimalSupervisedBaseline:
                         logger.error(f"Could not obtain prediction for test pair {pair_id} due to OOM when training.")
                         # avoid OOM
                         continue
+                    if sup_baseline.train_dataset.shape[0] == 0:
+                        logger.error(f"Could not train baseline for test pair {pair_id} due to no existing training data.")
+                        continue
                 except ValueError as e:
                     logger.error(f"Skipping this test pair because SVC training data contains only one class. Error: {e}")
                     continue
