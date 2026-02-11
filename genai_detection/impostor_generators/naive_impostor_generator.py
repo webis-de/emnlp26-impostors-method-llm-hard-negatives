@@ -176,13 +176,11 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
         if text is None:
             text = self.mongoDB.get_text_or_id_from_orginal_collection(text_id=text_id, text=text)
 
-
-        # TODO: create one method with search generator: No, bc i need if here anyway
         impostors, _ = self.obtain_existing_paraphrases(
             collection=self.mongoDB.naive_paraphrase_collection,
             search_args={"text_id": text_id},
         )
-        logging.info("Obtained {} impostors".format(len(impostors)))
+        logging.info("Obtained {} existing impostors from naive paraphrases mongodb collection".format(len(impostors)))
 
         n_imp_to_generate -= len(impostors)
         if n_imp_to_generate <= 0:

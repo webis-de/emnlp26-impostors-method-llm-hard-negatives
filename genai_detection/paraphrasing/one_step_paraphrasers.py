@@ -234,11 +234,21 @@ class SAIAParaphraser(OneStepParaphraser):
     """
 
     def __init__(self, model_id: str = CONFIG.SAIA_MODEL):
-        self.client = OpenAI(
-            base_url=CONFIG.SAIA_URL if os.path.exists("/Users/klara") else os.environ['SAIA_URL'],
-            api_key=CONFIG.SAIA_KEY if os.path.exists("/Users/klara") else os.environ['SAIA_KEY'],
-        )
+        self._init_client()
         self.model_id = model_id
+
+    def _init_client(self, saia_api_key:str= CONFIG.SAIA_KEY):
+        if not saia_api_key:
+            saia_api_key = CONFIG.SAIA_KEY if os.path.exists("/Users/klara") else os.environ["SAIA_KEY"]
+
+        self.client = OpenAI(
+            base_url=(
+                CONFIG.SAIA_URL
+                if os.path.exists("/Users/klara")
+                else os.environ["SAIA_URL"]
+            ),
+            api_key=saia_api_key,
+        )
 
     def paraphrase(
         self,
