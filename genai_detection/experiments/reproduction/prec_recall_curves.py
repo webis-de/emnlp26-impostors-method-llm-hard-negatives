@@ -31,7 +31,8 @@ from genai_detection.detectors.impostor_supervised_baseline import SupervisedImp
 from genai_detection.detectors.impostor_unsupervised_baseline import UnSupervisedImpostorBaseline
 from genai_detection.detectors.ppmd import PPMdDetector
 from genai_detection.detectors.unmasking import UnmaskingDetector
-from genai_detection.experiments.reproduction.impostor_metrics import (compute_metrics_parallel, load_all_pairs, )
+from genai_detection.experiments.reproduction.impostor_metrics import (compute_metrics_for_thresholds,
+                                                                       compute_metrics_parallel, load_all_pairs, )
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -232,6 +233,8 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
 
     mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
 
+    results = {}
+
     def _check_id_type(value):
         assert isinstance(value, ObjectId), f"{value} is not an ObjectId, but of type {type(value)}"
         return value
@@ -262,31 +265,6 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
         )
         return scores_by_pair
 
-    scores_by_technique: Dict[str, Dict[Tuple[ObjectId, ObjectId], float]] = {}
-    for technique in imp_gen_techniques:
-        # key: (left_id, right_id)
-        loaded_scores_by_technique = _load_scores_for_technique(technique)
-        if len(loaded_scores_by_technique) > 0:
-            scores_by_technique[technique] = loaded_scores_by_technique
-        else:
-            logger.warning(f"No scores for technique {technique} found in mongoDB.")
-
-    if not scores_by_technique:
-        raise ValueError("No impostor scores found for any technique.")
-
-    # list of keys of type: (left_id, right_id)
-    ordered_keys = list(scores_by_technique[imp_gen_techniques[0]].keys())
-    common_keys_across_techniques = None
-    for scores_by_pair in scores_by_technique.values():
-        pair_keys = set(scores_by_pair.keys())
-        common_keys_across_techniques = pair_keys if common_keys_across_techniques is None else common_keys_across_techniques & pair_keys
-
-    if not common_keys_across_techniques:
-        raise ValueError("No common pairs across impostor techniques.")
-
-    ordered_keys = [key for key in ordered_keys if key in common_keys_across_techniques]
-    logger.info(f"Loaded {len(ordered_keys)} common text pairs across different impostor techniques.")
-
     def _load_ground_truth_for_pairs(
         keys: List[Tuple[ObjectId, ObjectId]],
     ) -> Dict[Tuple[ObjectId, ObjectId], int]:
@@ -302,74 +280,70 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
                 gt_by_pair[(doc["left_id"], doc["right_id"])] = int(doc["same"])
         return gt_by_pair
 
-    # key of gt_by_pair: (left_id, right_id)
-    gt_by_pair = _load_ground_truth_for_pairs(ordered_keys)
+    for technique in imp_gen_techniques:
+        # key: (left_id, right_id)
+        loaded_scores_by_technique = _load_scores_for_technique(technique)
+        if len(loaded_scores_by_technique) > 0:
+            loaded_keys = list(loaded_scores_by_technique.keys())
+            gt_by_pair = _load_ground_truth_for_pairs(loaded_keys)
+            ordered_keys = sorted(
+                key for key in loaded_keys if key in gt_by_pair
+            )
+            if len(ordered_keys) != len(loaded_scores_by_technique):
+                logger.warning(
+                    "Missing ground-truth for %d pairs (technique=%s); dropping them.",
+                    len(loaded_scores_by_technique) - len(ordered_keys),
+                    technique,
+                )
+            else:
+                logger.info("All loaded %d pairs (technique=%s) have a ground truth.",
+                    len(loaded_scores_by_technique) ,
+                    technique,)
+            ground_truth = [gt_by_pair[key] for key in ordered_keys]
+            predictions = [loaded_scores_by_technique[key] for key in ordered_keys]
 
-    # (left_id, right_id): value
-    pairs_with_gt = {key:value for key,value in gt_by_pair.items() if key in ordered_keys}
-    if len(pairs_with_gt) != len(ordered_keys):
-        logger.warning(
-            "Missing ground-truth for %d pairs; dropping them.",
-            len(ordered_keys) - len(pairs_with_gt),
-        )
+            # for technique, predictions in predictions.items():
+            results[technique] = compute_metrics_for_thresholds(
+                ground_truth=ground_truth,
+                scores=predictions,
+                thresholds=CONFIG.THRESHOLDS,
+            )
+            logger.info(f"Results for {technique}: {results[technique]}")
+        else:
+            logger.warning(f"No scores for technique {technique} found in mongoDB.")
 
     baselines = _build_baselines(dataset_name=dataset_name)
-
-    used_pairs: List[Tuple[ObjectId, ObjectId]] = []
-    baseline_predictions: Dict[str, List[float]] = {name: [] for name in baselines.keys()}
-    pairs_items = list(pairs_with_gt.items())   # dict is not hashable -> hence iteration error
-    logger.info(f"Found {len(pairs_items)} pairs with ground truth.")
-
-    for batch_items in _iter_batches(pairs_items, batch_size):
-        batch_pairs = dict(batch_items)  # back to dict
-        text_ids = {pid for pair in batch_pairs.keys() for pid in pair}
-        texts_cursor = mongoDB.original_collection.find(
-            {"_id": {"$in": list(text_ids)}},
-            {"text": 1},
-        )
-        text_map = {doc["_id"]: doc["text"] for doc in texts_cursor}
-        if len(text_map) == 0:
-            logger.warning(f"No text for texts with IDs %s; skipping.", text_ids)
-            continue
-        batch_text_pairs = []
-        batch_used_pairs = []
-        for left_id, right_id in batch_pairs:
-            left_text = text_map.get(left_id)
-            right_text = text_map.get(right_id)
-            if left_text is None or right_text is None:
-                logger.warning(
-                    "Missing text for pair (%s, %s); skipping.",
-                    left_id,
-                    right_id,
-                )
-                continue
-            batch_text_pairs.append((left_text, right_text))
-            batch_used_pairs.append((left_id, right_id))
-        if not batch_text_pairs:
-            continue
-        batch_preds = _score_baselines_for_pair_batches(
-            baselines=baselines,
-            pair_batches=[batch_text_pairs],
-        )
-        for name, preds in batch_preds.items():
-            baseline_predictions[name].extend(preds)
-        used_pairs.extend(batch_used_pairs)
-
-    if not used_pairs:
-        raise ValueError("No usable pairs after text lookup; aborting.")
-
-    ground_truth = [gt_by_pair[p] for p in used_pairs]
-    predictions: Dict[str, List[float]] = {}
-    for technique in imp_gen_techniques:
-        if technique in scores_by_technique.keys():
-            predictions[technique] = [scores_by_technique[technique][p] for p in used_pairs]
-    predictions.update(baseline_predictions)
-
-    return _compute_metrics_for_predictions(
-        ground_truth=ground_truth,
-        predictions=predictions,
+    # load all pairs per dataset
+    text_id_pairs, ground_truth = load_all_pairs(dataset_name)
+    text_id_pairs_len = len(text_id_pairs)
+    assert (
+        text_id_pairs_len % 2 == 0
+    ), "Flattened text list must contain even number of elements but length is {}".format(
+        text_id_pairs_len
+    )
+    logger.info(
+        "Number of texts used %d, number of pairs %d",
+        text_id_pairs_len,
+        text_id_pairs_len // 2,
     )
 
+    text_test_pairs = mongoDB.get_texts_for_ids(text_ids=text_id_pairs)
+
+    text_pairs = list(zip(text_test_pairs[0::2], text_test_pairs[1::2]))
+    baseline_predictions = _score_baselines_for_pair_batches(
+        baselines=baselines,
+        pair_batches=[text_pairs],
+    )
+
+    for baseline, pred in baseline_predictions.items():
+        results[baseline] = compute_metrics_for_thresholds(
+            ground_truth=ground_truth,
+            scores=baseline_predictions[baseline],
+            thresholds=CONFIG.THRESHOLDS,
+        )
+        logger.info(f"Results for {baseline}: {results[baseline]}")
+
+    return results
 
 # ---------------------------------------------------------------------
 # Plotting
