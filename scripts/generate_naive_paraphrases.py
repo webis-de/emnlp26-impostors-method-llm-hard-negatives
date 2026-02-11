@@ -73,7 +73,7 @@ def main() -> None:
     parser.add_argument(
         "--workers",
         type=int,
-        default=1,#None,
+        default=2,#None,
         help="Number of parallel workers (defaults to number of SAIA keys).",
     )
     args = parser.parse_args()
