@@ -9,6 +9,8 @@ original impostor method are:
   frequencies (authors specify letters, hence no numbers; they say 'up to three', hence one, two and three)).
   - Scoring via sparse reconstruction (homotopy-style L1) instead of similarity-based "wins".
   - No role swap
+  - Here, we allow any impostor generation, but in the original paper they only decribe search-based (or:
+  "on-the-fly") impostor generation
 What is Sparse Representation classification?
 1. Select random impostors and texts from the candidate author (one or more, here: one)
 2. Selected texts are represented in Vector Space Model using features listed above
