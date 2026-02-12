@@ -21,20 +21,27 @@ from genai_detection.experiments.reproduction.impostor_metrics import (compute_m
 from genai_detection.experiments.reproduction.prec_recall_curves import plot_precision_recall_curve
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
-from ablations import (ASGALFImpostorDetector, Potha2017ImpostorDetector,
-                       )
+from ablations import (
+    ASGALFImpostorDetector,
+    HBCImpostorDetector,
+    Potha2017ImpostorDetector,
+)
 
 logger = logging.getLogger(__name__)
 
 
 ABLATION_DETECTORS = {
+    "homotopy": HBCImpostorDetector,
     "potha2017": Potha2017ImpostorDetector,
     "asgalf": ASGALFImpostorDetector,
     "std_impostor": StdImpostor,
-    # "homotopy": HBCImpostorDetector,
 }
 
 ABLATION_ARGS = {
+        "homotopy":{
+            "rounds": 50,
+            "n_impostors": 20,
+            },
         "asgalf":{
             "rounds": 50,
             "portion_delete": 0.6,
