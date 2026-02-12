@@ -199,14 +199,14 @@ class HBCScorer:
         self,
         rounds: int,
         impostor_keep_ratio: float = 0.5,
-        # alpha: float = 0.001,
+        alpha: float = 0.001,
         max_iter: int = 500,
         tol: float = 1e-4,
         random_state: int | None = None,
     ):
         self.rounds = rounds
         self.impostor_keep_ratio = impostor_keep_ratio
-        # self.alpha = alpha
+        self.alpha = alpha
         self.max_iter = max_iter
         self.tol = tol
         self.random_state = random_state
@@ -311,7 +311,7 @@ class HBCImpostorDetector(ImpostorDetector):
         self.scorer = HBCScorer(
             rounds=self.rounds,
             impostor_keep_ratio=impostor_keep_ratio,
-            # alpha=homotopy_alpha,
+            alpha=0.001,
         )
         # save outputs to extra ablation output collection
         self.impostor_output_collection = self.mongoDB.impostor_ablation_output_collection
