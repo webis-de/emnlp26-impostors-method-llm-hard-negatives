@@ -40,7 +40,7 @@ ABLATION_DETECTORS = {
 ABLATION_ARGS = {
         "homotopy":{
             "rounds": 50,
-            "n_impostors": 20,
+            "n_impostors": 50,
             },
         "asgalf":{
             "rounds": 50,
