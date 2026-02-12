@@ -5,10 +5,20 @@ Homotopy-based classification (HBC) impostor variant.
 This module adapts the ImpostorDetector to the Homotopy-based Classification
 scheme described by Gutierrez et al. (2015). The only differences from the
 original impostor method are:
-  - Document representation (bag of words, word bigrams, punctuation counts,
-    and letter trigrams).
-  - Scoring via sparse reconstruction (homotopy-style L1) instead of
-    similarity-based "wins".
+  - Document representation (bag of words frequencies, word bigrams frequencies,
+  punctuation counts for non-English texts (hence: here ignored due to only English texts), and character trigram
+  frequencies (authors specify letters, hence no numbers; they say 'up to three', hence one, two and three)).
+  - Scoring via sparse reconstruction (homotopy-style L1) instead of similarity-based "wins".
+  - No role swap
+What is Sparse Representation classification?
+1. Select random impostors and texts from the candidate author (one or more, here: one)
+2. Selected texts are represented in Vector Space Model using features listed above
+3. Selected texts (text = column) combined are matrix A
+4. Use L_1 homotopy algorithm (sparse coding = forces only few non-zero entries) to find optimal x' s.t. y = Ax' (almost)
+5. Compute residuals r_i(y) = |y- Ax'_i| for each class i (impostors vs. candidate texts) where x'_i masks all
+non-class members with 0
+6. If candidate class = class i with minimal residual: This experiment suggest same authorship
+7. Repeat with different sample of impostors and candidate texts
 """
 from __future__ import annotations
 
@@ -33,9 +43,9 @@ from genai_detection.detectors.impostor import ImpostorDetector
 class HBCFeatureConfig:
     """Configuration for homotopy-based document features."""
 
-    include_words: bool = True
+    include_words_unigrams: bool = True
     include_word_bigrams: bool = True
-    include_punctuation: bool = True
+    include_punctuation: bool = False # Gutierrez et al. (2015) only include for non-English texts
     include_char_trigrams: bool = True
     min_df: int = 1
     max_features: int | None = None
@@ -77,6 +87,23 @@ class HBCFeatureExtractor:
 
     @staticmethod
     def _char_trigram_tokens(text: str) -> List[str]:
+        """
+        Extract sliding character trigrams over the sequence of letters only.
+
+        Implementation rationale (strict replication):
+        Following Gutierrez et al. (PAN 2015), character features are defined as
+        "three consecutive letters". We therefore:
+            - lowercase the text,
+            - remove all non-letter characters,
+            - compute trigrams over the resulting continuous letter stream.
+
+        Importantly, we do NOT preserve whitespace or enforce word boundaries.
+        This allows trigrams to cross original word boundaries, which is
+        consistent with the standard sliding-window letter n-gram extraction
+        commonly used in PAN-style authorship systems of that period.
+
+        No boundary markers are inserted and no per-word splitting is performed.
+        """
         letters = re.sub(r"[^A-Za-z]", "", text.lower())
         if len(letters) < 3:
             return []
@@ -86,7 +113,7 @@ class HBCFeatureExtractor:
         self._vectorizers = []
         cfg = self.config
 
-        if cfg.include_words or cfg.include_word_bigrams:
+        if cfg.include_words_unigrams or cfg.include_word_bigrams:
             analyzer = (
                 self._word_and_bigram_tokens
                 if cfg.include_word_bigrams
@@ -203,66 +230,51 @@ class HBCScorer:
 
     def score_pair(self, pair: Dict[str, Any], vectorizer) -> ScoreResult:
         total_score = 0.0
-        p_values: Dict[str, float] = {}
+        disputed, candidate = "left", "right"
+        disputed_vec = np.asarray(pair[disputed]["tfidf"], dtype=float)
+        # should also be sampled but we only have one candidate text at the time
+        candidate_vecs = [pair[candidate]["tfidf"]]
 
-        for j, (disputed, candidate) in enumerate(
-            [("left", "right"), ("right", "left")]
-        ):
-            round_score = 0
-            disputed_vec = np.asarray(pair[disputed]["tfidf"], dtype=float)
-            candidate_vecs = [pair[candidate]["tfidf"]]
-
-            for _ in range(self.rounds):
-                impostors = self._sample_impostors(
-                    pair[candidate]["impostors_tfidf"]
-                )
-
-                if not impostors:
-                    continue
-
-                # Build dictionary A with candidate docs first, then impostors.
-                cols = candidate_vecs + impostors
-                A = np.stack(cols, axis=1)
-
-                # Solve y ~ A x with L1 regularization (homotopy-style).
-                model = LassoLars(
-                    alpha=self.alpha,
-                    fit_intercept=False,
-                    max_iter=self.max_iter,
-                    eps=self.tol,
-                )
-                model.fit(A, disputed_vec)
-                coeffs = model.coef_
-
-                # Residuals: candidate identity (all candidate columns) vs each impostor.
-                candidate_idx = list(range(len(candidate_vecs)))
-                r_candidate = self._residual(disputed_vec, A, coeffs, candidate_idx)
-                r_impostors = [
-                    self._residual(
-                        disputed_vec,
-                        A,
-                        coeffs,
-                        [len(candidate_vecs) + i],
-                    )
-                    for i in range(len(impostors))
-                ]
-
-                if r_impostors and r_candidate <= min(r_impostors):
-                    round_score += 1
-
-            total_score += round_score
-            p_feat_name = (
-                f"{disputed}_disputed_{candidate}_candidate_uncorrected_p_value"
+        for _ in range(self.rounds):
+            impostors = self._sample_impostors(
+                pair[candidate]["impostors_tfidf"]
             )
-            p_values[p_feat_name] = binom_test(
-                count=int(round_score),
-                nobs=self.rounds,
-                prop=1 / (1 + len(pair[candidate]["impostors_tfidf"])),
-                alternative="larger",
-            )
-            total_score /= j + 1
 
-        return ScoreResult(score=total_score, p_values=p_values)
+            if not impostors:
+                continue
+
+            # Build dictionary A with candidate docs first, then impostors.
+            cols = candidate_vecs + impostors
+            A = np.stack(cols, axis=1)
+
+            # Solve y ~ A x with L1 regularization (homotopy-style).
+            model = LassoLars(
+                alpha=self.alpha,
+                fit_intercept=False,
+                max_iter=self.max_iter,
+                eps=self.tol,
+            )
+            model.fit(A, disputed_vec)
+            coeffs = model.coef_
+
+            # Residuals: candidate identity (all candidate columns) vs each impostor.
+            # usually: only one candidate text, but generally more are possible
+            candidate_idx = list(range(len(candidate_vecs)))
+            r_candidate = self._residual(disputed_vec, A, coeffs, candidate_idx)
+            r_impostors = [
+                self._residual(
+                    disputed_vec,
+                    A,
+                    coeffs,
+                    [len(candidate_vecs) + i],
+                )
+                for i in range(len(impostors))
+            ]
+
+            if r_impostors and r_candidate <= min(r_impostors):
+                total_score += 1
+
+        return ScoreResult(score=total_score/self.rounds, p_values={})
 
 
 class HBCImpostorDetector(ImpostorDetector):
@@ -283,7 +295,7 @@ class HBCImpostorDetector(ImpostorDetector):
         super().__init__(*args, **kwargs)
 
         feature_config = HBCFeatureConfig(
-            include_words=True,
+            include_words_unigrams=True,
             include_word_bigrams=True,
             include_punctuation=True,
             include_char_trigrams=True,
