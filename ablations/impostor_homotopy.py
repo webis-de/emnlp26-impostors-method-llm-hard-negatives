@@ -33,6 +33,7 @@ import numpy as np
 import scipy.sparse as sp
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LassoLars
+# import spams
 from sklearn.preprocessing import normalize
 from statsmodels.stats.proportion import binom_test
 
@@ -198,14 +199,14 @@ class HBCScorer:
         self,
         rounds: int,
         impostor_keep_ratio: float = 0.5,
-        alpha: float = 0.001,
+        # alpha: float = 0.001,
         max_iter: int = 500,
         tol: float = 1e-4,
         random_state: int | None = None,
     ):
         self.rounds = rounds
         self.impostor_keep_ratio = impostor_keep_ratio
-        self.alpha = alpha
+        # self.alpha = alpha
         self.max_iter = max_iter
         self.tol = tol
         self.random_state = random_state
@@ -257,6 +258,7 @@ class HBCScorer:
             )
             model.fit(A, disputed_vec)
             coeffs = model.coef_
+            # coeffs = spams.lasso(A, disputed_vec, lambda1=0.1)
 
             # Residuals: candidate identity (all candidate columns) vs each impostor.
             # usually: only one candidate text, but generally more are possible
@@ -289,11 +291,12 @@ class HBCImpostorDetector(ImpostorDetector):
     def __init__(
         self,
         *args,
-        impostor_keep_ratio: float = 0.5,
-        homotopy_alpha: float = 0.001,
+        n_impostors: int  = 50,
+        # homotopy_alpha: float = 0.001,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs, n_impostors=n_impostors)
+        impostor_keep_ratio = n_impostors / self.impostor_generator.num_potential_impostors
 
         feature_config = HBCFeatureConfig(
             include_words_unigrams=True,
@@ -308,7 +311,7 @@ class HBCImpostorDetector(ImpostorDetector):
         self.scorer = HBCScorer(
             rounds=self.rounds,
             impostor_keep_ratio=impostor_keep_ratio,
-            alpha=homotopy_alpha,
+            # alpha=homotopy_alpha,
         )
         # save outputs to extra ablation output collection
         self.impostor_output_collection = self.mongoDB.impostor_ablation_output_collection
