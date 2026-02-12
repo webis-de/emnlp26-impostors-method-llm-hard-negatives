@@ -24,20 +24,17 @@ non-class members with 0
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Any, Dict, Iterable, List
-
-import re
+from typing import Any, Dict, List
 
 import numpy as np
 import scipy.sparse as sp
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LassoLars
-
 # import spams
 from sklearn.preprocessing import normalize
-from statsmodels.stats.proportion import binom_test
 
 from genai_detection.detectors.components.scorer import ScoreResult
 from genai_detection.detectors.impostor import ImpostorDetector
