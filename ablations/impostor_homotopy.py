@@ -21,6 +21,7 @@ non-class members with 0
 6. If candidate class = class i with minimal residual: This experiment suggest same authorship
 7. Repeat with different sample of impostors and candidate texts
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -33,6 +34,7 @@ import numpy as np
 import scipy.sparse as sp
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LassoLars
+
 # import spams
 from sklearn.preprocessing import normalize
 from statsmodels.stats.proportion import binom_test
@@ -47,7 +49,9 @@ class HBCFeatureConfig:
 
     include_words_unigrams: bool = True
     include_word_bigrams: bool = True
-    include_punctuation: bool = False # Gutierrez et al. (2015) only include for non-English texts
+    include_punctuation: bool = (
+        False  # Gutierrez et al. (2015) only include for non-English texts
+    )
     include_char_trigrams: bool = True
     min_df: int = 1
     max_features: int | None = None
@@ -222,7 +226,9 @@ class HBCScorer:
         return [impostors[i] for i in idx]
 
     @staticmethod
-    def _residual(y: np.ndarray, A: np.ndarray, coeffs: np.ndarray, idx: List[int]) -> float:
+    def _residual(
+        y: np.ndarray, A: np.ndarray, coeffs: np.ndarray, idx: List[int]
+    ) -> float:
         if not idx:
             return float("inf")
         masked = np.zeros_like(coeffs)
@@ -238,9 +244,7 @@ class HBCScorer:
         candidate_vecs = [pair[candidate]["tfidf"]]
 
         for _ in range(self.rounds):
-            impostors = self._sample_impostors(
-                pair[candidate]["impostors_tfidf"]
-            )
+            impostors = self._sample_impostors(pair[candidate]["impostors_tfidf"])
 
             if not impostors:
                 continue
@@ -277,7 +281,7 @@ class HBCScorer:
             if r_impostors and r_candidate <= min(r_impostors):
                 total_score += 1
 
-        return ScoreResult(score=total_score/self.rounds, p_values={})
+        return ScoreResult(score=total_score / self.rounds, p_values={})
 
 
 class HBCImpostorDetector(ImpostorDetector):
@@ -291,12 +295,14 @@ class HBCImpostorDetector(ImpostorDetector):
     def __init__(
         self,
         *args,
-        n_impostors: int  = 50,
+        n_impostors: int = 50,
         # homotopy_alpha: float = 0.001,
         **kwargs,
     ):
         super().__init__(*args, **kwargs, n_impostors=n_impostors)
-        impostor_keep_ratio = n_impostors / self.impostor_generator.num_potential_impostors
+        impostor_keep_ratio = (
+            n_impostors / self.impostor_generator.num_potential_impostors
+        )
 
         feature_config = HBCFeatureConfig(
             include_words_unigrams=True,
@@ -314,7 +320,9 @@ class HBCImpostorDetector(ImpostorDetector):
             alpha=0.001,
         )
         # save outputs to extra ablation output collection
-        self.impostor_output_collection = self.mongoDB.impostor_ablation_output_collection
+        self.impostor_output_collection = (
+            self.mongoDB.impostor_ablation_output_collection
+        )
 
 
 __all__ = ["HBCImpostorDetector"]
