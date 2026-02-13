@@ -23,6 +23,7 @@ from genai_detection.experiments.reproduction.prec_recall_curves import plot_pre
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 from ablations import (
     ASGALFImpostorDetector,
+    BDIImpostorDetector,
     HBCImpostorDetector,
     Potha2017ImpostorDetector,
 )
@@ -31,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 ABLATION_DETECTORS = {
+    "bdi": BDIImpostorDetector,
     "homotopy": HBCImpostorDetector,
     "potha2017": Potha2017ImpostorDetector,
     "asgalf": ASGALFImpostorDetector,
@@ -38,6 +40,11 @@ ABLATION_DETECTORS = {
 }
 
 ABLATION_ARGS = {
+        "bdi": {
+            "rounds": 50,
+            "portion_delete": 0.67,
+            "n_impostors": 50,
+        },
         "homotopy":{
             "rounds": 50,
             "n_impostors": 50,
