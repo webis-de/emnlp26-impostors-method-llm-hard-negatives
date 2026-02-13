@@ -95,8 +95,8 @@ class BaseConfig:
         "translation": "Translation",
         "potha2017": "Potha et al., 2017",
         "asgalf": "Khonji & Iraqi, 2014",
-        "std_impostor": "Kestemont et al., 2016"
-
+        "std_impostor": "Kestemont et al., 2016",
+        "bdi": "Nagy, 2024"
     }
 
     # Fixed colors per label (matplotlib-compatible)
@@ -114,6 +114,7 @@ class BaseConfig:
         "potha2017": "#aec7e8",   # light blue
         "asgalf": "#ffbb78",      # light orange
         "std_impostor": "#98df8a",                 # light green
+        "bdi": "#c5b0d5",  # light purple
     }
 
     DATASET_TRANSLATIONS = {BLOG:"Blog", STUDENT_ESSAYS: "Student Essays"}
