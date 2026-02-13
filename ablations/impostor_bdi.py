@@ -45,7 +45,7 @@ class BDIScorer(Scorer):
 
     def __init__(
         self,
-        rounds: int = 50,   # Nagy (2024) does not specify beyond "repeat n times"
+        rounds: int = 100,   # Nagy (2024) does not specify beyond "repeat n times", but BDI implementation has 100 nb_bootstrap_iter
         portion_delete: float = 0.67,   # cf. Bootstrap Distance Imposters (BDI) ablation by Nagy (2024)
         similarity_fn=minmax_similarity,    # Nagy (2024) reported minmax and cosine scores
     ):
