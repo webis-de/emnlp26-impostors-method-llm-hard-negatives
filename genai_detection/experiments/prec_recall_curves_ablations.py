@@ -41,9 +41,9 @@ ABLATION_DETECTORS = {
 
 ABLATION_ARGS = {
         "bdi": {
-            "rounds": 50,
-            "portion_delete": 0.67,
-            "n_impostors": 50,
+            "rounds": 100,   # Nagy (2024) does not specify beyond "repeat n times", but BDI implementation has 100 nb_bootstrap_iter
+            "portion_delete": 0.67, # cf. Nagy (2024)
+            "n_impostors": 30,   # Nagy (2024) does not specify, but BDI implementation has 30 nb_impostors
         },
         "homotopy":{
             "rounds": 50,
