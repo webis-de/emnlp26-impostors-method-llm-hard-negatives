@@ -21,6 +21,7 @@ import typing as t
 from typing import Any, Dict, List
 
 import numpy as np
+import scipy as sp
 
 from genai_detection.detectors.components.scorer import ScoreResult, Scorer
 from genai_detection.detectors.components.vector_similarity import minmax_similarity
@@ -61,12 +62,17 @@ class BDIScorer(Scorer):
 
     @staticmethod
     def _mass_above_zero(diffs: List[float]) -> float:
+        """
+        This corresponds to the original's implementation's approach to scoring.
+        Refer to https://github.com/bnagy/ruzicka/blob/bfd33af0cdece337872eefbb06461b05c3791ea9/ruzicka/BDIVerifier.py#L409
+        (13.02.2026) for more information.
+        :param diffs:
+        :return:
+        """
+
         if not diffs:
             return 0.5
-        arr = np.asarray(diffs, dtype=float)
-        gt = np.sum(arr > 0.0)
-        eq = np.sum(arr == 0.0)
-        return float((gt + 0.5 * eq) / len(arr))
+        return float((100 - sp.stats.percentileofscore(diffs, 0)) / 100.0)
 
     def score_pair(self, pair: Dict[str, Any], vectorizer) -> ScoreResult:
         assert (
