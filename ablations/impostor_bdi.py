@@ -30,7 +30,7 @@ from genai_detection.detectors.impostor import ImpostorDetector
 
 class BDIScorer(Scorer):
     """
-    Scorer implementing Bootstrap Distance Imposters.
+    Scorer implementing Bootstrap Distance Imposters (BDI).
 
     For each round:
     1) sample random feature subset,
@@ -38,10 +38,10 @@ class BDIScorer(Scorer):
     3) select closest impostor and candidate (minimum distance),
     4) compute diff = d(disputed, closest_impostor) - d(disputed, closest_candidate).
 
-    In our scenario, we have only one candidate.
+    In this repository's pairwise setup, there is exactly one candidate vector.
 
-    Final score is the estimated probability mass above zero
-    (ties at zero contribute half).
+    The probability estimate follows Ruzicka's BDI implementation:
+    ``proba = (100 - percentileofscore(diffs, 0)) / 100``.
     """
 
     def __init__(
@@ -57,17 +57,23 @@ class BDIScorer(Scorer):
         )
 
     def _distance(self, a: np.ndarray, b: np.ndarray) -> float:
-        # Convert similarity to distance in [0, 1] for minmax/cosine-like metrics.
+        """Convert similarity output to distance-like form in [0, 1]."""
         return 1.0 - float(self.similarity_fn(a, b))
 
     @staticmethod
     def _mass_above_zero(diffs: List[float]) -> float:
         """
-        This corresponds to the original's implementation's approach to scoring.
-        Refer to https://github.com/bnagy/ruzicka/blob/bfd33af0cdece337872eefbb06461b05c3791ea9/ruzicka/BDIVerifier.py#L409
-        (13.02.2026) for more information.
-        :param diffs:
-        :return:
+        Map bootstrap distance differences to a probability-like score.
+
+        This mirrors ``BDIVerifier.predict_proba``:
+        ``(100 - scipy.stats.percentileofscore(diffs, 0)) / 100``.
+
+        Args:
+            diffs: Bootstrap differences where each element is
+                ``d(disputed, impostor) - d(disputed, candidate)``.
+
+        Returns:
+            Score in [0, 1]. If no valid differences exist, returns 0.5.
         """
 
         if not diffs:
@@ -75,6 +81,17 @@ class BDIScorer(Scorer):
         return float((100 - sp.stats.percentileofscore(diffs, 0)) / 100.0)
 
     def score_pair(self, pair: Dict[str, Any], vectorizer) -> ScoreResult:
+        """
+        Score one pair via BDI bootstrapped distance differences.
+
+        Args:
+            pair: Pair dictionary containing left/right TF-IDF vectors and
+                candidate-side impostor vectors.
+            vectorizer: Fitted vectorizer-like object exposing ``vocabulary_``.
+
+        Returns:
+            ``ScoreResult`` with BDI score and an empty p-values dict.
+        """
         assert (
             vectorizer.vocabulary_ is not None
         ), "Vectorizer must be fitted before scoring."
@@ -104,8 +121,8 @@ class BDIScorer(Scorer):
             )
             diffs.append(float(diff))
 
-        # Base ImpostorDetector divides returned scores by `self.rounds`.
-        # Rescale so the final externally reported score equals BDI probability mass.
+        # ImpostorDetector normalizes returned scores by `self.rounds`.
+        # Rescale here so the externally reported value remains the BDI score.
         return ScoreResult(score=self._mass_above_zero(diffs) * self.rounds, p_values={})
 
 
@@ -118,6 +135,12 @@ class BDIImpostorDetector(ImpostorDetector):
     """
 
     def __init__(self, *args, **kwargs):
+        """
+        Initialize BDI by replacing only the scoring component.
+
+        All preprocessing, impostor generation, feature extraction, caching,
+        and persistence remain inherited from ``ImpostorDetector``.
+        """
         super().__init__(*args, **kwargs)
         self.scorer = BDIScorer(
             rounds=self.rounds,
