@@ -10,6 +10,9 @@ with the BDI-style bootstrap distance differences described by Nagy (2024):
     - select closest impostor and closest candidate (here: only one) to disputed text
     - compute d(disputed, impostor) - d(disputed, candidate) (= one point in distribution)
 - summarize the resulting distribution by probability mass above zero.
+
+Find other implementations:
+- https://github.com/bnagy/ruzicka/blob/main/ruzicka/BDIVerifier.py (13.02.2026)
 """
 
 from __future__ import annotations

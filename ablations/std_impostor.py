@@ -3,6 +3,10 @@ Caesar (O2-only by Kestemont et al., 2016) variant aligned with the ImpostorDete
 
 This keeps the original Impostor logic intact and only swaps the feature
 representation to TF-STD (Burrows, 2002) with Caesar-style word/char n-grams.
+
+Find other implementations:
+- https://computationalstylistics.github.io/docs/imposters (12.02.2026)
+- https://github.com/bnagy/ruzicka/blob/main/ruzicka/Order2Verifier.py (13.02.2026)
 """
 from __future__ import annotations
 
