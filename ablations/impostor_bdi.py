@@ -121,9 +121,7 @@ class BDIScorer(Scorer):
             )
             diffs.append(float(diff))
 
-        # ImpostorDetector normalizes returned scores by `self.rounds`.
-        # Rescale here so the externally reported value remains the BDI score.
-        return ScoreResult(score=self._mass_above_zero(diffs) * self.rounds, p_values={})
+        return ScoreResult(score=self._mass_above_zero(diffs), p_values={})
 
 
 class BDIImpostorDetector(ImpostorDetector):
