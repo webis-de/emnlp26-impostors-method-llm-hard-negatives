@@ -291,9 +291,11 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
             )
             if len(ordered_keys) != len(loaded_scores_by_technique):
                 logger.warning(
-                    "Missing ground-truth for %d pairs (technique=%s); dropping them.",
+                    "Missing ground-truth for %d pairs (technique=%s, dataset=%s); dropping them. Since the "
+                    "'dataset_name' is not saved in the 'impostors_outputs' collection, this could lead to these "
+                    "drops (not ID inconsistencies).",
                     len(loaded_scores_by_technique) - len(ordered_keys),
-                    technique,
+                    technique, dataset_name,
                 )
             else:
                 logger.info("All loaded %d pairs (technique=%s) have a ground truth.",
@@ -302,7 +304,6 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
             ground_truth = [gt_by_pair[key] for key in ordered_keys]
             predictions = [loaded_scores_by_technique[key] for key in ordered_keys]
 
-            # for technique, predictions in predictions.items():
             results[technique] = compute_metrics_for_thresholds(
                 ground_truth=ground_truth,
                 scores=predictions,
