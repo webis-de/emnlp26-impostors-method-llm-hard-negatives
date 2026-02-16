@@ -73,16 +73,16 @@ if __name__ == "__main__":
     logging.info(f"Arguments for impostor detector: {args}")
 
     our_figure_impostor_options = [
-        # "on_the_fly",
         "in_domain",
+        "on_the_fly",
         # "one_step_llm",   # SAIA URL on betaweb error: httpx.InvalidURL: Invalid port: 'academiccloud:de'
-        "two_step_llm",
+        # "two_step_llm",
         # "translation",
         # "mirror_minds",   # raises error
     ]
 
     # logger.info(f"About to start {CONFIG.BLOG} dataset.")
-    # run_acc_curves(dataset_name=CONFIG.BLOG,imp_gen_techniques=our_figure_impostor_options)
+    run_acc_curves(dataset_name=CONFIG.BLOG,imp_gen_techniques=our_figure_impostor_options)
     logger.info(f"Finished {CONFIG.BLOG} dataset, about to start {CONFIG.STUDENT_ESSAYS} dataset.")
     run_acc_curves(dataset_name=CONFIG.STUDENT_ESSAYS,imp_gen_techniques=our_figure_impostor_options)
     logger.info(f"Finished {CONFIG.BLOG} and {CONFIG.STUDENT_ESSAYS} dataset.")
