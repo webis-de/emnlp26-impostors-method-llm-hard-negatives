@@ -29,7 +29,7 @@ from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 # ---------------------------------------------------------------------
 
 LOCAL_SAVE_PATH = (
-    Path(__file__).resolve().parents[3]
+    Path(__file__).resolve().parents[2]
     / CONFIG.SAVE_PATH
     / "supervised_baseline"
 )
