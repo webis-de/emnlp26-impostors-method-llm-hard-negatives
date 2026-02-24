@@ -62,11 +62,6 @@ class StatisticalAnalysis:
         if missing:
             raise ValueError(f"Missing columns in impostor outputs: {missing}")
 
-        for col in ["left_id", "right_id"]:
-            impostor_outputs[col] = impostor_outputs[col] = impostor_outputs[col].apply(
-                lambda x: bson.ObjectId(x) if pd.notna(x) else x
-            )
-
         # --------------------------------------------------------------
         # Load ground truth
         # --------------------------------------------------------------
@@ -169,6 +164,7 @@ class StatisticalAnalysis:
 
 
             for technique in ds_df["impostor_generation_technique"].unique():
+                # TODO: group by index if on-the-fly
                 tech_df = ds_df[
                     ds_df["impostor_generation_technique"] == technique
                     ]
@@ -187,6 +183,15 @@ class StatisticalAnalysis:
 
                 if tech_df.empty:
                     continue
+
+                confusion_order = [
+                    c for c in ["TP", "FP", "FN", "TN"]
+                    if c in tech_df["confusion"].dropna().unique()
+                ]
+                if not confusion_order:
+                    confusion_order = sorted(tech_df["confusion"].dropna().unique())
+
+                confusion_counts = tech_df["confusion"].value_counts()
                 fig, ax = plt.subplots(figsize=(12, 6))
 
                 # for side in ["left", "right"]:
@@ -195,6 +200,7 @@ class StatisticalAnalysis:
                     x="confusion",
                     y="p_value",
                     hue="side",
+                    order=confusion_order,
                     split=True,
                     inner="quart",
                     bw_adjust=.5,
@@ -209,6 +215,7 @@ class StatisticalAnalysis:
                     x="confusion",
                     y="p_value",
                     hue="side",
+                    order=confusion_order,
                     legend=False,
                     dodge=False,
                     alpha=0.1,
@@ -221,6 +228,10 @@ class StatisticalAnalysis:
                 )
                 ax.set_ylabel("Uncorrected p-value")
                 ax.set_xlabel("Confusion category")
+                ax.set_xticks(range(len(confusion_order)))
+                ax.set_xticklabels(
+                    [f"{label} ({int(confusion_counts.get(label, 0))})" for label in confusion_order]
+                )
 
                 plt.legend(title="Side", loc="upper right")
                 plt.tight_layout()
