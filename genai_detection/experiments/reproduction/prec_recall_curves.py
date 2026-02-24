@@ -354,6 +354,7 @@ def plot_precision_recall_curve(
     results: Dict[str, pd.DataFrame],
     dataset_name: str,
     save_path: Path = None,
+    title: str = None,
 ):
     """
     Precision–Recall curves (Figures 4a, 4b in Koppel et al., 2014).
@@ -367,45 +368,46 @@ def plot_precision_recall_curve(
         for key, df in results.items():
             label = CONFIG.LABEL_TRANSLATIONS.get(key, key)
             color = CONFIG.LABEL_COLORS.get(key, "black")
-            precisions = df["precision"].apply(
-                lambda x: x[positive_class_id]
-            )
-            recalls = df["recall"].apply(
-                lambda x: x[positive_class_id]
-            )
+            if "precision" in df.columns and "recall" in df.columns:
+                precisions = df["precision"].apply(
+                    lambda x: x[positive_class_id]
+                )
+                recalls = df["recall"].apply(
+                    lambda x: x[positive_class_id]
+                )
 
-            # filter out points where both precision and recall are zero
-            mask = ~(
-                ((precisions == 0) & (recalls == 0))
-                | ((precisions == 1) & (recalls == 0))
-                | ((precisions == 0) & (recalls == 1))
-            )
+                # filter out points where both precision and recall are zero
+                mask = ~(
+                    ((precisions == 0) & (recalls == 0))
+                    | ((precisions == 1) & (recalls == 0))
+                    | ((precisions == 0) & (recalls == 1))
+                )
 
-            precisions = precisions[mask]
-            recalls = recalls[mask]
-            unique_pairs = set(zip(recalls, precisions))
+                precisions = precisions[mask]
+                recalls = recalls[mask]
+                unique_pairs = set(zip(recalls, precisions))
 
-            logger.info("%s: class %d", key, positive_class_id)
-            logger.info("Number of unique (x, y) pairs: %d", len(unique_pairs))
+                logger.info("%s: class %d", key, positive_class_id)
+                logger.info("Number of unique (x, y) pairs: %d", len(unique_pairs))
 
-            plt.plot(
-                recalls,
-                precisions,
-                # marker="o",
-                # markersize=4,
-                color=color,
-                label=label,
-            )
+                plt.plot(
+                    recalls,
+                    precisions,
+                    # marker="o",
+                    # markersize=4,
+                    color=color,
+                    label=label,
+                )
 
         plt.grid(True, linestyle="--", alpha=0.6)
         plt.ylim(0, 1)
         plt.gca().set_aspect("equal")
         plt.xlabel("Recall $\\frac{TP}{TP + FN}$", fontsize=14)
         plt.ylabel("Precision $\\frac{TP}{TP + FP}$", fontsize=14)
-        plt.title(
-            "Precision–Recall Curve Across Impostor Generation Techniques\n"
-            f"Dataset: {CONFIG.DATASET_TRANSLATIONS[dataset_name]} ({positive_class})"
-        )
+        if title is None:
+            title = "Precision–Recall Curve Across Impostor Generation Techniques"
+        title += f"\nDataset: {CONFIG.DATASET_TRANSLATIONS[dataset_name]} ({positive_class})"    # subtitle
+        plt.title(title)
         plt.xlim(-0.01, 1.01)
         plt.ylim(-0.01, 1.01)
         plt.legend()
@@ -436,48 +438,49 @@ def _extract_best_pr_points_per_impostor(
     for impostor_method, df in results.items():
 
         for class_id, class_name in [(0, "Different Author"), (1, "Same Author")]:
-            precisions = df["precision"].apply(lambda x: x[class_id]).to_numpy()
-            recalls = df["recall"].apply(lambda x: x[class_id]).to_numpy()
-            thresholds = df["threshold"].to_numpy()
+            if "precision" in df.columns and "recall" in df.columns:
+                precisions = df["precision"].apply(lambda x: x[class_id]).to_numpy()
+                recalls = df["recall"].apply(lambda x: x[class_id]).to_numpy()
+                thresholds = df["threshold"].to_numpy()
 
-            # Sort by recall for valid PR AUC
-            order = np.argsort(recalls)
-            recalls_sorted = recalls[order]
-            precisions_sorted = precisions[order]
+                # Sort by recall for valid PR AUC
+                order = np.argsort(recalls)
+                recalls_sorted = recalls[order]
+                precisions_sorted = precisions[order]
 
-            pr_auc = auc(recalls_sorted, precisions_sorted)
+                pr_auc = auc(recalls_sorted, precisions_sorted)
 
-            # ---- Best precision (tie → recall) ----
-            best_p_idx = np.lexsort((-recalls, -precisions))[0]
+                # ---- Best precision (tie → recall) ----
+                best_p_idx = np.lexsort((-recalls, -precisions))[0]
 
-            # ---- Best recall (tie → precision) ----
-            best_r_idx = np.lexsort((-precisions, -recalls))[0]
+                # ---- Best recall (tie → precision) ----
+                best_r_idx = np.lexsort((-precisions, -recalls))[0]
 
-            # ---- Best PR operating point (proxy for PR-AUC) ----
-            pr_product = precisions * recalls
-            best_auc_idx = pr_product.argmax()
+                # ---- Best PR operating point (proxy for PR-AUC) ----
+                pr_product = precisions * recalls
+                best_auc_idx = pr_product.argmax()
 
-            rows.append({
-                "dataset_name": dataset_name.replace("_", " ").capitalize(),
-                "impostor_generation": CONFIG.LABEL_TRANSLATIONS[impostor_method],
-                "class": class_name,
+                rows.append({
+                    "dataset_name": dataset_name.replace("_", " ").capitalize(),
+                    "impostor_generation": CONFIG.LABEL_TRANSLATIONS[impostor_method],
+                    "class": class_name,
 
-                "n_test_samples": 50,   # TODO: adjust
+                    "n_test_samples": 50,   # TODO: adjust
 
-                "best_precision": precisions[best_p_idx],
-                "best_precision_recall": recalls[best_p_idx],
-                "best_precision_threshold": thresholds[best_p_idx],
+                    "best_precision": precisions[best_p_idx],
+                    "best_precision_recall": recalls[best_p_idx],
+                    "best_precision_threshold": thresholds[best_p_idx],
 
-                "best_recall": recalls[best_r_idx],
-                "best_recall_precision": precisions[best_r_idx],
-                "best_recall_threshold": thresholds[best_r_idx],
+                    "best_recall": recalls[best_r_idx],
+                    "best_recall_precision": precisions[best_r_idx],
+                    "best_recall_threshold": thresholds[best_r_idx],
 
-                "best_auc_precision": precisions[best_auc_idx],
-                "best_auc_recall": recalls[best_auc_idx],
-                "best_auc_threshold": thresholds[best_auc_idx],
+                    "best_auc_precision": precisions[best_auc_idx],
+                    "best_auc_recall": recalls[best_auc_idx],
+                    "best_auc_threshold": thresholds[best_auc_idx],
 
-                "pr_auc": pr_auc,
-            })
+                    "pr_auc": pr_auc,
+                })
 
     return pd.DataFrame(rows)
 
