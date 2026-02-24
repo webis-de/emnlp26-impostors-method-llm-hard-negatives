@@ -73,7 +73,7 @@ def main() -> None:
     parser.add_argument(
         "--workers",
         type=int,
-        default=2,#None,
+        default=1,#None,
         help="Number of parallel workers (defaults to number of SAIA keys).",
     )
     args = parser.parse_args()
@@ -145,16 +145,21 @@ def main() -> None:
             task_queue.task_done()
         return processed
 
-    with ThreadPoolExecutor(max_workers=worker_count) as executor:
-        futures = [
-            executor.submit(_worker, idx)
-            for idx in range(worker_count)
-        ]
+    if worker_count > 1:
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = [
+                executor.submit(_worker, idx)
+                for idx in range(worker_count)
+            ]
+            for text_id in iter_original_text_ids(mongo, args.dataset, args.limit):
+                task_queue.put(text_id)
+            for _ in range(worker_count):
+                task_queue.put(None)
+            processed = sum(f.result() for f in futures)
+    else:
         for text_id in iter_original_text_ids(mongo, args.dataset, args.limit):
             task_queue.put(text_id)
-        for _ in range(worker_count):
-            task_queue.put(None)
-        processed = sum(f.result() for f in futures)
+            worker = _worker(0)
 
     logger.info("Done. Processed %d text(s).", processed)
 
