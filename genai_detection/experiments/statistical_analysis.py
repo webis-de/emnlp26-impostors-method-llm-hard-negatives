@@ -203,6 +203,8 @@ class StatisticalAnalysis:
                     )
 
     def _violine_summary_per_df(self, tech_df: pd.DataFrame, dataset_name: str, technique:str):
+        if tech_df.empty:
+            return
         summary = tech_df.groupby(["confusion", "side"])["p_value"].agg(
             ["count", "nunique", "min", "max"]
         )
@@ -439,5 +441,5 @@ if __name__ == "__main__":
     )
     logger = logging.getLogger(__name__)
     statistical_analysis = StatisticalAnalysis()
-    # statistical_analysis.display_p_val_per_side()
+    statistical_analysis.display_p_val_per_side()
     statistical_analysis.histogram_per_approach()
