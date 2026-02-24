@@ -240,6 +240,26 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
         return value
 
     def _load_scores_for_technique(technique: str) -> Dict[Tuple[ObjectId, ObjectId], float]:
+        index = None
+        if "on_the_fly" in technique and len("on_the_fly") < len(technique):
+            # different indices are not stored in impostors_output_collection, but on_the_fly_paraphrases -> filter
+            # later
+            index = CONFIG.RETRIEVAL_INDEX_TRANSLATIONS[technique]
+            technique = "on_the_fly"
+            on_the_fly_cursor = mongoDB.on_the_fly_collection.find(
+                    {"index": index},
+                    {"_id": 1, "text_id": 1, "index": 1},
+            )
+            on_the_fly_df = pd.DataFrame(on_the_fly_cursor)
+            if on_the_fly_df.empty:
+                on_the_fly_df = pd.DataFrame(columns=["text_id", "index"])
+                logger.error(f"'{technique}' paraphrases on index '{index}' empty.")
+            else:
+                on_the_fly_df = (
+                    on_the_fly_df.sort_values("_id")
+                    .drop_duplicates(subset=["text_id"], keep="first")
+                )[["text_id", "index"]]
+
         query = {
             "impostor_generation_technique": technique,
             "n_impostors": n_impostors,
@@ -256,6 +276,12 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
             left_id = _check_id_type(doc["left_id"])
             right_id = _check_id_type(doc["right_id"])
             pair = (left_id, right_id)
+            if technique == "on_the_fly" and index:
+                # duplicates omitted before -> result is only one entry
+                paraphrases = on_the_fly_df[on_the_fly_df["text_id"]==left_id]
+                if paraphrases.empty or not (index == paraphrases["index"].iloc[0]):
+                    continue
+
             if pair not in scores_by_pair:
                 scores_by_pair[pair] = doc["scores_over_different_rounds"] / rounds
         logger.info(
