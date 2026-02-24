@@ -74,7 +74,9 @@ if __name__ == "__main__":
     logging.info(f"Arguments for impostor detector: {args}")
 
     our_figure_impostor_options = [
-        "on_the_fly",
+        "on_the_fly_chatnoir",
+        "on_the_fly_serpapi",
+        "on_the_fly_startpage",
         "in_domain",
         "one_step_llm",   # SAIA URL on betaweb error: httpx.InvalidURL: Invalid port: 'academiccloud:de'
         "two_step_llm",

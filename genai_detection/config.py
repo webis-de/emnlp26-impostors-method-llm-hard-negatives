@@ -85,6 +85,9 @@ class BaseConfig:
     LABEL_TRANSLATIONS = {
         "in_domain": "In-Domain",
         "on_the_fly": "Retrieval-Based",
+        "on_the_fly_chatnoir": "Retrieval-Based (ChatNoir)",
+        "on_the_fly_serpapi": "Retrieval-Based (SerpApi)",
+        "on_the_fly_startpage": "Retrieval-Based (Startpage)",
         "one_step_llm": "One-Step Paraphraser (LLM)",
         "two_step_llm": "Two-Step Paraphraser (LLM)",
         "unsupervised_baseline_min-max": "Unsup. Min-Max (B)",
@@ -104,6 +107,9 @@ class BaseConfig:
     LABEL_COLORS = {
         "in_domain": "#1f77b4",  # blue
         "on_the_fly": "#9467bd",  # purple
+        "on_the_fly_chatnoir": "#5e3c99",  # dark violet
+        "on_the_fly_serpapi": "#2b8cbe",  # blue-cyan
+        "on_the_fly_startpage": "#7bccc4",  # light teal
         "one_step_llm": "#8c564b",  # brown
         "two_step_llm": "#e377c2",  # pink
         "unsupervised_baseline_min-max": "#ff7f0e",  # orange
@@ -112,9 +118,9 @@ class BaseConfig:
         "unmasking": "#7f7f7f",  # gray
         "ppmd": "#bcbd22",  # olive
         "translation": "#17becf",  # cyan
-        "potha2017": "#aec7e8",   # light blue
-        "asgalf": "#ffbb78",      # light orange
-        "std_impostor": "#98df8a",                 # light green
+        "potha2017": "#aec7e8",  # light blue
+        "asgalf": "#ffbb78",  # light orange
+        "std_impostor": "#98df8a",  # light green
         "bdi": "#c5b0d5",  # light purple
         "homotopy": "#ff9896",  # light red
     }
