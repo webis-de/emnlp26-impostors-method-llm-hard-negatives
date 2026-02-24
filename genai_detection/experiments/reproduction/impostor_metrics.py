@@ -42,9 +42,11 @@ def _load_input_pairs(dataset_name: str, split:str="all", balanced:bool=True) ->
 
     if balanced:
         min_len = min(len(same_pairs), len(diff_pairs))
-        test_pairs = diff_pairs[:min_len] + same_pairs[:min_len]
+        test_pairs = same_pairs[:min_len] + diff_pairs[:min_len]
     else:
-        test_pairs = diff_pairs + same_pairs
+        test_pairs = same_pairs + diff_pairs
+
+    # TODO: shuffle test pairs
 
     text_ids = [
         str(id_)
@@ -124,10 +126,11 @@ def compute_metrics_for_thresholds(
 
     for t in thresholds:
         binary_preds = [1 if s >= t else 0 for s in scores]
-        rows.append(
-            compute_metrics_for_binary_predictions(
-                ground_truth=ground_truth, binary_preds=binary_preds, threshold=t)
-        )
+        if binary_preds:
+            rows.append(
+                compute_metrics_for_binary_predictions(
+                    ground_truth=ground_truth, binary_preds=binary_preds, threshold=t)
+            )
 
     return pd.DataFrame(rows)
 
