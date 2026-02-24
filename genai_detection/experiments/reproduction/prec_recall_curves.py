@@ -500,8 +500,8 @@ def run_prec_recall_curves(dataset_name:str, imp_gen_techniques:List[str], compu
     combined_df = pd.concat(dfs, ignore_index=True)
 
     # Save to CSV
-    combined_df.to_csv(LOCAL_SAVE_PATH / "effectiveness_scores.csv", index=False)
-    logger.info(f"Saved effectiveness scores as csv to {LOCAL_SAVE_PATH}/effectiveness_scores.csv.")
+    combined_df.to_csv(LOCAL_SAVE_PATH / f"effectiveness_scores_{dataset_name}.csv", index=False)
+    logger.info(f"Saved effectiveness scores as csv to {LOCAL_SAVE_PATH}/effectiveness_scores_{dataset_name}.csv.")
 
     # best PR operating points
     best_pr_df = _extract_best_pr_points_per_impostor(
