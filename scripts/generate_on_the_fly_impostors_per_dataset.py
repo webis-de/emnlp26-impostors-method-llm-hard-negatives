@@ -82,7 +82,7 @@ if __name__ == "__main__":
         "on_the_fly_chatnoir",
         "on_the_fly_serpapi",
     ]
-    imp_per_appr = {CONFIG.BLOG:[imp_gen_techniques[0]], CONFIG.STARTPAGE:[imp_gen_techniques[0], imp_gen_techniques[
+    imp_per_appr = {CONFIG.BLOG:[imp_gen_techniques[0]], CONFIG.STUDENT_ESSAYS:[imp_gen_techniques[0], imp_gen_techniques[
         1]]}
     for dataset_name in [CONFIG.BLOG, CONFIG.STUDENT_ESSAYS]:
         main(imp_per_appr[dataset_name], dataset_name)
