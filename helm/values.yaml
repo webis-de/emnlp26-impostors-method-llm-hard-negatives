@@ -1,5 +1,5 @@
 persistence:
-  size: 16Gi
+  size: 32Gi
   storageClass: csi-rbd-retain
 architecture: standalone #replicaset
 updateStrategy:
