@@ -83,9 +83,10 @@ if __name__ == "__main__":
     ]
 
     run_prec_recall_curves(
-        dataset_name=CONFIG.BLOG, imp_gen_techniques=our_figure_impostor_options
+        dataset_name=CONFIG.STUDENT_ESSAYS,
+        imp_gen_techniques=our_figure_impostor_options,
     )
 
     run_prec_recall_curves(
-        dataset_name=CONFIG.STUDENT_ESSAYS, imp_gen_techniques=our_figure_impostor_options
+        dataset_name=CONFIG.BLOG, imp_gen_techniques=our_figure_impostor_options
     )
