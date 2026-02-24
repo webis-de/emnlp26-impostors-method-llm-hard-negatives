@@ -164,7 +164,7 @@ class StatisticalAnalysis:
 
 
             for technique in ds_df["impostor_generation_technique"].unique():
-                # TODO: group by index if on-the-fly
+                # TODO: group by index if on_the_fly
                 tech_df = ds_df[
                     ds_df["impostor_generation_technique"] == technique
                     ]
@@ -228,10 +228,15 @@ class StatisticalAnalysis:
                 )
                 ax.set_ylabel("Uncorrected p-value")
                 ax.set_xlabel("Confusion category")
+                tick_labels = [
+                    f"{label} ({int(confusion_counts.get(label, 0))})"
+                    for label in confusion_order
+                ]
                 ax.set_xticks(range(len(confusion_order)))
-                ax.set_xticklabels(
-                    [f"{label} ({int(confusion_counts.get(label, 0))})" for label in confusion_order]
-                )
+                ax.set_xticklabels(tick_labels)
+                for tick in ax.get_xticklabels():
+                    if tick.get_text().startswith(("TN ", "TP ")):
+                        tick.set_fontweight("bold")
 
                 plt.legend(title="Side", loc="upper right")
                 plt.tight_layout()
