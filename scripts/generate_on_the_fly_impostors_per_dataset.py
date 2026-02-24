@@ -23,13 +23,14 @@ from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 logger = logging.getLogger(__name__)
 
-def main():
+def main(imp_gen_techniques, dataset_name):
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
+    logging.info(f"Dataset {dataset_name} with impostor generation techniques {imp_gen_techniques}.")
 
-    text_id_pairs, ground_truth = load_all_pairs(CONFIG.BLOG)
+    text_id_pairs, ground_truth = load_all_pairs(dataset_name)
     text_id_pairs_len = len(text_id_pairs)
     assert (
         text_id_pairs_len % 2 == 0
@@ -43,19 +44,12 @@ def main():
     )
     TEXT_BATCH_SIZE = 50
 
-    imp_gen_techniques = [
-            # "on_the_fly_chatnoir",
-            # "on_the_fly_serpapi",
-            "on_the_fly_startpage",
-            ]
-
-    predictions: Dict[str, List[float]] = {tech: [] for tech in imp_gen_techniques}
     # Build detectors once (avoid re-instantiating each batch)
     detectors = {
         technique: ImpostorDetector(
             impostor_technique=technique,
             n_impostors=50,
-            dataset_name=CONFIG.BLOG,
+            dataset_name=dataset_name,
         )
         for technique in imp_gen_techniques
     }
@@ -79,8 +73,16 @@ def main():
 
         for technique in imp_gen_techniques:
             detector = detectors[technique]
-            batch_scores = detector.get_score(text=batch_texts)
+            _ = detector.get_score(text=batch_texts)
 
 
 if __name__ == "__main__":
-    main()
+    imp_gen_techniques = [
+        "on_the_fly_startpage",
+        "on_the_fly_chatnoir",
+        "on_the_fly_serpapi",
+    ]
+    imp_per_appr = {CONFIG.BLOG:[imp_gen_techniques[0]], CONFIG.STARTPAGE:[imp_gen_techniques[0], imp_gen_techniques[
+        1]]}
+    for dataset_name in [CONFIG.BLOG, CONFIG.STUDENT_ESSAYS]:
+        main(imp_per_appr[dataset_name], dataset_name)
