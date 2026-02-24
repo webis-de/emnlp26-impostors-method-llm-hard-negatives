@@ -17,6 +17,7 @@ from genai_detection.detectors.components.preprocessing import PairPreprocessor,
 from genai_detection.detectors.components.scorer import Scorer, ScoreResult
 from genai_detection.detectors.components.vector_similarity import minmax_similarity
 from genai_detection.detectors.impostor_base import ImpostorBase
+from genai_detection.impostor_generators.search_generator_base import SearchImpostorGeneratorBase
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from genai_detection.config import CONFIG
@@ -350,6 +351,10 @@ class ImpostorDetector(ImpostorBase):
                 document2insert = self._handle_statistical_test(document2insert, p_values, pair)
 
             document2insert["impostor_generation_technique"] = self.impostor_technique
+            if isinstance(self.impostor_generator, SearchImpostorGeneratorBase):
+                document2insert["impostor_generation_technique"] = "on_the_fly"
+                document2insert["retrieval_index"] = self.impostor_generator.index_name
+            document2insert["dataset_name"] = self.dataset_name
             document2insert["n_impostors"] = self.n_impostors
             document2insert["n_potential_impostors"] = (
                 self.impostor_generator.num_potential_impostors
