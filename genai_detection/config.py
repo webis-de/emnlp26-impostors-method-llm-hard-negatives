@@ -82,6 +82,12 @@ class BaseConfig:
 
     THRESHOLDS = np.arange(0.0, 1.05, 0.01)
 
+    RETRIEVAL_INDEX_TRANSLATIONS = {
+        "on_the_fly_chatnoir": "msmarco-v2.1",
+        "on_the_fly_serpapi": "Google",
+        "on_the_fly_startpage": "Google-Startpage",
+    }
+
     LABEL_TRANSLATIONS = {
         "in_domain": "In-Domain",
         "on_the_fly": "Retrieval-Based",
