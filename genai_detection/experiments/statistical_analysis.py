@@ -17,33 +17,6 @@ from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 logger = logging.getLogger(__name__)
 
-# Fixed colors per label (matplotlib-compatible)
-LABEL_COLORS = {
-    "in_domain": "#1f77b4",                 # blue
-    "on_the_fly": "#9467bd",                # purple
-    "one_step_llm": "#8c564b",              # brown
-    "two_step_llm": "#e377c2",              # pink
-    "unsupervised_baseline_min-max": "#ff7f0e", # orange
-    "unsupervised_baseline_cosine": "#2ca02c",  # green
-    "supervised_baseline": "#d62728",       # red
-    "unmasking": "#7f7f7f",                 # gray
-    "ppmd": "#bcbd22",                      # olive
-    "translation": "#17becf",               # cyan
-}
-
-LEGEND_TRANSLATIONS = {
-    "in_domain": "In-Domain",
-    "on_the_fly": "Retrieval-Based",
-    "one_step_llm": "One-Step Paraphraser (LLM)",
-    "two_step_llm": "Two-Step Paraphraser (LLM)",
-    "unsupervised_baseline_min-max": "Unsup. Min-Max (B)",
-    "unsupervised_baseline_cosine": "Unsup. Cosine (B)",
-    "supervised_baseline": "Sup. SVM (B)",
-    "unmasking": "Unmasking",
-    "ppmd": "PPMd",
-    "translation": "Translation",
-}
-
 # ---------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------
@@ -320,7 +293,7 @@ class StatisticalAnalysis:
                     y="percent",
                     hue="impostor_generation_technique",
                     order=confusion_order,
-                    palette=LABEL_COLORS,
+                    palette=CONFIG.LABEL_COLORS,
                     ax=ax,
                 )
 
@@ -358,7 +331,7 @@ class StatisticalAnalysis:
 
             # Translate labels + append counts
             translated_labels = [
-                f"{LEGEND_TRANSLATIONS.get(label, label)} ({total_counts.get(label, 0)//2})"
+                f"{CONFIG.LABEL_TRANSLATIONS.get(label, label)} ({total_counts.get(label, 0)//2})"
                 for label in labels
             ]
 
