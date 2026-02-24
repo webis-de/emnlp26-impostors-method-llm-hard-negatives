@@ -59,7 +59,7 @@ class GoogleSearchImpostorGenerator(SearchImpostorGeneratorBase):
             max_workers=max_workers,
             n_max_words=n_max_words,
             n_min_words=n_min_words,
-            index_name="Google",
+            index_name=CONFIG.RETRIEVAL_INDEX_TRANSLATIONS["on_the_fly_serpapi"],
         )
 
     def fetch_results(self, query: str) -> List[Dict]:

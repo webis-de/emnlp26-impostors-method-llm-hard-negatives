@@ -32,7 +32,7 @@ class ChatNoirSearchImpostorGenerator(SearchImpostorGeneratorBase):
         max_workers: int = 2,
         n_min_words: int = 3,
         n_max_words: int = 5,
-        index_name: str = "msmarco-v2.1"
+        index_name: str = CONFIG.RETRIEVAL_INDEX_TRANSLATIONS["on_the_fly_chatnoir"]
     ):
         """
         Configuration from Koppel, Moshe, and Yaron Winter. ‘Determining If Two Documents Are Written by the Same Author’. Journal of the Association for Information Science and Technology 65, no. 1 (January 2014): 178–87. https://doi.org/10.1002/asi.22954 is:
