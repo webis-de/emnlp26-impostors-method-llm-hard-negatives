@@ -114,7 +114,7 @@ class BaseConfig:
         "in_domain": "#1f77b4",  # blue
         "on_the_fly": "#9467bd",  # purple
         "on_the_fly_chatnoir": "#5e3c99",  # dark violet
-        "on_the_fly_serpapi": "#2b8cbe",  # blue-cyan
+        "on_the_fly_serpapi": "#b103fc",  # violet
         "on_the_fly_startpage": "#7bccc4",  # light teal
         "one_step_llm": "#8c564b",  # brown
         "two_step_llm": "#e377c2",  # pink
