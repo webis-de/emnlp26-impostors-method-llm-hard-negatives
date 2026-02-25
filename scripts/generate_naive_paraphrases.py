@@ -67,6 +67,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--skip-existing",
+        default=True,
         action="store_true",
         help="Skip texts that already have >= n-impostors paraphrases.",
     )
