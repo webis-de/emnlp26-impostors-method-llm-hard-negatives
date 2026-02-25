@@ -160,7 +160,8 @@ def main() -> None:
     else:
         for text_id in iter_original_text_ids(mongo, args.dataset, args.limit):
             task_queue.put(text_id)
-            worker = _worker(0)
+        task_queue.put(None)
+        processed = _worker(0)
 
     logger.info("Done. Processed %d text(s).", processed)
 
