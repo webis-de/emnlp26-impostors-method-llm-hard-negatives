@@ -1,6 +1,7 @@
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
+from itertools import zip_longest
 from typing import Dict, List, Iterable, Tuple
 
 import pandas as pd
@@ -30,7 +31,7 @@ def _load_input_pairs(dataset_name: str, split:str="all", balanced:bool=True) ->
             {"dataset_name": dataset_name,
              "same":False},
         )
-    )#[:N_PAIRS//2]
+    )
     same_pairs =list(
         mongoDB.find_document_by_multiple_fields(
             collection=collection,
@@ -38,15 +39,20 @@ def _load_input_pairs(dataset_name: str, split:str="all", balanced:bool=True) ->
             {"dataset_name": dataset_name,
              "same":True},
         )
-    )#[:N_PAIRS//2]
+    )
 
     if balanced:
         min_len = min(len(same_pairs), len(diff_pairs))
-        test_pairs = same_pairs[:min_len] + diff_pairs[:min_len]
-    else:
-        test_pairs = same_pairs + diff_pairs
+        same_pairs, diff_pairs = same_pairs[:min_len], diff_pairs[:min_len]
 
-    # TODO: shuffle test pairs
+    # alternate between same and different pairs
+    test_pairs = [
+        p
+        for pair_group in zip_longest(same_pairs, diff_pairs)
+        for p in pair_group
+        if p is not None
+    ]
+
 
     text_ids = [
         str(id_)
