@@ -56,7 +56,7 @@ class Paraphraser(ABC):
 
     def save_paraphrase_in_mongodb(self, original_text_id:ObjectId, original_text:str, paraphrased_text:str,
                                    extracted_info:Optional[dict], total_costs:Optional[float],
-                                   collection, temperature:float=1.0,
+                                   collection, temperature:float=1.0, dataset_name:Optional[str]=None,
                                    prompt:str="bullet points dspy", intermediate_prompt:str="bullet points dspy",) -> None:
         """
         Save the paraphrase to the MongoDB database collection called "paraphrase".
@@ -87,6 +87,7 @@ class Paraphraser(ABC):
             "extracted_info": extracted_info,
             "created_at": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
             "openai_costs": total_costs,
+            "dataset_name": dataset_name,
         }
 
         # Insert into document into paraphrase collection
