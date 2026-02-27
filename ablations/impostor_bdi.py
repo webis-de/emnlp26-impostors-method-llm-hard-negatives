@@ -50,19 +50,23 @@ class BDIScorer(Scorer):
         rounds: int = 100,   # Nagy (2024) does not specify beyond "repeat n times", but BDI implementation has 100 nb_bootstrap_iter
         portion_delete: float = 0.67,   # cf. Bootstrap Distance Imposters (BDI) ablation by Nagy (2024)
         similarity_fn=minmax_similarity,    # Nagy (2024) reported minmax and cosine scores
+        probability_threshold:float=1.0,    # Nagy (2024) use probability mass above 0
     ):
         super().__init__(
             rounds=rounds,
             portion_delete=portion_delete,
             similarity_fn=similarity_fn,
         )
+        assert (probability_threshold >= 0) and (probability_threshold <= 1), (f"'probability_threshold' must between 0 "
+                                                                           f"and 1 but is {probability_threshold}")
+        self.probability_threshold = probability_threshold
 
     def _distance(self, a: np.ndarray, b: np.ndarray) -> float:
         """Convert similarity output to distance-like form in [0, 1]."""
         return 1.0 - float(self.similarity_fn(a, b))
 
-    @staticmethod
-    def _mass_above_zero(diffs: List[float]) -> float:
+
+    def _mass_above_zero(self, diffs: List[float]) -> float:
         """
         Map bootstrap distance differences to a probability-like score.
 
@@ -80,9 +84,8 @@ class BDIScorer(Scorer):
         if not diffs:
             return 0.5
         # percentileofscore of, for example, 80% means that 80% of the scores in a are below the given score
-        # strict means < instead of <= (i.e., weak)
-        print(diffs)
-        return float((100 - sp.stats.percentileofscore(diffs, 0, kind="strict")) / 100.0)
+        # weak means <= instead of < (i.e., strict)
+        return float((100 - sp.stats.percentileofscore(diffs, self.probability_threshold, kind="weak")) / 100.0)
 
     def score_pair(self, pair: Dict[str, Any], vectorizer) -> ScoreResult:
         """
@@ -147,6 +150,7 @@ class BDIImpostorDetector(ImpostorDetector):
             rounds=self.rounds,
             portion_delete=self.portion_delete,
             similarity_fn=minmax_similarity,
+            probability_threshold=0.01, # Nagy (2024) use probability mass above 0, but with 0 most values are 1
         )
         self.impostor_output_collection = self.mongoDB.impostor_ablation_output_collection
 
