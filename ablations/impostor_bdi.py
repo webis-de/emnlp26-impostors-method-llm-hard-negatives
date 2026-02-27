@@ -8,7 +8,8 @@ with the BDI-style bootstrap distance differences described by Nagy (2024):
     - compute distance difference between each impostor and disputed text,
         as well as each candidate (here: one) and disputed text.
     - select closest impostor and closest candidate (here: only one) to disputed text
-    - compute d(disputed, impostor) - d(disputed, candidate) (= one point in distribution)
+    - compute d(disputed, candidate) - d(disputed, impostor) (= one point in distribution; negative if impostors are
+    more similar)
 - summarize the resulting distribution by probability mass above zero.
 
 Find other implementations:
@@ -35,8 +36,8 @@ class BDIScorer(Scorer):
     For each round:
     1) sample random feature subset,
     2) compute distances from disputed to all candidates and impostors,
-    3) select closest impostor and candidate (minimum distance),
-    4) compute diff = d(disputed, closest_impostor) - d(disputed, closest_candidate).
+    3) select the closest imposter and candidate (minimum distance),
+    4) compute diff = d(disputed, closest_candidate) - d(disputed, closest_impostor).
 
     In this repository's pairwise setup, there is exactly one candidate vector.
 
@@ -78,7 +79,10 @@ class BDIScorer(Scorer):
 
         if not diffs:
             return 0.5
-        return float((100 - sp.stats.percentileofscore(diffs, 0)) / 100.0)
+        # percentileofscore of, for example, 80% means that 80% of the scores in a are below the given score
+        # strict means < instead of <= (i.e., weak)
+        print(diffs)
+        return float((100 - sp.stats.percentileofscore(diffs, 0, kind="strict")) / 100.0)
 
     def score_pair(self, pair: Dict[str, Any], vectorizer) -> ScoreResult:
         """
@@ -116,9 +120,8 @@ class BDIScorer(Scorer):
                 self._distance(disputed_vec, impostor_vec)
                 for impostor_vec in impostor_vecs
             )
-            diff = closest_impostor_distance - self._distance(
-                disputed_vec, candidate_vec
-            )
+            # difference is negative if impostors are closer to disputed than candidate
+            diff = self._distance(disputed_vec, candidate_vec) - closest_impostor_distance
             diffs.append(float(diff))
 
         return ScoreResult(score=self._mass_above_zero(diffs), p_values={})
