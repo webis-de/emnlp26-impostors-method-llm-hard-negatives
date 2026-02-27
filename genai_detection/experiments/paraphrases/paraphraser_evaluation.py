@@ -547,7 +547,6 @@ class ParaphrasingEvaluator:
         # use for over (1) llm, (2) prompt, (3) temperature
         group_cols = ["llm", "prompt", "temperature"]
         results = []
-        df.rename(columns={"dataset": "dataset_name"}, inplace=True)
         print(df["dataset_name"].value_counts(dropna=False))
 
         for dataset_name in df["dataset_name"].unique():
