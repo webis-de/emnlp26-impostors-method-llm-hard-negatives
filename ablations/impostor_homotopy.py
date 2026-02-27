@@ -9,7 +9,7 @@ original impostor method are:
   frequencies (authors specify letters, hence no numbers; they say 'up to three', hence one, two and three)).
   - Scoring via sparse reconstruction (homotopy-style L1) instead of similarity-based "wins".
   - No role swap
-  - Here, we allow any impostor generation, but in the original paper they only decribe search-based (or:
+  - Here, we allow any impostor generation, but in the original paper they only describe search-based (or:
   "on-the-fly") impostor generation
 What is Sparse Representation classification?
 1. Select random impostors and texts from the candidate author (one or more, here: one)
@@ -200,7 +200,7 @@ class HBCScorer:
         self,
         rounds: int,
         impostor_keep_ratio: float = 0.5,
-        alpha: float = 0.001,
+        alpha: float = 1e-8,
         max_iter: int = 500,
         tol: float = 1e-4,
         random_state: int | None = None,
@@ -236,6 +236,7 @@ class HBCScorer:
     def score_pair(self, pair: Dict[str, Any], vectorizer) -> ScoreResult:
         total_score = 0.0
         disputed, candidate = "left", "right"
+        # tfidf stores all features from feature extractor
         disputed_vec = np.asarray(pair[disputed]["tfidf"], dtype=float)
         # should also be sampled but we only have one candidate text at the time
         candidate_vecs = [pair[candidate]["tfidf"]]
@@ -259,24 +260,20 @@ class HBCScorer:
             )
             model.fit(A, disputed_vec)
             coeffs = model.coef_
-            # coeffs = spams.lasso(A, disputed_vec, lambda1=0.1)
 
             # Residuals: candidate identity (all candidate columns) vs each impostor.
             # usually: only one candidate text, but generally more are possible
             candidate_idx = list(range(len(candidate_vecs)))
+            impostors_idx = list(range(len(candidate_vecs), len(candidate_vecs) + len(impostors)))
             r_candidate = self._residual(disputed_vec, A, coeffs, candidate_idx)
-            r_impostors = [
-                self._residual(
-                    disputed_vec,
-                    A,
-                    coeffs,
-                    [len(candidate_vecs) + i],
-                )
-                for i in range(len(impostors))
-            ]
+            r_impostors = self._residual(disputed_vec, A, coeffs, impostors_idx)
 
-            if r_impostors and r_candidate <= min(r_impostors):
+            if r_candidate < r_impostors:
                 total_score += 1
+            else:
+                print("residual impostors: ", r_impostors, "residual candidates: ", r_candidate)
+
+        print("Total score over ", self.rounds, "is: ", total_score)
 
         return ScoreResult(score=total_score / self.rounds, p_values={})
 
@@ -293,7 +290,6 @@ class HBCImpostorDetector(ImpostorDetector):
         self,
         *args,
         n_impostors: int = 50,
-        # homotopy_alpha: float = 0.001,
         **kwargs,
     ):
         super().__init__(*args, **kwargs, n_impostors=n_impostors)
@@ -314,7 +310,7 @@ class HBCImpostorDetector(ImpostorDetector):
         self.scorer = HBCScorer(
             rounds=self.rounds,
             impostor_keep_ratio=impostor_keep_ratio,
-            alpha=0.001,
+            alpha=1e-8,
         )
         # save outputs to extra ablation output collection
         self.impostor_output_collection = (
