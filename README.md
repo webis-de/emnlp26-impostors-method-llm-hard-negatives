@@ -240,6 +240,21 @@ You may now need to restart the pod again to make sure everything works with the
 (1) `kubectl get pods -n webisservices`, find the name of you pod (without client in the name), then (2) `kubectl delete pod <pod-name> -n webisservices` so that the pod will restart and the password change is applied.
 
 
+### No Disk Space Left for mongodb
+Find out whether the issue is space:
+```bash 
+kubectl logs artificial-authorship-verification-mongodb-566757dd9b-49pf7 -n webisservices
+```
+Increase the size of the persistent volume (and alter the requested size):
+```bash
+kubectl edit pvc -n webisservices artificial-authorship-verification-mongodb
+```
+To finalize the fix, renew deployment:
+```bash
+kubectl rollout restart -n webisservices deployment/artificial-authorship-verification-mongodb
+```
+Also, you may need to restart the path forwarding.
+
 ### Populate the database
 You can populate the database with paraphrased texts and their evaluation scores using the scripts provided in the `genai_detection/paraphrasers` directory.
 ```bash 
