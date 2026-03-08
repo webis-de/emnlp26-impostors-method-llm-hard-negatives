@@ -8,6 +8,7 @@ MongoDB collection.
 
 import logging
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import Dict, Iterable, List
 
@@ -18,6 +19,7 @@ from ablations.std_impostor import StdImpostor
 from genai_detection.config import CONFIG
 from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENERATORS
 from genai_detection.experiments.reproduction.impostor_metrics import (compute_metrics_parallel, load_all_pairs, )
+from genai_detection.experiments.reproduction.pan_metrics import BinaryVerificationEvaluator
 from genai_detection.experiments.reproduction.prec_recall_curves import plot_precision_recall_curve
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
@@ -33,10 +35,10 @@ logger = logging.getLogger(__name__)
 
 ABLATION_DETECTORS = {
     "bdi": BDIImpostorDetector,
-    "homotopy": HBCImpostorDetector,
-    "potha2017": Potha2017ImpostorDetector,
-    "asgalf": ASGALFImpostorDetector,
-    "std_impostor": StdImpostor,
+    # "homotopy": HBCImpostorDetector,
+    # "potha2017": Potha2017ImpostorDetector,
+    # "asgalf": ASGALFImpostorDetector,
+    # "std_impostor": StdImpostor,
 }
 
 ABLATION_ARGS = {
@@ -47,7 +49,7 @@ ABLATION_ARGS = {
         },
         "homotopy":{
             "rounds": 50,
-            "n_impostors": 50,
+            "n_impostors": 2,
             },
         "asgalf":{
             "rounds": 50,
@@ -146,6 +148,41 @@ def _score_detectors(
 
     return predictions
 
+def get_pan_metrics(predictions, y_true):
+    evaluator = BinaryVerificationEvaluator()
+
+    pan_metrics = {}
+
+    for method_name, method_scores in predictions.items():
+        method_scores = np.asarray(method_scores, dtype=float)
+
+        print(f"\nMethod: {method_name}")
+        print("Number of unique prediction values:")
+        print(Counter(method_scores))
+
+        best_result = evaluator.tune_threshold(
+                y_true=y_true,
+                scores=method_scores,
+                thresholds=CONFIG.THRESHOLDS,
+                rejection_radius=0.0,   # or e.g. 0.05 if you want unanswered cases
+                optimize_for="c_at_1",
+                )
+
+        pan_metrics[method_name] = {
+                "threshold": best_result.threshold,
+                "rejection_radius": best_result.rejection_radius,
+                "n_answered": best_result.n_answered,
+                "n_unanswered": best_result.n_unanswered,
+                "precision": best_result.precision,
+                "recall": best_result.recall,
+                "f1": best_result.f1,
+                "accuracy": best_result.accuracy,
+                "c_at_1": best_result.c_at_1,
+                "auroc": best_result.auroc,
+                "auroc_c_at_1": best_result.auroc_c_at_1,
+                }
+    return pan_metrics
+
 
 def compute_prec_recall_curves_ablations(
     dataset_name: str,
@@ -170,12 +207,19 @@ def compute_prec_recall_curves_ablations(
         text_ids=text_ids,
         pair_batch_size=pair_batch_size,
     )
+    pan_metrics = get_pan_metrics(predictions, ground_truth)
+    print("Number of unique prediction values:")
+    print(Counter(predictions["bdi"]))
+    res = {
+            "pan_metrics": pan_metrics,
+            "metrics": compute_metrics_parallel(
+                ground_truth=ground_truth,
+                predictions=predictions,
+                thresholds=CONFIG.THRESHOLDS,
+            )
+            }
 
-    return compute_metrics_parallel(
-        ground_truth=ground_truth,
-        predictions=predictions,
-        thresholds=CONFIG.THRESHOLDS,
-    )
+    return res
 
 
 __all__ = ["compute_prec_recall_curves_ablations"]
@@ -187,9 +231,13 @@ if __name__ == "__main__":
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
     logger = logging.getLogger(__name__)
+    pan_metrics = {}
 
     for dataset_name in [CONFIG.BLOG, CONFIG.STUDENT_ESSAYS]:
-        results_dict = compute_prec_recall_curves_ablations(dataset_name=dataset_name, impostor_technique="in_domain")
+        results = compute_prec_recall_curves_ablations(dataset_name=dataset_name, impostor_technique="in_domain")
+        results_dict = results["metrics"]
+        pan_metrics[dataset_name] = results["pan_metrics"]
+
         logger.info("Results for dataset %s as dictionary:", dataset_name)
         logger.info(results_dict)
         # optional: flatten to a single DataFrame for CSV
@@ -202,3 +250,8 @@ if __name__ == "__main__":
 
         plot_precision_recall_curve(results=results_dict, dataset_name=dataset_name, save_path=LOCAL_SAVE_PATH,
                                     title=f"Precision–Recall Curve")
+
+    # save pan metrics
+    with open(LOCAL_SAVE_PATH / "pan_metrics.json", "w") as f:
+        import json
+        json.dump(pan_metrics, f, indent=2)
