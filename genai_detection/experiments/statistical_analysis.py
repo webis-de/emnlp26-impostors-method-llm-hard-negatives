@@ -432,7 +432,7 @@ class StatisticalAnalysis:
                 translated_labels,
                 title="Impostor generation (# Pairs)",
                 loc="upper right",
-                bbox_to_anchor=(0.99, 1.02),
+                bbox_to_anchor=(0.99, 0.95),
             )
 
             plt.tight_layout()
