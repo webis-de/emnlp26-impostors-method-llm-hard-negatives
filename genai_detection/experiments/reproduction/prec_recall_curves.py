@@ -11,12 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import json
 import logging
 import os
 import sys
+from collections import defaultdict
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import DefaultDict, Dict, Iterable, List, Optional, Tuple
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import numpy as np
 import pandas as pd
@@ -239,7 +241,7 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
         assert isinstance(value, ObjectId), f"{value} is not an ObjectId, but of type {type(value)}"
         return value
 
-    def _load_scores_for_technique(technique: str) -> Dict[Tuple[ObjectId, ObjectId], float]:
+    def _load_scores_for_technique(technique: str, dataset_name:str=None) -> Dict[Tuple[ObjectId, ObjectId], float]:
         index = None
         if "on_the_fly" in technique and len("on_the_fly") < len(technique):
             # different indices are not stored in impostors_output_collection, but on_the_fly_paraphrases -> filter
@@ -266,9 +268,11 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
         }
         if n_potential_impostors is not None:
             query["n_potential_impostors"] = n_potential_impostors
+        if dataset_name is not None:
+            query["dataset_name"] = dataset_name
         cursor = mongoDB.impostor_output_collection.find(
             query,
-            {"left_id": 1, "right_id": 1, "scores_over_different_rounds": 1},
+            {"left_id": 1, "right_id": 1, "scores_over_different_rounds": 1, "dataset_name":1},
             batch_size=batch_size,
         ).sort("_id", 1)
         scores_by_pair: Dict[Tuple[ObjectId, ObjectId], float] = {}
@@ -306,9 +310,12 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
                 gt_by_pair[(doc["left_id"], doc["right_id"])] = int(doc["same"])
         return gt_by_pair
 
+    n_pairs_per_technique: dict[str, int] = defaultdict(int)
     for technique in imp_gen_techniques:
         # key: (left_id, right_id)
-        loaded_scores_by_technique = _load_scores_for_technique(technique)
+        loaded_scores_by_technique = _load_scores_for_technique(technique=technique, dataset_name=dataset_name)
+        # contains only matching dataset
+        n_pairs_per_technique[technique] = len(loaded_scores_by_technique)
         if len(loaded_scores_by_technique) > 0:
             loaded_keys = list(loaded_scores_by_technique.keys())
             gt_by_pair = _load_ground_truth_for_pairs(loaded_keys)
@@ -317,9 +324,7 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
             )
             if len(ordered_keys) != len(loaded_scores_by_technique):
                 logger.warning(
-                    "Missing ground-truth for %d pairs (technique=%s, dataset=%s); dropping them. Since the "
-                    "'dataset_name' is not saved in the 'impostors_outputs' collection, this could lead to these "
-                    "drops (not ID inconsistencies).",
+                    "Missing ground-truth for %d pairs (technique=%s, dataset=%s); dropping them.",
                     len(loaded_scores_by_technique) - len(ordered_keys),
                     technique, dataset_name,
                 )
@@ -363,6 +368,7 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
     )
 
     for baseline, pred in baseline_predictions.items():
+        n_pairs_per_technique[baseline] = len(pred)
         results[baseline] = compute_metrics_for_thresholds(
             ground_truth=ground_truth,
             scores=baseline_predictions[baseline],
@@ -370,6 +376,8 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
         )
         logger.info(f"Results for {baseline}: {results[baseline]}")
 
+    with open(LOCAL_SAVE_PATH / f"prec_rec_{dataset_name}_n_pairs_per_technique.json", "w") as f:
+        json.dump(dict(n_pairs_per_technique), f, indent=2)
     return results
 
 # ---------------------------------------------------------------------
