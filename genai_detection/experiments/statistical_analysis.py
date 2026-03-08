@@ -47,7 +47,7 @@ class StatisticalAnalysis:
         # --------------------------------------------------------------
         impostor_outputs_cursor = self.mongodb.impostor_output_collection.find({})
         impostor_outputs = pd.DataFrame(impostor_outputs_cursor)
-        logger.info(f"Obtained {impostor_outputs.shape[0]} impostor outputs.")
+        logger.info(f"Obtained {impostor_outputs.shape} impostor outputs.")
 
         required_cols = {
             "left_id",
@@ -62,6 +62,11 @@ class StatisticalAnalysis:
         missing = required_cols - set(impostor_outputs.columns)
         if missing:
             raise ValueError(f"Missing columns in impostor outputs: {missing}")
+        assert isinstance(
+            impostor_outputs["left_id"][0], bson.objectid.ObjectId
+        ) and isinstance(
+            impostor_outputs["right_id"][0], bson.objectid.ObjectId
+        ), f"Columns of impostor_outputs have incorrect data type: {type(impostor_outputs['left_id'][0])}, {type(impostor_outputs['right_id'][0])}"
 
         left_ids = impostor_outputs["left_id"].dropna().unique().tolist()
         on_the_fly_cursor = self.mongodb.on_the_fly_collection.find(
@@ -72,6 +77,10 @@ class StatisticalAnalysis:
         if on_the_fly_df.empty:
             on_the_fly_df = pd.DataFrame(columns=["left_id", "index"])
         else:
+            assert isinstance(
+                on_the_fly_df["text_id"][0], bson.objectid.ObjectId
+            ), f"Column of on_the_fly_df has incorrect data type: {type(on_the_fly_df['text_id'][0])}"
+
             # Keep only the first match per text_id and preserve missing matches via left-join.
             on_the_fly_df = (
                 on_the_fly_df.sort_values("_id")
@@ -84,7 +93,7 @@ class StatisticalAnalysis:
             how="left",
             validate="many_to_one",
         )
-
+        logger.info(f"Merged impostor outputs with on-the-fly data: {impostor_outputs.shape}")
         # --------------------------------------------------------------
         # Load ground truth
         # --------------------------------------------------------------
@@ -104,25 +113,29 @@ class StatisticalAnalysis:
         gt_data = pd.DataFrame(gt_cursor)
         logger.info(f"Obtained ground truth {gt_data.shape[0]} pairs")
         assert "left_id" in gt_data.columns and "right_id" in gt_data.columns, f"Missing columns in ground truth data with columns: {gt_data.columns}"
+        assert isinstance(gt_data["left_id"][0], bson.objectid.ObjectId) and isinstance(
+            gt_data["right_id"][0], bson.objectid.ObjectId
+        ), f"Columns of gt_data have incorrect data type: {type(gt_data['left_id'][0])}, {type(gt_data['right_id'][0])}"
 
         # --------------------------------------------------------------
         # Merge
         # --------------------------------------------------------------
-        assert isinstance(gt_data["left_id"][0], bson.objectid.ObjectId) and isinstance(gt_data["right_id"][0],
-                                                                                        bson.objectid.ObjectId), f"Columns of gt_data have incorrect data type: {type(gt_data['left_id'][0])}, {type(gt_data['right_id'][0])}"
-        assert isinstance(impostor_outputs["left_id"][0], bson.objectid.ObjectId) and isinstance(
-            impostor_outputs["right_id"][0],
-            bson.objectid.ObjectId), f"Columns of impostor_outputs have incorrect data type: {type(impostor_outputs['left_id'][0])}, {type(impostor_outputs['right_id'][0])}"
         df = impostor_outputs.merge(
             gt_data,
-            on=["left_id", "right_id"],
+            on=["left_id", "right_id", "dataset_name"],
             how="left",
             validate="many_to_one",
         )
-        assert len(df['same'].isna()) - len(df) < 0, f"None of {len(df)} impostor outputs have a ground-truth match."
+        missing = df["same"].isna().sum()
 
-        if df["same"].isna().any():
-            logger.warning(f"{len(df['same'].isna())}/{len(df)} impostor outputs have no ground-truth match")
+        assert (
+            df["same"].notna().any()
+        ), f"None of {len(df)} impostor outputs have a ground-truth match."
+
+        if missing > 0:
+            logger.warning(
+                f"{missing}/{len(df)} impostor outputs have no ground-truth match"
+            )
         logger.info(f"Merged ground truth impostor outputs: {df.shape}")
 
         # --------------------------------------------------------------
