@@ -8,8 +8,8 @@ with the BDI-style bootstrap distance differences described by Nagy (2024):
     - compute distance difference between each impostor and disputed text,
         as well as each candidate (here: one) and disputed text.
     - select closest impostor and closest candidate (here: only one) to disputed text
-    - compute d(disputed, candidate) - d(disputed, impostor) (= one point in distribution; negative if impostors are
-    more similar)
+    - compute d(disputed, impostor) - d(disputed, candidate) (= one point in distribution; negative if impostors are
+    more similar, bc d is distance and not similarity)
 - summarize the resulting distribution by probability mass above zero.
 
 Find other implementations:
@@ -36,8 +36,8 @@ class BDIScorer(Scorer):
     For each round:
     1) sample random feature subset,
     2) compute distances from disputed to all candidates and impostors,
-    3) select the closest imposter and candidate (minimum distance),
-    4) compute diff = d(disputed, closest_candidate) - d(disputed, closest_impostor).
+    3) select the closest imposter and candidate (minimum distance d),
+    4) compute diff = d(disputed, closest_impostor) -d(disputed, closest_candidate).
 
     In this repository's pairwise setup, there is exactly one candidate vector.
 
@@ -62,7 +62,7 @@ class BDIScorer(Scorer):
         self.probability_threshold = probability_threshold
 
     def _distance(self, a: np.ndarray, b: np.ndarray) -> float:
-        """Convert similarity output to distance-like form in [0, 1]."""
+        """Convert similarity output to distance-like form in [0, 1]. Near one is dissimilar."""
         return 1.0 - float(self.similarity_fn(a, b))
 
 
@@ -123,8 +123,8 @@ class BDIScorer(Scorer):
                 self._distance(disputed_vec, impostor_vec)
                 for impostor_vec in impostor_vecs
             )
-            # difference is negative if impostors are closer to disputed than candidate
-            diff = self._distance(disputed_vec, candidate_vec) - closest_impostor_distance
+            # difference od distances is negative if impostors are closer to disputed than candidate
+            diff = closest_impostor_distance - self._distance(disputed_vec, candidate_vec)
             diffs.append(float(diff))
 
         return ScoreResult(score=self._mass_above_zero(diffs), p_values={})
@@ -150,7 +150,7 @@ class BDIImpostorDetector(ImpostorDetector):
             rounds=self.rounds,
             portion_delete=self.portion_delete,
             similarity_fn=minmax_similarity,
-            probability_threshold=0.01, # Nagy (2024) use probability mass above 0, but with 0 most values are 1
+            probability_threshold=0.00, # Nagy (2024) use probability mass above 0, but with 0 most values are 1
         )
         self.impostor_output_collection = self.mongoDB.impostor_ablation_output_collection
 
