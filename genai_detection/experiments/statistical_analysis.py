@@ -47,7 +47,7 @@ class StatisticalAnalysis:
         # --------------------------------------------------------------
         impostor_outputs_cursor = self.mongodb.impostor_output_collection.find({})
         impostor_outputs = pd.DataFrame(impostor_outputs_cursor)
-        logger.info("Obtained impostor outputs")
+        logger.info(f"Obtained {impostor_outputs.shape[0]} impostor outputs.")
 
         required_cols = {
             "left_id",
@@ -102,7 +102,7 @@ class StatisticalAnalysis:
             },
         )
         gt_data = pd.DataFrame(gt_cursor)
-        logger.info(f"Obtained ground truth data.")
+        logger.info(f"Obtained ground truth {gt_data.shape[0]} pairs")
         assert "left_id" in gt_data.columns and "right_id" in gt_data.columns, f"Missing columns in ground truth data with columns: {gt_data.columns}"
 
         # --------------------------------------------------------------
@@ -119,6 +119,7 @@ class StatisticalAnalysis:
             how="left",
             validate="many_to_one",
         )
+        assert len(df['same'].isna()) - len(df) < 0, f"None of {len(df)} impostor outputs have a ground-truth match."
 
         if df["same"].isna().any():
             logger.warning(f"{len(df['same'].isna())}/{len(df)} impostor outputs have no ground-truth match")
@@ -306,7 +307,7 @@ class StatisticalAnalysis:
         }
         missing = required_cols - set(df.columns)
         if missing:
-            raise ValueError(f"Missing required columns: {missing}")
+            raise ValueError(f"Missing required columns: {missing}, only have {df.columns}")
 
         confusion_order = ["TP", "FP", "FN", "TN"]
 
@@ -441,5 +442,5 @@ if __name__ == "__main__":
     )
     logger = logging.getLogger(__name__)
     statistical_analysis = StatisticalAnalysis()
-    statistical_analysis.display_p_val_per_side()
+    # statistical_analysis.display_p_val_per_side()
     statistical_analysis.histogram_per_approach()
