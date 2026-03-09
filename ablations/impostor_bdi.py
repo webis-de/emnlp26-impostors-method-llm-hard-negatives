@@ -78,14 +78,14 @@ class BDIScorer(Scorer):
                 ``d(disputed, impostor) - d(disputed, candidate)``.
 
         Returns:
-            Score in [0, 100]. If no valid differences exist, returns 50.
+            Score in [0, 1]. If no valid differences exist, returns 0.5.
         """
 
         if not diffs:
-            return 50
+            return 0.5
         # percentileofscore of, for example, 80% means that 80% of the scores in a are below the given score
         # weak means <= instead of < (i.e., strict)
-        return 100 - sp.stats.percentileofscore(diffs, self.probability_threshold, kind="weak")
+        return (100 - sp.stats.percentileofscore(diffs, self.probability_threshold, kind="weak")) / 100
 
     def score_pair(self, pair: Dict[str, Any], vectorizer) -> ScoreResult:
         """
