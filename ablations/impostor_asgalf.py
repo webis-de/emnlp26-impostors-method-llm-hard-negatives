@@ -149,7 +149,7 @@ class ASGALFScorer(Scorer):
             vectorizer: Fitted vectorizer-like object with `vocabulary_`.
 
         Returns:
-            Tuple[float, Dict]: (aggregate score, empty p-values dict).
+            Tuple[float, Dict]: (aggregated score, empty p-values dict). Scores are between 0 and self.rounds.
         """
         assert (
             vectorizer.vocabulary_ is not None
