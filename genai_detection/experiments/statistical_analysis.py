@@ -97,7 +97,7 @@ class StatisticalAnalysis:
         # --------------------------------------------------------------
         # Load ground truth
         # --------------------------------------------------------------
-        gt_cursor = self.mongodb.test_pairs_collection.find(
+        gt_cursor = self.mongodb.all_pairs_collection.find(
             {
                 # "left_id": {"$in": impostor_outputs["left_id"].unique().tolist()},
                 # "right_id": {"$in": impostor_outputs["right_id"].unique().tolist()},
@@ -111,8 +111,11 @@ class StatisticalAnalysis:
             },
         )
         gt_data = pd.DataFrame(gt_cursor)
+
         logger.info(f"Obtained ground truth {gt_data.shape[0]} pairs")
-        assert "left_id" in gt_data.columns and "right_id" in gt_data.columns, f"Missing columns in ground truth data with columns: {gt_data.columns}"
+        assert (
+            "left_id" in gt_data.columns and "right_id" in gt_data.columns
+        ), f"Missing columns in ground truth data with columns: {gt_data.columns}"
         assert isinstance(gt_data["left_id"][0], bson.objectid.ObjectId) and isinstance(
             gt_data["right_id"][0], bson.objectid.ObjectId
         ), f"Columns of gt_data have incorrect data type: {type(gt_data['left_id'][0])}, {type(gt_data['right_id'][0])}"
@@ -123,19 +126,17 @@ class StatisticalAnalysis:
         df = impostor_outputs.merge(
             gt_data,
             on=["left_id", "right_id", "dataset_name"],
-            how="left",
+            how="inner",
             validate="many_to_one",
         )
-        missing = df["same"].isna().sum()
-
+        if len(df) < len(impostor_outputs):
+            logger.warning(
+                f"{len(df)}/{len(impostor_outputs)} impostor outputs have no ground-truth match"
+            )
         assert (
             df["same"].notna().any()
         ), f"None of {len(df)} impostor outputs have a ground-truth match."
 
-        if missing > 0:
-            logger.warning(
-                f"{missing}/{len(df)} impostor outputs have no ground-truth match"
-            )
         logger.info(f"Merged ground truth impostor outputs: {df.shape}")
 
         # --------------------------------------------------------------
@@ -331,6 +332,12 @@ class StatisticalAnalysis:
 
             if ds_df.empty:
                 continue
+                # print value counts
+            for imp_gen_tech in df["impostor_generation_technique"].dropna().unique():
+                imp_gen_df = ds_df[ds_df["impostor_generation_technique"] == imp_gen_tech]
+                print(dataset_name, imp_gen_tech)
+                print(imp_gen_df["confusion_left"].value_counts())
+                print(imp_gen_df["confusion_right"].value_counts())
 
             hue_order = sorted(ds_df["technique_plot"].dropna().unique())
             on_the_fly_variants = [h for h in hue_order if h.startswith("on_the_fly (")]
