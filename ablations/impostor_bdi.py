@@ -78,14 +78,14 @@ class BDIScorer(Scorer):
                 ``d(disputed, impostor) - d(disputed, candidate)``.
 
         Returns:
-            Score in [0, 1]. If no valid differences exist, returns 0.5.
+            Score in [0, 100]. If no valid differences exist, returns 50.
         """
 
         if not diffs:
-            return 0.5
+            return 50
         # percentileofscore of, for example, 80% means that 80% of the scores in a are below the given score
         # weak means <= instead of < (i.e., strict)
-        return float((100 - sp.stats.percentileofscore(diffs, self.probability_threshold, kind="weak")) / 100.0)
+        return 100 - sp.stats.percentileofscore(diffs, self.probability_threshold, kind="weak")
 
     def score_pair(self, pair: Dict[str, Any], vectorizer) -> ScoreResult:
         """
@@ -97,7 +97,7 @@ class BDIScorer(Scorer):
             vectorizer: Fitted vectorizer-like object exposing ``vocabulary_``.
 
         Returns:
-            ``ScoreResult`` with BDI score and an empty p-values dict.
+            ``ScoreResult`` with BDI score (between 0 and self.rounds) and an empty p-values dict.
         """
         assert (
             vectorizer.vocabulary_ is not None
@@ -127,7 +127,8 @@ class BDIScorer(Scorer):
             diff = closest_impostor_distance - self._distance(disputed_vec, candidate_vec)
             diffs.append(float(diff))
 
-        return ScoreResult(score=self._mass_above_zero(diffs), p_values={})
+        # impostor detector normalizes score by number of rounds; hence, we need to return value between 0 and self.rounds
+        return ScoreResult(score=self._mass_above_zero(diffs) * self.rounds, p_values={})
 
 
 class BDIImpostorDetector(ImpostorDetector):
