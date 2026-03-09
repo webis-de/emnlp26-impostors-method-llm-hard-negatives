@@ -49,12 +49,16 @@ def extended_minmax_similarity(candidate, disputed, candidate_fillers):
     """
     Calculate extended min-max similarity between two vectors in TFIDF format given a background set of fillers.
     Khonji & Iraqi (2014) use this version of the min-max similarity.
+
+    We ensure it is a valid metric between 0 and 1.
     """
     def get_most_similar_to_reference(reference, fillers):
         filler_similarities = [
             minmax_similarity(reference, filler) for filler in fillers
         ]
         return fillers[argmax(filler_similarities)]
+    if not candidate_fillers:
+        return 0.0
     max_sim_imp_to_candidate = get_most_similar_to_reference(reference=candidate, fillers=candidate_fillers)
     max_sim_imp_to_disputed = get_most_similar_to_reference(
         reference=disputed, fillers=candidate_fillers
@@ -64,7 +68,7 @@ def extended_minmax_similarity(candidate, disputed, candidate_fillers):
 
     if denominator == 0:
         return 0.0
-    return candidate_disputed_min_max**2/denominator
+    return min(1.0, candidate_disputed_min_max**2/denominator)
 
 def manhattan_distance(a: np.ndarray, b: np.ndarray) -> float:
     """
