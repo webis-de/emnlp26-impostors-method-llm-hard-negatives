@@ -52,6 +52,7 @@ class Scorer:
             "right": { "tfidf": [...], "impostors_tfidf": [...] },
             ...
         }
+        Score values are between 0 and self.rounds.
         """
         assert (
             vectorizer.vocabulary_ is not None
