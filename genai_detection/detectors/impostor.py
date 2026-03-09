@@ -345,6 +345,7 @@ class ImpostorDetector(ImpostorBase):
                 raise TypeError(
                     f"score_pair must return ScoreResult, got {type(score_result)}."
                 )
+            assert 0 <= score_result.score <= self.rounds, f"Score must be in [0,{self.rounds}], got {score_result.score}."
             document2insert["scores_over_different_rounds"] = score_result.score
             p_values = score_result.p_values
             if p_values:    # ablations inherit from this method, but do not return p-values
