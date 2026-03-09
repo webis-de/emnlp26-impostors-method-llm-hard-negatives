@@ -94,6 +94,27 @@ class Potha2017Scorer(Scorer):
         return random.sample(impostor_vecs, self.impostors_per_round)
 
     def score_pair(self, pair: Dict[str, Any], vectorizer) -> ScoreResult:
+        """
+        Scores a candidate document ("right") against a disputed document ("left")
+        using impostor-based similarity assessment over random feature subsets.
+
+        The method evaluates the likelihood of authorship by comparing the
+        similarities of TF-IDF-reduced vectors between the candidate, disputed
+        document, and selected impostor texts. For each round, a randomized set of TF-IDF
+        features is retained, similarity scores are computed, and the candidate's
+        similarity rank among impostors is calculated. A final score is derived by
+        averaging normalized ranks over all rounds.
+
+        :param pair: A dictionary containing the disputed ("left") and candidate ("right")
+            documents. Each document must provide keys "tfidf" (TF-IDF sparse vector),
+            "original_text" (text content), and "impostors" (list of impostor texts).
+        :type pair: Dict[str, Any]
+        :param vectorizer: A pre-fitted TF-IDF vectorizer used for transforming
+            text into vector space for impostor identification and feature reduction.
+            The vectorizer must have a valid `vocabulary_` attribute.
+        :return: A ScoreResult object containing the final similarity score (between 0 and self.rounds) and an
+            empty dictionary for p-values.
+        """
         assert (
             vectorizer.vocabulary_ is not None
         ), "Vectorizer must be fitted before scoring."
