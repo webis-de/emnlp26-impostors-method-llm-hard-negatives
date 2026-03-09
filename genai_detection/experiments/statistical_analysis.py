@@ -98,10 +98,7 @@ class StatisticalAnalysis:
         # Load ground truth
         # --------------------------------------------------------------
         gt_cursor = self.mongodb.all_pairs_collection.find(
-            {
-                # "left_id": {"$in": impostor_outputs["left_id"].unique().tolist()},
-                # "right_id": {"$in": impostor_outputs["right_id"].unique().tolist()},
-            },
+            {},
             {
                 "_id": 0,
                 "left_id": 1,
@@ -207,7 +204,6 @@ class StatisticalAnalysis:
                 if tech_df.empty:
                     continue
                 if technique == "on_the_fly":
-                    print(tech_df.keys())
                     for index in tech_df["index"].unique():
                         tech_df = tech_df[tech_df["index"] == index]
                         self._violine_summary_per_df(tech_df=tech_df, dataset_name=dataset_name,
@@ -332,12 +328,6 @@ class StatisticalAnalysis:
 
             if ds_df.empty:
                 continue
-                # print value counts
-            for imp_gen_tech in df["impostor_generation_technique"].dropna().unique():
-                imp_gen_df = ds_df[ds_df["impostor_generation_technique"] == imp_gen_tech]
-                print(dataset_name, imp_gen_tech)
-                print(imp_gen_df["confusion_left"].value_counts())
-                print(imp_gen_df["confusion_right"].value_counts())
 
             hue_order = sorted(ds_df["technique_plot"].dropna().unique())
             on_the_fly_variants = [h for h in hue_order if h.startswith("on_the_fly (")]
@@ -462,5 +452,5 @@ if __name__ == "__main__":
     )
     logger = logging.getLogger(__name__)
     statistical_analysis = StatisticalAnalysis()
-    # statistical_analysis.display_p_val_per_side()
+    statistical_analysis.display_p_val_per_side()
     statistical_analysis.histogram_per_approach()
