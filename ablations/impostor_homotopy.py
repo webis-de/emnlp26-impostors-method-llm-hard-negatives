@@ -234,6 +234,21 @@ class HBCScorer:
         return float(np.linalg.norm(y - recon))
 
     def score_pair(self, pair: Dict[str, Any], vectorizer) -> ScoreResult:
+        """
+        Calculates a score based on the similarity between a disputed document and a
+        candidate document, utilizing impostor documents to refine the scoring process.
+        This function employs LassoLars with L1 regularization to fit the data and
+        analyzes the residuals to measure the closeness of the candidate compared to
+        impostors.
+
+        :param pair: Dictionary containing the disputed and candidate document data,
+            as well as the feature vectors (e.g., TF-IDF) for each. Specifically,
+            it includes keys "left", "right", and "impostors_tfidf".
+        :type pair: Dict[str, Any]
+        :param vectorizer: Unused parameter related to feature extraction.
+        :return: A `ScoreResult` object containing the overall score normalized
+            across the number of rounds (between 0 and self.rounds) and an empty dictionary for p-values.
+        """
         total_score = 0.0
         disputed, candidate = "left", "right"
         # tfidf stores all features from feature extractor
@@ -273,9 +288,8 @@ class HBCScorer:
             else:
                 print("residual impostors: ", r_impostors, "residual candidates: ", r_candidate)
 
-        print("Total score over ", self.rounds, "is: ", total_score)
-
-        return ScoreResult(score=total_score / self.rounds, p_values={})
+        # impostor detector normalizes score by number of rounds; hence, we need to return value between 0 and self.rounds
+        return ScoreResult(score=total_score, p_values={})
 
 
 class HBCImpostorDetector(ImpostorDetector):
