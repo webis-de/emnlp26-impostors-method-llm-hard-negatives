@@ -405,7 +405,7 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
     with open(LOCAL_SAVE_PATH / f"prec_rec_{dataset_name}_n_pairs_per_technique.json", "w") as f:
         json.dump(dict(n_pairs_per_technique), f, indent=2)
 
-    pan_metrics_save_path = save_pan_metrics(LOCAL_SAVE_PATH, pan_metrics, dataset_name=dataset_name)
+    pan_metrics_save_path = save_pan_metrics(save_path=LOCAL_SAVE_PATH, pan_metrics=pan_metrics, dataset_name=dataset_name)
     logger.info("Saved pan_metrics to %s", pan_metrics_save_path)
 
     return results
@@ -578,18 +578,14 @@ def run_prec_recall_curves(dataset_name:str, imp_gen_techniques:List[str], compu
     combined_df.to_csv(LOCAL_SAVE_PATH / f"effectiveness_scores_{dataset_name}.csv", index=False)
     logger.info(f"Saved effectiveness scores as csv to {LOCAL_SAVE_PATH}/effectiveness_scores_{dataset_name}.csv.")
 
-    # save precision-recall curve for approaches as json
-    with open(LOCAL_SAVE_PATH / f"prec_rec_{dataset_name}.json", "w") as f:
-        json.dump(results_dict, f, indent=2)
-        # serializable_results = {
-        #     approach: _df_to_serializable_records(df)
-        #     for approach, df in results_dict.items()
-        # }
-        # json.dump(serializable_results, f, indent=2)
-
     # save precision-recall AUC values
     with open(LOCAL_SAVE_PATH / f"prec_rec_auc_{dataset_name}.json", "w") as f:
         json.dump(pr_aucs, f, indent=2)
+        # serializable_results = {
+        #         approach: _df_to_serializable_records(df)
+        #         for approach, df in pr_aucs.items()
+        #         }
+        # json.dump(serializable_results, f, indent=2)
 
     # best PR operating points
     best_pr_df = _extract_best_pr_points_per_impostor(
