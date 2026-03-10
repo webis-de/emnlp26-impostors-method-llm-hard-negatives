@@ -7,9 +7,9 @@ representation to TF-STD (Burrows, 2002) with Caesar-style word/char n-grams.
 TF-STD here means:
 1. Build a count vector over fixed-length word/char n-grams.
 2. Convert counts to TF by dividing each document's counts by its length.
-3. Scale each feature by the inverse of its corpus standard deviation
-   (feature-wise std across documents). This down-weights very stable features
-   and up-weights those that vary more across documents.
+3. Scale each feature (term frequencies) by its corpus standard deviation
+   (feature-wise std across documents). This boosts stable features
+   and is the inverse intuition of TF-IDF.
 4. L2-normalize each document vector.
 
 In short: TF (document-normalized counts) then STD scaling (feature-wise std),
@@ -36,7 +36,7 @@ class CaesarTFStdFeatureExtractor:
     """
     Feature extractor adapter for the Impostor pipeline using TF-STD.
 
-    TF-STD here is "term frequency scaled by feature-wise standard deviation":
+    TF-STD (=tf/std) here is "term frequency scaled by feature-wise standard deviation":
     - TF: counts normalized by document length.
     - STD: standard deviation computed per feature across documents.
     - Final step: L2-normalize per document.
@@ -110,7 +110,8 @@ class CaesarTFStdFeatureExtractor:
         doc_lengths[doc_lengths == 0] = 1.0
         tf = counts / doc_lengths
 
-        # Feature-wise std across documents; inverse scaling per Burrows TF-STD.
+        # Feature-wise std across documents. We use inverse-std weighting (tf / std):
+        # stable/common features (low std) are boosted, volatile features are down-weighted.
         std = tf.std(axis=0, ddof=0)
         std[std == 0] = 1.0
         scaled = tf / std
