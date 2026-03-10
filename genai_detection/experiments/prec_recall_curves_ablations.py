@@ -19,7 +19,10 @@ from ablations.std_impostor import StdImpostor
 from genai_detection.config import CONFIG
 from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENERATORS
 from genai_detection.experiments.reproduction.impostor_metrics import (compute_metrics_parallel, load_all_pairs, )
-from genai_detection.experiments.reproduction.pan_metrics import BinaryVerificationEvaluator
+from genai_detection.experiments.reproduction.pan_metrics import (
+    get_pan_metrics,
+    save_pan_metrics,
+)
 from genai_detection.experiments.reproduction.prec_recall_curves import plot_precision_recall_curve
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
@@ -148,41 +151,6 @@ def _score_detectors(
 
     return predictions
 
-def get_pan_metrics(predictions, y_true):
-    evaluator = BinaryVerificationEvaluator()
-
-    pan_metrics = {}
-
-    for method_name, method_scores in predictions.items():
-        method_scores = np.asarray(method_scores, dtype=float)
-
-        print(f"\nMethod: {method_name}")
-        print("Number of unique prediction values:")
-        print(Counter(method_scores))
-
-        best_result = evaluator.tune_threshold(
-                y_true=y_true,
-                scores=method_scores,
-                thresholds=CONFIG.THRESHOLDS,
-                rejection_radius=0.0,   # or e.g. 0.05 if you want unanswered cases
-                optimize_for="c_at_1",
-                )
-
-        pan_metrics[method_name] = {
-                "threshold": best_result.threshold,
-                "rejection_radius": best_result.rejection_radius,
-                "n_answered": best_result.n_answered,
-                "n_unanswered": best_result.n_unanswered,
-                "precision": best_result.precision,
-                "recall": best_result.recall,
-                "f1": best_result.f1,
-                "accuracy": best_result.accuracy,
-                "c_at_1": best_result.c_at_1,
-                "auroc": best_result.auroc,
-                "auroc_c_at_1": best_result.auroc_c_at_1,
-                }
-    return pan_metrics
-
 
 def compute_prec_recall_curves_ablations(
     dataset_name: str,
@@ -252,6 +220,4 @@ if __name__ == "__main__":
                                     title=f"Precision–Recall Curve")
 
     # save pan metrics
-    with open(LOCAL_SAVE_PATH / "pan_metrics.json", "w") as f:
-        import json
-        json.dump(pan_metrics, f, indent=2)
+    save_pan_metrics(pan_metrics=pan_metrics, save_path=LOCAL_SAVE_PATH)

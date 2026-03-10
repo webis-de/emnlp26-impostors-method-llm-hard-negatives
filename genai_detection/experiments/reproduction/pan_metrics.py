@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from typing import Iterable, Sequence
 
@@ -11,6 +12,8 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
+
+from genai_detection.config import CONFIG
 
 
 @dataclass
@@ -247,3 +250,50 @@ class BinaryVerificationEvaluator:
 
         assert best_result is not None
         return best_result
+
+
+def get_pan_metrics(predictions, y_true):
+    evaluator = BinaryVerificationEvaluator()
+
+    pan_metrics = {}
+
+    for method_name, method_scores in predictions.items():
+        method_scores = np.asarray(method_scores, dtype=float)
+
+        print(f"\nMethod: {method_name}")
+        print("Number of unique prediction values:")
+        print(Counter(method_scores))
+
+        best_result = evaluator.tune_threshold(
+                y_true=y_true,
+                scores=method_scores,
+                thresholds=CONFIG.THRESHOLDS,
+                rejection_radius=0.0,   # or e.g., 0.05 if you want unanswered cases
+                optimize_for="c_at_1",
+                )
+
+        pan_metrics[method_name] = {
+                "threshold": best_result.threshold,
+                "rejection_radius": best_result.rejection_radius,
+                "n_answered": best_result.n_answered,
+                "n_unanswered": best_result.n_unanswered,
+                "precision": best_result.precision,
+                "recall": best_result.recall,
+                "f1": best_result.f1,
+                "accuracy": best_result.accuracy,
+                "c_at_1": best_result.c_at_1,
+                "auroc": best_result.auroc,
+                "auroc_c_at_1": best_result.auroc_c_at_1,
+                }
+    return pan_metrics
+
+def save_pan_metrics(pan_metrics, save_path, dataset_name=None):
+    assert save_path.exists(), f"Directory {save_path} does not exist."
+    if not save_pan_metrics:
+        save_file = save_path / "pan_metrics.json"
+    else:
+        save_file = save_path / f"{dataset_name}_pan_metrics.json"
+    with open(save_file, "w") as f:
+        import json
+        json.dump(pan_metrics, f, indent=2)
+    return save_file
