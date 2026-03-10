@@ -4,6 +4,17 @@ Caesar (O2-only by Kestemont et al., 2016) variant aligned with the ImpostorDete
 This keeps the original Impostor logic intact and only swaps the feature
 representation to TF-STD (Burrows, 2002) with Caesar-style word/char n-grams.
 
+TF-STD here means:
+1. Build a count vector over fixed-length word/char n-grams.
+2. Convert counts to TF by dividing each document's counts by its length.
+3. Scale each feature by the inverse of its corpus standard deviation
+   (feature-wise std across documents). This down-weights very stable features
+   and up-weights those that vary more across documents.
+4. L2-normalize each document vector.
+
+In short: TF (document-normalized counts) then STD scaling (feature-wise std),
+followed by cosine similarity in the impostor pipeline.
+
 Find other implementations:
 - https://computationalstylistics.github.io/docs/imposters (12.02.2026)
 - https://github.com/bnagy/ruzicka/blob/main/ruzicka/Order2Verifier.py (13.02.2026)
@@ -24,6 +35,11 @@ from genai_detection.detectors.impostor import ImpostorDetector
 class CaesarTFStdFeatureExtractor:
     """
     Feature extractor adapter for the Impostor pipeline using TF-STD.
+
+    TF-STD here is "term frequency scaled by feature-wise standard deviation":
+    - TF: counts normalized by document length.
+    - STD: standard deviation computed per feature across documents.
+    - Final step: L2-normalize per document.
 
     It mirrors the Caesar TF-STD representation but exposes `fit_transform`
     and `vectorizer.vocabulary_` to match the ImpostorDetector interface.
@@ -84,6 +100,7 @@ class CaesarTFStdFeatureExtractor:
 
         Returns:
             CSR matrix (documents x features) with TF-STD features.
+            Each row is TF-normalized, scaled by inverse feature std, then L2-normalized.
         """
         texts = [self.preprocess_fn(t) for t in texts]
         self._count_vectorizer = self._build_vectorizer()
@@ -93,6 +110,7 @@ class CaesarTFStdFeatureExtractor:
         doc_lengths[doc_lengths == 0] = 1.0
         tf = counts / doc_lengths
 
+        # Feature-wise std across documents; inverse scaling per Burrows TF-STD.
         std = tf.std(axis=0, ddof=0)
         std[std == 0] = 1.0
         scaled = tf / std
@@ -107,7 +125,8 @@ class StdImpostor(ImpostorDetector):
     Caesar Paper O2 variant that reuses the ImpostorDetector pipeline.
 
     Only differences from the original impostor approach:
-      - TF-STD representation with word/char n-grams.
+    - TF-STD representation with word/char n-grams.
+    - Cosine similarity over L2-normalized TF-STD vectors.
     """
 
     def __init__(
@@ -149,7 +168,7 @@ class StdImpostor(ImpostorDetector):
         feature_type: t.Literal["word", "char"],
         char_n: int,
     ) -> t.Callable[[str], t.List[str]]:
-        """Tokenizer for length matching in PairPreprocessor."""
+        """Tokenizer for length matching in PairPreprocessor (word or fixed char n-grams)."""
         if feature_type == "word":
             return lambda text: text.split()
         if feature_type == "char":
