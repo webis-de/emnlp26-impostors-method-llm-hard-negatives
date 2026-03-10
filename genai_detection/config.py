@@ -131,6 +131,6 @@ class BaseConfig:
         "homotopy": "#ff9896",  # light red
     }
 
-    DATASET_TRANSLATIONS = {BLOG:"Blog", STUDENT_ESSAYS: "Student Essays"}
+    DATASET_TRANSLATIONS = {BLOG:"Blog Posts", STUDENT_ESSAYS: "Student Essays"}
 
 CONFIG = BaseConfig()
