@@ -1,10 +1,18 @@
 """
-The purpose of this file is to run the experiment where we use different training data configurations to optimize the
-supervised baseline from Koppel et al. (2014).
-- Leave One Out (i.e., train on all but "one" input pair and rotate which pair is considered for test)
-    - with leaving out all pairs which contain any of two authors from test pair in training data
-    - c.f. above but only train on pairs from the same two assignments
-Training data should be balanced.
+Run the supervised-baseline optimization experiment from Koppel et al. (2014).
+
+What happens end-to-end:
+1. For each dataset and configuration, iterate over all author pairs in MongoDB.
+2. For each pair, reuse an existing prediction if stored; otherwise train a supervised
+   impostor baseline in a leave-one-out fashion and compute a score.
+3. Persist per-pair predictions to MongoDB, then compute thresholded metrics
+   (precision/recall/F1/accuracy) for both "same" and "different" author labels.
+4. Persist per-config scores to MongoDB and write a CSV summary to disk.
+
+Notes:
+- Leave-one-out training excludes the current test pair and, depending on the config,
+  may also exclude any pair sharing either author.
+- The training data is expected to be balanced; invalid or missing predictions are skipped.
 """
 import logging
 import os
@@ -35,14 +43,19 @@ LOCAL_SAVE_PATH = (
 )
 LOCAL_SAVE_PATH.mkdir(parents=True, exist_ok=True)
 
+
 class OptimalSupervisedBaseline:
+    """Orchestrates the supervised-baseline optimization and persistence of results."""
+
     def __init__(self):
+        """Initialize MongoDB connections and relevant collections."""
         self.mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
         self.all_pairs_collection = self.mongoDB.all_pairs_collection
         logger.info(f"Obtained pairs from mongoDB.")
 
     @staticmethod
     def train_svc(dataset_name, test_pair, additional_in_args:List[str]):
+        """Create a SupervisedImpostorBaseline configured for a specific test pair."""
         return SupervisedImpostorBaseline(
             dataset_name=dataset_name,
             left_input={key:val for key, val in test_pair.items() if "left" in key},
@@ -53,6 +66,15 @@ class OptimalSupervisedBaseline:
 
 
     def obtain_loo_preds_gt_for_one_config(self, config:List[str], dataset_name:str=CONFIG.STUDENT_ESSAYS,):
+        """
+        Obtain leave-one-out predictions and ground-truth labels for a config.
+
+        This method:
+        - checks for stored predictions in MongoDB,
+        - trains a baseline if needed,
+        - stores fresh predictions back to MongoDB, and
+        - returns dicts keyed by pair id.
+        """
         predictions = {}
         gt = {}
         for test_pair in self.mongoDB.find_document_by_non_id_field(
@@ -62,6 +84,7 @@ class OptimalSupervisedBaseline:
         ):
             pair_id = test_pair["_id"]
             search_args = {"pair_id": pair_id, "config": config, "dataset_name": dataset_name}
+            # Prefer cached predictions if available to avoid retraining.
             pred_cursor = self.mongoDB.find_document_by_multiple_fields(
                 collection=self.mongoDB.supervised_baseline_diff_config_preds_collection,
                 search_args= search_args,
@@ -76,6 +99,7 @@ class OptimalSupervisedBaseline:
                     for config_item in config:
                         assert f"left_{config_item}" in test_pair and f"right_{config_item}" in test_pair, f"Required keys not found in test pair: {test_pair.keys()}"
                 try:
+                    # Train on all other pairs according to the config (leave-one-out).
                     sup_baseline = self.train_svc(dataset_name=test_pair["dataset_name"], test_pair=test_pair, additional_in_args=config)
                     if sup_baseline is None:
                         logger.error(f"Could not obtain prediction for test pair {pair_id} due to OOM when training.")
@@ -87,6 +111,7 @@ class OptimalSupervisedBaseline:
                 except ValueError as e:
                     logger.error(f"Skipping this test pair because SVC training data contains only one class. Error: {e}")
                     continue
+                # Fetch the actual text content for scoring.
                 text_test_pairs = self.mongoDB.get_texts_for_ids(text_ids=[test_pair["left_id"], test_pair["right_id"]])
 
                 preds = sup_baseline.get_score(text_test_pairs)
@@ -96,6 +121,7 @@ class OptimalSupervisedBaseline:
                     logger.error(f"Obtained invalid prediction for test pair {pair_id}; skipping insert.")
                     continue
                 predictions[pair_id] = pred_scalar
+                # Persist the freshly computed prediction for reuse.
                 self.mongoDB.insert_document(
                     collection=self.mongoDB.supervised_baseline_diff_config_preds_collection,
                     insert_data={
@@ -116,11 +142,13 @@ class OptimalSupervisedBaseline:
     def run_experiment(
             self
     ):
+        """Run the optimization across datasets/configs and persist scores."""
         dataset_names = [CONFIG.STUDENT_ESSAYS, CONFIG.BLOG]
         configs = [None, ["assignment"]]
         scores = pd.DataFrame()
         for dataset_name in dataset_names:
             for config in configs:
+                # Gather per-pair predictions and ground-truth labels.
                 preds, gt = self.obtain_loo_preds_gt_for_one_config(config=config, dataset_name=dataset_name)
                 # compute recall, precision, f1, accuracy for different thresholds
                 invalid_pred_keys = [
@@ -136,6 +164,7 @@ class OptimalSupervisedBaseline:
                 if not preds:
                     logger.error(f"No valid predictions for dataset {dataset_name} and config {config}; skipping.")
                     continue
+                # Sweep thresholds across the prediction range.
                 sup_preds = list(preds.values())
                 sup_thresholds = np.arange(np.min(sup_preds), np.max(sup_preds), 0.01)
                 df_metrics = compute_metrics_for_thresholds(
@@ -166,7 +195,7 @@ class OptimalSupervisedBaseline:
 
                 scores_config_df = pd.DataFrame(rows)
 
-                # insert each row separately to satisfy expected dict input
+                # Insert each row separately to satisfy expected dict input.
                 for doc in rows:
                     self.mongoDB.insert_document(
                         collection=self.mongoDB.supervised_baseline_diff_config_scores_collection,
@@ -176,7 +205,7 @@ class OptimalSupervisedBaseline:
                 scores = pd.concat([scores, scores_config_df])
                 logger.info(f"Obtained (same- and different-author) scores for dataset {dataset_name} and config {config}.")
 
-        # save dataframe to disk
+        # Save the aggregated metrics to disk for offline inspection.
         scores.to_csv(LOCAL_SAVE_PATH / "effectiveness_scores.csv", index=False)
         logger.info(f"Saved effectiveness scores as csv to {LOCAL_SAVE_PATH}/effectiveness_scores.csv.")
 
@@ -190,4 +219,3 @@ if __name__ == "__main__":
 
     optimal_sup_baseline = OptimalSupervisedBaseline()
     optimal_sup_baseline.run_experiment()
-
