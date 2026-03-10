@@ -35,6 +35,10 @@ from genai_detection.detectors.ppmd import PPMdDetector
 from genai_detection.detectors.unmasking import UnmaskingDetector
 from genai_detection.experiments.reproduction.impostor_metrics import (compute_metrics_for_thresholds,
                                                                        compute_metrics_parallel, load_all_pairs, )
+from genai_detection.experiments.reproduction.pan_metrics import (
+    get_pan_metrics,
+    save_pan_metrics,
+)
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -76,6 +80,21 @@ def _build_baselines(dataset_name: str):
 def _iter_batches(items: List, batch_size: int):
     for i in range(0, len(items), batch_size):
         yield items[i:i + batch_size]
+
+# def _jsonify_value(value):
+#     if isinstance(value, np.ndarray):
+#         return value.tolist()
+#     if isinstance(value, (np.floating, np.integer)):
+#         return value.item()
+#     if isinstance(value, (list, tuple)):
+#         return [_jsonify_value(v) for v in value]
+#     if isinstance(value, dict):
+#         return {k: _jsonify_value(v) for k, v in value.items()}
+#     return value
+#
+# def _df_to_serializable_records(df: pd.DataFrame) -> List[Dict]:
+#     records = df.to_dict(orient="records")
+#     return [{k: _jsonify_value(v) for k, v in row.items()} for row in records]
 
 def _score_baselines_for_pair_batches(
     baselines: Dict[str, object],
@@ -311,6 +330,7 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
         return gt_by_pair
 
     n_pairs_per_technique: dict[str, int] = defaultdict(int)
+    pan_metrics: dict[str, dict[str, float]] = defaultdict(dict)
     for technique in imp_gen_techniques:
         # key: (left_id, right_id)
         loaded_scores_by_technique = _load_scores_for_technique(technique=technique, dataset_name=dataset_name)
@@ -339,6 +359,9 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
                 ground_truth=ground_truth,
                 scores=predictions,
                 thresholds=CONFIG.THRESHOLDS,
+            )
+            pan_metrics[technique] = get_pan_metrics(
+                {technique: predictions}, ground_truth
             )
             logger.info(f"Results for {technique}: {results[technique]}")
         else:
@@ -374,10 +397,15 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
             scores=baseline_predictions[baseline],
             thresholds=CONFIG.THRESHOLDS,
         )
+        pan_metrics[baseline] = get_pan_metrics(baseline_predictions[baseline], ground_truth)
         logger.info(f"Results for {baseline}: {results[baseline]}")
 
     with open(LOCAL_SAVE_PATH / f"prec_rec_{dataset_name}_n_pairs_per_technique.json", "w") as f:
         json.dump(dict(n_pairs_per_technique), f, indent=2)
+
+    pan_metrics_save_path = save_pan_metrics(LOCAL_SAVE_PATH, pan_metrics, dataset_name=dataset_name)
+    logger.info("Saved pan_metrics to %s", pan_metrics_save_path)
+
     return results
 
 # ---------------------------------------------------------------------
@@ -530,7 +558,16 @@ def run_prec_recall_curves(dataset_name:str, imp_gen_techniques:List[str], compu
         temp_df = df.copy()
         temp_df["approach"] = approach
         dfs.append(temp_df)
-        pr_aucs[approach] = auc(df["recall"], df["precision"])
+        # Precision/recall are per-class arrays; compute PR-AUC per class.
+        if "precision" in df.columns and "recall" in df.columns:
+            class_aucs = {}
+            for class_id, class_name in [(0, "Different Author"), (1, "Same Author")]:
+                precisions = df["precision"].apply(lambda x: x[class_id]).to_numpy()
+                recalls = df["recall"].apply(lambda x: x[class_id]).to_numpy()
+                # Sort by recall for a valid PR-AUC.
+                order = np.argsort(recalls)
+                class_aucs[class_name] = auc(recalls[order], precisions[order])
+            pr_aucs[approach] = class_aucs
 
     # Combine all approaches
     combined_df = pd.concat(dfs, ignore_index=True)
@@ -542,6 +579,15 @@ def run_prec_recall_curves(dataset_name:str, imp_gen_techniques:List[str], compu
     # save precision-recall curve for approaches as json
     with open(LOCAL_SAVE_PATH / f"prec_rec_{dataset_name}.json", "w") as f:
         json.dump(results_dict, f, indent=2)
+        # serializable_results = {
+        #     approach: _df_to_serializable_records(df)
+        #     for approach, df in results_dict.items()
+        # }
+        # json.dump(serializable_results, f, indent=2)
+
+    # save precision-recall AUC values
+    with open(LOCAL_SAVE_PATH / f"prec_rec_auc_{dataset_name}.json", "w") as f:
+        json.dump(pr_aucs, f, indent=2)
 
     # best PR operating points
     best_pr_df = _extract_best_pr_points_per_impostor(
