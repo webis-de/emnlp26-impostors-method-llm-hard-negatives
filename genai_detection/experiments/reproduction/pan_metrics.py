@@ -95,6 +95,8 @@ class BinaryVerificationEvaluator:
     ) -> np.ndarray:
         """
         Return predictions in {0, 1, 0.5}, where 0.5 means unanswered.
+        Rejection radius is used to reject scores that are too close to the threshold.
+        Rejection means it is filled with a specific unanswered value.
         """
         preds = np.full(shape=len(scores), fill_value=cls.UNANSWERED, dtype=float)
         preds[scores > threshold + rejection_radius] = 1.0
@@ -117,6 +119,31 @@ class BinaryVerificationEvaluator:
         threshold: float,
         rejection_radius: float = 0.0,
     ) -> EvaluationResult:
+        """
+        Evaluates the performance of a binary classification model at a given threshold with
+        an optional rejection radius.
+        Rejection means it is filled with a specific unanswered value.
+        This method calculates various metrics such as precision,
+        recall, F1-score, accuracy, c@1, AUROC, and a combined measure (AUROC*c@1).
+
+        :param y_true: Ground truth binary labels. Must contain at least two unique classes.
+        :type y_true: Sequence[int] | np.ndarray
+        :param scores: Predicted scores or probabilities for the positive class. Must have
+            the same length as `y_true`.
+        :type scores: Sequence[float] | np.ndarray
+        :param threshold: Decision threshold above which predictions are categorized
+            as the positive class.
+        :type threshold: float
+        :param rejection_radius: Optional rejection radius to define a margin for ambiguous
+            predictions where no decision is made. Defaults to 0.0.
+            Rejection means it is filled with a specific unanswered value.
+        :type rejection_radius: float
+        :return: An `EvaluationResult` object containing threshold, rejection radius, the number
+            of answered and unanswered instances, and computed metrics like precision, recall,
+            F1-score, accuracy, c@1, AUROC, and AUROC*c@1.
+        :rtype: EvaluationResult
+        """
+
         y_true_np = self._to_numpy(y_true).astype(int)
         scores_np = self._to_numpy(scores).astype(float)
 
@@ -191,6 +218,9 @@ class BinaryVerificationEvaluator:
     ) -> EvaluationResult:
         """
         Tune threshold on a validation set.
+        Rejection radius is used to reject scores that are too close to the threshold.
+        Defaults to 0, hence no margin around the threshold.
+        Rejection means it is filled with a specific unanswered value.
 
         Supported `optimize_for`:
         - "c_at_1"
@@ -240,7 +270,8 @@ class BinaryVerificationEvaluator:
                 y_true=y_true_np,
                 scores=scores_np,
                 threshold=float(threshold),
-                rejection_radius=rejection_radius,
+                # Rejection means it is filled with a specific unanswered value.
+                rejection_radius=rejection_radius,  # Rejection radius is used to reject scores that are too close to the threshold.
             )
             current_value = getattr(result, optimize_for)
 
