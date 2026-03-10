@@ -397,7 +397,9 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
             scores=baseline_predictions[baseline],
             thresholds=CONFIG.THRESHOLDS,
         )
-        pan_metrics[baseline] = get_pan_metrics(baseline_predictions[baseline], ground_truth)
+        pan_metrics[baseline] = get_pan_metrics(
+            {baseline: baseline_predictions[baseline]}, ground_truth
+        )
         logger.info(f"Results for {baseline}: {results[baseline]}")
 
     with open(LOCAL_SAVE_PATH / f"prec_rec_{dataset_name}_n_pairs_per_technique.json", "w") as f:
