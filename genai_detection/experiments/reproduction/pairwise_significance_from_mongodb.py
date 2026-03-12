@@ -791,3 +791,5 @@ if __name__ == "__main__":
     Permutation test: pairwise, broader metric comparison
     """
     main()
+
+    # TODO: create a separate script for running these tests on ablations without considering n_impostors etc.
