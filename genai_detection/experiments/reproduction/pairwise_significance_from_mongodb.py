@@ -721,7 +721,7 @@ def main() -> None:
         "--correction_method",
         type=str,
         choices=["none", "bonferroni", "holm", "fdr_bh"],
-        default="holm",
+        default="bonferroni",
     )
     parser.add_argument(
         "--include_bootstrap_auc_diff",
@@ -773,9 +773,6 @@ def main() -> None:
             "prediction_field": args.prediction_field,
             "alpha": args.alpha,
             "correction_method": args.correction_method,
-            "include_bootstrap_auc_diff": args.include_bootstrap_auc_diff,
-            "n_bootstrap": args.n_bootstrap,
-            "bootstrap_seed": args.bootstrap_seed,
         }
         saved = save_pairwise_significance_results(
             results=results,
