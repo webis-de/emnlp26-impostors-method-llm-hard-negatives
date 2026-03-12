@@ -235,11 +235,13 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
     n_potential_impostors: Optional[int] = None,
     rounds: int = 100,
     batch_size: int = 250,
+    include_baselines: bool = True,
+    save_artifacts: bool = True,
 ) -> Dict[str, pd.DataFrame]:
     """
     Same as compute_prec_recall_f1_acc_dict, but loads precomputed
     impostor scores from the MongoDB impostor_outputs collection instead of active computation.
-    Baselines are computed on the fly.
+    Baselines are computed on the fly unless include_baselines=False.
     """
     logger.info(
         "Reproducing Figure 4 from stored impostor outputs for %s",
@@ -367,46 +369,48 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
         else:
             logger.warning(f"No scores for technique {technique} found in mongoDB.")
 
-    baselines = _build_baselines(dataset_name=dataset_name)
-    # load all pairs per dataset
-    text_id_pairs, ground_truth = load_all_pairs(dataset_name)
-    text_id_pairs_len = len(text_id_pairs)
-    assert (
-        text_id_pairs_len % 2 == 0
-    ), "Flattened text list must contain even number of elements but length is {}".format(
-        text_id_pairs_len
-    )
-    logger.info(
-        "Number of texts used %d, number of pairs %d",
-        text_id_pairs_len,
-        text_id_pairs_len // 2,
-    )
-
-    text_test_pairs = mongoDB.get_texts_for_ids(text_ids=text_id_pairs)
-
-    text_pairs = list(zip(text_test_pairs[0::2], text_test_pairs[1::2]))
-    baseline_predictions = _score_baselines_for_pair_batches(
-        baselines=baselines,
-        pair_batches=[text_pairs],
-    )
-
-    for baseline, pred in baseline_predictions.items():
-        n_pairs_per_technique[baseline] = len(pred)
-        results[baseline] = compute_metrics_for_thresholds(
-            ground_truth=ground_truth,
-            scores=baseline_predictions[baseline],
-            thresholds=CONFIG.THRESHOLDS,
+    if include_baselines:
+        baselines = _build_baselines(dataset_name=dataset_name)
+        # load all pairs per dataset
+        text_id_pairs, ground_truth = load_all_pairs(dataset_name)
+        text_id_pairs_len = len(text_id_pairs)
+        assert (
+            text_id_pairs_len % 2 == 0
+        ), "Flattened text list must contain even number of elements but length is {}".format(
+            text_id_pairs_len
         )
-        pan_metrics[baseline] = get_pan_metrics(
-            {baseline: baseline_predictions[baseline]}, ground_truth
+        logger.info(
+            "Number of texts used %d, number of pairs %d",
+            text_id_pairs_len,
+            text_id_pairs_len // 2,
         )
-        logger.info(f"Results for {baseline}: {results[baseline]}")
 
-    with open(LOCAL_SAVE_PATH / f"prec_rec_{dataset_name}_n_pairs_per_technique.json", "w") as f:
-        json.dump(dict(n_pairs_per_technique), f, indent=2)
+        text_test_pairs = mongoDB.get_texts_for_ids(text_ids=text_id_pairs)
 
-    pan_metrics_save_path = save_pan_metrics(save_path=LOCAL_SAVE_PATH, pan_metrics=pan_metrics, dataset_name=dataset_name)
-    logger.info("Saved pan_metrics to %s", pan_metrics_save_path)
+        text_pairs = list(zip(text_test_pairs[0::2], text_test_pairs[1::2]))
+        baseline_predictions = _score_baselines_for_pair_batches(
+            baselines=baselines,
+            pair_batches=[text_pairs],
+        )
+
+        for baseline, pred in baseline_predictions.items():
+            n_pairs_per_technique[baseline] = len(pred)
+            results[baseline] = compute_metrics_for_thresholds(
+                ground_truth=ground_truth,
+                scores=baseline_predictions[baseline],
+                thresholds=CONFIG.THRESHOLDS,
+            )
+            pan_metrics[baseline] = get_pan_metrics(
+                {baseline: baseline_predictions[baseline]}, ground_truth
+            )
+            logger.info(f"Results for {baseline}: {results[baseline]}")
+
+    if save_artifacts:
+        with open(LOCAL_SAVE_PATH / f"prec_rec_{dataset_name}_n_pairs_per_technique.json", "w") as f:
+            json.dump(dict(n_pairs_per_technique), f, indent=2)
+
+        pan_metrics_save_path = save_pan_metrics(save_path=LOCAL_SAVE_PATH, pan_metrics=pan_metrics, dataset_name=dataset_name)
+        logger.info("Saved pan_metrics to %s", pan_metrics_save_path)
 
     return results
 
@@ -419,6 +423,7 @@ def plot_precision_recall_curve(
     dataset_name: str,
     save_path: Path = None,
     title: str = None,
+    label_translations: Optional[Dict[str, str]] = CONFIG.LABEL_TRANSLATIONS,
 ):
     """
     Precision–Recall curves (Figures 4a, 4b in Koppel et al., 2014).
@@ -430,7 +435,7 @@ def plot_precision_recall_curve(
         )
 
         for key, df in results.items():
-            label = CONFIG.LABEL_TRANSLATIONS.get(key, key)
+            label = label_translations.get(key, key)
             color = CONFIG.LABEL_COLORS.get(key, "black")
             if "precision" in df.columns and "recall" in df.columns:
                 precisions = df["precision"].apply(
