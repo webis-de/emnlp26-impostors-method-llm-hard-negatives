@@ -63,6 +63,7 @@ class ChatNoirSearchImpostorGenerator(SearchImpostorGeneratorBase):
     def fetch_results(self, query: str) -> List[Dict]:
         """
         Fetches search results for a given query using the ChatNoir Search API.
+        Find different indices here: https://www.chatnoir.eu/docs/api-general#indices (12.03.2026)
         :param query: Search query to fetch results for
         :return: List of dictionaries containing search results with keys: 'query', 'title', 'url', 'snippet', and 'position'
         """
