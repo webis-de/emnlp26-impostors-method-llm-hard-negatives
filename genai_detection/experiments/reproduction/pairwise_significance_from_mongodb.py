@@ -680,10 +680,10 @@ def _build_default_technique_list() -> List[str]:
 
     return [
         "on_the_fly_chatnoir",
-        # "on_the_fly_serpapi",
+        "on_the_fly_serpapi",
         "on_the_fly_startpage",
         "in_domain",
-        # "one_step_llm",
+        "one_step_llm",
         "two_step_llm",
     ]
 
