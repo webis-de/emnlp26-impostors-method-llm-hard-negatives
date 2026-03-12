@@ -11,6 +11,10 @@ Pipeline overview:
 
 The implementation is intentionally self-contained so it can be executed as a script
 or imported by other experiment runners.
+
+Refer to:
+- https://medium.com/statistics-in-machine-learning/comparing-roc-curves-in-machine-learning-model-with-delongs
+    -test-a-practical-guide-using-python-e70b5d20abde (12.03.2026) for DeLong's Test
 """
 
 import argparse
@@ -101,9 +105,7 @@ def load_scores_and_predictions_for_technique(
     """
     Load precomputed scores/predictions for one technique from MongoDB.
 
-    For `on_the_fly_*` variants, rows are filtered down to the matching retrieval index.
-    The first row per `(left_id, right_id)` pair is used to keep behavior deterministic
-    and aligned with existing reproduction scripts.
+    For `on_the_fly_*` variants, rows are filtered down to the matching retrieval index..
     """
 
     base_technique, retrieval_index = _normalize_technique_name(technique)
@@ -260,7 +262,9 @@ def _adjust_pvalues(pvals: np.ndarray, method: str) -> np.ndarray:
 
 
 def _compute_midrank(x: np.ndarray) -> np.ndarray:
-    """Compute midranks used by DeLong's AUROC covariance estimator."""
+    """
+    Compute midranks used by DeLong's AUROC covariance estimator.
+    """
 
     order = np.argsort(x)
     sorted_x = x[order]
@@ -292,6 +296,7 @@ def _fast_delong(
     - covariance matrix of AUC estimates
     """
 
+    # number of positive examples m, negative examples n, and classifiers k
     m = label_1_count
     n = predictions_sorted_transposed.shape[1] - m
     k = predictions_sorted_transposed.shape[0]
@@ -299,6 +304,7 @@ def _fast_delong(
     positive_examples = predictions_sorted_transposed[:, :m]
     negative_examples = predictions_sorted_transposed[:, m:]
 
+    # Initialize arrays for midrank computations
     tx = np.empty((k, m), dtype=float)
     ty = np.empty((k, n), dtype=float)
     tz = np.empty((k, m + n), dtype=float)
@@ -308,10 +314,14 @@ def _fast_delong(
         ty[r, :] = _compute_midrank(negative_examples[r, :])
         tz[r, :] = _compute_midrank(predictions_sorted_transposed[r, :])
 
+    # Calculate AUCs
     aucs = tz[:, :m].sum(axis=1) / (m * n) - (m + 1.0) / (2.0 * n)
+
+    # Compute variance components
     v01 = (tz[:, :m] - tx) / n
     v10 = 1.0 - (tz[:, m:] - ty) / m
 
+    # Compute covariance matrices
     sx = np.cov(v01)
     sy = np.cov(v10)
 
@@ -367,6 +377,7 @@ def delong_roc_test(
             "var_delta": np.nan,
         }
 
+    # Calculating z-score and p-value
     var_delta = float(cov[0, 0] + cov[1, 1] - 2.0 * cov[0, 1])
     delta_auc = float(aucs[0] - aucs[1])
 
