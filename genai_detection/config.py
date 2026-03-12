@@ -106,7 +106,7 @@ class BaseConfig:
         "asgalf": "Khonji & Iraqi, 2014",
         "std_impostor": "Kestemont et al., 2016",
         "bdi": "Nagy, 2024",
-        "homotopy": "Gutierrez et al. (2015)",
+        "homotopy": "Gutierrez et al., 2015",
     }
 
     # Fixed colors per label (matplotlib-compatible)
