@@ -15,6 +15,12 @@ or imported by other experiment runners.
 Refer to:
 - https://medium.com/statistics-in-machine-learning/comparing-roc-curves-in-machine-learning-model-with-delongs
     -test-a-practical-guide-using-python-e70b5d20abde (12.03.2026) for DeLong's Test
+- Hemmerich, W. (2023). StatistikGuru: McNemar-Test. Retrieved from https://statistikguru.de/lexikon/mcnemar-test.html
+    (12.03.2026) for McNemar's Test
+- https://www.geeksforgeeks.org/python/how-to-perform-mcnemars-test-in-python/ (12.03.2026) for McNemar's Test in Python
+- https://github.com/Brritany/MLstatkit?tab=readme-ov-file#bootstrapping-for-confidence-intervals (12.03.2026)
+    for paired bootstrap confidence intervals for AUROC (area under the ROC curve),
+    AUPRC (area under the precision-recall curve), and F1 score metrics.
 """
 
 import argparse
@@ -28,9 +34,10 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+from MLstatkit import Bootstrapping, Permutation_test
+from MLstatkit.stats import Delong_test
 from bson import ObjectId
-from scipy.stats import binomtest, chi2, norm
-from sklearn.metrics import roc_auc_score
+from statsmodels.stats.contingency_tables import mcnemar
 
 from genai_detection.config import CONFIG
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
@@ -261,79 +268,6 @@ def _adjust_pvalues(pvals: np.ndarray, method: str) -> np.ndarray:
     return adjusted
 
 
-def _compute_midrank(x: np.ndarray) -> np.ndarray:
-    """
-    Compute midranks used by DeLong's AUROC covariance estimator.
-    """
-
-    order = np.argsort(x)
-    sorted_x = x[order]
-    n = len(x)
-    t = np.zeros(n, dtype=float)
-
-    i = 0
-    while i < n:
-        j = i
-        while j < n and sorted_x[j] == sorted_x[i]:
-            j += 1
-        t[i:j] = 0.5 * (i + j - 1) + 1
-        i = j
-
-    out = np.empty(n, dtype=float)
-    out[order] = t
-    return out
-
-
-def _fast_delong(
-    predictions_sorted_transposed: np.ndarray,
-    label_1_count: int,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Fast DeLong implementation for correlated ROC AUC estimates.
-
-    Returns:
-    - vector of AUCs (one per classifier)
-    - covariance matrix of AUC estimates
-    """
-
-    # number of positive examples m, negative examples n, and classifiers k
-    m = label_1_count
-    n = predictions_sorted_transposed.shape[1] - m
-    k = predictions_sorted_transposed.shape[0]
-
-    positive_examples = predictions_sorted_transposed[:, :m]
-    negative_examples = predictions_sorted_transposed[:, m:]
-
-    # Initialize arrays for midrank computations
-    tx = np.empty((k, m), dtype=float)
-    ty = np.empty((k, n), dtype=float)
-    tz = np.empty((k, m + n), dtype=float)
-
-    for r in range(k):
-        tx[r, :] = _compute_midrank(positive_examples[r, :])
-        ty[r, :] = _compute_midrank(negative_examples[r, :])
-        tz[r, :] = _compute_midrank(predictions_sorted_transposed[r, :])
-
-    # Calculate AUCs
-    aucs = tz[:, :m].sum(axis=1) / (m * n) - (m + 1.0) / (2.0 * n)
-
-    # Compute variance components
-    v01 = (tz[:, :m] - tx) / n
-    v10 = 1.0 - (tz[:, m:] - ty) / m
-
-    # Compute covariance matrices
-    sx = np.cov(v01)
-    sy = np.cov(v10)
-
-    if np.ndim(sx) == 0:
-        sx = np.asarray([[float(sx)]])
-    if np.ndim(sy) == 0:
-        sy = np.asarray([[float(sy)]])
-
-    delong_cov = sx / m + sy / n
-    return aucs, delong_cov
-
-
 def delong_roc_test(
     y_true: np.ndarray,
     scores_a: np.ndarray,
@@ -341,6 +275,8 @@ def delong_roc_test(
 ) -> Dict[str, float]:
     """
     Two-sided DeLong test for AUROC difference between two paired score vectors.
+    If z > 0, model A has higher AUROC; if z < 0, model B has higher AUROC.
+    p-value < 0.05 (or any alpha) rejects the null hypothesis (where H_0: no difference between AUCs)‚.
     """
 
     if len(y_true) != len(scores_a) or len(y_true) != len(scores_b):
@@ -349,54 +285,9 @@ def delong_roc_test(
     y_true = np.asarray(y_true, dtype=int)
     scores_a = np.asarray(scores_a, dtype=float)
     scores_b = np.asarray(scores_b, dtype=float)
-
-    if len(np.unique(y_true)) < 2:
-        return {
-            "auc_a": np.nan,
-            "auc_b": np.nan,
-            "delta_auc": np.nan,
-            "z": np.nan,
-            "p_value": np.nan,
-            "var_delta": np.nan,
-        }
-
-    # DeLong expects positives first.
-    order = np.argsort(-y_true)
-    label_1_count = int(np.sum(y_true))
-    predictions = np.vstack([scores_a, scores_b])[:, order]
-
-    aucs, cov = _fast_delong(predictions_sorted_transposed=predictions, label_1_count=label_1_count)
-
-    if cov.shape != (2, 2):
-        return {
-            "auc_a": float(aucs[0]),
-            "auc_b": float(aucs[1]),
-            "delta_auc": float(aucs[0] - aucs[1]),
-            "z": np.nan,
-            "p_value": np.nan,
-            "var_delta": np.nan,
-        }
-
-    # Calculating z-score and p-value
-    var_delta = float(cov[0, 0] + cov[1, 1] - 2.0 * cov[0, 1])
-    delta_auc = float(aucs[0] - aucs[1])
-
-    if var_delta <= 0:
-        z_value = 0.0 if abs(delta_auc) < 1e-15 else np.nan
-        p_value = 1.0 if abs(delta_auc) < 1e-15 else np.nan
-    else:
-        z_value = float(abs(delta_auc) / np.sqrt(var_delta))
-        p_value = float(2.0 * norm.sf(z_value))
-
-    return {
-        "auc_a": float(aucs[0]),
-        "auc_b": float(aucs[1]),
-        "delta_auc": delta_auc,
-        "z": z_value,
-        "p_value": p_value,
-        "var_delta": var_delta,
-    }
-
+    # Perform DeLong's test
+    z_score, p_value = Delong_test(y_true, scores_a, scores_b)
+    return {"statistic": z_score, "p_value": p_value}
 
 def mcnemar_test_from_predictions(
     y_true: np.ndarray,
@@ -406,7 +297,7 @@ def mcnemar_test_from_predictions(
     """
     McNemar test comparing two paired classifiers on the same instances.
 
-    Returns both exact (binomial) and chi-square approximations.
+    p-value < 0.05 (or any alpha) rejects the null hypothesis (where H_0: no difference between predictions).
     """
 
     y_true = np.asarray(y_true, dtype=int)
@@ -420,105 +311,95 @@ def mcnemar_test_from_predictions(
     b_correct = pred_b == y_true
 
     # Discordant cells in the 2x2 paired correctness table.
+    a = int(np.sum(a_correct & b_correct))  # Both correct
     b = int(np.sum(a_correct & ~b_correct))  # A correct, B wrong
     c = int(np.sum(~a_correct & b_correct))  # A wrong, B correct
-    discordant = b + c
+    d = int(np.sum(~a_correct & ~b_correct))  # Both wrong
 
-    if discordant == 0:
-        exact_p = 1.0
-        chi2_cc = 0.0
-        chi2_no_cc = 0.0
-        p_chi2_cc = 1.0
-        p_chi2_no_cc = 1.0
-    else:
-        exact_p = float(binomtest(k=min(b, c), n=discordant, p=0.5, alternative="two-sided").pvalue)
-        chi2_cc = float((abs(b - c) - 1.0) ** 2 / discordant)
-        chi2_no_cc = float((b - c) ** 2 / discordant)
-        p_chi2_cc = float(chi2.sf(chi2_cc, df=1))
-        p_chi2_no_cc = float(chi2.sf(chi2_no_cc, df=1))
+    data = [[a, b],
+            [c, d]]
+    # McNemar's Test with the continuity correction
+    statistic, p_value = mcnemar(data, exact=False, correction=False)
 
-    acc_a = float(np.mean(a_correct))
-    acc_b = float(np.mean(b_correct))
 
     return {
-        "n": int(len(y_true)),
-        "discordant": discordant,
-        "b_a_correct_b_wrong": b,
-        "c_a_wrong_b_correct": c,
-        "accuracy_a": acc_a,
-        "accuracy_b": acc_b,
-        "delta_accuracy": acc_a - acc_b,
-        "chi2_cc": chi2_cc,
-        "p_chi2_cc": p_chi2_cc,
-        "chi2_no_cc": chi2_no_cc,
-        "p_chi2_no_cc": p_chi2_no_cc,
-        "p_exact": exact_p,
+      "statistic": statistic,
+        "p_value": p_value
     }
 
 
-def bootstrap_auc_difference(
+def bootstrap_confidence_intervals(
+    y_true: np.ndarray,
+    scores: np.ndarray,
+) -> Dict[str, float]:
+    """
+    Paired bootstrap for AUROC, AUPRC, and F1 score
+    """
+
+    y_true = np.asarray(y_true, dtype=int)
+    scores = np.asarray(scores, dtype=float)
+
+    if len(y_true) != len(scores):
+        raise ValueError("y_true and scores must have same length")
+
+    results = {}
+    # Calculate confidence intervals for AUROC, AUPRC, and F1 score
+    for metric_name in ["roc_auc", "pr_auc", "f1"]:
+        original_score, confidence_lower, confidence_upper = Bootstrapping(y_true, scores, metric_name)
+        print(
+            f"{metric_name.upper()} original score: {original_score:.3f}, "
+            f"confidence interval: [{confidence_lower:.3f} - {confidence_upper:.3f}]")
+        results[f"{metric_name}_original_score"] = original_score
+        results[f"{metric_name}_ci_low"] = confidence_lower
+        results[f"{metric_name}_ci_high"] = confidence_upper
+
+    return results
+
+
+def run_permutation_test(
     y_true: np.ndarray,
     scores_a: np.ndarray,
     scores_b: np.ndarray,
-    n_bootstrap: int = 2000,
+    n_permutations: int = 1000,
     seed: int = 42,
 ) -> Dict[str, float]:
     """
-    Paired bootstrap for AUROC difference (AUC_A - AUC_B).
+    The Permutation_test function evaluates whether the observed difference in performance between two models is
+    statistically significant.
+    It works by randomly shuffling the predictions between the models and recalculating the chosen metric many times
+    to generate a null distribution of differences.
+    This approach makes no assumptions about the underlying distribution of the data, making it a robust method for
+    model comparison.
 
-    This complements DeLong by providing an effect-size confidence interval.
+    Performance measures: 'f1', 'accuracy', 'recall', 'precision', 'roc_auc', 'pr_auc', 'average_precision'
+
+    https://github.com/Brritany/MLstatkit?tab=readme-ov-file#permutation-test-for-statistical-significance
+    (12.03.2026) for implementation details.
     """
 
     y_true = np.asarray(y_true, dtype=int)
     scores_a = np.asarray(scores_a, dtype=float)
     scores_b = np.asarray(scores_b, dtype=float)
 
-    n = len(y_true)
-    if n == 0:
-        return {
-            "delta_auc_mean": np.nan,
-            "delta_auc_ci_low": np.nan,
-            "delta_auc_ci_high": np.nan,
-            "bootstrap_p_value": np.nan,
-            "n_bootstrap_used": 0,
-        }
+    if len(y_true) != len(scores_a) or len(y_true) != len(scores_b):
+        raise ValueError("y_true, scores_a and scores_b must have same length")
 
-    rng = np.random.default_rng(seed)
-    deltas: List[float] = []
-
-    for _ in range(n_bootstrap):
-        # Paired resampling preserves correlation between both systems.
-        idx = rng.integers(0, n, size=n)
-        y_b = y_true[idx]
-        if len(np.unique(y_b)) < 2:
-            continue
-        auc_a = roc_auc_score(y_b, scores_a[idx])
-        auc_b = roc_auc_score(y_b, scores_b[idx])
-        deltas.append(float(auc_a - auc_b))
-
-    if not deltas:
-        return {
-            "delta_auc_mean": np.nan,
-            "delta_auc_ci_low": np.nan,
-            "delta_auc_ci_high": np.nan,
-            "bootstrap_p_value": np.nan,
-            "n_bootstrap_used": 0,
-        }
-
-    deltas_np = np.asarray(deltas, dtype=float)
-    ci_low, ci_high = np.percentile(deltas_np, [2.5, 97.5])
-
-    p_left = float(np.mean(deltas_np <= 0.0))
-    p_right = float(np.mean(deltas_np >= 0.0))
-    p_two_sided = float(min(1.0, 2.0 * min(p_left, p_right)))
-
-    return {
-        "delta_auc_mean": float(np.mean(deltas_np)),
-        "delta_auc_ci_low": float(ci_low),
-        "delta_auc_ci_high": float(ci_high),
-        "bootstrap_p_value": p_two_sided,
-        "n_bootstrap_used": int(len(deltas_np)),
-    }
+    results = {}
+    # Compare models using a permutation test on different score
+    for metric_name in ['f1', 'accuracy', 'recall', 'precision', 'roc_auc', 'pr_auc', 'average_precision']:
+        metric_a, metric_b, p_value, benchmark, samples_mean, samples_std = Permutation_test(
+            y_true, scores_a, scores_b, metric_str=metric_name
+        )
+        print(
+            f"{metric_name.upper()} - Model A: {metric_a:.3f}, Model B: {metric_b:.3f}, p-value: {p_value:.4f}, benchmark: {benchmark:.3f}, samples mean: {samples_mean:.3f}, samples std: {samples_std:.3f}"
+        )
+        results[f"{metric_name}_model_a"] = metric_a
+        results[f"{metric_name}_model_b"] = metric_b
+        results[f"{metric_name}_p_value"] = p_value
+        results[f"{metric_name}_benchmark"] = benchmark
+        results[f"{metric_name}_samples_mean"] = samples_mean
+        results[f"{metric_name}_samples_std"] = samples_std
+    return results
 
 
 def run_pairwise_significance_tests_from_mongodb(
@@ -531,9 +412,6 @@ def run_pairwise_significance_tests_from_mongodb(
     prediction_field: str = "corr_pred_over_different_rounds",
     alpha: float = 0.05,
     correction_method: str = "holm",
-    include_bootstrap_auc_diff: bool = True,
-    n_bootstrap: int = 2000,
-    bootstrap_seed: int = 42,
 ) -> Dict[str, pd.DataFrame]:
     """
     Run all pairwise significance tests for the given dataset and techniques.
@@ -541,7 +419,7 @@ def run_pairwise_significance_tests_from_mongodb(
     Returns three dataframes:
     - `mcnemar`
     - `delong`
-    - `bootstrap_auc_diff`
+    - `bootstrap_diff` (not pairwise)
     """
 
     if not imp_gen_techniques:
@@ -581,6 +459,43 @@ def run_pairwise_significance_tests_from_mongodb(
     mcnemar_rows = []
     delong_rows = []
     bootstrap_rows = []
+    permutation_rows = []
+
+    # -----------------------------
+    # Bootstrap confidence intervals per technique
+    # -----------------------------
+    for technique, outputs in outputs_by_technique.items():
+        common_score_pairs = set(outputs.scores_by_pair.keys()) & set(gt_by_pair.keys())
+
+        if not common_score_pairs:
+            logger.warning(
+                "No common pairs with precomputed scores for bootstrap CI: %s (%s)",
+                technique,
+                dataset_name,
+            )
+            continue
+
+        ordered_pairs = list(common_score_pairs)
+        y_true = np.asarray([gt_by_pair[p] for p in ordered_pairs], dtype=int)
+        scores = np.asarray([outputs.scores_by_pair[p] for p in ordered_pairs], dtype=float)
+
+        try:
+            ci_results = bootstrap_confidence_intervals(y_true=y_true, scores=scores)
+            bootstrap_rows.append(
+                {
+                    "dataset_name": dataset_name,
+                    "technique": technique,
+                    "n_common_pairs": len(ordered_pairs),
+                    **ci_results,
+                }
+            )
+        except Exception as e:
+            logger.exception(
+                "Bootstrap CI failed for %s (%s): %s",
+                technique,
+                dataset_name,
+                e,
+            )
 
     for tech_a, tech_b in combinations(imp_gen_techniques, 2):
         out_a = outputs_by_technique[tech_a]
@@ -648,22 +563,31 @@ def run_pairwise_significance_tests_from_mongodb(
                 }
             )
 
-            if include_bootstrap_auc_diff:
-                bs = bootstrap_auc_difference(
+            # -----------------------------
+            # Permutation test (pairwise score comparison)
+            # -----------------------------
+            try:
+                perm = run_permutation_test(
                     y_true=y_true,
                     scores_a=scores_a,
-                    scores_b=scores_b,
-                    n_bootstrap=n_bootstrap,
-                    seed=bootstrap_seed,
+                    scores_b=scores_b
                 )
-                bootstrap_rows.append(
+                permutation_rows.append(
                     {
                         "dataset_name": dataset_name,
                         "technique_a": tech_a,
                         "technique_b": tech_b,
                         "n_common_pairs": len(ordered_score_pairs),
-                        **bs,
+                        **perm,
                     }
+                )
+            except Exception as e:
+                logger.exception(
+                    "Permutation test failed for %s vs %s (%s): %s",
+                    tech_a,
+                    tech_b,
+                    dataset_name,
+                    e,
                 )
         else:
             logger.warning(
@@ -675,7 +599,8 @@ def run_pairwise_significance_tests_from_mongodb(
 
     mcnemar_df = pd.DataFrame(mcnemar_rows)
     delong_df = pd.DataFrame(delong_rows)
-    bootstrap_df = pd.DataFrame(bootstrap_rows)
+    bootstrap_ci_df = pd.DataFrame(bootstrap_rows)
+    permutation_df = pd.DataFrame(permutation_rows)
 
     # Correct p-values family-wise across all pairwise comparisons per test family.
     if not mcnemar_df.empty:
@@ -697,10 +622,31 @@ def run_pairwise_significance_tests_from_mongodb(
         delong_df["alpha"] = alpha
         delong_df["correction_method"] = correction_method
 
+    if not permutation_df.empty:
+        pval_cols = [c for c in permutation_df.columns if c.endswith("_p_value")]
+
+        for col in pval_cols:
+            pvals = permutation_df[col].to_numpy(dtype=float)
+            valid_mask = ~np.isnan(pvals)
+            adj = np.full_like(pvals, fill_value=np.nan, dtype=float)
+
+            if np.any(valid_mask):
+                adj[valid_mask] = _adjust_pvalues(pvals[valid_mask], method=correction_method)
+
+            adj_col = f"{col}_adj"
+            reject_col = f"{col}_reject_h0"
+
+            permutation_df[adj_col] = adj
+            permutation_df[reject_col] = permutation_df[adj_col] <= alpha
+
+        permutation_df["alpha"] = alpha
+        permutation_df["correction_method"] = correction_method
+
     return {
         "mcnemar": mcnemar_df,
         "delong": delong_df,
-        "bootstrap_auc_diff": bootstrap_df,
+        "bootstrap_ci": bootstrap_ci_df,
+        "permutation": permutation_df,
     }
 
 
@@ -816,9 +762,6 @@ def main() -> None:
             prediction_field=args.prediction_field,
             alpha=args.alpha,
             correction_method=args.correction_method,
-            include_bootstrap_auc_diff=args.include_bootstrap_auc_diff,
-            n_bootstrap=args.n_bootstrap,
-            bootstrap_seed=args.bootstrap_seed,
         )
 
         metadata = {
@@ -844,4 +787,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    """
+    McNemar: pairwise, binary predictions
+    DeLong: pairwise, AUROC comparison
+    Bootstrap CI: single-model uncertainty estimate
+    Permutation test: pairwise, broader metric comparison
+    """
     main()
