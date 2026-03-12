@@ -359,9 +359,7 @@ def bootstrap_confidence_intervals(
 def run_permutation_test(
     y_true: np.ndarray,
     scores_a: np.ndarray,
-    scores_b: np.ndarray,
-    n_permutations: int = 1000,
-    seed: int = 42,
+    scores_b: np.ndarray
 ) -> Dict[str, float]:
     """
     The Permutation_test function evaluates whether the observed difference in performance between two models is
