@@ -179,8 +179,6 @@ def compute_prec_recall_curves_ablations(
         pair_batch_size=pair_batch_size,
     )
     pan_metrics = get_pan_metrics(predictions, ground_truth)
-    print("Number of unique prediction values:")
-    print(Counter(predictions["bdi"]))
     metrics = compute_metrics_parallel(
         ground_truth=ground_truth,
         predictions=predictions,
