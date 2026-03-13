@@ -528,10 +528,6 @@ def run_pairwise_significance_tests_from_mongodb(
         out_a = outputs_by_technique[tech_a]
         out_b = outputs_by_technique[tech_b]
 
-        # -----------------------------
-        # McNemar (precomputed predictions)
-        # -----------------------------
-        # Critical requirement: evaluate only pairs available for both techniques.
         common_pred_pairs = (
             set(out_a.preds_by_pair.keys())
             & set(out_b.preds_by_pair.keys())
@@ -544,6 +540,10 @@ def run_pairwise_significance_tests_from_mongodb(
             pred_a = np.asarray([out_a.preds_by_pair[p] for p in ordered_pred_pairs], dtype=int)
             pred_b = np.asarray([out_b.preds_by_pair[p] for p in ordered_pred_pairs], dtype=int)
 
+            # -----------------------------
+            # McNemar (precomputed predictions)
+            # -----------------------------
+            # Critical requirement: evaluate only pairs available for both techniques.
             mc = mcnemar_test_from_predictions(y_true=y_true, pred_a=pred_a, pred_b=pred_b)
             mcnemar_rows.append(
                 {
@@ -555,7 +555,14 @@ def run_pairwise_significance_tests_from_mongodb(
                     **mc,
                 }
             )
-            # TODO: delete
+            # -----------------------------
+            # Permutation test (pairwise score comparison)
+            # -----------------------------
+            # use predictions instead of scores for a permutation test to avoid using a one-fits-all threshold (usually,
+            # with a permutation test, you give a
+            #  score (float) and a threshold (defaults to 0.5), but since optimal
+            # thresholds can differ across impostor generation method, we you statistical inference to determine
+            # prediction (0 or 1) and evaluate these results
             perm = run_permutation_test(y_true=y_true, scores_a=pred_a, scores_b=pred_b)
             permutation_rows.append(
                 {
@@ -600,36 +607,6 @@ def run_pairwise_significance_tests_from_mongodb(
                     **de,
                 }
             )
-
-            # -----------------------------
-            # Permutation test (pairwise score comparison)
-            # -----------------------------
-            try:
-                pass
-                # TODO: use predicition instead of score for permutation test to avoid using one-fits-all threshold
-                #  used by library for binarization.
-                # perm = run_permutation_test(
-                #     y_true=y_true,
-                #     scores_a=scores_a,
-                #     scores_b=scores_b
-                # )
-                # permutation_rows.append(
-                #     {
-                #         "dataset_name": dataset_name,
-                #         "technique_a": tech_a,
-                #         "technique_b": tech_b,
-                #         "n_common_pairs": len(ordered_score_pairs),
-                #         **perm,
-                #     }
-                # )
-            except Exception as e:
-                logger.exception(
-                    "Permutation test failed for %s vs %s (%s): %s",
-                    tech_a,
-                    tech_b,
-                    dataset_name,
-                    e,
-                )
         else:
             logger.warning(
                 "No common pairs with precomputed scores for %s vs %s (%s)",
