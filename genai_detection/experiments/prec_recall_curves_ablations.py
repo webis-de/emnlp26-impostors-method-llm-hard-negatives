@@ -23,7 +23,10 @@ from genai_detection.experiments.reproduction.pan_metrics import (
     get_pan_metrics,
     save_pan_metrics,
 )
-from genai_detection.experiments.reproduction.prec_recall_curves import plot_precision_recall_curve
+from genai_detection.experiments.reproduction.prec_recall_curves import (
+    compute_prec_recall_f1_acc_dict_on_existing_impostor_scores,
+    plot_precision_recall_curve,
+)
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 from ablations import (
@@ -178,14 +181,28 @@ def compute_prec_recall_curves_ablations(
     pan_metrics = get_pan_metrics(predictions, ground_truth)
     print("Number of unique prediction values:")
     print(Counter(predictions["bdi"]))
+    metrics = compute_metrics_parallel(
+        ground_truth=ground_truth,
+        predictions=predictions,
+        thresholds=CONFIG.THRESHOLDS,
+    )
+
+
+    traditional_results = compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
+        dataset_name=dataset_name,
+        imp_gen_techniques=[impostor_technique],
+        include_baselines=False,
+        save_artifacts=False,
+    )
+    if impostor_technique in traditional_results:
+        metrics[impostor_technique] = traditional_results[impostor_technique]
+    else:
+        logger.warning("No precomputed in_domain results found for dataset %s.", dataset_name)
+
     res = {
-            "pan_metrics": pan_metrics,
-            "metrics": compute_metrics_parallel(
-                ground_truth=ground_truth,
-                predictions=predictions,
-                thresholds=CONFIG.THRESHOLDS,
-            )
-            }
+        "pan_metrics": pan_metrics,
+        "metrics": metrics,
+    }
 
     return res
 
@@ -200,6 +217,8 @@ if __name__ == "__main__":
     )
     logger = logging.getLogger(__name__)
     pan_metrics = {}
+    label_translations = dict(CONFIG.LABEL_TRANSLATIONS)
+    label_translations["in_domain"] = "Koppel and Winter, 2014"
 
     for dataset_name in [CONFIG.BLOG, CONFIG.STUDENT_ESSAYS]:
         results = compute_prec_recall_curves_ablations(dataset_name=dataset_name, impostor_technique="in_domain")
@@ -216,8 +235,13 @@ if __name__ == "__main__":
         metrics_df.to_csv(LOCAL_SAVE_PATH / "effectiveness_scores.csv", index=False)
         logger.info(f"Saved effectiveness scores to {LOCAL_SAVE_PATH / 'effectiveness_scores.csv'}")
 
-        plot_precision_recall_curve(results=results_dict, dataset_name=dataset_name, save_path=LOCAL_SAVE_PATH,
-                                    title=f"Precision–Recall Curve")
+        plot_precision_recall_curve(
+            results=results_dict,
+            dataset_name=dataset_name,
+            save_path=LOCAL_SAVE_PATH,
+            title="Precision–Recall Curve",
+            label_translations=label_translations,
+        )
 
     # save pan metrics
     save_pan_metrics(pan_metrics=pan_metrics, save_path=LOCAL_SAVE_PATH)
