@@ -285,8 +285,23 @@ def delong_roc_test(
     y_true = np.asarray(y_true, dtype=int)
     scores_a = np.asarray(scores_a, dtype=float)
     scores_b = np.asarray(scores_b, dtype=float)
-    # Perform DeLong's test
-    z_score, p_value = Delong_test(y_true, scores_a, scores_b)
+    # Perform DeLong's test (newer MLstatkit returns extra values by default)
+    try:
+        result = Delong_test(
+            y_true,
+            scores_a,
+            scores_b,
+            return_ci=False,
+            return_auc=False,
+            verbose=0,
+        )
+    except TypeError:
+        result = Delong_test(y_true, scores_a, scores_b)
+
+    if isinstance(result, (tuple, list)):
+        z_score, p_value = result[0], result[1]
+    else:
+        z_score, p_value = result.z_score, result.pvalue
     return {"statistic": z_score, "p_value": p_value}
 
 def mcnemar_test_from_predictions(
@@ -318,8 +333,10 @@ def mcnemar_test_from_predictions(
 
     data = [[a, b],
             [c, d]]
-    # McNemar's Test with the continuity correction
-    statistic, p_value = mcnemar(data, exact=False, correction=False)
+    # McNemar's Test (statsmodels returns a result object, not a tuple)
+    result = mcnemar(data, exact=False, correction=False)
+    statistic = float(result.statistic)
+    p_value = float(result.pvalue)
 
 
     return {
@@ -602,7 +619,7 @@ def run_pairwise_significance_tests_from_mongodb(
 
     # Correct p-values family-wise across all pairwise comparisons per test family.
     if not mcnemar_df.empty:
-        pvals = mcnemar_df["p_exact"].to_numpy(dtype=float)
+        pvals = mcnemar_df["p_value"].to_numpy(dtype=float)
         adj = _adjust_pvalues(pvals, method=correction_method)
         mcnemar_df["p_exact_adj"] = adj
         mcnemar_df["reject_h0"] = mcnemar_df["p_exact_adj"] <= alpha
