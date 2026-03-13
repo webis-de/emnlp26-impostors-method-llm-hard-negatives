@@ -492,22 +492,32 @@ def run_pairwise_significance_tests_from_mongodb(
     # Bootstrap confidence intervals per technique
     # -----------------------------
     for technique, outputs in outputs_by_technique.items():
-        common_score_pairs = set(outputs.scores_by_pair.keys()) & set(gt_by_pair.keys())
+        # common_score_pairs = set(outputs.scores_by_pair.keys()) & set(gt_by_pair.keys())
+        common_pred_pairs = set(outputs.preds_by_pair.keys()) & set(gt_by_pair.keys())
 
-        if not common_score_pairs:
+        if not common_pred_pairs:
             logger.warning(
-                "No common pairs with precomputed scores for bootstrap CI: %s (%s)",
+                "No common pairs with precomputed predictions for bootstrap CI: %s (%s)",
                 technique,
                 dataset_name,
             )
             continue
 
-        ordered_pairs = list(common_score_pairs)
+        # ordered_pairs = list(common_score_pairs)
+        ordered_pairs = list(common_pred_pairs)
         y_true = np.asarray([gt_by_pair[p] for p in ordered_pairs], dtype=int)
-        scores = np.asarray([outputs.scores_by_pair[p] for p in ordered_pairs], dtype=float)
+        # scores = np.asarray([outputs.scores_by_pair[p] for p in ordered_pairs], dtype=float)
+        preds = np.asarray(
+            [outputs.preds_by_pair[p] for p in ordered_pairs], dtype=int
+        )
 
         try:
-            ci_results = bootstrap_confidence_intervals(y_true=y_true, scores=scores)
+            # use predictions instead of scores for a permutation test to avoid using a one-fits-all threshold (usually,
+            # with a permutation test, you give a
+            #  score (float) and a threshold (defaults to 0.5), but since optimal
+            # thresholds can differ across impostor generation method, we you statistical inference to determine
+            # prediction (0 or 1) and evaluate these results
+            ci_results = bootstrap_confidence_intervals(y_true=y_true, scores=preds)
             bootstrap_rows.append(
                 {
                     "dataset_name": dataset_name,
