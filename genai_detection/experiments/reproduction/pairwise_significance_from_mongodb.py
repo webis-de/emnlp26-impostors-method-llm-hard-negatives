@@ -17,6 +17,7 @@ Refer to:
     -test-a-practical-guide-using-python-e70b5d20abde (12.03.2026) for DeLong's Test
 - Hemmerich, W. (2023). StatistikGuru: McNemar-Test. Retrieved from https://statistikguru.de/lexikon/mcnemar-test.html
     (12.03.2026) for McNemar's Test
+- https://jameshoward.us/2024/12/17/mcnemars-test-the-hidden-gem-for-paired-binary-data (13.03.2026)
 - https://www.geeksforgeeks.org/python/how-to-perform-mcnemars-test-in-python/ (12.03.2026) for McNemar's Test in Python
 - https://github.com/Brritany/MLstatkit?tab=readme-ov-file#bootstrapping-for-confidence-intervals (12.03.2026)
     for paired bootstrap confidence intervals for AUROC (area under the ROC curve),
@@ -106,13 +107,15 @@ def load_scores_and_predictions_for_technique(
     technique: str,
     n_impostors: int = 50,
     n_potential_impostors: Optional[int] = None,
+    rounds: int = 100,
     batch_size: int = 500,
     prediction_field: str = "corr_pred_over_different_rounds",
 ) -> TechniqueOutputs:
     """
     Load precomputed scores/predictions for one technique from MongoDB.
 
-    For `on_the_fly_*` variants, rows are filtered down to the matching retrieval index..
+    For `on_the_fly_*` variants, rows are filtered down to the matching retrieval index.
+    Scores are normalized by `rounds`, matching the PR-pipeline score scaling.
     """
 
     base_technique, retrieval_index = _normalize_technique_name(technique)
@@ -171,8 +174,11 @@ def load_scores_and_predictions_for_technique(
             score = doc.get("scores_over_different_rounds")
             if score is None:
                 continue
-            scores_by_pair[pair] = float(score)
+            scores_by_pair[pair] = float(score) / float(rounds)
 
+        # Keep compatibility with existing prediction fields if present, but
+        # McNemar/pairwise label metrics are computed from normalized scores and
+        # a fixed threshold later for consistency with the PR pipeline.
         pred_val = doc.get(prediction_field)
         if (
             pred_val is not None
@@ -340,8 +346,11 @@ def mcnemar_test_from_predictions(
 
 
     return {
-      "statistic": statistic,
-        "p_value": p_value
+        "statistic": statistic,
+        "p_value": p_value,
+        "n_discordant": int(b + c),
+        "b_a_correct_b_wrong": b,
+        "c_a_wrong_b_correct": c,
     }
 
 
@@ -350,7 +359,7 @@ def bootstrap_confidence_intervals(
     scores: np.ndarray,
 ) -> Dict[str, float]:
     """
-    Paired bootstrap for AUROC, AUPRC, and F1 score
+    Paired bootstrap for 'f1', 'accuracy', 'recall', 'precision', 'roc_auc', 'pr_auc', and 'average_precision'.
     """
 
     y_true = np.asarray(y_true, dtype=int)
@@ -360,8 +369,8 @@ def bootstrap_confidence_intervals(
         raise ValueError("y_true and scores must have same length")
 
     results = {}
-    # Calculate confidence intervals for AUROC, AUPRC, and F1 score
-    for metric_name in ["roc_auc", "pr_auc", "f1"]:
+    # Calculate confidence intervals for different metrics
+    for metric_name in ['f1', 'accuracy', 'recall', 'precision', 'roc_auc', 'pr_auc', 'average_precision']:
         original_score, confidence_lower, confidence_upper = Bootstrapping(y_true, scores, metric_name)
         print(
             f"{metric_name.upper()} original score: {original_score:.3f}, "
@@ -369,6 +378,7 @@ def bootstrap_confidence_intervals(
         results[f"{metric_name}_original_score"] = original_score
         results[f"{metric_name}_ci_low"] = confidence_lower
         results[f"{metric_name}_ci_high"] = confidence_upper
+        results[f"{metric_name}_half_width"] = (confidence_upper - confidence_lower) / 2
 
     return results
 
@@ -403,7 +413,7 @@ def run_permutation_test(
     # Compare models using a permutation test on different score
     for metric_name in ['f1', 'accuracy', 'recall', 'precision', 'roc_auc', 'pr_auc', 'average_precision']:
         metric_a, metric_b, p_value, benchmark, samples_mean, samples_std = Permutation_test(
-            y_true, scores_a, scores_b, metric_str=metric_name
+            y_true, scores_a, scores_b, metric_str=metric_name, n_bootstraps=5000
         )
         print(
             f"{metric_name.upper()} - Model A: {metric_a:.3f}, Model B: {metric_b:.3f}, p-value: {p_value:.4f}, benchmark: {benchmark:.3f}, samples mean: {samples_mean:.3f}, samples std: {samples_std:.3f}"
@@ -411,9 +421,9 @@ def run_permutation_test(
         results[f"{metric_name}_model_a"] = metric_a
         results[f"{metric_name}_model_b"] = metric_b
         results[f"{metric_name}_p_value"] = p_value
-        results[f"{metric_name}_benchmark"] = benchmark
-        results[f"{metric_name}_samples_mean"] = samples_mean
-        results[f"{metric_name}_samples_std"] = samples_std
+        results[f"{metric_name}_difference"] = benchmark
+        results[f"{metric_name}_permutation_samples_mean"] = samples_mean
+        results[f"{metric_name}_permutation_samples_std"] = samples_std
     return results
 
 
@@ -423,6 +433,7 @@ def run_pairwise_significance_tests_from_mongodb(
     *,
     n_impostors: int = 50,
     n_potential_impostors: Optional[int] = None,
+    rounds: int = 100,
     batch_size: int = 500,
     prediction_field: str = "corr_pred_over_different_rounds",
     alpha: float = 0.05,
@@ -452,6 +463,7 @@ def run_pairwise_significance_tests_from_mongodb(
             technique=technique,
             n_impostors=n_impostors,
             n_potential_impostors=n_potential_impostors,
+            rounds=rounds,
             batch_size=batch_size,
             prediction_field=prediction_field,
         )
@@ -543,6 +555,17 @@ def run_pairwise_significance_tests_from_mongodb(
                     **mc,
                 }
             )
+            # TODO: delete
+            perm = run_permutation_test(y_true=y_true, scores_a=pred_a, scores_b=pred_b)
+            permutation_rows.append(
+                {
+                    "dataset_name": dataset_name,
+                    "technique_a": tech_a,
+                    "technique_b": tech_b,
+                    "n_common_pairs": len(ordered_pred_pairs),
+                    **perm,
+                }
+            )
         else:
             logger.warning(
                 "No common pairs with precomputed predictions for %s vs %s (%s)",
@@ -582,20 +605,23 @@ def run_pairwise_significance_tests_from_mongodb(
             # Permutation test (pairwise score comparison)
             # -----------------------------
             try:
-                perm = run_permutation_test(
-                    y_true=y_true,
-                    scores_a=scores_a,
-                    scores_b=scores_b
-                )
-                permutation_rows.append(
-                    {
-                        "dataset_name": dataset_name,
-                        "technique_a": tech_a,
-                        "technique_b": tech_b,
-                        "n_common_pairs": len(ordered_score_pairs),
-                        **perm,
-                    }
-                )
+                pass
+                # TODO: use predicition instead of score for permutation test to avoid using one-fits-all threshold
+                #  used by library for binarization.
+                # perm = run_permutation_test(
+                #     y_true=y_true,
+                #     scores_a=scores_a,
+                #     scores_b=scores_b
+                # )
+                # permutation_rows.append(
+                #     {
+                #         "dataset_name": dataset_name,
+                #         "technique_a": tech_a,
+                #         "technique_b": tech_b,
+                #         "n_common_pairs": len(ordered_score_pairs),
+                #         **perm,
+                #     }
+                # )
             except Exception as e:
                 logger.exception(
                     "Permutation test failed for %s vs %s (%s): %s",
@@ -621,8 +647,8 @@ def run_pairwise_significance_tests_from_mongodb(
     if not mcnemar_df.empty:
         pvals = mcnemar_df["p_value"].to_numpy(dtype=float)
         adj = _adjust_pvalues(pvals, method=correction_method)
-        mcnemar_df["p_exact_adj"] = adj
-        mcnemar_df["reject_h0"] = mcnemar_df["p_exact_adj"] <= alpha
+        mcnemar_df["p_value_adj"] = adj
+        mcnemar_df["reject_h0"] = mcnemar_df["p_value_adj"] <= alpha
         mcnemar_df["alpha"] = alpha
         mcnemar_df["correction_method"] = correction_method
 
@@ -695,7 +721,7 @@ def _build_default_technique_list() -> List[str]:
 
     return [
         "on_the_fly_chatnoir",
-        "on_the_fly_serpapi",
+        # "on_the_fly_serpapi",
         "on_the_fly_startpage",
         "in_domain",
         "one_step_llm",
@@ -724,12 +750,13 @@ def main() -> None:
     )
     parser.add_argument("--n_impostors", type=int, default=50)
     parser.add_argument("--n_potential_impostors", type=int, default=None)
+    parser.add_argument("--rounds", type=int, default=100)
     parser.add_argument("--batch_size", type=int, default=500)
     parser.add_argument(
         "--prediction_field",
         type=str,
         default="corr_pred_over_different_rounds",
-        help="Field in impostor_outputs used as precomputed binary decision for McNemar.",
+        help="Field in impostor_outputs used as binary decision for McNemar and label-based permutation/bootstrap metrics.",
     )
     parser.add_argument("--alpha", type=float, default=0.05)
     parser.add_argument(
@@ -773,6 +800,7 @@ def main() -> None:
             imp_gen_techniques=args.imp_gen_techniques,
             n_impostors=args.n_impostors,
             n_potential_impostors=args.n_potential_impostors,
+            rounds=args.rounds,
             batch_size=args.batch_size,
             prediction_field=args.prediction_field,
             alpha=args.alpha,
@@ -784,6 +812,7 @@ def main() -> None:
             "imp_gen_techniques": args.imp_gen_techniques,
             "n_impostors": args.n_impostors,
             "n_potential_impostors": args.n_potential_impostors,
+            "rounds": args.rounds,
             "batch_size": args.batch_size,
             "prediction_field": args.prediction_field,
             "alpha": args.alpha,
@@ -806,5 +835,3 @@ if __name__ == "__main__":
     Permutation test: pairwise, broader metric comparison
     """
     main()
-
-    # TODO: create a separate script for running these tests on ablations without considering n_impostors etc.
