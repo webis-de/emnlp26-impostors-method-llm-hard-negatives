@@ -291,8 +291,6 @@ def get_pan_metrics(predictions, y_true):
     for method_name, method_scores in predictions.items():
         method_scores = np.asarray(method_scores, dtype=float)
 
-        print(f"\nMethod: {method_name}")
-        print("Number of unique prediction values:")
         print(Counter(method_scores))
 
         best_result = evaluator.tune_threshold(
