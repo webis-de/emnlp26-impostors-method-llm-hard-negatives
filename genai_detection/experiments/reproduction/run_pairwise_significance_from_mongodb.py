@@ -12,8 +12,6 @@ import logging
 
 from genai_detection.experiments.reproduction.pairwise_significance_from_mongodb import main
 
-# ray job submit --address https://ray.srv.webis.de --working-dir . --runtime-env env.yml -- python genai_detection/experiments/reproduction/run_pairwise_significance_from_mongodb.py
-
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
