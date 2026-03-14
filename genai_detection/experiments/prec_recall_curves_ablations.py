@@ -188,7 +188,7 @@ def compute_prec_recall_curves_ablations(
 
     traditional_results = compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
         dataset_name=dataset_name,
-        imp_gen_techniques=[impostor_technique],
+        imp_gen_techniques=[impostor_technique, "two_step_llm"],
         include_baselines=False,
         save_artifacts=False,
     )
