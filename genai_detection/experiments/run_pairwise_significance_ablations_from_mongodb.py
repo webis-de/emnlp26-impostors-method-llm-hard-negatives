@@ -157,7 +157,7 @@ def run_pairwise_significance_tests_ablations_from_mongodb(
     prediction_field: str = "corr_pred_over_different_rounds",
     decision_threshold: float = 0.5,
     alpha: float = 0.05,
-    correction_method: str = "holm",
+    correction_method: str = "bonferroni",
     batch_size: int = 500,
 ) -> Dict[str, pd.DataFrame]:
     """Run McNemar and DeLong pairwise tests across selected ablations."""
@@ -208,37 +208,6 @@ def run_pairwise_significance_tests_ablations_from_mongodb(
         out_a = outputs_by_ablation[ablation_a]
         out_b = outputs_by_ablation[ablation_b]
 
-        common_pred_pairs = (
-            set(out_a.preds_by_pair.keys())
-            & set(out_b.preds_by_pair.keys())
-            & set(gt_by_pair.keys())
-        )
-        if common_pred_pairs:
-            ordered_pairs = list(common_pred_pairs)
-            y_true = np.asarray([gt_by_pair[p] for p in ordered_pairs], dtype=int)
-            pred_a = np.asarray([out_a.preds_by_pair[p] for p in ordered_pairs], dtype=int)
-            pred_b = np.asarray([out_b.preds_by_pair[p] for p in ordered_pairs], dtype=int)
-
-            mc = mcnemar_test_from_predictions(y_true=y_true, pred_a=pred_a, pred_b=pred_b)
-            mcnemar_rows.append(
-                {
-                    "dataset_name": dataset_name,
-                    "technique_a": ablation_a,
-                    "technique_b": ablation_b,
-                    "n_common_pairs": len(ordered_pairs),
-                    "prediction_field": prediction_field,
-                    "decision_threshold": decision_threshold,
-                    **mc,
-                }
-            )
-        else:
-            logger.warning(
-                "No common prediction pairs for %s vs %s (%s)",
-                ablation_a,
-                ablation_b,
-                dataset_name,
-            )
-
         common_score_pairs = (
             set(out_a.scores_by_pair.keys())
             & set(out_b.scores_by_pair.keys())
@@ -258,6 +227,19 @@ def run_pairwise_significance_tests_ablations_from_mongodb(
                     "technique_b": ablation_b,
                     "n_common_pairs": len(ordered_pairs),
                     **de,
+                }
+            )
+            mc = mcnemar_test_from_predictions(
+                y_true=y_true, pred_a=scores_a, pred_b=scores_b
+            )
+            mcnemar_rows.append(
+                {
+                    "dataset_name": dataset_name,
+                    "technique_a": ablation_a,
+                    "technique_b": ablation_b,
+                    "n_common_pairs": len(ordered_pairs),
+                    "decision_threshold": decision_threshold,
+                    **mc,
                 }
             )
         else:
