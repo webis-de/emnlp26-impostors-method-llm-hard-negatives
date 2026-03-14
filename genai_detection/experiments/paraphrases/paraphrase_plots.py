@@ -35,12 +35,12 @@ class ParaphrasePlotter:
             {
                 "figure.dpi": 150,
                 "savefig.dpi": 300,
-                "axes.titlesize": 15,
-                "axes.labelsize": 14.5,
-                "xtick.labelsize": 12,
-                "ytick.labelsize": 12,
-                "legend.fontsize": 12,
-                "legend.title_fontsize": 13,
+                "axes.titlesize": 17,
+                "axes.labelsize": 16.5,
+                "xtick.labelsize": 14,
+                "ytick.labelsize": 14,
+                "legend.fontsize": 14,
+                "legend.title_fontsize": 15,
                 # "font.family": "serif",
                 # "font.serif": ["DejaVu Serif", "Times New Roman", "Times"],
             }
