@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -26,197 +27,22 @@ from matplotlib import pyplot as plt
 class ParaphrasePlotter:
     def __init__(self, save_base_path: Path):
         self.save_base_path = save_base_path
-
-    def plot_metric_radar_per_dataset(
-        self,
-        df_all: pd.DataFrame,
-        metrics: list[str],
-        save_path: Path | None = None,
-        dataset_col: str = "dataset",
-        display_plot: bool = True,
-    ):
-        metrics = [
-            m
-            for m in metrics
-            if m in df_all.columns and pd.api.types.is_numeric_dtype(df_all[m])
-        ]
-        assert metrics, "No numeric metrics found to plot."
-        grouped_mean = df_all.groupby(dataset_col)[metrics].mean().round(2)
-        grouped_std = df_all.groupby(dataset_col)[metrics].std().round(2)
-        grouped_median = df_all.groupby(dataset_col)[metrics].median().round(2)
-
-        if save_path:
-            save_path = Path(save_path)
-            save_path.mkdir(parents=True, exist_ok=True)
-            mean_std_df = pd.concat(
-                {"mean": grouped_mean, "std": grouped_std, "median": grouped_median},
-                axis=1,
-            )
-            csv_out = save_path / "extraction_metrics_mean_std_median_per_dataset.csv"
-            mean_std_df.to_csv(csv_out)
-            logging.info(f"Saved mean/std values as CSV file to {csv_out}")
-
-        angles = np.linspace(0, 2 * np.pi, len(metrics), endpoint=False).tolist()
-        angles += angles[:1]
-
-        fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(polar=True))
-
-        unique_labels = grouped_mean.index
-        palette = sns.color_palette(
-            "tab20" if len(unique_labels) > 10 else "tab10", n_colors=len(unique_labels)
+        self.paper_palette_name = "colorblind"
+        sns.set_theme(context="paper", style="whitegrid", palette=self.paper_palette_name)
+        plt.rcParams.update(
+            {
+                "figure.dpi": 150,
+                "savefig.dpi": 300,
+                "axes.titlesize": 12,
+                "axes.labelsize": 10.5,
+                "xtick.labelsize": 9,
+                "ytick.labelsize": 9,
+                "legend.fontsize": 9,
+                "legend.title_fontsize": 10,
+                "font.family": "serif",
+                "font.serif": ["DejaVu Serif", "Times New Roman", "Times"],
+            }
         )
-        label_to_color = {
-            label: palette[i % len(palette)] for i, label in enumerate(unique_labels)
-        }
-        line_styles = [
-            "solid",
-            "dashed",
-            "dotted",
-            "dashdot",
-            (0, (3, 1, 1, 1)),
-            (0, (5, 1)),
-        ]
-
-        for i, groupby_value in enumerate(unique_labels):
-            mean_values = grouped_mean.loc[groupby_value].tolist()
-            std_values = grouped_std.loc[groupby_value].tolist()
-
-            mean_values += mean_values[:1]
-            std_values += std_values[:1]
-
-            lower = np.maximum(-1, np.array(mean_values) - np.array(std_values))
-            upper = np.minimum(1, np.array(mean_values) + np.array(std_values))
-
-            ax.plot(
-                angles,
-                mean_values,
-                label=self._wrap_label(groupby_value),
-                alpha=0.7,
-                color=label_to_color[groupby_value],
-                linewidth=2,
-                linestyle=line_styles[i % len(line_styles)],
-            )
-            ax.fill_between(
-                angles, lower, upper, color=label_to_color[groupby_value], alpha=0.2
-            )
-
-        ax.set_xticks(angles[:-1])
-        ax.set_xticklabels(metrics)
-        ax.tick_params(axis="y")
-
-        ax.legend(
-            loc="lower left",
-            bbox_to_anchor=(1.1, 0.8),
-            fontsize=10,
-            title=dataset_col.capitalize(),
-        )
-
-        title = "Radar plot of Metric Distributions by Dataset"
-        fig.suptitle(title)
-        plt.tight_layout()
-
-        if save_path:
-            for format in ["svg", "pdf"]:
-                out = save_path / f"radar_extraction_quality_per_dataset.{format}"
-                fig.savefig(out, bbox_inches="tight", transparent=True, format=format)
-                logging.info(f"Saved radar plot to {out}")
-        else:
-            logging.info("No save path provided, plot not saved.")
-        if display_plot:
-            plt.show()
-        plt.close()
-
-    def plot_models_metrics(
-        self,
-        df: pd.DataFrame,
-        metric_names: list[str],
-        data_category: Optional[str] = None,
-        group_by: Optional[str] = "model",
-        display_plot: bool = True,
-    ):
-        save_path = self.save_base_path / "radar_charts"
-        save_path.mkdir(parents=True, exist_ok=True)
-        labels = [metric for metric in metric_names if metric in df.columns]
-        assert (
-            group_by in df.columns
-        ), f"Group by column '{group_by}' not found in DataFrame."
-        if group_by == "model" and "Paraphraser" not in df.columns:
-            data = df.rename(columns={group_by: "Paraphraser"}, inplace=False)
-            group_by = "Paraphraser"
-        else:
-            data = df.copy()
-        grouped_mean = data.groupby(group_by)[labels].mean()
-        grouped_std = data.groupby(group_by)[labels].std()
-
-        angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
-        angles += angles[:1]
-
-        fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
-
-        unique_labels = grouped_mean.index
-        palette = sns.color_palette(
-            "tab20" if len(unique_labels) > 10 else "tab10", n_colors=len(unique_labels)
-        )
-        label_to_color = {
-            label: palette[i % len(palette)] for i, label in enumerate(unique_labels)
-        }
-
-        for groupby_value in unique_labels:
-            mean_values = grouped_mean.loc[groupby_value].tolist()
-            std_values = grouped_std.loc[groupby_value].tolist()
-
-            mean_values += mean_values[:1]
-            std_values += std_values[:1]
-
-            lower = np.maximum(0, np.array(mean_values) - np.array(std_values))
-            upper = np.minimum(1, np.array(mean_values) + np.array(std_values))
-
-            ax.plot(
-                angles,
-                mean_values,
-                label=self._wrap_label(groupby_value),
-                alpha=0.7,
-                color=label_to_color[groupby_value],
-            )
-            ax.fill_between(
-                angles, lower, upper, color=label_to_color[groupby_value], alpha=0.2
-            )
-
-        ax.set_xticks(angles[:-1])
-        ax.set_xticklabels(labels, fontsize=10)
-        ax.tick_params(axis="y", labelsize=8)
-
-        ax.set_ylim(0, 1)
-
-        ax.legend(
-            loc="lower left",
-            bbox_to_anchor=(1.1, 0.7),
-            fontsize=9,
-            title=group_by.capitalize(),
-        )
-        title = (
-            f"Radar Chart of Paraphrasing Metrics\non {' '.join(word.capitalize() for word in data_category.split())} Dataset, grouped by {group_by.capitalize()}"
-            if data_category
-            else f"Radar Chart of Paraphrasing Metrics\ngrouped by {group_by.capitalize()}"
-        )
-        plt.title(title, fontsize=12)
-        plt.tight_layout()
-
-        if save_path:
-            save_path = Path(save_path)
-            save_path.mkdir(parents=True, exist_ok=True)
-            for format in ["svg", "pdf"]:
-                file_name = (
-                    save_path
-                    / f"{data_category.replace(' ', '_')}_paraphrasing_metrics_grouped_by_{group_by}_radar_chart.{format}"
-                )
-                plt.savefig(
-                    file_name, bbox_inches="tight", transparent=True, format=format
-                )
-                logging.info(f"Plot saved to {file_name}")
-        if display_plot:
-            plt.show()
-        plt.close()
 
     def plot_metric_scatter(
         self,
@@ -332,142 +158,6 @@ class ParaphrasePlotter:
             plt.show()
         plt.close()
 
-    def plot_metric_distributions(
-        self,
-        df: pd.DataFrame,
-        metric_names: list[str],
-        data_category: Optional[str] = None,
-        group_by: Optional[str] = "model",
-        display_plot: bool = True,
-    ):
-        save_path = self.save_base_path / "metric_distributions"
-        save_path.mkdir(parents=True, exist_ok=True)
-        metric_names = [metric for metric in metric_names if metric in df.columns]
-        if group_by == "model" and "Paraphraser" not in df.columns:
-            data = df.rename(columns={group_by: "Paraphraser"}, inplace=False)
-            group_by = "Paraphraser"
-        else:
-            data = df.copy()
-        assert len(metric_names) > 0, "No valid metrics found in DataFrame."
-        assert (
-            group_by in data.columns
-        ), f"Group by column '{group_by}' not found in DataFrame."
-
-        n_metrics = len(metric_names)
-        n_cols = 2
-        n_rows = (n_metrics + 1) // n_cols
-
-        unique_labels = data[group_by].unique()
-        max_words_in_label = max(len(str(label).split()) for label in unique_labels)
-        use_shared_legend = max_words_in_label > 3 or len(unique_labels) > 5
-        palette = sns.color_palette("tab20", n_colors=len(unique_labels))
-        label_to_color = {
-            label: palette[i % len(palette)] for i, label in enumerate(unique_labels)
-        }
-
-        for scale in ["linear", "symlog"]:
-            fig, axes = plt.subplots(n_rows, n_cols, figsize=(6 * n_cols, 4 * n_rows))
-            axes = axes.flatten()
-            for i, metric in enumerate(metric_names):
-                ax = axes[i]
-
-                counts = data.groupby(group_by)[metric].count()
-                assert (
-                    counts != 0
-                ).any(), (
-                    f"No data points found for metric '{metric}' in group '{group_by}'."
-                )
-
-                models_multi = counts[counts > 1].index
-                models_single = counts[counts == 1].index
-
-                if len(models_multi) > 0:
-                    sns.kdeplot(
-                        data=data[data[group_by].isin(models_multi)],
-                        x=metric,
-                        hue=group_by,
-                        fill=True,
-                        common_norm=False,
-                        alpha=0.4,
-                        ax=ax,
-                        palette=label_to_color,
-                        legend=False,
-                    )
-
-                for model in models_single:
-                    single_val = data[(data[group_by] == model)][metric].values[0]
-                    label = model if not use_shared_legend else None
-                    color = label_to_color[model]
-                    ax.scatter(
-                        single_val,
-                        1,
-                        label=label,
-                        color=color,
-                        s=50,
-                        edgecolor="k",
-                        zorder=5,
-                    )
-                if scale == "symlog":
-                    ax.grid(which="both", linestyle="--", color="gray", alpha=0.5)
-                ax.set_yscale(scale)
-                metric_for_tile = " ".join([t.capitalize() for t in metric.split("_")])
-                ax.set_title(f"Distribution of {metric_for_tile}")
-                min_val = data[metric].min()
-                max_val = data[metric].max()
-                ax.set_xlim(left=max(0, min_val), right=min(1, max_val))
-                ax.set_xlabel(metric_for_tile)
-                ax.set_ylabel("Density")
-
-            legend_patches = [
-                mpatches.Patch(color=color, label=self._wrap_label(label))
-                for label, color in label_to_color.items()
-            ]
-            fig.legend(
-                handles=legend_patches,
-                loc="upper left",
-                bbox_to_anchor=(
-                    0.95,
-                    0.95,
-                ),
-                title=group_by.capitalize(),
-                frameon=True,
-                borderaxespad=0,
-                fontsize=10,
-                title_fontsize=12,
-            )
-
-            for j in range(len(metric_names), len(axes)):
-                fig.delaxes(axes[j])
-            title = (
-                f"Metric Distributions\non {' '.join(word.capitalize() for word in data_category.split())} Dataset, grouped by {group_by.capitalize()}"
-                if data_category
-                else f"Metric Distributions\ngrouped by {group_by.capitalize()}"
-            )
-            fig.suptitle(title, fontsize=18)
-            plt.tight_layout(rect=[0, 0, 0.95, 0.95])
-
-            if save_path:
-                scale_save_path = Path(save_path) / f"{scale}_scale"
-                scale_save_path.mkdir(parents=True, exist_ok=True)
-                for format in ["svg", "pdf"]:
-                    filenaname = f"{data_category.replace(' ', '_')}_metric_distributions_grouped_by_{group_by}_{scale}_scale.{format}"
-                    full_path = scale_save_path / filenaname
-                    plt.savefig(
-                        full_path, bbox_inches="tight", transparent=True, format=format
-                    )
-                    logging.info(f"Plot saved to {full_path}")
-
-            if display_plot:
-                plt.show()
-            plt.close()
-        self._plot_one_plot_per_metric_distribution(
-            data=data,
-            metric_names=metric_names,
-            group_by=group_by,
-            data_category=data_category,
-            display_plot=False,
-        )
-
     def _plot_one_plot_per_metric_distribution(
         self,
         data: pd.DataFrame,
@@ -548,6 +238,284 @@ class ParaphrasePlotter:
                 if display_plot:
                     plt.show()
                 plt.close()
+
+    def _prepare_plot_data(
+        self,
+        df: pd.DataFrame,
+        data_category: Optional[str],
+        group_by: str,
+        technique_label_mode: str = "model_prompt_approach",
+        prompt_words: int = 6,
+        include_approaches: tuple[str, ...] = ("non_naive", "naive"),
+    ) -> tuple[pd.DataFrame, str]:
+        data = df.copy()
+        if data_category and "dataset_name" in data.columns:
+            data = data[data["dataset_name"] == data_category].copy()
+
+        if include_approaches and "paraphrase_approach" in data.columns:
+            data = data[data["paraphrase_approach"].isin(include_approaches)].copy()
+
+        resolved_group_by = group_by
+        if group_by == "paraphrase_technique":
+            data[group_by] = self._build_technique_labels(
+                data=data,
+                label_mode=technique_label_mode,
+                prompt_words=prompt_words,
+            )
+        elif group_by not in data.columns:
+            raise ValueError(f"Group by column '{group_by}' not found in DataFrame.")
+
+        if data.empty:
+            raise ValueError("No rows left to plot after filtering.")
+        return data, resolved_group_by
+
+    @staticmethod
+    def _normalize_prompt(prompt: str) -> str:
+        prompt = str(prompt).replace("<TEXT>", "").strip()
+        prompt = re.sub(r"\s+", " ", prompt)
+        return prompt
+
+    def _prompt_signature(self, prompt: str, words: int = 6) -> str:
+        norm = self._normalize_prompt(prompt)
+        if not norm:
+            return "prompt: n/a"
+        tokens = norm.split()
+        if len(tokens) <= words:
+            return f"prompt: {norm}"
+        return f"prompt: {' '.join(tokens[:words])}..."
+
+    def _build_technique_labels(
+        self, data: pd.DataFrame, label_mode: str, prompt_words: int
+    ) -> pd.Series:
+        valid_modes = {"model", "prompt", "model_prompt", "model_prompt_approach"}
+        if label_mode not in valid_modes:
+            raise ValueError(
+                f"Unsupported technique_label_mode '{label_mode}'. Use one of: "
+                f"{sorted(valid_modes)}"
+            )
+
+        model_series = (
+            data["model"].astype(str)
+            if "model" in data.columns
+            else (
+                data["llm"].astype(str)
+                if "llm" in data.columns
+                else pd.Series(["unknown_model"] * len(data), index=data.index)
+            )
+        )
+        approach_series = (
+            data["paraphrase_approach"].astype(str)
+            if "paraphrase_approach" in data.columns
+            else pd.Series(["unknown_approach"] * len(data), index=data.index)
+        )
+        prompt_series = (
+            data["prompt"].fillna("").astype(str)
+            if "prompt" in data.columns
+            else pd.Series([""] * len(data), index=data.index)
+        )
+        prompt_signatures = prompt_series.apply(
+            lambda p: self._prompt_signature(prompt=p, words=prompt_words)
+        )
+
+        if label_mode == "model":
+            return model_series
+        if label_mode == "prompt":
+            return prompt_signatures
+        if label_mode == "model_prompt":
+            return model_series + " | " + prompt_signatures
+        return approach_series + " | " + model_series + " | " + prompt_signatures
+
+    def _labels_with_counts(
+        self, counts: pd.Series, words_per_line: int = 4
+    ) -> dict[str, str]:
+        label_map = {}
+        for label, count in counts.items():
+            wrapped = self._wrap_label(str(label), words_per_line=words_per_line)
+            label_map[label] = f"{wrapped} [n={int(count)}]"
+        return label_map
+
+    def plot_length_percentage_boxplot(
+        self,
+        df: pd.DataFrame,
+        data_category: Optional[str] = None,
+        group_by: str = "paraphrase_technique",
+        technique_label_mode: str = "model_prompt_approach",
+        prompt_words: int = 6,
+        display_plot: bool = True,
+    ):
+        data, group_by = self._prepare_plot_data(
+            df=df,
+            data_category=data_category,
+            group_by=group_by,
+            technique_label_mode=technique_label_mode,
+            prompt_words=prompt_words,
+        )
+        if "paraphrase_length_pct_words" not in data.columns:
+            if {"paraphrased_text", "original_text"}.issubset(data.columns):
+                original_lengths = data["original_text"].fillna("").astype(str).str.split().str.len()
+                paraphrase_lengths = data["paraphrased_text"].fillna("").astype(str).str.split().str.len()
+                data["paraphrase_length_pct_words"] = np.where(
+                    original_lengths > 0,
+                    (paraphrase_lengths / original_lengths) * 100,
+                    np.nan,
+                )
+            else:
+                raise ValueError(
+                    "Missing 'paraphrase_length_pct_words' and source text columns."
+                )
+
+        plot_df = data[[group_by, "paraphrase_length_pct_words"]].dropna().copy()
+        if plot_df.empty:
+            raise ValueError("No valid rows to plot for paraphrase length percentage.")
+
+        counts = plot_df.groupby(group_by, sort=True)["paraphrase_length_pct_words"].count()
+        label_map = self._labels_with_counts(counts=counts)
+        plot_df["_group_label"] = plot_df[group_by].map(label_map)
+        order = [label_map[label] for label in counts.index]
+        palette = sns.color_palette(self.paper_palette_name, n_colors=len(order))
+        label_to_color = {
+            label: palette[i % len(palette)] for i, label in enumerate(order)
+        }
+
+        fig, ax = plt.subplots(
+            figsize=(max(10, len(order) * 1.2), 6), constrained_layout=True
+        )
+        sns.boxplot(
+            data=plot_df,
+            x="_group_label",
+            y="paraphrase_length_pct_words",
+            hue="_group_label",
+            order=order,
+            palette=label_to_color,
+            dodge=False,
+            showfliers=False,
+            linewidth=1.1,
+            ax=ax,
+        )
+        if ax.legend_ is not None:
+            ax.legend_.remove()
+        ax.axhline(100, color="gray", linestyle="--", linewidth=1, alpha=0.8)
+        ax.set_xlabel("Paraphrase technique")
+        ax.set_ylabel("Paraphrase length (% of original words)")
+        title = (
+            f"Paraphrase Length in Words (% of Original)\n{data_category} Dataset"
+            if data_category
+            else "Paraphrase Length in Words (% of Original)"
+        )
+        ax.set_title(title)
+        plt.setp(ax.get_xticklabels(), rotation=20, ha="right")
+        ax.grid(axis="y", linestyle="--", alpha=0.35)
+        sns.despine(ax=ax)
+
+        save_path = self.save_base_path / "metric_boxplots"
+        save_path.mkdir(parents=True, exist_ok=True)
+        safe_category = (
+            str(data_category).replace(" ", "_").replace("/", "_")
+            if data_category
+            else "all_datasets"
+        )
+        for format in ["svg", "pdf"]:
+            out = save_path / f"{safe_category}_paraphrase_length_pct_words_grouped_by_{group_by}.{format}"
+            fig.savefig(out, bbox_inches="tight", transparent=True, format=format)
+            logging.info(f"Plot saved to {out}")
+        if display_plot:
+            plt.show()
+        plt.close()
+
+    def plot_metric_boxplots_per_metric(
+        self,
+        df: pd.DataFrame,
+        metric_names: list[str],
+        data_category: Optional[str] = None,
+        group_by: str = "paraphrase_technique",
+        technique_label_mode: str = "model_prompt_approach",
+        prompt_words: int = 6,
+        display_plot: bool = True,
+    ):
+        data, group_by = self._prepare_plot_data(
+            df=df,
+            data_category=data_category,
+            group_by=group_by,
+            technique_label_mode=technique_label_mode,
+            prompt_words=prompt_words,
+        )
+        metric_names = [metric for metric in metric_names if metric in data.columns]
+        if not metric_names:
+            raise ValueError("No valid metrics found in DataFrame.")
+
+        save_path = self.save_base_path / "metric_boxplots" / "per_metric"
+        save_path.mkdir(parents=True, exist_ok=True)
+        safe_category = (
+            str(data_category).replace(" ", "_").replace("/", "_")
+            if data_category
+            else "all_datasets"
+        )
+
+        for metric in metric_names:
+            plot_df = data[[group_by, metric]].dropna().copy()
+            if plot_df.empty:
+                logging.warning(f"Skipping metric '{metric}' because it has no data.")
+                continue
+
+            counts = plot_df.groupby(group_by, sort=True)[metric].count()
+            label_map = self._labels_with_counts(counts=counts)
+            plot_df["_group_label"] = plot_df[group_by].map(label_map)
+            order = [label_map[label] for label in counts.index]
+
+            palette = sns.color_palette(self.paper_palette_name, n_colors=len(order))
+            label_to_color = {
+                label: palette[i % len(palette)] for i, label in enumerate(order)
+            }
+
+            fig, ax = plt.subplots(
+                figsize=(max(10, len(order) * 1.2), 6), constrained_layout=True
+            )
+            sns.boxplot(
+                data=plot_df,
+                x="_group_label",
+                y=metric,
+                hue="_group_label",
+                order=order,
+                palette=label_to_color,
+                dodge=False,
+                showfliers=False,
+                linewidth=1.1,
+                ax=ax,
+            )
+            if ax.legend_ is not None:
+                ax.legend_.remove()
+
+            metric_for_title = " ".join([t.capitalize() for t in metric.split("_")])
+            ax.set_xlabel("Paraphrase technique")
+            ax.set_ylabel(metric_for_title)
+            title = (
+                f"{metric_for_title} by Paraphrase Technique\n{data_category} Dataset"
+                if data_category
+                else f"{metric_for_title} by Paraphrase Technique"
+            )
+            ax.set_title(title)
+            plt.setp(ax.get_xticklabels(), rotation=20, ha="right")
+            ax.grid(axis="y", linestyle="--", alpha=0.35)
+            sns.despine(ax=ax)
+
+            min_val = plot_df[metric].min()
+            max_val = plot_df[metric].max()
+            if np.isfinite(min_val) and np.isfinite(max_val) and min_val != max_val:
+                padding = (max_val - min_val) * 0.05
+                ax.set_ylim(min_val - padding, max_val + padding)
+
+            safe_metric = str(metric).replace(" ", "_").replace("/", "_")
+            for format in ["svg", "pdf"]:
+                out = (
+                    save_path
+                    / f"{safe_category}_{safe_metric}_boxplot_grouped_by_{group_by}.{format}"
+                )
+                fig.savefig(out, bbox_inches="tight", transparent=True, format=format)
+                logging.info(f"Plot saved to {out}")
+
+            if display_plot:
+                plt.show()
+            plt.close()
 
     def _wrap_label(self, label: str, words_per_line: int = 6) -> str:
         assert (

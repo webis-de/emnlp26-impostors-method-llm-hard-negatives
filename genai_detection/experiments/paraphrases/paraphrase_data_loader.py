@@ -174,8 +174,12 @@ class ParaphraseDataLoader:
     def obtain_complete_paraphrase_df_from_mongodb(self) -> pd.DataFrame:
         non_naive_paraphrases_cursor = self.mongodb.non_naive_paraphrase_collection.find({})
         non_naive_paraphrases = pd.DataFrame(non_naive_paraphrases_cursor)
+        if not non_naive_paraphrases.empty:
+            non_naive_paraphrases["paraphrase_approach"] = "non_naive"
         naive_paraphrases_cursor = self.mongodb.naive_paraphrase_collection.find({})
         naive_paraphrases = pd.DataFrame(naive_paraphrases_cursor)
+        if not naive_paraphrases.empty:
+            naive_paraphrases["paraphrase_approach"] = "naive"
 
         paraphrases = pd.concat([non_naive_paraphrases, naive_paraphrases], axis=0, ignore_index=True)
         extracted_df = pd.json_normalize(paraphrases["extracted_info"])
