@@ -35,12 +35,12 @@ class ParaphrasePlotter:
             {
                 "figure.dpi": 150,
                 "savefig.dpi": 300,
-                "axes.titlesize": 12,
-                "axes.labelsize": 10.5,
-                "xtick.labelsize": 9,
-                "ytick.labelsize": 9,
-                "legend.fontsize": 9,
-                "legend.title_fontsize": 10,
+                "axes.titlesize": 15,
+                "axes.labelsize": 14.5,
+                "xtick.labelsize": 12,
+                "ytick.labelsize": 12,
+                "legend.fontsize": 12,
+                "legend.title_fontsize": 13,
                 # "font.family": "serif",
                 # "font.serif": ["DejaVu Serif", "Times New Roman", "Times"],
             }
@@ -333,7 +333,7 @@ class ParaphrasePlotter:
         label_map = {}
         for label, count in counts.items():
             wrapped = self._wrap_label(str(label), words_per_line=words_per_line)
-            label_map[label] = f"{wrapped} [n={int(count)}]"
+            label_map[label] = f"{wrapped}\n[n={int(count)}]"
         return label_map
 
     def plot_length_percentage_boxplot(
