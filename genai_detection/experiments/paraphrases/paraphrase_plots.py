@@ -41,8 +41,8 @@ class ParaphrasePlotter:
                 "ytick.labelsize": 9,
                 "legend.fontsize": 9,
                 "legend.title_fontsize": 10,
-                "font.family": "serif",
-                "font.serif": ["DejaVu Serif", "Times New Roman", "Times"],
+                # "font.family": "serif",
+                # "font.serif": ["DejaVu Serif", "Times New Roman", "Times"],
             }
         )
 
