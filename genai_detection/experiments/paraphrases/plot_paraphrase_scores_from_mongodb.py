@@ -252,7 +252,7 @@ def _parse_args() -> argparse.Namespace:
         "--metric",
         dest="metrics",
         action="append",
-        default=["gohsen_delta"],
+        default=None,#["gohsen_delta"],
         help="Metric to plot. Repeat to pass multiple metrics.",
     )
     parser.add_argument(
