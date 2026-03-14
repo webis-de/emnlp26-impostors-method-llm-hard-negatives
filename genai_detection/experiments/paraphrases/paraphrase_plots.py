@@ -23,6 +23,8 @@ import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 
+from genai_detection.config import CONFIG
+
 
 class ParaphrasePlotter:
     def __init__(self, save_base_path: Path):
@@ -489,7 +491,7 @@ class ParaphrasePlotter:
             ax.set_xlabel("Paraphrase technique")
             ax.set_ylabel(metric_for_title)
             title = (
-                f"{metric_for_title} by Paraphrase Technique\n{data_category} Dataset"
+                f"{metric_for_title} by Paraphrase Technique\n{CONFIG.DATASET_TRANSLATIONS[data_category]} Dataset"
                 if data_category
                 else f"{metric_for_title} by Paraphrase Technique"
             )
