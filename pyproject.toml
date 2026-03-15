@@ -64,6 +64,7 @@ dspy = "^3.0.3"
 resiliparse = "^0.15.2"
 ray = "^2.53.0"
 black = "^26.1.0"
+mlstatkit = "^0.1.91"
 
 [[tool.poetry.source]]
 name = "torch-cu128"
