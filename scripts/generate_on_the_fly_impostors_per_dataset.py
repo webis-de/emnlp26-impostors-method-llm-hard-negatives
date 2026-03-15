@@ -78,11 +78,13 @@ def main(imp_gen_techniques, dataset_name):
 
 if __name__ == "__main__":
     imp_gen_techniques = [
+        # "on_the_fly_serpapi",
         "on_the_fly_startpage",
         "on_the_fly_chatnoir",
-        "on_the_fly_serpapi",
     ]
-    imp_per_appr = {CONFIG.BLOG:[imp_gen_techniques[0]], CONFIG.STUDENT_ESSAYS:[imp_gen_techniques[0], imp_gen_techniques[
-        1]]}
+    imp_per_appr = {
+        CONFIG.BLOG: [imp_gen_techniques[0]],
+        CONFIG.STUDENT_ESSAYS: [imp_gen_techniques[0], imp_gen_techniques[1]],
+    }
     for dataset_name in [CONFIG.BLOG, CONFIG.STUDENT_ESSAYS]:
         main(imp_per_appr[dataset_name], dataset_name)
