@@ -185,17 +185,18 @@ def compute_prec_recall_curves_ablations(
         thresholds=CONFIG.THRESHOLDS,
     )
 
-
+    imp_generation_techniques = [impostor_technique, "two_step_llm"]
     traditional_results = compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
         dataset_name=dataset_name,
-        imp_gen_techniques=[impostor_technique, "two_step_llm"],
+        imp_gen_techniques=imp_generation_techniques,
         include_baselines=False,
         save_artifacts=False,
     )
-    if impostor_technique in traditional_results:
-        metrics[impostor_technique] = traditional_results[impostor_technique]
-    else:
-        logger.warning("No precomputed in_domain results found for dataset %s.", dataset_name)
+    for technique in imp_generation_techniques:
+        if technique in traditional_results:
+            metrics[technique] = traditional_results[technique]
+        else:
+            logger.warning(f"No precomputed {technique} results found for dataset %s.", dataset_name)
 
     res = {
         "pan_metrics": pan_metrics,
@@ -217,6 +218,7 @@ if __name__ == "__main__":
     pan_metrics = {}
     label_translations = dict(CONFIG.LABEL_TRANSLATIONS)
     label_translations["in_domain"] = "Koppel and Winter, 2014"
+    label_translations["two_step_llm"] = "LLM-based Impostors"
 
     for dataset_name in [CONFIG.BLOG, CONFIG.STUDENT_ESSAYS]:
         results = compute_prec_recall_curves_ablations(dataset_name=dataset_name, impostor_technique="in_domain")
