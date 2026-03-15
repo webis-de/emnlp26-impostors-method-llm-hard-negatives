@@ -218,7 +218,7 @@ if __name__ == "__main__":
     pan_metrics = {}
     label_translations = dict(CONFIG.LABEL_TRANSLATIONS)
     label_translations["in_domain"] = "Koppel and Winter, 2014"
-    label_translations["two_step_llm"] = "LLM-based Impostors"
+    label_translations["two_step_llm"] = "LLM-based impostors"
 
     for dataset_name in [CONFIG.BLOG, CONFIG.STUDENT_ESSAYS]:
         results = compute_prec_recall_curves_ablations(dataset_name=dataset_name, impostor_technique="in_domain")
