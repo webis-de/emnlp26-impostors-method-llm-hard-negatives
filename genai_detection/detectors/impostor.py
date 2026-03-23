@@ -355,7 +355,9 @@ class ImpostorDetector(ImpostorBase):
             if isinstance(self.impostor_generator, SearchImpostorGeneratorBase):
                 document2insert["impostor_generation_technique"] = "on_the_fly"
                 document2insert["retrieval_index"] = self.impostor_generator.index_name
-            document2insert["dataset_name"] = self.dataset_name
+            document2insert["dataset_name"] = (
+                self.dataset_name or self.impostor_generator.dataset_name
+            )
             document2insert["n_impostors"] = self.n_impostors
             document2insert["n_potential_impostors"] = (
                 self.impostor_generator.num_potential_impostors
