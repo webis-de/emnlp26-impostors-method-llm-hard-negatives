@@ -100,7 +100,6 @@ class ImpostorDetector(ImpostorBase):
         self.min_n_tokens = min_n_tokens
         self.upsample = upsample
         self.impostor_technique = impostor_technique
-        self._training_mode = True  # set to True if you are in training mode, False for validation of model
 
         self.impostor_generator = create_impostor_generator(
             impostor_technique=impostor_technique,
@@ -132,22 +131,6 @@ class ImpostorDetector(ImpostorBase):
         if not (0 <= threshold <= 1):
             raise ValueError("Threshold must be in [0, 1].")
         self.threshold = threshold
-
-    def set_training_mode(self, training_mode: bool):
-        """
-        Set the training mode for the detector.
-        If training_mode is True, the detector will use the test split of the impostor generator.
-        If training_mode is False, the detector will use the train split of the impostor generator.
-        This will reduce the risk of texts from the actual author among the impostors (i.e. actual positives among the hard negatives).
-        :param training_mode: True if in training mode, False otherwise.
-        """
-        self._training_mode = training_mode
-        self.impostor_generator = create_impostor_generator(
-            impostor_technique=self.impostor_technique,
-            n_impostors=self.n_impostors,
-            split="test" if self._training_mode else "train",
-            path2imp=self.dataset_name,
-        )
 
     def _generate_impostors_for_single_input(
         self, input_dict: t.Dict[str, str]
