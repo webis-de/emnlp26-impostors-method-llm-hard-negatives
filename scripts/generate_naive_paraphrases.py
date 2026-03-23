@@ -63,7 +63,7 @@ def main() -> None:
     parser.add_argument(
         "--dataset",
         type=str,
-        default=None,
+        default=CONFIG.STUDENT_ESSAYS,
         help="Filter by dataset name stored in MongoDB (optional).",
     )
     parser.add_argument(
@@ -132,6 +132,7 @@ def main() -> None:
         n_impostors=args.n_impostors, top_n_freq_words=args.top_n_freq_words
     )
     _init_saia_clients(generator, api_key=api_key)
+    generator._set_dataset_name(dataset_name=args.dataset)
 
     processed = 0
     for text_id in iter_original_text_ids(mongo, args.dataset, args.limit):
