@@ -80,6 +80,7 @@ class TwoStepImpostorGenerator(NonNaiveLLMImpostorGenerator):
                 paraphrased_text=imp,
                 extracted_info=extracted_info,
                 total_costs=total_cost / len(new_impostors),
+                dataset_name=self.dataset_name,
                 temperature=1.0,  # Temperature requirements for reasoning models like gpt-5-nano
                 collection=self.mongoDB.non_naive_paraphrase_collection,
             )
