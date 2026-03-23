@@ -81,17 +81,10 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
         self.max_token_jaccard = 0.65
         self.max_char_ngram_overlap = 0.75
         self.char_ngram_n = 4
-        self.dataset_name = None    # manually set and saved with paraphrased text
 
     @staticmethod
     def _tokenize(text: str) -> List[str]:
         return re.findall(r"[A-Za-z0-9']+", text.lower())
-
-    def _set_dataset_name(self, dataset_name: str):
-        if dataset_name in [CONFIG.STUDENT_ESSAYS, CONFIG.BLOG]:
-            self.dataset_name = dataset_name
-        else:
-            raise ValueError(f"Invalid dataset name: {dataset_name}, must be one of {CONFIG.STUDENT_ESSAYS}, {CONFIG.BLOG}")
 
     def _char_ngrams(self, text: str) -> set:
         text = re.sub(r"\s+", " ", text.lower()).strip()

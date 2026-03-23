@@ -23,6 +23,7 @@ import numpy as np
 from bson import ObjectId
 from dotenv import load_dotenv
 
+from genai_detection.config import CONFIG
 from genai_detection.detectors.components.feature_extractor import TfidfFeatureExtractor
 from genai_detection.detectors.components.preprocessing import Preprocessor
 from genai_detection.detectors.components.vector_similarity import minmax_similarity
@@ -103,6 +104,25 @@ class MongoDBSavedGenerator(BaseImpostorGenerator):
         super().__init__(n_impostors=n_impostors, top_n_freq_words=top_n_freq_words)
         self.mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
         self.text_processor = Preprocessor()
+        self.dataset_name = None    # manually set and saved with paraphrased text
+
+    def _set_dataset_name(self, dataset_name: str):
+        """
+        Sets the dataset name for the current configuration. Only specific dataset names
+        as defined in the configuration are allowed. If the provided name does not match
+        the allowed options, a ValueError is raised.
+
+        :param dataset_name: The name of the dataset to set. Must be one of the allowable
+            options defined in the CONFIG object: CONFIG.STUDENT_ESSAYS or CONFIG.BLOG.
+        :type dataset_name: str
+        :return: None
+        :raises ValueError: If the provided dataset_name is not one of the accepted values.
+        """
+        if dataset_name in [CONFIG.STUDENT_ESSAYS, CONFIG.BLOG]:
+            self.dataset_name = dataset_name
+        else:
+            raise ValueError(f"Invalid dataset name: {dataset_name}, must be one of {CONFIG.STUDENT_ESSAYS}, {CONFIG.BLOG}")
+
 
     def generate_impostors(
             self, text: Optional[str]=None, text_id: Optional[ObjectId]=None
