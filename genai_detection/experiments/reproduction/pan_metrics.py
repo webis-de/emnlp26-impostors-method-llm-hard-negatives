@@ -18,6 +18,9 @@ from sklearn.utils.multiclass import type_of_target
 from sklearn.utils.validation import check_consistent_length
 
 from genai_detection.config import CONFIG
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -417,6 +420,7 @@ class BinaryVerificationEvaluator:
                 n_splits=n_splits, n_repeats=n_repeats, random_state=random_state
             )
             split_iter = splitter.split(scores_np, y_true_np)
+            logger.info(f"Splitting data with {split_config}.")
         except ValueError as exc:
             raise ValueError(
                 "Stratified split failed. Ensure each class in y_true has at least two samples."
@@ -467,6 +471,8 @@ class BinaryVerificationEvaluator:
                         best_lower_threshold = lower_threshold
                         best_upper_threshold = upper_threshold
 
+                logger.info(f"Finished split {len(per_split_results) + 1} of {n_splits} (optimizing across parameter "
+                            f"grid).")
                 assert best_lower_threshold is not None
                 assert best_upper_threshold is not None
                 per_split_results.append(
@@ -485,6 +491,7 @@ class BinaryVerificationEvaluator:
         metrics_mean, metrics_std, metric_values, metrics_ci = self._summarize_metrics(
             per_split_results, ci_level=ci_level, n_boot=n_boot
         )
+        logger.info(f"Summary of metrics obtained. See metric means: {metrics_mean}")
 
         return EvaluationCVResult(
             split_config=split_config,
@@ -508,10 +515,8 @@ def get_pan_metrics(predictions, y_true):
     pan_metrics = {}
 
     for method_name, method_scores in predictions.items():
+        logger.info(f"Starting with method {method_name}.")
         method_scores = np.asarray(method_scores, dtype=float)
-
-        print(Counter(method_scores))
-
         cv_result = evaluator.tune_threshold(
                 y_true=y_true,
                 scores=method_scores,
@@ -543,6 +548,7 @@ def get_pan_metrics(predictions, y_true):
                     for result in cv_result.per_split
                 ],
                 }
+        logger.info(f"Obtained summary of PAN metrics for method {method_name}.")
     return pan_metrics
 
 def save_pan_metrics(pan_metrics, save_path, dataset_name=None):
@@ -559,4 +565,5 @@ def save_pan_metrics(pan_metrics, save_path, dataset_name=None):
     with open(save_file, "w") as f:
         import json
         json.dump(pan_metrics, f, indent=2)
+        logger.info(f"PAN metrics saved to {save_file}.")
     return save_file
