@@ -12,14 +12,17 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
+from sklearn.model_selection import ParameterGrid, StratifiedShuffleSplit
+from sklearn.utils.multiclass import type_of_target
+from sklearn.utils.validation import check_consistent_length
 
 from genai_detection.config import CONFIG
 
 
 @dataclass
 class EvaluationResult:
-    threshold: float
-    rejection_radius: float
+    lower_threshold: float
+    upper_threshold: float
     n_answered: int
     n_unanswered: int
     precision: float
@@ -42,9 +45,9 @@ class BinaryVerificationEvaluator:
     - higher score => more evidence for class 1
 
     Prediction rule:
-    - score > threshold + rejection_radius   -> predict 1
-    - score < threshold - rejection_radius   -> predict 0
-    - otherwise                              -> unanswered (0.5)
+    - score > upper_threshold -> predict 1
+    - score < lower_threshold -> predict 0
+    - otherwise               -> unanswered (0.5)
 
     Notes:
     - AUROC is computed on raw scores and does not use a threshold.
@@ -59,6 +62,50 @@ class BinaryVerificationEvaluator:
     @staticmethod
     def _to_numpy(x: Sequence[float] | Sequence[int] | np.ndarray) -> np.ndarray:
         return np.asarray(x)
+
+    def _validate_binary_inputs(
+        self,
+        y_true: Sequence[int] | np.ndarray,
+        scores: Sequence[float] | np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        y_true_np = self._to_numpy(y_true).astype(int)
+        scores_np = self._to_numpy(scores).astype(float)
+
+        check_consistent_length(y_true_np, scores_np)
+
+        if np.isnan(scores_np).any() or np.isinf(scores_np).any():
+            raise ValueError("scores must not contain NaN or infinite values.")
+
+        y_target_type = type_of_target(y_true_np)
+        if y_target_type != "binary":
+            raise ValueError(
+                f"y_true must be binary labels, got target type '{y_target_type}'."
+            )
+
+        return y_true_np, scores_np
+
+    @staticmethod
+    def _normalize_thresholds(
+        scores: np.ndarray,
+        thresholds: Iterable[float] | None,
+    ) -> np.ndarray:
+        if thresholds is None:
+            unique_scores = np.unique(scores)
+            return np.concatenate(
+                (
+                    [float(np.min(scores)) - 1e-12],
+                    unique_scores,
+                    [float(np.max(scores)) + 1e-12],
+                )
+            )
+
+        threshold_array = np.asarray(list(thresholds), dtype=float)
+        if threshold_array.size == 0:
+            raise ValueError("thresholds must contain at least one value.")
+        if np.isnan(threshold_array).any() or np.isinf(threshold_array).any():
+            raise ValueError("thresholds must not contain NaN or infinite values.")
+        return np.unique(threshold_array)
+
 
     @classmethod
     def compute_c_at_1(
@@ -87,23 +134,6 @@ class BinaryVerificationEvaluator:
         return (1.0 / n) * (n_c + n_u * (n_c / n))
 
     @classmethod
-    def predict_with_rejection(
-        cls,
-        scores: np.ndarray,
-        threshold: float,
-        rejection_radius: float = 0.0,
-    ) -> np.ndarray:
-        """
-        Return predictions in {0, 1, 0.5}, where 0.5 means unanswered.
-        Rejection radius is used to reject scores that are too close to the threshold.
-        Rejection means it is filled with a specific unanswered value.
-        """
-        preds = np.full(shape=len(scores), fill_value=cls.UNANSWERED, dtype=float)
-        preds[scores > threshold + rejection_radius] = 1.0
-        preds[scores < threshold - rejection_radius] = 0.0
-        return preds
-
-    @classmethod
     def _answered_only(
         cls,
         y_true: np.ndarray,
@@ -116,12 +146,11 @@ class BinaryVerificationEvaluator:
         self,
         y_true: Sequence[int] | np.ndarray,
         scores: Sequence[float] | np.ndarray,
-        threshold: float,
-        rejection_radius: float = 0.0,
+        lower_threshold: float,
+        upper_threshold: float,
     ) -> EvaluationResult:
         """
-        Evaluates the performance of a binary classification model at a given threshold with
-        an optional rejection radius.
+        Evaluates the performance of a binary classification model at a given a lower and upper threshold.
         Rejection means it is filled with a specific unanswered value.
         This method calculates various metrics such as precision,
         recall, F1-score, accuracy, c@1, AUROC, and a combined measure (AUROC*c@1).
@@ -131,37 +160,30 @@ class BinaryVerificationEvaluator:
         :param scores: Predicted scores or probabilities for the positive class. Must have
             the same length as `y_true`.
         :type scores: Sequence[float] | np.ndarray
-        :param threshold: Decision threshold above which predictions are categorized
-            as the positive class.
-        :type threshold: float
-        :param rejection_radius: Optional rejection radius to define a margin for ambiguous
-            predictions where no decision is made. Defaults to 0.0.
-            Rejection means it is filled with a specific unanswered value.
-        :type rejection_radius: float
-        :return: An `EvaluationResult` object containing threshold, rejection radius, the number
+        :param lower_threshold: Decision threshold below which predictions are categorized
+            as the negative class.
+        :param upper_threshold: Decision threshold above which predictions are categorized as positive class.
+        :return: An `EvaluationResult` object containing thresholds, the number
             of answered and unanswered instances, and computed metrics like precision, recall,
             F1-score, accuracy, c@1, AUROC, and AUROC*c@1.
         :rtype: EvaluationResult
         """
 
-        y_true_np = self._to_numpy(y_true).astype(int)
-        scores_np = self._to_numpy(scores).astype(float)
-
-        if len(y_true_np) != len(scores_np):
-            raise ValueError("y_true and scores must have the same length.")
+        y_true_np, scores_np = self._validate_binary_inputs(y_true=y_true, scores=scores)
 
         if len(np.unique(y_true_np)) < 2:
             raise ValueError("AUROC requires both classes to be present in y_true.")
 
-        y_pred_with_reject = self.predict_with_rejection(
-            scores=scores_np,
-            threshold=threshold,
-            rejection_radius=rejection_radius,
-        )
+        if lower_threshold > upper_threshold:
+            raise ValueError("lower_threshold must be <= upper_threshold.")
+
+        preds = np.full(shape=len(scores_np), fill_value=self.UNANSWERED, dtype=float)
+        preds[scores_np > upper_threshold] = 1.0
+        preds[scores_np < lower_threshold] = 0.0
 
         y_true_answered, y_pred_answered = self._answered_only(
             y_true_np,
-            y_pred_with_reject,
+            preds,
         )
 
         n_answered = len(y_true_answered)
@@ -190,13 +212,13 @@ class BinaryVerificationEvaluator:
             )
             accuracy = accuracy_score(y_true_answered, y_pred_answered)
 
-        c_at_1 = self.compute_c_at_1(y_true_np, y_pred_with_reject)
+        c_at_1 = self.compute_c_at_1(y_true_np, preds)
         auroc = roc_auc_score(y_true_np, scores_np)
         auroc_c_at_1 = auroc * c_at_1
 
         return EvaluationResult(
-            threshold=threshold,
-            rejection_radius=rejection_radius,
+            lower_threshold=lower_threshold,
+            upper_threshold=upper_threshold,
             n_answered=n_answered,
             n_unanswered=n_unanswered,
             precision=float(precision),
@@ -213,13 +235,15 @@ class BinaryVerificationEvaluator:
         y_true: Sequence[int] | np.ndarray,
         scores: Sequence[float] | np.ndarray,
         thresholds: Iterable[float] | None = None,
-        rejection_radius: float = 0.0,
         optimize_for: str = "c_at_1",
     ) -> EvaluationResult:
         """
-        Tune threshold on a validation set.
-        Rejection radius is used to reject scores that are too close to the threshold.
-        Defaults to 0, hence no margin around the threshold.
+        Tune a threshold on a stratified subset of the input dataset and return
+        results on the held-out items.
+        A deterministic 50/50 split is used with class-stratification based on `y_true`.
+
+        Two thresholds are selected directly from the candidate `thresholds` list.
+        Pairs are evaluated with the constraint `lower_threshold <= upper_threshold`.
         Rejection means it is filled with a specific unanswered value.
 
         Supported `optimize_for`:
@@ -232,23 +256,29 @@ class BinaryVerificationEvaluator:
 
         Returns the full evaluation result at the best threshold.
         """
-        y_true_np = self._to_numpy(y_true).astype(int)
-        scores_np = self._to_numpy(scores).astype(float)
+        y_true_np, scores_np = self._validate_binary_inputs(y_true=y_true, scores=scores)
 
-        if len(y_true_np) != len(scores_np):
-            raise ValueError("y_true and scores must have the same length.")
+        if len(np.unique(y_true_np)) < 2:
+            raise ValueError("Threshold tuning requires both classes to be present in y_true.")
 
-        if thresholds is None:
-            unique_scores = np.unique(scores_np)
-            thresholds = np.concatenate(
-                (
-                    [float(np.min(scores_np)) - 1e-12],
-                    unique_scores,
-                    [float(np.max(scores_np)) + 1e-12],
-                )
-            )
+        try:
+            splitter = StratifiedShuffleSplit(n_splits=1, test_size=0.5, random_state=42)
+            train_idx, test_idx = next(splitter.split(scores_np, y_true_np))
+        except ValueError as exc:
+            raise ValueError(
+                "Stratified split failed. Ensure each class in y_true has at least two samples."
+            ) from exc
 
-        best_result: EvaluationResult | None = None
+        y_true_train = y_true_np[train_idx]
+        scores_train = scores_np[train_idx]
+        y_true_test = y_true_np[test_idx]
+        scores_test = scores_np[test_idx]
+
+        threshold_values = self._normalize_thresholds(scores=scores_train, thresholds=thresholds)
+
+        best_lower_threshold: float | None = None
+        best_upper_threshold: float | None = None
+        best_n_answered = -1
         best_value = -np.inf
 
         valid_metrics = {
@@ -265,22 +295,38 @@ class BinaryVerificationEvaluator:
                 f"Choose one of: {sorted(valid_metrics)}"
             )
 
-        for threshold in thresholds:
+        param_grid = ParameterGrid(
+            {"lower_threshold": threshold_values, "upper_threshold": threshold_values}
+        )
+        for params in param_grid:
+            lower_threshold = float(params["lower_threshold"])
+            upper_threshold = float(params["upper_threshold"])
+            if lower_threshold > upper_threshold:
+                continue
             result = self.evaluate_at_threshold(
-                y_true=y_true_np,
-                scores=scores_np,
-                threshold=float(threshold),
-                # Rejection means it is filled with a specific unanswered value.
-                rejection_radius=rejection_radius,  # Rejection radius is used to reject scores that are too close to the threshold.
+                y_true=y_true_train,
+                scores=scores_train,
+                lower_threshold=lower_threshold,
+                upper_threshold=upper_threshold,
             )
             current_value = getattr(result, optimize_for)
 
-            if current_value > best_value:
+            if current_value > best_value or (
+                np.isclose(current_value, best_value) and result.n_answered > best_n_answered
+            ):
                 best_value = current_value
-                best_result = result
+                best_n_answered = result.n_answered
+                best_lower_threshold = lower_threshold
+                best_upper_threshold = upper_threshold
 
-        assert best_result is not None
-        return best_result
+        assert best_lower_threshold is not None
+        assert best_upper_threshold is not None
+        return self.evaluate_at_threshold(
+            y_true=y_true_test,
+            scores=scores_test,
+            lower_threshold=best_lower_threshold,
+            upper_threshold=best_upper_threshold,
+        )
 
 
 def get_pan_metrics(predictions, y_true):
@@ -297,13 +343,12 @@ def get_pan_metrics(predictions, y_true):
                 y_true=y_true,
                 scores=method_scores,
                 thresholds=CONFIG.THRESHOLDS,
-                rejection_radius=0.0,   # or e.g., 0.05 if you want unanswered cases
                 optimize_for="c_at_1",
                 )
 
         pan_metrics[method_name] = {
-                "threshold": best_result.threshold,
-                "rejection_radius": best_result.rejection_radius,
+                "upper_threshold": best_result.upper_threshold,
+                "lower_threshold": best_result.lower_threshold,
                 "n_answered": best_result.n_answered,
                 "n_unanswered": best_result.n_unanswered,
                 "precision": best_result.precision,
@@ -318,7 +363,7 @@ def get_pan_metrics(predictions, y_true):
 
 def save_pan_metrics(pan_metrics, save_path, dataset_name=None):
     assert save_path.exists(), f"Directory {save_path} does not exist."
-    if not save_pan_metrics:
+    if dataset_name is None:
         save_file = save_path / "pan_metrics.json"
     else:
         save_file = save_path / f"{dataset_name}_pan_metrics.json"
