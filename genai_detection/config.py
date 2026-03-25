@@ -80,7 +80,7 @@ class BaseConfig:
     MONGO_HOST = "localhost"  # Local, but forwarded to server
     MONGO_PORT = 27018
 
-    THRESHOLDS = np.arange(0.0, 1.05, 0.01)
+    THRESHOLDS = np.arange(0.0, 1.001, 0.001)
 
     RETRIEVAL_INDEX_TRANSLATIONS = {
         "on_the_fly_chatnoir": "msmarco-v2.1",
