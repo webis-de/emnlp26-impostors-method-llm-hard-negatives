@@ -323,9 +323,8 @@ class BinaryVerificationEvaluator:
                 zero_division=0,
             )
 
-            # we compute accuracy on answered and unanswered, because we have c@1 as a accuracy variant that rewards
-            # unanswered problems
-            accuracy = accuracy_score(y_true_np, preds)
+            # we compute accuracy only on answered problems, because otherwise we need to optimize a third threshold
+            accuracy = accuracy_score(y_true_answered, y_pred_answered)
 
         c_at_1 = self.compute_c_at_1(y_true=y_true_np, y_preds=preds)
         auroc = roc_auc_score(y_true_np, scores_np)
