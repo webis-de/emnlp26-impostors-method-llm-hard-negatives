@@ -222,31 +222,31 @@ class BinaryVerificationEvaluator:
 
         return metrics_mean, metrics_std, metric_values, metrics_ci
 
-
     @classmethod
     def compute_c_at_1(
         cls,
         y_true: np.ndarray,
-        y_pred_with_reject: np.ndarray,
+        y_preds: np.ndarray,
     ) -> float:
         """
         Compute c@1 as defined in PAN-style evaluation.
+        Peñas & Rodrigo (2011): "A Simple Measure to Assess Non-response"
 
-        `y_pred_with_reject` must contain:
+        `y_preds` must contain:
         - 0 for negative prediction
         - 1 for positive prediction
-        - 0.5 for unanswered
+        - 0.5 or cls.UNANSWERED for unanswered
         Example values: y_true=[0, 1, 0], y_pred_with_reject=[0, 0.5, 1].
         """
         n = len(y_true)
         if n == 0:
             raise ValueError("Empty inputs are not allowed.")
 
-        answered_mask = y_pred_with_reject != cls.UNANSWERED
+        answered_mask = y_preds != cls.UNANSWERED
         unanswered_mask = ~answered_mask
 
         n_u = int(np.sum(unanswered_mask))
-        n_c = int(np.sum(y_true[answered_mask] == y_pred_with_reject[answered_mask]))
+        n_c = int(np.sum(y_true[answered_mask] == y_preds[answered_mask]))
 
         return (1.0 / n) * (n_c + n_u * (n_c / n))
 
@@ -300,6 +300,7 @@ class BinaryVerificationEvaluator:
             f1 = 0.0
             accuracy = 0.0
         else:
+            # we compute precision and recall only on answered problems
             precision = precision_score(
                 y_true_answered,
                 y_pred_answered,
@@ -310,14 +311,20 @@ class BinaryVerificationEvaluator:
                 y_pred_answered,
                 zero_division=0,
             )
+            # PAN: does not take into account non-answered:
+            # cf. https://ceur-ws.org/Vol-2936/paper-147.pdf (2021)
+            # cf. https://ceur-ws.org/Vol-3497/paper-199.pdf (2023)
             f1 = f1_score(
                 y_true_answered,
                 y_pred_answered,
                 zero_division=0,
             )
-            accuracy = accuracy_score(y_true_answered, y_pred_answered)
 
-        c_at_1 = self.compute_c_at_1(y_true_np, preds)
+            # we compute accuracy on answered and unanswered, because we have c@1 as a accuracy variant that rewards
+            # unanswered problems
+            accuracy = accuracy_score(y_true_np, preds)
+
+        c_at_1 = self.compute_c_at_1(y_true=y_true_np, y_preds=preds)
         auroc = roc_auc_score(y_true_np, scores_np)
         auroc_c_at_1 = auroc * c_at_1
 
