@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Iterable, Sequence
 
 import numpy as np
+from scipy.stats import bootstrap
 from sklearn.metrics import (
     accuracy_score,
     f1_score,
@@ -12,7 +13,7 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
-from sklearn.model_selection import ParameterGrid, StratifiedShuffleSplit
+from sklearn.model_selection import ParameterGrid, RepeatedStratifiedKFold
 from sklearn.utils.multiclass import type_of_target
 from sklearn.utils.validation import check_consistent_length
 
@@ -21,6 +22,9 @@ from genai_detection.config import CONFIG
 
 @dataclass
 class EvaluationResult:
+    """
+    Metrics for a single evaluation using a fixed (lower, upper) threshold pair.
+    """
     lower_threshold: float
     upper_threshold: float
     n_answered: int
@@ -34,10 +38,39 @@ class EvaluationResult:
     auroc_c_at_1: float
 
 
+@dataclass
+class EvaluationCVResult:
+    """
+    Cross-validation summary for threshold tuning.
+
+    - split_config: parameters used to generate CV splits.
+    - per_split: list of EvaluationResult objects for each held-out split.
+    - metric_values: raw per-split metric values.
+    - metrics_mean/std: summary statistics across splits.
+    - metrics_ci: percentile bootstrap CI for the mean of each metric.
+    - candidate_thresholds: candidate threshold grid, not the chosen lower/upper thresholds.
+
+    Example values: split_config={"n_splits": 10, "n_repeats": 5, "test_size": 0.1, "random_state": 42},
+    optimize_for="c_at_1", candidate_thresholds=[0.2, 0.5, 0.8], per_split=[EvaluationResult(...), ...],
+    metrics_mean={"c_at_1": 0.72}, metrics_std={"c_at_1": 0.05},
+    metric_values={"c_at_1": [0.7, 0.75]}, metrics_ci={"c_at_1": {"low": 0.65, "high": 0.78, "level": 0.95, "method": "bootstrap_percentile", "n_boot": 10000}}.
+    """
+    split_config: dict[str, float | int]
+    optimize_for: str
+    candidate_thresholds: list[float] | None
+    per_split: list[EvaluationResult]
+    metrics_mean: dict[str, float]
+    metrics_std: dict[str, float]
+    metric_values: dict[str, list[float]]
+    metrics_ci: dict[str, dict[str, float | int | str]]
+
+
 class BinaryVerificationEvaluator:
     """
     Evaluate binary verification scores with threshold-dependent metrics,
-    c@1, AUROC, and AUROC*c@1.
+    c@1, AUROC, and AUROC*c@1. Supports tuning a rejection band defined
+    by lower/upper thresholds and summarizing performance across
+    repeated stratified k-fold splits.
 
     Assumptions:
     - y_true contains binary gold labels: 0 or 1
@@ -68,6 +101,10 @@ class BinaryVerificationEvaluator:
         y_true: Sequence[int] | np.ndarray,
         scores: Sequence[float] | np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Ensure inputs are aligned, finite, and binary labels.
+        Example values: y_true=[0, 1, 0], scores=[0.12, 0.87, 0.33].
+        """
         y_true_np = self._to_numpy(y_true).astype(int)
         scores_np = self._to_numpy(scores).astype(float)
 
@@ -89,6 +126,11 @@ class BinaryVerificationEvaluator:
         scores: np.ndarray,
         thresholds: Iterable[float] | None,
     ) -> np.ndarray:
+        """
+        Return a sorted, unique array of candidate thresholds.
+        If thresholds is None, use the observed scores plus two sentinels.
+        Example values: scores=[0.1, 0.4, 0.9], thresholds=[0.2, 0.5, 0.8] or None.
+        """
         if thresholds is None:
             unique_scores = np.unique(scores)
             return np.concatenate(
@@ -106,6 +148,80 @@ class BinaryVerificationEvaluator:
             raise ValueError("thresholds must not contain NaN or infinite values.")
         return np.unique(threshold_array)
 
+    @staticmethod
+    def _summarize_metrics(
+        results: Sequence[EvaluationResult],
+        ci_level: float,
+        n_boot: int,
+    ) -> tuple[dict[str, float], dict[str, float], dict[str, list[float]]]:
+        """
+        Compute per-metric mean/std across splits and percentile bootstrap CIs
+        for the mean. For each metric, bootstrap draws resample the per-split
+        values with replacement, using the same list length, repeated `n_boot`
+        times. The CI bounds are the percentile cutoffs of those bootstrap means.
+        Returns mean, std, raw values, and CI dicts.
+        Example values: results=[EvaluationResult(...), ...], ci_level=0.95, n_boot=10000.
+        """
+        metric_values: dict[str, list[float]] = {
+            "precision": [],
+            "recall": [],
+            "f1": [],
+            "accuracy": [],
+            "c_at_1": [],
+            "auroc": [],
+            "auroc_c_at_1": [],
+            "n_answered": [],
+            "n_unanswered": [],
+        }
+        for result in results:
+            metric_values["precision"].append(result.precision)
+            metric_values["recall"].append(result.recall)
+            metric_values["f1"].append(result.f1)
+            metric_values["accuracy"].append(result.accuracy)
+            metric_values["c_at_1"].append(result.c_at_1)
+            metric_values["auroc"].append(result.auroc)
+            metric_values["auroc_c_at_1"].append(result.auroc_c_at_1)
+            metric_values["n_answered"].append(float(result.n_answered))
+            metric_values["n_unanswered"].append(float(result.n_unanswered))
+
+        metrics_mean: dict[str, float] = {}
+        metrics_std: dict[str, float] = {}
+        for metric, values in metric_values.items():
+            metrics_mean[metric] = float(np.mean(values))
+            metrics_std[metric] = float(np.std(values, ddof=1)) if len(values) > 1 else 0.0
+
+        metrics_ci: dict[str, dict[str, float | int | str]] = {}
+        for metric, values in metric_values.items():
+            arr = np.asarray(values, dtype=float)
+            if len(arr) < 2 or n_boot <= 0:
+                metrics_ci[metric] = {
+                    "low": float(np.nan),
+                    "high": float(np.nan),
+                    "level": float(ci_level),
+                    "method": "bootstrap_percentile",
+                    "n_boot": int(n_boot),
+                }
+                continue
+            boot = bootstrap(
+                (arr,),
+                np.mean,
+                confidence_level=ci_level,
+                n_resamples=n_boot,
+                method="percentile",
+                random_state=42,
+            )
+            low = float(boot.confidence_interval.low)
+            high = float(boot.confidence_interval.high)
+            metrics_ci[metric] = {
+                "low": low,
+                "high": high,
+                "level": float(ci_level),
+                "method": "bootstrap_percentile",
+                "n_boot": int(n_boot),
+            }
+
+        return metrics_mean, metrics_std, metric_values, metrics_ci
+
 
     @classmethod
     def compute_c_at_1(
@@ -114,12 +230,13 @@ class BinaryVerificationEvaluator:
         y_pred_with_reject: np.ndarray,
     ) -> float:
         """
-        Compute c@1.
+        Compute c@1 as defined in PAN-style evaluation.
 
         `y_pred_with_reject` must contain:
         - 0 for negative prediction
         - 1 for positive prediction
         - 0.5 for unanswered
+        Example values: y_true=[0, 1, 0], y_pred_with_reject=[0, 0.5, 1].
         """
         n = len(y_true)
         if n == 0:
@@ -150,23 +267,11 @@ class BinaryVerificationEvaluator:
         upper_threshold: float,
     ) -> EvaluationResult:
         """
-        Evaluates the performance of a binary classification model at a given a lower and upper threshold.
-        Rejection means it is filled with a specific unanswered value.
-        This method calculates various metrics such as precision,
-        recall, F1-score, accuracy, c@1, AUROC, and a combined measure (AUROC*c@1).
+        Evaluate metrics for a fixed lower/upper threshold band.
 
-        :param y_true: Ground truth binary labels. Must contain at least two unique classes.
-        :type y_true: Sequence[int] | np.ndarray
-        :param scores: Predicted scores or probabilities for the positive class. Must have
-            the same length as `y_true`.
-        :type scores: Sequence[float] | np.ndarray
-        :param lower_threshold: Decision threshold below which predictions are categorized
-            as the negative class.
-        :param upper_threshold: Decision threshold above which predictions are categorized as positive class.
-        :return: An `EvaluationResult` object containing thresholds, the number
-            of answered and unanswered instances, and computed metrics like precision, recall,
-            F1-score, accuracy, c@1, AUROC, and AUROC*c@1.
-        :rtype: EvaluationResult
+        Scores in (lower_threshold, upper_threshold) are treated as unanswered (0.5).
+        Example values: y_true=[0, 1, 0], scores=[0.2, 0.8, 0.4],
+        lower_threshold=0.3, upper_threshold=0.7.
         """
 
         y_true_np, scores_np = self._validate_binary_inputs(y_true=y_true, scores=scores)
@@ -235,16 +340,20 @@ class BinaryVerificationEvaluator:
         y_true: Sequence[int] | np.ndarray,
         scores: Sequence[float] | np.ndarray,
         thresholds: Iterable[float] | None = None,
+        n_splits: int = 10,
+        n_repeats: int = 5,
+        random_state: int = 42,
         optimize_for: str = "c_at_1",
-    ) -> EvaluationResult:
+        ci_level: float = 0.95,
+        n_boot: int = 10000,
+    ) -> EvaluationCVResult:
         """
-        Tune a threshold on a stratified subset of the input dataset and return
-        results on the held-out items.
-        A deterministic 50/50 split is used with class-stratification based on `y_true`.
+        Tune thresholds on repeated stratified k-fold splits and summarize
+        performance on held-out folds.
 
-        Two thresholds are selected directly from the candidate `thresholds` list.
-        Pairs are evaluated with the constraint `lower_threshold <= upper_threshold`.
-        Rejection means it is filled with a specific unanswered value.
+        Threshold pairs are drawn from the candidate `thresholds` list and
+        evaluated under the constraint `lower_threshold <= upper_threshold`.
+        Scores between the thresholds are treated as unanswered.
 
         Supported `optimize_for`:
         - "c_at_1"
@@ -254,32 +363,24 @@ class BinaryVerificationEvaluator:
         - "recall"
         - "auroc_c_at_1"
 
-        Returns the full evaluation result at the best threshold.
+        Returns per-split results plus mean/std and percentile bootstrap CIs.
+        Example values: y_true=[0, 1, 0, 1], scores=[0.1, 0.9, 0.4, 0.7],
+        thresholds=[0.2, 0.5, 0.8], n_splits=10, n_repeats=5, random_state=42,
+        optimize_for="c_at_1", ci_level=0.95, n_boot=10000.
         """
         y_true_np, scores_np = self._validate_binary_inputs(y_true=y_true, scores=scores)
 
         if len(np.unique(y_true_np)) < 2:
             raise ValueError("Threshold tuning requires both classes to be present in y_true.")
 
-        try:
-            splitter = StratifiedShuffleSplit(n_splits=1, test_size=0.5, random_state=42)
-            train_idx, test_idx = next(splitter.split(scores_np, y_true_np))
-        except ValueError as exc:
-            raise ValueError(
-                "Stratified split failed. Ensure each class in y_true has at least two samples."
-            ) from exc
-
-        y_true_train = y_true_np[train_idx]
-        scores_train = scores_np[train_idx]
-        y_true_test = y_true_np[test_idx]
-        scores_test = scores_np[test_idx]
-
-        threshold_values = self._normalize_thresholds(scores=scores_train, thresholds=thresholds)
-
-        best_lower_threshold: float | None = None
-        best_upper_threshold: float | None = None
-        best_n_answered = -1
-        best_value = -np.inf
+        if n_splits < 2:
+            raise ValueError("n_splits must be >= 2 for cross-validation.")
+        if n_repeats < 1:
+            raise ValueError("n_repeats must be >= 1 for cross-validation.")
+        if not 0.0 < ci_level < 1.0:
+            raise ValueError("ci_level must be between 0 and 1.")
+        if n_boot < 1:
+            raise ValueError("n_boot must be >= 1.")
 
         valid_metrics = {
             "c_at_1",
@@ -295,41 +396,106 @@ class BinaryVerificationEvaluator:
                 f"Choose one of: {sorted(valid_metrics)}"
             )
 
-        param_grid = ParameterGrid(
-            {"lower_threshold": threshold_values, "upper_threshold": threshold_values}
-        )
-        for params in param_grid:
-            lower_threshold = float(params["lower_threshold"])
-            upper_threshold = float(params["upper_threshold"])
-            if lower_threshold > upper_threshold:
-                continue
-            result = self.evaluate_at_threshold(
-                y_true=y_true_train,
-                scores=scores_train,
-                lower_threshold=lower_threshold,
-                upper_threshold=upper_threshold,
+        split_config = {
+            "n_splits": int(n_splits),
+            "n_repeats": int(n_repeats),
+            "test_size": float(1.0 / n_splits),
+            "random_state": int(random_state),
+        }
+
+        per_split_results: list[EvaluationResult] = []
+
+        try:
+            splitter = RepeatedStratifiedKFold(
+                n_splits=n_splits, n_repeats=n_repeats, random_state=random_state
             )
-            current_value = getattr(result, optimize_for)
+            split_iter = splitter.split(scores_np, y_true_np)
+        except ValueError as exc:
+            raise ValueError(
+                "Stratified split failed. Ensure each class in y_true has at least two samples."
+            ) from exc
 
-            if current_value > best_value or (
-                np.isclose(current_value, best_value) and result.n_answered > best_n_answered
-            ):
-                best_value = current_value
-                best_n_answered = result.n_answered
-                best_lower_threshold = lower_threshold
-                best_upper_threshold = upper_threshold
+        thresholds_list = (
+            None if thresholds is None else [float(x) for x in thresholds]
+        )
 
-        assert best_lower_threshold is not None
-        assert best_upper_threshold is not None
-        return self.evaluate_at_threshold(
-            y_true=y_true_test,
-            scores=scores_test,
-            lower_threshold=best_lower_threshold,
-            upper_threshold=best_upper_threshold,
+        try:
+            for train_idx, test_idx in split_iter:
+                y_true_train = y_true_np[train_idx]
+                scores_train = scores_np[train_idx]
+                y_true_test = y_true_np[test_idx]
+                scores_test = scores_np[test_idx]
+
+                threshold_values = self._normalize_thresholds(
+                    scores=scores_train, thresholds=thresholds
+                )
+
+                best_lower_threshold: float | None = None
+                best_upper_threshold: float | None = None
+                best_n_answered = -1
+                best_value = -np.inf
+
+                param_grid = ParameterGrid(
+                    {"lower_threshold": threshold_values, "upper_threshold": threshold_values}
+                )
+                for params in param_grid:
+                    lower_threshold = float(params["lower_threshold"])
+                    upper_threshold = float(params["upper_threshold"])
+                    if lower_threshold > upper_threshold:
+                        continue
+                    result = self.evaluate_at_threshold(
+                        y_true=y_true_train,
+                        scores=scores_train,
+                        lower_threshold=lower_threshold,
+                        upper_threshold=upper_threshold,
+                    )
+                    current_value = getattr(result, optimize_for)
+
+                    if current_value > best_value or (
+                        np.isclose(current_value, best_value)
+                        and result.n_answered > best_n_answered
+                    ):
+                        best_value = current_value
+                        best_n_answered = result.n_answered
+                        best_lower_threshold = lower_threshold
+                        best_upper_threshold = upper_threshold
+
+                assert best_lower_threshold is not None
+                assert best_upper_threshold is not None
+                per_split_results.append(
+                    self.evaluate_at_threshold(
+                        y_true=y_true_test,
+                        scores=scores_test,
+                        lower_threshold=best_lower_threshold,
+                        upper_threshold=best_upper_threshold,
+                    )
+                )
+        except ValueError as exc:
+            raise ValueError(
+                "Stratified split failed. Ensure each class in y_true has at least two samples."
+            ) from exc
+
+        metrics_mean, metrics_std, metric_values, metrics_ci = self._summarize_metrics(
+            per_split_results, ci_level=ci_level, n_boot=n_boot
+        )
+
+        return EvaluationCVResult(
+            split_config=split_config,
+            optimize_for=optimize_for,
+            candidate_thresholds=thresholds_list,
+            per_split=per_split_results,
+            metrics_mean=metrics_mean,
+            metrics_std=metrics_std,
+            metric_values=metric_values,
+            metrics_ci=metrics_ci,
         )
 
 
 def get_pan_metrics(predictions, y_true):
+    """
+    Compute PAN metrics for each method name and return a structured summary.
+    Example values: predictions={"method_a": [0.1, 0.4]}, y_true=[0, 1].
+    """
     evaluator = BinaryVerificationEvaluator()
 
     pan_metrics = {}
@@ -339,7 +505,7 @@ def get_pan_metrics(predictions, y_true):
 
         print(Counter(method_scores))
 
-        best_result = evaluator.tune_threshold(
+        cv_result = evaluator.tune_threshold(
                 y_true=y_true,
                 scores=method_scores,
                 thresholds=CONFIG.THRESHOLDS,
@@ -347,21 +513,37 @@ def get_pan_metrics(predictions, y_true):
                 )
 
         pan_metrics[method_name] = {
-                "upper_threshold": best_result.upper_threshold,
-                "lower_threshold": best_result.lower_threshold,
-                "n_answered": best_result.n_answered,
-                "n_unanswered": best_result.n_unanswered,
-                "precision": best_result.precision,
-                "recall": best_result.recall,
-                "f1": best_result.f1,
-                "accuracy": best_result.accuracy,
-                "c_at_1": best_result.c_at_1,
-                "auroc": best_result.auroc,
-                "auroc_c_at_1": best_result.auroc_c_at_1,
+                "split_config": cv_result.split_config,
+                "optimize_for": cv_result.optimize_for,
+                "candidate_thresholds": cv_result.candidate_thresholds,
+                "metrics_mean": cv_result.metrics_mean,
+                "metrics_std": cv_result.metrics_std,
+                "metric_values": cv_result.metric_values,
+                "per_split": [
+                    {
+                        "lower_threshold": result.lower_threshold,
+                        "upper_threshold": result.upper_threshold,
+                        "n_answered": result.n_answered,
+                        "n_unanswered": result.n_unanswered,
+                        "precision": result.precision,
+                        "recall": result.recall,
+                        "f1": result.f1,
+                        "accuracy": result.accuracy,
+                        "c_at_1": result.c_at_1,
+                        "auroc": result.auroc,
+                        "auroc_c_at_1": result.auroc_c_at_1,
+                    }
+                    for result in cv_result.per_split
+                ],
                 }
     return pan_metrics
 
 def save_pan_metrics(pan_metrics, save_path, dataset_name=None):
+    """
+    Persist PAN metrics to JSON in the provided directory.
+    Example values: pan_metrics={"method_a": {...}}, save_path=Path("results"),
+    dataset_name="pan23" or None.
+    """
     assert save_path.exists(), f"Directory {save_path} does not exist."
     if dataset_name is None:
         save_file = save_path / "pan_metrics.json"
