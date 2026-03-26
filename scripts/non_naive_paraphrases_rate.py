@@ -184,7 +184,7 @@ def main() -> None:
         import matplotlib.pyplot as plt
         from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
-        fig, ax = plt.subplots(figsize=(6, 4))
+        fig, ax = plt.subplots(figsize=(5, 4))
         box_colors = ["#4C78A8", "#F58518"]
 
         bp = ax.boxplot(
@@ -224,8 +224,8 @@ def main() -> None:
             #         color=box_colors[0],
             #     ),
             # )
-            x = 1.12  # x position of the bracket
-            dx = 0.025  # how far the "arms" extend to the right
+            x = 1.055  # x position of the bracket
+            dx = 0.02  # how far the "arms" extend to the right
             y0, y1 = max(250, float(min(hour_fliers))), float(max(hour_fliers))  # bracket span (lower/upper)
 
             ax.plot([x, x], [y0, y1], color=box_colors[0], lw=1.2)  # vertical
@@ -244,7 +244,7 @@ def main() -> None:
         ax.set_ylabel("# Paraphrases")
         ax.set_title("LLM-based Paraphrases")
 
-        axins = inset_axes(ax, width="25%", height="45%", loc="upper right")
+        axins = inset_axes(ax, width="33%", height="45%", loc="upper right")
         minute_hist = Counter(minute_series)
         print("Unique minute counts:", minute_hist)
         xs = sorted(minute_hist.keys())
