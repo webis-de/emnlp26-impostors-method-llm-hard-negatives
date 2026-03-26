@@ -97,7 +97,12 @@ def make_plot(df: pd.DataFrame, month_col: str, value_col: str, output: Path):
     ax.ticklabel_format(style="plain", axis="x", useOffset=False)
 
     # Format x-axis ticks as 100\,000\,000
-    ax.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: format_latex_thousands(x)))
+    def format_thousands_no_dot_zero(x, _):
+        if abs(x - round(x)) < 1e-9:
+            return format_latex_thousands(int(round(x)))
+        return format_latex_thousands(x)
+
+    ax.xaxis.set_major_formatter(FuncFormatter(format_thousands_no_dot_zero))
 
     add_value_labels(ax, bars, df[value_col].tolist())
 
