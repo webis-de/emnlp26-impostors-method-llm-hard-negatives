@@ -47,9 +47,9 @@ class EvaluationCVResult:
     Cross-validation summary for threshold tuning.
 
     - split_config: parameters used to generate CV splits.
-    - per_split: list of EvaluationResult objects for each held-out split.
-    - metric_values: raw per-split metric values.
-    - metrics_mean/std: summary statistics across splits.
+    - per_split: list of EvaluationResult objects, one per fold.
+    - metric_values: raw per-fold metric values (length = n_splits * n_repeats).
+    - metrics_mean/std: summary statistics across folds.
     - metrics_ci: percentile bootstrap CI for the mean of each metric.
     - candidate_thresholds: candidate threshold grid, not the chosen lower/upper thresholds.
 
@@ -158,10 +158,11 @@ class BinaryVerificationEvaluator:
         n_boot: int,
     ) -> tuple[dict[str, float], dict[str, float], dict[str, list[float]]]:
         """
-        Compute per-metric mean/std across splits and percentile bootstrap CIs
-        for the mean. For each metric, bootstrap draws resample the per-split
-        values with replacement, using the same list length, repeated `n_boot`
-        times. The CI bounds are the percentile cutoffs of those bootstrap means.
+        Compute per-metric mean/std across folds and percentile bootstrap CIs
+        for the mean. For each metric, bootstrap draws resample the per-fold
+        values with replacement, using the same list length
+        (n_splits * n_repeats), repeated `n_boot` times. The CI bounds are
+        the percentile cutoffs of those bootstrap means.
         Returns mean, std, raw values, and CI dicts.
         Example values: results=[EvaluationResult(...), ...], ci_level=0.95, n_boot=10000.
         """
