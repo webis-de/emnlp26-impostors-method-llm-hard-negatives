@@ -49,7 +49,8 @@ class ParaphraseMongoDB:
             CONFIG.MONGO_TEST_PAIRS_COLLECTION,
             CONFIG.MONGO_TRAIN_PAIRS_COLLECTION,
             CONFIG.MONGO_ALL_PAIRS_COLLECTION,
-            CONFIG.MONGO_SUP_BASELINE_CONFIG_PREDS
+            CONFIG.MONGO_SUP_BASELINE_CONFIG_PREDS,
+            CONFIG.MONGO_PAN_METRICS_COLLECTION
 
         ]:
             if collection_name not in self.db.list_collection_names():
@@ -78,6 +79,7 @@ class ParaphraseMongoDB:
         self.all_pairs_collection = self.db[CONFIG.MONGO_ALL_PAIRS_COLLECTION]  # merge of train and test pairs
         self.supervised_baseline_diff_config_preds_collection = self.db[CONFIG.MONGO_SUP_BASELINE_CONFIG_PREDS] # predictions of supervised baseline for different configurations
         self.supervised_baseline_diff_config_scores_collection = self.db[CONFIG.MONGO_SUP_BASELINE_CONFIG_SCORES]
+        self.pan_metrics_collection = self.db[CONFIG.MONGO_PAN_METRICS_COLLECTION]
 
 
     def reset_collection(self, collection_name:str):

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
+import json
+import os
 from typing import Iterable, Sequence
 
 import numpy as np
@@ -30,6 +32,7 @@ class EvaluationResult:
     """
     lower_threshold: float
     upper_threshold: float
+    f1_threshold: float | None
     n_answered: int
     n_unanswered: int
     precision: float
@@ -167,6 +170,7 @@ class BinaryVerificationEvaluator:
         Example values: results=[EvaluationResult(...), ...], ci_level=0.95, n_boot=10000.
         """
         metric_values: dict[str, list[float]] = {
+            "f1_threshold": [],
             "precision": [],
             "recall": [],
             "f1": [],
@@ -178,6 +182,9 @@ class BinaryVerificationEvaluator:
             "n_unanswered": [],
         }
         for result in results:
+            metric_values["f1_threshold"].append(
+                float(result.f1_threshold) if result.f1_threshold is not None else float("nan")
+            )
             metric_values["precision"].append(result.precision)
             metric_values["recall"].append(result.recall)
             metric_values["f1"].append(result.f1)
@@ -263,12 +270,43 @@ class BinaryVerificationEvaluator:
         mask = y_pred_with_reject != cls.UNANSWERED
         return y_true[mask], y_pred_with_reject[mask].astype(int)
 
+    def _optimize_f1_threshold(
+        self,
+        y_true: np.ndarray,
+        scores: np.ndarray,
+        thresholds: Iterable[float] | None,
+    ) -> tuple[float, float]:
+        threshold_values = self._normalize_thresholds(scores=scores, thresholds=thresholds)
+
+        best_threshold = float(threshold_values[0])
+        best_f1 = -np.inf
+        best_recall = -np.inf
+        best_precision = -np.inf
+
+        for threshold in threshold_values:
+            preds = (scores > threshold).astype(int)
+            precision = precision_score(y_true, preds, zero_division=0)
+            recall = recall_score(y_true, preds, zero_division=0)
+            f1 = f1_score(y_true, preds, zero_division=0)
+
+            if f1 > best_f1 or (
+                np.isclose(f1, best_f1)
+                and (recall > best_recall or (np.isclose(recall, best_recall) and precision > best_precision))
+            ):
+                best_f1 = float(f1)
+                best_recall = float(recall)
+                best_precision = float(precision)
+                best_threshold = float(threshold)
+
+        return best_threshold, best_f1
+
     def evaluate_at_threshold(
         self,
         y_true: Sequence[int] | np.ndarray,
         scores: Sequence[float] | np.ndarray,
         lower_threshold: float,
         upper_threshold: float,
+        f1_threshold: float | None = None,
     ) -> EvaluationResult:
         """
         Evaluate metrics for a fixed lower/upper threshold band.
@@ -276,6 +314,9 @@ class BinaryVerificationEvaluator:
         Scores in (lower_threshold, upper_threshold) are treated as unanswered (0.5).
         Example values: y_true=[0, 1, 0], scores=[0.2, 0.8, 0.4],
         lower_threshold=0.3, upper_threshold=0.7.
+
+        If f1_threshold is provided, precision/recall/F1/accuracy are computed
+        on all samples using that threshold (no rejection band).
         """
 
         y_true_np, scores_np = self._validate_binary_inputs(y_true=y_true, scores=scores)
@@ -297,35 +338,42 @@ class BinaryVerificationEvaluator:
 
         n_answered = len(y_true_answered)
         n_unanswered = len(y_true_np) - n_answered
+        if f1_threshold is None:
+            logger.warning(f"No F1 threshold provided. Computing precision/recall/F1/accuracy on all samples with c@1 thresholds.")
+            if n_answered == 0:
+                precision = 0.0
+                recall = 0.0
+                f1 = 0.0
+                accuracy = 0.0
+            else:
+                # we compute precision and recall only on answered problems
+                precision = precision_score(
+                    y_true_answered,
+                    y_pred_answered,
+                    zero_division=0,
+                )
+                recall = recall_score(
+                    y_true_answered,
+                    y_pred_answered,
+                    zero_division=0,
+                )
+                # PAN: does not take into account non-answered:
+                # cf. https://ceur-ws.org/Vol-2936/paper-147.pdf (2021)
+                # cf. https://ceur-ws.org/Vol-3497/paper-199.pdf (2023)
+                f1 = f1_score(
+                    y_true_answered,
+                    y_pred_answered,
+                    zero_division=0,
+                )
 
-        if n_answered == 0:
-            precision = 0.0
-            recall = 0.0
-            f1 = 0.0
-            accuracy = 0.0
+                # we compute accuracy only on answered problems, because otherwise we need to optimize a third threshold
+                accuracy = accuracy_score(y_true_answered, y_pred_answered)
         else:
-            # we compute precision and recall only on answered problems
-            precision = precision_score(
-                y_true_answered,
-                y_pred_answered,
-                zero_division=0,
-            )
-            recall = recall_score(
-                y_true_answered,
-                y_pred_answered,
-                zero_division=0,
-            )
-            # PAN: does not take into account non-answered:
-            # cf. https://ceur-ws.org/Vol-2936/paper-147.pdf (2021)
-            # cf. https://ceur-ws.org/Vol-3497/paper-199.pdf (2023)
-            f1 = f1_score(
-                y_true_answered,
-                y_pred_answered,
-                zero_division=0,
-            )
-
-            # we compute accuracy only on answered problems, because otherwise we need to optimize a third threshold
-            accuracy = accuracy_score(y_true_answered, y_pred_answered)
+            preds_f1 = (scores_np > float(f1_threshold)).astype(int)
+            precision = precision_score(y_true_np, preds_f1, zero_division=0)
+            recall = recall_score(y_true_np, preds_f1, zero_division=0)
+            f1 = f1_score(y_true_np, preds_f1, zero_division=0)
+            accuracy = accuracy_score(y_true_np, preds_f1)
 
         c_at_1 = self.compute_c_at_1(y_true=y_true_np, y_preds=preds)
         auroc = roc_auc_score(y_true_np, scores_np)
@@ -334,6 +382,7 @@ class BinaryVerificationEvaluator:
         return EvaluationResult(
             lower_threshold=lower_threshold,
             upper_threshold=upper_threshold,
+            f1_threshold=None if f1_threshold is None else float(f1_threshold),
             n_answered=n_answered,
             n_unanswered=n_unanswered,
             precision=float(precision),
@@ -377,6 +426,9 @@ class BinaryVerificationEvaluator:
         Example values: y_true=[0, 1, 0, 1], scores=[0.1, 0.9, 0.4, 0.7],
         thresholds=[0.2, 0.5, 0.8], n_splits=10, n_repeats=5, random_state=42,
         optimize_for="c_at_1", ci_level=0.95, n_boot=10000.
+
+        Additionally, a single threshold is optimized on each training split for F1
+        and used to compute precision/recall/F1/accuracy on the test split.
         """
         y_true_np, scores_np = self._validate_binary_inputs(y_true=y_true, scores=scores)
 
@@ -441,6 +493,12 @@ class BinaryVerificationEvaluator:
                     scores=scores_train, thresholds=thresholds
                 )
 
+                best_f1_threshold, _ = self._optimize_f1_threshold(
+                    y_true=y_true_train,
+                    scores=scores_train,
+                    thresholds=thresholds,
+                )
+
                 best_lower_threshold: float | None = None
                 best_upper_threshold: float | None = None
                 best_n_answered = -1
@@ -481,6 +539,7 @@ class BinaryVerificationEvaluator:
                         scores=scores_test,
                         lower_threshold=best_lower_threshold,
                         upper_threshold=best_upper_threshold,
+                        f1_threshold=best_f1_threshold,
                     )
                 )
         except ValueError as exc:
@@ -535,6 +594,7 @@ def get_pan_metrics(predictions, y_true):
                     {
                         "lower_threshold": result.lower_threshold,
                         "upper_threshold": result.upper_threshold,
+                        "f1_threshold": result.f1_threshold,
                         "n_answered": result.n_answered,
                         "n_unanswered": result.n_unanswered,
                         "precision": result.precision,
@@ -551,19 +611,110 @@ def get_pan_metrics(predictions, y_true):
         logger.info(f"Obtained summary of PAN metrics for method {method_name}.")
     return pan_metrics
 
-def save_pan_metrics(pan_metrics, save_path, dataset_name=None):
+def _jsonify_value(value):
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, (np.floating, np.integer)):
+        return value.item()
+    if isinstance(value, (list, tuple)):
+        return [_jsonify_value(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _jsonify_value(v) for k, v in value.items()}
+    return value
+
+def _looks_like_pan_metrics(value: object) -> bool:
+    return isinstance(value, dict) and (
+        "metrics_mean" in value or "per_split" in value or "split_config" in value
+    )
+
+def _iter_pan_metrics_entries(pan_metrics: dict, dataset_name: str | None):
+    if dataset_name is not None:
+        for method_name, metrics in pan_metrics.items():
+            if (
+                isinstance(metrics, dict)
+                and method_name in metrics
+                and _looks_like_pan_metrics(metrics[method_name])
+            ):
+                yield dataset_name, method_name, metrics[method_name]
+            else:
+                yield dataset_name, method_name, metrics
+        return
+
+    known_datasets = {
+        CONFIG.PAN20,
+        CONFIG.PAN23,
+        CONFIG.PAN25,
+        CONFIG.BLOG,
+        CONFIG.GUTENBERG,
+        CONFIG.KOPPEL,
+        CONFIG.STUDENT_ESSAYS,
+        CONFIG.ARTIFICIAL_STUDENT_ESSAYS,
+    }
+
+    if all(key in known_datasets for key in pan_metrics.keys()):
+        for dataset_key, dataset_metrics in pan_metrics.items():
+            if not isinstance(dataset_metrics, dict):
+                continue
+            for method_name, metrics in dataset_metrics.items():
+                if (
+                    isinstance(metrics, dict)
+                    and method_name in metrics
+                    and _looks_like_pan_metrics(metrics[method_name])
+                ):
+                    yield dataset_key, method_name, metrics[method_name]
+                else:
+                    yield dataset_key, method_name, metrics
+        return
+
+    for method_name, metrics in pan_metrics.items():
+        if _looks_like_pan_metrics(metrics):
+            logger.warning(
+                "Skipping MongoDB PAN metrics save for method '%s' because dataset_name was not provided.",
+                method_name,
+            )
+        else:
+            logger.warning(
+                "Skipping MongoDB PAN metrics save for key '%s' due to unexpected structure.",
+                method_name,
+            )
+
+def save_pan_metrics(pan_metrics, save_path, dataset_name=None, save_to_mongodb: bool = True):
     """
     Persist PAN metrics to JSON in the provided directory.
     Example values: pan_metrics={"method_a": {...}}, save_path=Path("results"),
     dataset_name="pan23" or None.
     """
     assert save_path.exists(), f"Directory {save_path} does not exist."
+    serializable = _jsonify_value(pan_metrics)
     if dataset_name is None:
         save_file = save_path / "pan_metrics.json"
     else:
         save_file = save_path / f"{dataset_name}_pan_metrics.json"
     with open(save_file, "w") as f:
-        import json
-        json.dump(pan_metrics, f, indent=2)
+        json.dump(serializable, f, indent=2)
         logger.info(f"PAN metrics saved to {save_file}.")
+
+    if save_to_mongodb:
+        try:
+            from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
+
+            mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
+            for dataset_key, method_name, metrics in _iter_pan_metrics_entries(
+                pan_metrics=pan_metrics, dataset_name=dataset_name
+            ):
+                if dataset_key is None:
+                    continue
+                doc = {
+                    "dataset_name": dataset_key,
+                    "method_name": method_name,
+                    "pan_metrics": _jsonify_value(metrics),
+                }
+                mongoDB.pan_metrics_collection.replace_one(
+                    {"dataset_name": dataset_key, "method_name": method_name},
+                    doc,
+                    upsert=True,
+                )
+            logger.info("PAN metrics saved to MongoDB collection %s.", CONFIG.MONGO_PAN_METRICS_COLLECTION)
+        except Exception as exc:
+            logger.warning("Failed to save PAN metrics to MongoDB: %s", exc)
     return save_file
