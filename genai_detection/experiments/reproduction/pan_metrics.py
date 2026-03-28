@@ -561,6 +561,8 @@ def get_pan_metrics(predictions, y_true):
                 "metrics_std": cv_result.metrics_std,
                 "metric_values": cv_result.metric_values,
                 "per_split": [
+                        # c@1 and AUROC (and auroc_c_at_1) are computed on the two c@1-optimized thresholds
+                        # F1 threshold is used for all other metrics
                     {
                         "lower_threshold": result.lower_threshold,
                         "upper_threshold": result.upper_threshold,
