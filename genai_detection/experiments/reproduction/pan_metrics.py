@@ -556,12 +556,10 @@ def get_pan_metrics(predictions, y_true):
                 y_true=y_true,
                 scores=method_scores,
                 thresholds=CONFIG.THRESHOLDS,
-                optimize_for="c_at_1",
                 )
 
         pan_metrics[method_name] = {
                 "split_config": cv_result.split_config,
-                "optimize_for": cv_result.optimize_for,
                 "candidate_thresholds": cv_result.candidate_thresholds,
                 "metrics_mean": cv_result.metrics_mean,
                 "metrics_std": cv_result.metrics_std,
