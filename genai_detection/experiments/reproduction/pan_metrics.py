@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-from collections import Counter
 from dataclasses import dataclass
 import json
 import os
@@ -33,8 +31,8 @@ class EvaluationResult:
     lower_threshold: float
     upper_threshold: float
     f1_threshold: float | None
-    n_answered: int
-    n_unanswered: int
+    n_answered_c_at_1: int
+    n_unanswered_c_at_1: int
     precision: float
     recall: float
     f1: float
@@ -177,8 +175,8 @@ class BinaryVerificationEvaluator:
             "c_at_1": [],
             "auroc": [],
             "auroc_c_at_1": [],
-            "n_answered": [],
-            "n_unanswered": [],
+            "n_answered_c_at_1": [],
+            "n_unanswered_c_at_1": [],
         }
         for result in results:
             metric_values["f1_threshold"].append(
@@ -191,8 +189,8 @@ class BinaryVerificationEvaluator:
             metric_values["c_at_1"].append(result.c_at_1)
             metric_values["auroc"].append(result.auroc)
             metric_values["auroc_c_at_1"].append(result.auroc_c_at_1)
-            metric_values["n_answered"].append(float(result.n_answered))
-            metric_values["n_unanswered"].append(float(result.n_unanswered))
+            metric_values["n_answered_c_at_1"].append(float(result.n_answered))
+            metric_values["n_unanswered_c_at_1"].append(float(result.n_unanswered))
 
         metrics_mean: dict[str, float] = {}
         metrics_std: dict[str, float] = {}
@@ -275,14 +273,12 @@ class BinaryVerificationEvaluator:
         scores: np.ndarray,
         thresholds: Iterable[float] | None,
     ) -> tuple[float, float]:
-        threshold_values = self._normalize_thresholds(scores=scores, thresholds=thresholds)
-
-        best_threshold = float(threshold_values[0])
+        best_threshold = float(thresholds[0])
         best_f1 = -np.inf
         best_recall = -np.inf
         best_precision = -np.inf
 
-        for threshold in threshold_values:
+        for threshold in thresholds:
             preds = (scores > threshold).astype(int)
             precision = precision_score(y_true, preds, zero_division=0)
             recall = recall_score(y_true, preds, zero_division=0)
@@ -335,11 +331,11 @@ class BinaryVerificationEvaluator:
             preds,
         )
 
-        n_answered = len(y_true_answered)
-        n_unanswered = len(y_true_np) - n_answered
+        n_answered_c_at_1 = len(y_true_answered)
+        n_unanswered_c_at_1 = len(y_true_np) - n_answered_c_at_1
         if f1_threshold is None:
             # happens if only c@1 values are computed during tuning
-            if n_answered == 0:
+            if n_answered_c_at_1 == 0:
                 precision = 0.0
                 recall = 0.0
                 f1 = 0.0
@@ -382,8 +378,8 @@ class BinaryVerificationEvaluator:
             lower_threshold=lower_threshold,
             upper_threshold=upper_threshold,
             f1_threshold=None if f1_threshold is None else float(f1_threshold),
-            n_answered=n_answered,
-            n_unanswered=n_unanswered,
+            n_answered_c_at_1=n_answered_c_at_1,
+            n_unanswered_c_at_1=n_unanswered_c_at_1,
             precision=float(precision),
             recall=float(recall),
             f1=float(f1),
@@ -476,7 +472,7 @@ class BinaryVerificationEvaluator:
                 # optimize two thresholds for c@1
                 best_lower_threshold: float | None = None
                 best_upper_threshold: float | None = None
-                best_n_answered = -1
+                best_n_answered_c_at_1 = -1
                 best_value = -np.inf
 
                 param_grid = ParameterGrid(
@@ -498,10 +494,10 @@ class BinaryVerificationEvaluator:
 
                     if current_cat1_value > best_value or (
                         np.isclose(current_cat1_value, best_value)
-                        and result.n_answered > best_n_answered
+                        and result.n_answered_c_at_1 > best_n_answered_c_at_1
                     ):
                         best_value = current_cat1_value
-                        best_n_answered = result.n_answered
+                        best_n_answered_c_at_1 = result.n_answered_c_at_1
                         best_lower_threshold = lower_threshold
                         best_upper_threshold = upper_threshold
 
@@ -569,8 +565,8 @@ def get_pan_metrics(predictions, y_true):
                         "lower_threshold": result.lower_threshold,
                         "upper_threshold": result.upper_threshold,
                         "f1_threshold": result.f1_threshold,
-                        "n_answered": result.n_answered,
-                        "n_unanswered": result.n_unanswered,
+                        "n_answered_c_at_1": result.n_answered_c_at_1,
+                        "n_unanswered_c_at_1": result.n_unanswered_c_at_1,
                         "precision": result.precision,
                         "recall": result.recall,
                         "f1": result.f1,
