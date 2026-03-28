@@ -57,12 +57,11 @@ class EvaluationCVResult:
     - candidate_thresholds: candidate threshold grid, not the chosen lower/upper thresholds.
 
     Example values: split_config={"n_splits": 10, "n_repeats": 5, "test_size": 0.1, "random_state": 42},
-    optimize_for="c_at_1", candidate_thresholds=[0.2, 0.5, 0.8], per_split=[EvaluationResult(...), ...],
+    candidate_thresholds=[0.2, 0.5, 0.8], per_split=[EvaluationResult(...), ...],
     metrics_mean={"c_at_1": 0.72}, metrics_std={"c_at_1": 0.05},
     metric_values={"c_at_1": [0.7, 0.75]}, metrics_ci={"c_at_1": {"low": 0.65, "high": 0.78, "level": 0.95, "method": "bootstrap_percentile", "n_boot": 10000}}.
     """
     split_config: dict[str, float | int]
-    optimize_for: str
     candidate_thresholds: list[float] | None
     per_split: list[EvaluationResult]
     metrics_mean: dict[str, float]
@@ -339,14 +338,14 @@ class BinaryVerificationEvaluator:
         n_answered = len(y_true_answered)
         n_unanswered = len(y_true_np) - n_answered
         if f1_threshold is None:
-            logger.warning(f"No F1 threshold provided. Computing precision/recall/F1/accuracy on all samples with c@1 thresholds.")
+            # happens if only c@1 values are computed during tuning
             if n_answered == 0:
                 precision = 0.0
                 recall = 0.0
                 f1 = 0.0
                 accuracy = 0.0
             else:
-                # we compute precision and recall only on answered problems
+                # fallback: Compute precision and recall only on answered problems
                 precision = precision_score(
                     y_true_answered,
                     y_pred_answered,
@@ -394,7 +393,7 @@ class BinaryVerificationEvaluator:
             auroc_c_at_1=float(auroc_c_at_1),
         )
 
-    def tune_threshold(
+    def tune_thresholds(
         self,
         y_true: Sequence[int] | np.ndarray,
         scores: Sequence[float] | np.ndarray,
@@ -402,33 +401,21 @@ class BinaryVerificationEvaluator:
         n_splits: int = 10,
         n_repeats: int = 5,
         random_state: int = 42,
-        optimize_for: str = "c_at_1",
         ci_level: float = 0.95,
         n_boot: int = 10000,
     ) -> EvaluationCVResult:
         """
         Tune thresholds on repeated stratified k-fold splits and summarize
         performance on held-out folds.
+        Optimize two thresholds for c@1, optimize a single threshold for F1 (used later for all other metrics).
 
         Threshold pairs are drawn from the candidate `thresholds` list and
         evaluated under the constraint `lower_threshold <= upper_threshold`.
         Scores between the thresholds are treated as unanswered.
 
-        Supported `optimize_for`:
-        - "c_at_1"
-        - "f1"
-        - "accuracy"
-        - "precision"
-        - "recall"
-        - "auroc_c_at_1"
-
         Returns per-split results plus mean/std and percentile bootstrap CIs.
         Example values: y_true=[0, 1, 0, 1], scores=[0.1, 0.9, 0.4, 0.7],
-        thresholds=[0.2, 0.5, 0.8], n_splits=10, n_repeats=5, random_state=42,
-        optimize_for="c_at_1", ci_level=0.95, n_boot=10000.
-
-        Additionally, a single threshold is optimized on each training split for F1
-        and used to compute precision/recall/F1/accuracy on the test split.
+        thresholds=[0.2, 0.5, 0.8], n_splits=10, n_repeats=5, random_state=42, ci_level=0.95, n_boot=10000.
         """
         y_true_np, scores_np = self._validate_binary_inputs(y_true=y_true, scores=scores)
 
@@ -443,20 +430,6 @@ class BinaryVerificationEvaluator:
             raise ValueError("ci_level must be between 0 and 1.")
         if n_boot < 1:
             raise ValueError("n_boot must be >= 1.")
-
-        valid_metrics = {
-            "c_at_1",
-            "f1",
-            "accuracy",
-            "precision",
-            "recall",
-            "auroc_c_at_1",
-        }
-        if optimize_for not in valid_metrics:
-            raise ValueError(
-                f"Unsupported optimize_for='{optimize_for}'. "
-                f"Choose one of: {sorted(valid_metrics)}"
-            )
 
         split_config = {
             "n_splits": int(n_splits),
@@ -493,12 +466,14 @@ class BinaryVerificationEvaluator:
                     scores=scores_train, thresholds=thresholds
                 )
 
+                # one F1 threshold per split/fold (used later for all metrics but c@1)
                 best_f1_threshold, _ = self._optimize_f1_threshold(
                     y_true=y_true_train,
                     scores=scores_train,
                     thresholds=thresholds,
                 )
 
+                # optimize two thresholds for c@1
                 best_lower_threshold: float | None = None
                 best_upper_threshold: float | None = None
                 best_n_answered = -1
@@ -517,14 +492,15 @@ class BinaryVerificationEvaluator:
                         scores=scores_train,
                         lower_threshold=lower_threshold,
                         upper_threshold=upper_threshold,
+                        f1_threshold=None,
                     )
-                    current_value = getattr(result, optimize_for)
+                    current_cat1_value = getattr(result, "c_at_1")
 
-                    if current_value > best_value or (
-                        np.isclose(current_value, best_value)
+                    if current_cat1_value > best_value or (
+                        np.isclose(current_cat1_value, best_value)
                         and result.n_answered > best_n_answered
                     ):
-                        best_value = current_value
+                        best_value = current_cat1_value
                         best_n_answered = result.n_answered
                         best_lower_threshold = lower_threshold
                         best_upper_threshold = upper_threshold
@@ -533,6 +509,7 @@ class BinaryVerificationEvaluator:
                             f"grid).")
                 assert best_lower_threshold is not None
                 assert best_upper_threshold is not None
+                # computes c@1 and AUROC for two optimizing thresholds, rest of metrics are computed on F1 threshold
                 per_split_results.append(
                     self.evaluate_at_threshold(
                         y_true=y_true_test,
@@ -554,7 +531,6 @@ class BinaryVerificationEvaluator:
 
         return EvaluationCVResult(
             split_config=split_config,
-            optimize_for=optimize_for,
             candidate_thresholds=thresholds_list,
             per_split=per_split_results,
             metrics_mean=metrics_mean,
@@ -576,7 +552,7 @@ def get_pan_metrics(predictions, y_true):
     for method_name, method_scores in predictions.items():
         logger.info(f"Starting with method {method_name}.")
         method_scores = np.asarray(method_scores, dtype=float)
-        cv_result = evaluator.tune_threshold(
+        cv_result = evaluator.tune_thresholds(
                 y_true=y_true,
                 scores=method_scores,
                 thresholds=CONFIG.THRESHOLDS,
