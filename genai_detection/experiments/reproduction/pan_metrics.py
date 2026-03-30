@@ -1,11 +1,12 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from itertools import combinations
 import json
 import os
 from typing import Iterable, Sequence
 
 import numpy as np
-from scipy.stats import bootstrap
+from scipy.stats import bootstrap, mannwhitneyu, ttest_ind, ttest_rel, wilcoxon
 from sklearn.metrics import (
     accuracy_score,
     f1_score,
@@ -581,6 +582,7 @@ def get_pan_metrics(predictions, y_true):
                 ],
                 }
         logger.info(f"Obtained summary of PAN metrics for method {method_name}.")
+
     return pan_metrics
 
 def _jsonify_value(value):
@@ -690,3 +692,118 @@ def save_pan_metrics(pan_metrics, save_path, dataset_name=None, save_to_mongodb:
         except Exception as exc:
             logger.warning("Failed to save PAN metrics to MongoDB: %s", exc)
     return save_file
+
+def _filter_finite_pairs(
+    a: np.ndarray,
+    b: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    mask = np.isfinite(a) & np.isfinite(b)
+    return a[mask], b[mask]
+
+
+def _pairwise_p_value(
+    a: np.ndarray,
+    b: np.ndarray,
+    test: str,
+    alternative: str,
+) -> float:
+    if test == "wilcoxon":
+        stat = wilcoxon(a, b, alternative=alternative, zero_method="pratt")
+        return float(stat.pvalue)
+    if test == "ttest_rel":
+        stat = ttest_rel(a, b, alternative=alternative)
+        return float(stat.pvalue)
+    if test == "mannwhitney":
+        stat = mannwhitneyu(a, b, alternative=alternative)
+        return float(stat.pvalue)
+    if test == "ttest_ind":
+        stat = ttest_ind(a, b, alternative=alternative)
+        return float(stat.pvalue)
+    raise ValueError(f"Unknown test '{test}'.")
+
+
+def compare_pan_metrics_significance(
+    pan_metrics: dict,
+    metrics: Iterable[str] | None = None,
+    alpha_levels: Sequence[float] = (0.05, 0.01, 0.005),
+    test: str = "wilcoxon",
+    alternative: str = "two-sided",
+    min_samples: int = 2,
+) -> dict[str, dict]:
+    """
+    Assess pairwise significance between approaches per metric using per-fold values.
+
+    - pan_metrics: mapping of method -> metrics, i.e., no dataset_name as key (should only contain values for one dataset).
+    - dataset_name: select a dataset when pan_metrics is dataset-keyed.
+    - metrics: subset of metric names; defaults to metrics present in metric_values.
+    - alpha_levels: p-value thresholds to report.
+    - test: one of {"wilcoxon", "ttest_rel", "mannwhitney", "ttest_ind"}.
+    - alternative: scipy.stats alternative hypothesis parameter.
+    - min_samples: minimum paired samples required to run a test.
+
+    Returns dict with per-pair, per-metric p-values and significance flags.
+    """
+    method_names = sorted(pan_metrics.keys())
+    if len(method_names) < 2:
+        raise ValueError("Need at least two methods to compare.")
+
+    alpha_sorted = sorted(set(float(a) for a in alpha_levels))
+    results: dict[str, dict] = {
+        "test": test,
+        "alternative": alternative,
+        "alpha_levels": alpha_sorted,
+        "pairs": {},
+    }
+
+    for method_a, method_b in combinations(method_names, 2):
+        metrics_a = pan_metrics[method_a].get("metric_values", {})
+        metrics_b = pan_metrics[method_b].get("metric_values", {})
+        if not metrics_a or not metrics_b:
+            raise ValueError(
+                f"Missing metric_values for methods '{method_a}' or '{method_b}'."
+            )
+
+        if metrics is None:
+            metric_names = sorted(set(metrics_a.keys()) & set(metrics_b.keys()))
+        else:
+            metric_names = list(metrics)
+
+        pair_key = f"{method_a} vs {method_b}"
+        pair_results: dict[str, dict] = {}
+
+        for metric in metric_names:
+            values_a = np.asarray(metrics_a.get(metric, []), dtype=float)
+            values_b = np.asarray(metrics_b.get(metric, []), dtype=float)
+
+            if test in {"mannwhitney", "ttest_ind"}:
+                values_a = values_a[np.isfinite(values_a)]
+                values_b = values_b[np.isfinite(values_b)]
+            else:
+                values_a, values_b = _filter_finite_pairs(values_a, values_b)
+            if len(values_a) != len(values_b) and test in {"wilcoxon", "ttest_rel"}:
+                raise ValueError(
+                    f"Paired test '{test}' requires equal-length samples for "
+                    f"metric '{metric}' ({method_a} vs {method_b})."
+                )
+            if len(values_a) < min_samples or len(values_b) < min_samples:
+                pair_results[metric] = {
+                    "p_value": float("nan"),
+                    "n": int(min(len(values_a), len(values_b))),
+                    "significant": {str(a): False for a in alpha_sorted},
+                }
+                continue
+
+            try:
+                p_value = _pairwise_p_value(values_a, values_b, test, alternative)
+            except ValueError:
+                p_value = float("nan")
+
+            pair_results[metric] = {
+                "p_value": float(p_value),
+                "n": int(min(len(values_a), len(values_b))),
+                "significant": {str(a): bool(p_value <= a) for a in alpha_sorted},
+            }
+
+        results["pairs"][pair_key] = pair_results
+
+    return results

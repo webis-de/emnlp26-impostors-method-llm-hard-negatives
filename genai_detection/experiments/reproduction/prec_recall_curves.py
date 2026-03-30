@@ -35,9 +35,8 @@ from genai_detection.detectors.ppmd import PPMdDetector
 from genai_detection.detectors.unmasking import UnmaskingDetector
 from genai_detection.experiments.reproduction.impostor_metrics import (compute_metrics_for_thresholds,
                                                                        compute_metrics_parallel, load_all_pairs, )
-from genai_detection.experiments.reproduction.pan_metrics import (
-    get_pan_metrics,
-    save_pan_metrics,
+from genai_detection.experiments.reproduction.pan_metrics import (compare_pan_metrics_significance, get_pan_metrics,
+                                                                  save_pan_metrics,
 )
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
@@ -237,6 +236,7 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
     batch_size: int = 250,
     include_baselines: bool = True,
     save_artifacts: bool = True,
+    pairwise_pan_metric_significance: bool = True,
 ) -> Dict[str, pd.DataFrame]:
     """
     Same as compute_prec_recall_f1_acc_dict, but loads precomputed
@@ -411,6 +411,16 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
 
         pan_metrics_save_path = save_pan_metrics(save_path=LOCAL_SAVE_PATH, pan_metrics=pan_metrics, dataset_name=dataset_name)
         logger.info("Saved pan_metrics to %s", pan_metrics_save_path)
+
+    if pairwise_pan_metric_significance:
+        sig = compare_pan_metrics_significance(
+            pan_metrics,
+            test="wilcoxon",  # paired test (default), appropriate if folds are shared
+            alpha_levels=(0.05, 0.01, 0.005),
+        )
+        # save pairwise significance results (per metric)
+        with open(LOCAL_SAVE_PATH / f"pan_metrics_significance_{dataset_name}.json", "w") as f:
+            json.dump(sig, f, indent=2)
 
     return results
 
