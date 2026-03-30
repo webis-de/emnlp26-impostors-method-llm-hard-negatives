@@ -189,8 +189,8 @@ class BinaryVerificationEvaluator:
             metric_values["c_at_1"].append(result.c_at_1)
             metric_values["auroc"].append(result.auroc)
             metric_values["auroc_c_at_1"].append(result.auroc_c_at_1)
-            metric_values["n_answered_c_at_1"].append(float(result.n_answered))
-            metric_values["n_unanswered_c_at_1"].append(float(result.n_unanswered))
+            metric_values["n_answered_c_at_1"].append(float(result.n_answered_c_at_1))
+            metric_values["n_unanswered_c_at_1"].append(float(result.n_unanswered_c_at_1))
 
         metrics_mean: dict[str, float] = {}
         metrics_std: dict[str, float] = {}
