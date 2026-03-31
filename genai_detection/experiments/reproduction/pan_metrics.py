@@ -55,15 +55,12 @@ class EvaluationCVResult:
     - metric_values: raw per-fold metric values (length = n_splits * n_repeats).
     - metrics_mean/std: summary statistics across folds.
     - metrics_ci: percentile bootstrap CI for the mean of each metric.
-    - candidate_thresholds: candidate threshold grid, not the chosen lower/upper thresholds.
 
     Example values: split_config={"n_splits": 10, "n_repeats": 5, "test_size": 0.1, "random_state": 42},
-    candidate_thresholds=[0.2, 0.5, 0.8], per_split=[EvaluationResult(...), ...],
-    metrics_mean={"c_at_1": 0.72}, metrics_std={"c_at_1": 0.05},
+    per_split=[EvaluationResult(...), ...], metrics_mean={"c_at_1": 0.72}, metrics_std={"c_at_1": 0.05},
     metric_values={"c_at_1": [0.7, 0.75]}, metrics_ci={"c_at_1": {"low": 0.65, "high": 0.78, "level": 0.95, "method": "bootstrap_percentile", "n_boot": 10000}}.
     """
     split_config: dict[str, float | int]
-    candidate_thresholds: list[float] | None
     per_split: list[EvaluationResult]
     metrics_mean: dict[str, float]
     metrics_std: dict[str, float]
@@ -397,9 +394,8 @@ class BinaryVerificationEvaluator:
         performance on held-out folds.
         Optimize two thresholds for c@1, optimize a single threshold for F1 (used later for all other metrics).
 
-        Threshold pairs are drawn from the candidate `thresholds` list and
-        evaluated under the constraint `lower_threshold <= upper_threshold`.
-        Scores between the thresholds are treated as unanswered.
+        Threshold pairs are drawn from the candidate `thresholds` list.
+        For c@1, AUROC, and c@1*AUROC, scores between the thresholds are treated as unanswered.
 
         Returns per-split results plus mean/std and percentile bootstrap CIs.
         Example values: y_true=[0, 1, 0, 1], scores=[0.1, 0.9, 0.4, 0.7],
@@ -439,27 +435,27 @@ class BinaryVerificationEvaluator:
                 "Stratified split failed. Ensure each class in y_true has at least two samples."
             ) from exc
 
-        if thresholds is None:
-            thresholds = CONFIG.THRESHOLDS
+        for train_idx, test_idx in split_iter:
+            y_true_train = y_true_np[train_idx]
+            scores_train = scores_np[train_idx]
+            y_true_test = y_true_np[test_idx]
+            scores_test = scores_np[test_idx]
 
-        try:
-            for train_idx, test_idx in split_iter:
-                y_true_train = y_true_np[train_idx]
-                scores_train = scores_np[train_idx]
-                y_true_test = y_true_np[test_idx]
-                scores_test = scores_np[test_idx]
-
-                threshold_values = self._normalize_thresholds(
-                    scores=scores_train, thresholds=thresholds
-                )
-
+            # if (candidate) thresholds are None, scores are used as thresholds
+            threshold_values = self._normalize_thresholds(
+                scores=scores_train, thresholds=thresholds
+            )
+            try:
                 # one F1 threshold per split/fold (used later for all metrics but c@1)
                 best_f1_threshold, _ = self._optimize_f1_threshold(
                     y_true=y_true_train,
                     scores=scores_train,
-                    thresholds=thresholds,
+                    thresholds=threshold_values,
                 )
-
+            except ValueError as exc:
+                logger.error(f"Failed to optimize F1 threshold for split {len(per_split_results) + 1}.")
+                raise ValueError(exc) from exc
+            try:
                 # optimize two thresholds for c@1
                 best_lower_threshold: float | None = None
                 best_upper_threshold: float | None = None
@@ -506,10 +502,10 @@ class BinaryVerificationEvaluator:
                         f1_threshold=best_f1_threshold,
                     )
                 )
-        except ValueError as exc:
-            raise ValueError(
-                "Stratified split failed. Ensure each class in y_true has at least two samples."
-            ) from exc
+            except ValueError as exc:
+                raise ValueError(
+                    "Stratified split failed. Ensure each class in y_true has at least two samples."
+                ) from exc
 
         metrics_mean, metrics_std, metric_values, metrics_ci = self._summarize_metrics(
             per_split_results, ci_level=ci_level, n_boot=n_boot
@@ -518,7 +514,6 @@ class BinaryVerificationEvaluator:
 
         return EvaluationCVResult(
             split_config=split_config,
-            candidate_thresholds=threshold_values,
             per_split=per_split_results,
             metrics_mean=metrics_mean,
             metrics_std=metrics_std,
@@ -573,7 +568,6 @@ def get_pan_metrics(predictions, y_true):
 
         # pan_metrics[method_name] = {
         #         "split_config": cv_result.split_config,
-        #         "candidate_thresholds": cv_result.candidate_thresholds,
         #         "metrics_mean": cv_result.metrics_mean,
         #         "metrics_std": cv_result.metrics_std,
         #         "metric_values": cv_result.metric_values,
