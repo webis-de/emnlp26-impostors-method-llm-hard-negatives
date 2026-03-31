@@ -403,16 +403,12 @@ class BinaryVerificationEvaluator:
         """
         y_true_np, scores_np = self._validate_binary_inputs(y_true=y_true, scores=scores)
 
-        if len(np.unique(y_true_np)) < 2:
-            raise ValueError("Threshold tuning requires both classes to be present in y_true.")
-
         class_counts = np.bincount(y_true_np)
         if (class_counts < n_splits).any():
             raise ValueError(
                 f"Each class must have at least n_splits={n_splits} samples. "
                 f"Counts: {class_counts.tolist()}"
             )
-
         if n_splits < 2:
             raise ValueError("n_splits must be >= 2 for cross-validation.")
         if n_repeats < 1:
