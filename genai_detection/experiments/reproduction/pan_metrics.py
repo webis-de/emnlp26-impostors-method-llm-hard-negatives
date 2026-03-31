@@ -406,6 +406,13 @@ class BinaryVerificationEvaluator:
         if len(np.unique(y_true_np)) < 2:
             raise ValueError("Threshold tuning requires both classes to be present in y_true.")
 
+        class_counts = np.bincount(y_true_np)
+        if (class_counts < n_splits).any():
+            raise ValueError(
+                f"Each class must have at least n_splits={n_splits} samples. "
+                f"Counts: {class_counts.tolist()}"
+            )
+
         if n_splits < 2:
             raise ValueError("n_splits must be >= 2 for cross-validation.")
         if n_repeats < 1:
@@ -430,6 +437,10 @@ class BinaryVerificationEvaluator:
         split_iter = splitter.split(scores_np, y_true_np)
         logger.info(f"Splitting data with {split_config}.")
 
+        thresholds_list = (
+            None if thresholds is None else np.asarray(list(thresholds), dtype=float)
+        )
+
         for split_idx, (train_idx, test_idx) in enumerate(split_iter, start=1):
             y_true_train = y_true_np[train_idx]
             scores_train = scores_np[train_idx]
@@ -438,7 +449,7 @@ class BinaryVerificationEvaluator:
 
             # if (candidate) thresholds are None, scores are used as thresholds
             threshold_values = self._normalize_thresholds(
-                scores=scores_train, thresholds=thresholds
+                scores=scores_train, thresholds=thresholds_list
             )
             try:
                 # one F1 threshold per split/fold (used later for all metrics but c@1)
@@ -490,20 +501,19 @@ class BinaryVerificationEvaluator:
                     best_lower_threshold = lower_threshold
                     best_upper_threshold = upper_threshold
 
-                logger.info(f"Finished split {len(per_split_results) + 1} of {n_splits} (optimizing across parameter "
-                            f"grid).")
-                assert best_lower_threshold is not None
-                assert best_upper_threshold is not None
-                # computes c@1 and AUROC for two optimizing thresholds, rest of metrics are computed on F1 threshold
-                per_split_results.append(
-                    self.evaluate_at_threshold(
-                        y_true=y_true_test,
-                        scores=scores_test,
-                        lower_threshold=best_lower_threshold,
-                        upper_threshold=best_upper_threshold,
-                        f1_threshold=best_f1_threshold,
-                    )
+            logger.info("Finished split %d/%d", split_idx, n_splits * n_repeats)
+            assert best_lower_threshold is not None
+            assert best_upper_threshold is not None
+            # computes c@1 and AUROC for two optimizing thresholds, rest of metrics are computed on F1 threshold
+            per_split_results.append(
+                self.evaluate_at_threshold(
+                    y_true=y_true_test,
+                    scores=scores_test,
+                    lower_threshold=best_lower_threshold,
+                    upper_threshold=best_upper_threshold,
+                    f1_threshold=best_f1_threshold,
                 )
+            )
 
         metrics_mean, metrics_std, metric_values, metrics_ci = self._summarize_metrics(
             per_split_results, ci_level=ci_level, n_boot=n_boot
