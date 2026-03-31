@@ -362,10 +362,10 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
                 scores=predictions,
                 thresholds=CONFIG.THRESHOLDS,
             )
-
+            # already returns dict with key being the technique name
             pan_metrics[technique] = get_pan_metrics(
                 {technique: predictions}, ground_truth, dataset_name=dataset_name
-            )
+            )[technique]
             logger.info(f"Results for {technique}: {results[technique]}")
         else:
             logger.warning(f"No scores for technique {technique} found in mongoDB.")
@@ -401,9 +401,11 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
                 scores=baseline_predictions[baseline],
                 thresholds=CONFIG.THRESHOLDS,
             )
+
+            # already returns dict with key being the technique name
             pan_metrics[baseline] = get_pan_metrics(
                 {baseline: baseline_predictions[baseline]}, ground_truth, dataset_name=dataset_name
-            )
+            )[baseline]
             logger.info(f"Results for {baseline}: {results[baseline]}")
 
     if save_artifacts:
