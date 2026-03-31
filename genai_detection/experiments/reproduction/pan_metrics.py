@@ -533,7 +533,7 @@ def get_pan_metrics(predictions, y_true, dataset_name: str):
     Compute PAN metrics for each method name and return a structured summary.
     The predictions are expected to be a dict mapping method names to lists of scores.
     If a method/dataset entry exists in MongoDB, reuse it.
-    Example values: predictions={"method_a": [0.1, 0.4]}, y_true=[0, 1], dataset_name="BlogPosts".
+    Example values: predictions={"method_a": [0.1, 0.4]}, y_true=[0, 1], dataset_name="blogs".
     Returns a dict mapping method names to dicts containing the summary of the metrics.
     """
     from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
