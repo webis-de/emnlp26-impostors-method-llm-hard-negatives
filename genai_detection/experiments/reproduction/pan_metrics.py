@@ -159,7 +159,12 @@ class BinaryVerificationEvaluator:
         results: Sequence[EvaluationResult],
         ci_level: float,
         n_boot: int,
-    ) -> tuple[dict[str, float], dict[str, float], dict[str, list[float]]]:
+    ) -> tuple[
+        dict[str, float],
+        dict[str, float],
+        dict[str, list[float]],
+        dict[str, dict[str, float | int | str]],
+    ]:
         """
         Compute per-metric mean/std across folds and percentile bootstrap CIs
         for the mean. For each metric, bootstrap draws resample the per-fold
@@ -434,9 +439,8 @@ class BinaryVerificationEvaluator:
                 "Stratified split failed. Ensure each class in y_true has at least two samples."
             ) from exc
 
-        thresholds_list = (
-            None if thresholds is None else [float(x) for x in thresholds]
-        )
+        if thresholds is None:
+            thresholds = CONFIG.THRESHOLDS
 
         try:
             for train_idx, test_idx in split_iter:
@@ -514,7 +518,7 @@ class BinaryVerificationEvaluator:
 
         return EvaluationCVResult(
             split_config=split_config,
-            candidate_thresholds=thresholds_list,
+            candidate_thresholds=threshold_values,
             per_split=per_split_results,
             metrics_mean=metrics_mean,
             metrics_std=metrics_std,
