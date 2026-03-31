@@ -384,12 +384,11 @@ class BinaryVerificationEvaluator:
         self,
         y_true: Sequence[int] | np.ndarray,
         scores: Sequence[float] | np.ndarray,
-            # TODO: increase
-        n_splits: int = 3,#10,
-        n_repeats: int = 2,#5,
+        n_splits: int = 10,
+        n_repeats: int = 5,
         random_state: int = 42,
         ci_level: float = 0.95,
-        n_boot: int = 50,#10000,
+        n_boot: int = 10000,
     ) -> EvaluationCVResult:
         """
         Tune thresholds on repeated stratified k-fold splits and summarize
