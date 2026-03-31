@@ -236,7 +236,9 @@ if __name__ == "__main__":
         logger.info(metrics_df)
 
         metrics_df.to_csv(LOCAL_SAVE_PATH / f"effectiveness_scores_{dataset_name}.csv", index=False)
-        logger.info(f"Saved effectiveness scores to {LOCAL_SAVE_PATH / 'effectiveness_scores_'}{dataset_name}.csv")
+        logger.info(
+            f"Saved effectiveness scores to {LOCAL_SAVE_PATH / f'effectiveness_scores_{dataset_name}.csv'}"
+        )
 
         plot_precision_recall_curve(
             results=results_dict,
