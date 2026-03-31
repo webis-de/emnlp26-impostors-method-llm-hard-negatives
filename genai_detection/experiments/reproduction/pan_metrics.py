@@ -20,10 +20,7 @@ from sklearn.model_selection import ParameterGrid, RepeatedStratifiedKFold
 from sklearn.utils.multiclass import type_of_target
 from sklearn.utils.validation import check_consistent_length
 
-from genai_detection.config import CONFIG
 import logging
-
-from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 logger = logging.getLogger(__name__)
 
@@ -219,7 +216,10 @@ class BinaryVerificationEvaluator:
                 "n_boot": int(n_boot),
             }
 
-        return metrics_mean, metrics_std, metric_values, metrics_ci
+        # convert defaultdict to plain dict for dataclass serialization
+        metric_values_dict = {metric: list(values) for metric, values in metric_values.items()}
+
+        return metrics_mean, metrics_std, metric_values_dict, metrics_ci
 
     @classmethod
     def compute_c_at_1(
@@ -384,7 +384,6 @@ class BinaryVerificationEvaluator:
         self,
         y_true: Sequence[int] | np.ndarray,
         scores: Sequence[float] | np.ndarray,
-        thresholds: Iterable[float] | None = None,
             # TODO: increase
         n_splits: int = 3,#10,
         n_repeats: int = 2,#5,
@@ -436,9 +435,6 @@ class BinaryVerificationEvaluator:
         split_iter = splitter.split(scores_np, y_true_np)
         logger.info(f"Splitting data with {split_config}.")
 
-        thresholds_list = (
-            None if thresholds is None else np.asarray(list(thresholds), dtype=float)
-        )
 
         for split_idx, (train_idx, test_idx) in enumerate(split_iter, start=1):
             y_true_train = y_true_np[train_idx]
@@ -447,9 +443,7 @@ class BinaryVerificationEvaluator:
             scores_test = scores_np[test_idx]
 
             # if (candidate) thresholds are None, scores are used as thresholds
-            threshold_values = self._normalize_thresholds(
-                scores=scores_train, thresholds=thresholds_list
-            )
+            threshold_values = self._normalize_thresholds(scores=scores_train, thresholds=None)
             try:
                 # one F1 threshold per split/fold (used later for all metrics but c@1)
                 best_f1_threshold, _ = self._optimize_f1_threshold(
@@ -556,10 +550,10 @@ def get_pan_metrics(predictions, y_true, dataset_name: str):
             continue
 
         method_scores = np.asarray(method_scores, dtype=float)
+        # thresholds are computed on the scores
         cv_result = evaluator.tune_thresholds(
                 y_true=y_true,
                 scores=method_scores,
-                thresholds=CONFIG.THRESHOLDS,
                 )
         pan_metrics[method_name] = asdict(cv_result)
         mongo.pan_metrics_collection.replace_one(
