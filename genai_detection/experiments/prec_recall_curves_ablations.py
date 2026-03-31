@@ -22,7 +22,6 @@ from genai_detection.experiments.reproduction.impostor_metrics import (compute_m
 from genai_detection.experiments.reproduction.pan_metrics import (
     get_pan_metrics,
     save_pan_metrics,
-    save_pan_metrics_to_mongo_db,
 )
 from genai_detection.experiments.reproduction.prec_recall_curves import (
     compute_prec_recall_f1_acc_dict_on_existing_impostor_scores,
@@ -179,10 +178,9 @@ def compute_prec_recall_curves_ablations(
         text_ids=text_ids,
         pair_batch_size=pair_batch_size,
     )
-    pan_metrics = get_pan_metrics(predictions, ground_truth)
+
+    pan_metrics = get_pan_metrics(predictions, ground_truth, dataset_name=dataset_name)
     logger.info(f"PAN metrics for dataset {dataset_name}: {pan_metrics}")
-    save_pan_metrics_to_mongo_db(pan_metrics=pan_metrics, dataset_name=dataset_name)
-    logger.info(f"Saved PAN metrics to mongodb collection {CONFIG.MONGO_PAN_METRICS_COLLECTION}.")
 
     metrics = compute_metrics_parallel(
         ground_truth=ground_truth,

@@ -23,6 +23,8 @@ from sklearn.utils.validation import check_consistent_length
 from genai_detection.config import CONFIG
 import logging
 
+from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
+
 logger = logging.getLogger(__name__)
 
 
@@ -525,43 +527,31 @@ class BinaryVerificationEvaluator:
             metrics_ci=metrics_ci,
         )
 
-def save_pan_metrics_to_mongo_db(pan_metrics, dataset_name:str):
-    try:
-        from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
-
-        mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
-        for method_name, metrics in _iter_pan_metrics_entries(
-            pan_metrics=pan_metrics
-        ):
-            doc = {
-                "dataset_name": dataset_name,
-                "method_name": method_name,
-                "pan_metrics": _jsonify_value(metrics),
-            }
-            mongoDB.pan_metrics_collection.replace_one(
-                {"dataset_name": dataset_name, "method_name": method_name},
-                doc,
-                upsert=True,
-            )
-        logger.info(
-            "PAN metrics saved to MongoDB collection %s.",
-            CONFIG.MONGO_PAN_METRICS_COLLECTION,
-        )
-    except Exception as exc:
-        logger.warning("Failed to save PAN metrics to MongoDB: %s", exc)
-
-
-def get_pan_metrics(predictions, y_true):
+def get_pan_metrics(predictions, y_true, dataset_name: str):
     """
     Compute PAN metrics for each method name and return a structured summary.
-    Example values: predictions={"method_a": [0.1, 0.4]}, y_true=[0, 1].
+    If a method/dataset entry exists in MongoDB, reuse it.
+    Example values: predictions={"method_a": [0.1, 0.4]}, y_true=[0, 1], dataset_name="BlogPosts".
     """
+    from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
+
     evaluator = BinaryVerificationEvaluator()
+    mongo = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
 
     pan_metrics = {}
 
     for method_name, method_scores in predictions.items():
         logger.info(f"Starting with method {method_name}.")
+
+        existing_doc = mongo.pan_metrics_collection.find_one(
+            {"dataset_name": dataset_name, "method_name": method_name},
+            {"_id": 0, "pan_metrics": 1},
+        )
+        if existing_doc is not None:
+            pan_metrics[method_name] = existing_doc.get("pan_metrics", {})
+            logger.info("Skipping %s (PAN metrics already stored).", method_name)
+            continue
+
         method_scores = np.asarray(method_scores, dtype=float)
         cv_result = evaluator.tune_thresholds(
                 y_true=y_true,
@@ -569,6 +559,15 @@ def get_pan_metrics(predictions, y_true):
                 thresholds=CONFIG.THRESHOLDS,
                 )
         pan_metrics[method_name] = asdict(cv_result)
+        mongo.pan_metrics_collection.replace_one(
+            {"dataset_name": dataset_name, "method_name": method_name},
+            {
+                "dataset_name": dataset_name,
+                "method_name": method_name,
+                "pan_metrics": _jsonify_value(pan_metrics[method_name]),
+            },
+            upsert=True,
+        )
 
         # pan_metrics[method_name] = {
         #         "split_config": cv_result.split_config,
