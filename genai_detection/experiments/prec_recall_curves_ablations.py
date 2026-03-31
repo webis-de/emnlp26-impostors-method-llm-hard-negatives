@@ -105,7 +105,7 @@ def _build_ablation_detectors(
     for name, detector_cls in ABLATION_DETECTORS.items():
         args = ABLATION_ARGS[name]
         if ("n_impostors" not in args) and ("impostors_per_round" not in args):
-            args[n_impostors] = n_impostors
+            args["n_impostors"] = n_impostors
         detector = detector_cls(
             impostor_technique=impostor_technique,
             **args,
