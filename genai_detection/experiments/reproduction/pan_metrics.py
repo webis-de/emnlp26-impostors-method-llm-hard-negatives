@@ -424,18 +424,13 @@ class BinaryVerificationEvaluator:
 
         per_split_results: list[EvaluationResult] = []
 
-        try:
-            splitter = RepeatedStratifiedKFold(
-                n_splits=n_splits, n_repeats=n_repeats, random_state=random_state
-            )
-            split_iter = splitter.split(scores_np, y_true_np)
-            logger.info(f"Splitting data with {split_config}.")
-        except ValueError as exc:
-            raise ValueError(
-                "Stratified split failed. Ensure each class in y_true has at least two samples."
-            ) from exc
+        splitter = RepeatedStratifiedKFold(
+            n_splits=n_splits, n_repeats=n_repeats, random_state=random_state
+        )
+        split_iter = splitter.split(scores_np, y_true_np)
+        logger.info(f"Splitting data with {split_config}.")
 
-        for train_idx, test_idx in split_iter:
+        for split_idx, (train_idx, test_idx) in enumerate(split_iter, start=1):
             y_true_train = y_true_np[train_idx]
             scores_train = scores_np[train_idx]
             y_true_test = y_true_np[test_idx]
@@ -453,23 +448,24 @@ class BinaryVerificationEvaluator:
                     thresholds=threshold_values,
                 )
             except ValueError as exc:
-                logger.error(f"Failed to optimize F1 threshold for split {len(per_split_results) + 1}.")
-                raise ValueError(exc) from exc
-            try:
-                # optimize two thresholds for c@1
-                best_lower_threshold: float | None = None
-                best_upper_threshold: float | None = None
-                best_n_answered_c_at_1 = -1
-                best_value = -np.inf
+                logger.error("Split %d: F1 threshold optimization failed: %s", split_idx, exc)
+                raise
 
-                param_grid = ParameterGrid(
-                    {"lower_threshold": threshold_values, "upper_threshold": threshold_values}
-                )
-                for params in param_grid:
-                    lower_threshold = float(params["lower_threshold"])
-                    upper_threshold = float(params["upper_threshold"])
-                    if lower_threshold > upper_threshold:
-                        continue
+            # optimize two thresholds for c@1
+            best_lower_threshold: float | None = None
+            best_upper_threshold: float | None = None
+            best_n_answered_c_at_1 = -1
+            best_value = -np.inf
+
+            param_grid = ParameterGrid(
+                {"lower_threshold": threshold_values, "upper_threshold": threshold_values}
+            )
+            for params in param_grid:
+                lower_threshold = float(params["lower_threshold"])
+                upper_threshold = float(params["upper_threshold"])
+                if lower_threshold > upper_threshold:
+                    continue
+                try:
                     result = self.evaluate_at_threshold(
                         y_true=y_true_train,
                         scores=scores_train,
@@ -477,16 +473,22 @@ class BinaryVerificationEvaluator:
                         upper_threshold=upper_threshold,
                         f1_threshold=None,
                     )
-                    current_cat1_value = getattr(result, "c_at_1")
+                except ValueError as exc:
+                    logger.error(
+                            "Split %d: evaluate_at_threshold failed (lower=%s, upper=%s): %s",
+                            split_idx, lower_threshold, upper_threshold, exc,
+                            )
+                    raise
+                current_cat1_value = getattr(result, "c_at_1")
 
-                    if current_cat1_value > best_value or (
-                        np.isclose(current_cat1_value, best_value)
-                        and result.n_answered_c_at_1 > best_n_answered_c_at_1
-                    ):
-                        best_value = current_cat1_value
-                        best_n_answered_c_at_1 = result.n_answered_c_at_1
-                        best_lower_threshold = lower_threshold
-                        best_upper_threshold = upper_threshold
+                if current_cat1_value > best_value or (
+                    np.isclose(current_cat1_value, best_value)
+                    and result.n_answered_c_at_1 > best_n_answered_c_at_1
+                ):
+                    best_value = current_cat1_value
+                    best_n_answered_c_at_1 = result.n_answered_c_at_1
+                    best_lower_threshold = lower_threshold
+                    best_upper_threshold = upper_threshold
 
                 logger.info(f"Finished split {len(per_split_results) + 1} of {n_splits} (optimizing across parameter "
                             f"grid).")
@@ -502,10 +504,6 @@ class BinaryVerificationEvaluator:
                         f1_threshold=best_f1_threshold,
                     )
                 )
-            except ValueError as exc:
-                raise ValueError(
-                    "Stratified split failed. Ensure each class in y_true has at least two samples."
-                ) from exc
 
         metrics_mean, metrics_std, metric_values, metrics_ci = self._summarize_metrics(
             per_split_results, ci_level=ci_level, n_boot=n_boot
