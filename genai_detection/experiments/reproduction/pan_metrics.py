@@ -1,5 +1,7 @@
 from __future__ import annotations
-from dataclasses import dataclass
+
+from collections import defaultdict
+from dataclasses import asdict, dataclass, field, fields
 from itertools import combinations
 import json
 import os
@@ -29,18 +31,18 @@ class EvaluationResult:
     """
     Metrics for a single evaluation using a fixed (lower, upper) threshold pair.
     """
-    lower_threshold: float
-    upper_threshold: float
-    f1_threshold: float | None
-    n_answered_c_at_1: int
-    n_unanswered_c_at_1: int
-    precision: float
-    recall: float
-    f1: float
-    accuracy: float
-    c_at_1: float
-    auroc: float
-    auroc_c_at_1: float
+    lower_threshold: float = field(metadata={"summary": False})
+    upper_threshold: float = field(metadata={"summary": False})
+    f1_threshold: float | None = field(metadata={"summary": False})
+    n_answered_c_at_1: int = field(metadata={"summary": False})
+    n_unanswered_c_at_1: int = field(metadata={"summary": False})
+    precision: float = field(metadata={"summary": True})
+    recall: float = field(metadata={"summary": True})
+    f1: float = field(metadata={"summary": True})
+    accuracy: float = field(metadata={"summary": True})
+    c_at_1: float = field(metadata={"summary": True})
+    auroc: float = field(metadata={"summary": True})
+    auroc_c_at_1: float = field(metadata={"summary": True})
 
 
 @dataclass
@@ -167,31 +169,15 @@ class BinaryVerificationEvaluator:
         Returns mean, std, raw values, and CI dicts.
         Example values: results=[EvaluationResult(...), ...], ci_level=0.95, n_boot=10000.
         """
-        metric_values: dict[str, list[float]] = {
-            "f1_threshold": [],
-            "precision": [],
-            "recall": [],
-            "f1": [],
-            "accuracy": [],
-            "c_at_1": [],
-            "auroc": [],
-            "auroc_c_at_1": [],
-            "n_answered_c_at_1": [],
-            "n_unanswered_c_at_1": [],
-        }
-        for result in results:
-            metric_values["f1_threshold"].append(
-                float(result.f1_threshold) if result.f1_threshold is not None else float("nan")
-            )
-            metric_values["precision"].append(result.precision)
-            metric_values["recall"].append(result.recall)
-            metric_values["f1"].append(result.f1)
-            metric_values["accuracy"].append(result.accuracy)
-            metric_values["c_at_1"].append(result.c_at_1)
-            metric_values["auroc"].append(result.auroc)
-            metric_values["auroc_c_at_1"].append(result.auroc_c_at_1)
-            metric_values["n_answered_c_at_1"].append(float(result.n_answered_c_at_1))
-            metric_values["n_unanswered_c_at_1"].append(float(result.n_unanswered_c_at_1))
+        # stores metric values as lists for Bootstrapping code
+        metric_values = defaultdict(list)
+        for r in results:
+            for f in fields(r):
+                # thresholds should not part of summary (i.e., computing mean and std makes no sense)
+                if not f.metadata.get("summary", True):
+                    continue
+                v = getattr(r, f.name)
+                metric_values[f.name].append(np.nan if v is None else float(v))
 
         metrics_mean: dict[str, float] = {}
         metrics_std: dict[str, float] = {}
@@ -536,6 +522,31 @@ class BinaryVerificationEvaluator:
             metrics_ci=metrics_ci,
         )
 
+def save_pan_metrics_to_mongo_db(pan_metrics, dataset_name:str):
+    try:
+        from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
+
+        mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
+        for method_name, metrics in _iter_pan_metrics_entries(
+            pan_metrics=pan_metrics
+        ):
+            doc = {
+                "dataset_name": dataset_name,
+                "method_name": method_name,
+                "pan_metrics": _jsonify_value(metrics),
+            }
+            mongoDB.pan_metrics_collection.replace_one(
+                {"dataset_name": dataset_name, "method_name": method_name},
+                doc,
+                upsert=True,
+            )
+        logger.info(
+            "PAN metrics saved to MongoDB collection %s.",
+            CONFIG.MONGO_PAN_METRICS_COLLECTION,
+        )
+    except Exception as exc:
+        logger.warning("Failed to save PAN metrics to MongoDB: %s", exc)
+
 
 def get_pan_metrics(predictions, y_true):
     """
@@ -554,36 +565,38 @@ def get_pan_metrics(predictions, y_true):
                 scores=method_scores,
                 thresholds=CONFIG.THRESHOLDS,
                 )
+        pan_metrics[method_name] = asdict(cv_result)
 
-        pan_metrics[method_name] = {
-                "split_config": cv_result.split_config,
-                "candidate_thresholds": cv_result.candidate_thresholds,
-                "metrics_mean": cv_result.metrics_mean,
-                "metrics_std": cv_result.metrics_std,
-                "metric_values": cv_result.metric_values,
-                "per_split": [
-                        # c@1 and AUROC (and auroc_c_at_1) are computed on the two c@1-optimized thresholds
-                        # F1 threshold is used for all other metrics
-                    {
-                        "lower_threshold": result.lower_threshold,
-                        "upper_threshold": result.upper_threshold,
-                        "f1_threshold": result.f1_threshold,
-                        "n_answered_c_at_1": result.n_answered_c_at_1,
-                        "n_unanswered_c_at_1": result.n_unanswered_c_at_1,
-                        "precision": result.precision,
-                        "recall": result.recall,
-                        "f1": result.f1,
-                        "accuracy": result.accuracy,
-                        "c_at_1": result.c_at_1,
-                        "auroc": result.auroc,
-                        "auroc_c_at_1": result.auroc_c_at_1,
-                    }
-                    for result in cv_result.per_split
-                ],
-                }
+        # pan_metrics[method_name] = {
+        #         "split_config": cv_result.split_config,
+        #         "candidate_thresholds": cv_result.candidate_thresholds,
+        #         "metrics_mean": cv_result.metrics_mean,
+        #         "metrics_std": cv_result.metrics_std,
+        #         "metric_values": cv_result.metric_values,
+        #         "per_split": [
+        #                 # c@1 and AUROC (and auroc_c_at_1) are computed on the two c@1-optimized thresholds
+        #                 # F1 threshold is used for all other metrics
+        #             {
+        #                 "lower_threshold": result.lower_threshold,
+        #                 "upper_threshold": result.upper_threshold,
+        #                 "f1_threshold": result.f1_threshold,
+        #                 "n_answered_c_at_1": result.n_answered_c_at_1,
+        #                 "n_unanswered_c_at_1": result.n_unanswered_c_at_1,
+        #                 "precision": result.precision,
+        #                 "recall": result.recall,
+        #                 "f1": result.f1,
+        #                 "accuracy": result.accuracy,
+        #                 "c_at_1": result.c_at_1,
+        #                 "auroc": result.auroc,
+        #                 "auroc_c_at_1": result.auroc_c_at_1,
+        #             }
+        #             for result in cv_result.per_split
+        #         ],
+        #         }
         logger.info(f"Obtained summary of PAN metrics for method {method_name}.")
 
     return pan_metrics
+
 
 def _jsonify_value(value):
     if isinstance(value, np.ndarray):
@@ -601,58 +614,19 @@ def _looks_like_pan_metrics(value: object) -> bool:
         "metrics_mean" in value or "per_split" in value or "split_config" in value
     )
 
-def _iter_pan_metrics_entries(pan_metrics: dict, dataset_name: str | None):
-    if dataset_name is not None:
-        for method_name, metrics in pan_metrics.items():
-            if (
-                isinstance(metrics, dict)
-                and method_name in metrics
-                and _looks_like_pan_metrics(metrics[method_name])
-            ):
-                yield dataset_name, method_name, metrics[method_name]
-            else:
-                yield dataset_name, method_name, metrics
-        return
-
-    known_datasets = {
-        CONFIG.PAN20,
-        CONFIG.PAN23,
-        CONFIG.PAN25,
-        CONFIG.BLOG,
-        CONFIG.GUTENBERG,
-        CONFIG.KOPPEL,
-        CONFIG.STUDENT_ESSAYS,
-        CONFIG.ARTIFICIAL_STUDENT_ESSAYS,
-    }
-
-    if all(key in known_datasets for key in pan_metrics.keys()):
-        for dataset_key, dataset_metrics in pan_metrics.items():
-            if not isinstance(dataset_metrics, dict):
-                continue
-            for method_name, metrics in dataset_metrics.items():
-                if (
-                    isinstance(metrics, dict)
-                    and method_name in metrics
-                    and _looks_like_pan_metrics(metrics[method_name])
-                ):
-                    yield dataset_key, method_name, metrics[method_name]
-                else:
-                    yield dataset_key, method_name, metrics
-        return
-
+def _iter_pan_metrics_entries(pan_metrics: dict):
     for method_name, metrics in pan_metrics.items():
-        if _looks_like_pan_metrics(metrics):
-            logger.warning(
-                "Skipping MongoDB PAN metrics save for method '%s' because dataset_name was not provided.",
-                method_name,
-            )
+        if (
+            isinstance(metrics, dict)
+            and method_name in metrics
+            and _looks_like_pan_metrics(metrics[method_name])
+        ):
+            yield method_name, metrics[method_name]
         else:
-            logger.warning(
-                "Skipping MongoDB PAN metrics save for key '%s' due to unexpected structure.",
-                method_name,
-            )
+            yield method_name, metrics
+    return
 
-def save_pan_metrics(pan_metrics, save_path, dataset_name=None, save_to_mongodb: bool = True):
+def save_pan_metrics(pan_metrics, save_path, dataset_name=None):
     """
     Persist PAN metrics to JSON in the provided directory.
     Example values: pan_metrics={"method_a": {...}}, save_path=Path("results"),
@@ -667,30 +641,6 @@ def save_pan_metrics(pan_metrics, save_path, dataset_name=None, save_to_mongodb:
     with open(save_file, "w") as f:
         json.dump(serializable, f, indent=2)
         logger.info(f"PAN metrics saved to {save_file}.")
-
-    if save_to_mongodb:
-        try:
-            from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
-
-            mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
-            for dataset_key, method_name, metrics in _iter_pan_metrics_entries(
-                pan_metrics=pan_metrics, dataset_name=dataset_name
-            ):
-                if dataset_key is None:
-                    continue
-                doc = {
-                    "dataset_name": dataset_key,
-                    "method_name": method_name,
-                    "pan_metrics": _jsonify_value(metrics),
-                }
-                mongoDB.pan_metrics_collection.replace_one(
-                    {"dataset_name": dataset_key, "method_name": method_name},
-                    doc,
-                    upsert=True,
-                )
-            logger.info("PAN metrics saved to MongoDB collection %s.", CONFIG.MONGO_PAN_METRICS_COLLECTION)
-        except Exception as exc:
-            logger.warning("Failed to save PAN metrics to MongoDB: %s", exc)
     return save_file
 
 def _filter_finite_pairs(

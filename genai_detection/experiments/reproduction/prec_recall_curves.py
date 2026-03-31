@@ -36,8 +36,8 @@ from genai_detection.detectors.unmasking import UnmaskingDetector
 from genai_detection.experiments.reproduction.impostor_metrics import (compute_metrics_for_thresholds,
                                                                        compute_metrics_parallel, load_all_pairs, )
 from genai_detection.experiments.reproduction.pan_metrics import (compare_pan_metrics_significance, get_pan_metrics,
-                                                                  save_pan_metrics,
-)
+                                                                  save_pan_metrics, save_pan_metrics_to_mongo_db,
+                                                                  )
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -366,6 +366,8 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
                 {technique: predictions}, ground_truth
             )
             logger.info(f"Results for {technique}: {results[technique]}")
+            save_pan_metrics_to_mongo_db(pan_metrics=pan_metrics, dataset_name=dataset_name)
+            logger.info(f"Saved pan_metrics to mongoDB for {technique} to mongodb collection.")
         else:
             logger.warning(f"No scores for technique {technique} found in mongoDB.")
 
@@ -404,6 +406,8 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
                 {baseline: baseline_predictions[baseline]}, ground_truth
             )
             logger.info(f"Results for {baseline}: {results[baseline]}")
+            save_pan_metrics_to_mongo_db(pan_metrics=pan_metrics, dataset_name=dataset_name)
+            logger.info(f"Saved pan_metrics to mongoDB for {baseline} to mongodb collection.")
 
     if save_artifacts:
         with open(LOCAL_SAVE_PATH / f"prec_rec_{dataset_name}_n_pairs_per_technique.json", "w") as f:
