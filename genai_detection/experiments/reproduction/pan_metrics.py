@@ -901,7 +901,7 @@ def plot_pan_metrics_boxplots(
         legend_handles.append(
             plt.Line2D([0], [0], color=colors[i], lw=6, label=label)
         )
-    ax.legend(handles=legend_handles, title="Method", loc="best")
+    ax.legend(handles=legend_handles, title="Technique", loc="best")
     ax.grid(axis="y", linestyle="--", alpha=0.4)
 
     fig.tight_layout()
