@@ -5,9 +5,11 @@ from dataclasses import asdict, dataclass, field, fields
 from itertools import combinations
 import json
 import os
+from pathlib import Path
 from typing import Iterable, Sequence
 
 import numpy as np
+from matplotlib import pyplot as plt
 from scipy.stats import bootstrap, mannwhitneyu, ttest_ind, ttest_rel, wilcoxon
 from sklearn.metrics import (
     accuracy_score,
@@ -21,6 +23,8 @@ from sklearn.utils.multiclass import type_of_target
 from sklearn.utils.validation import check_consistent_length
 
 import logging
+
+from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 logger = logging.getLogger(__name__)
 
@@ -754,3 +758,151 @@ def compare_pan_metrics_significance(
         results["pairs"][pair_key] = pair_results
 
     return results
+
+
+def plot_pan_metrics_boxplots(
+    dataset_name: str | None = None,
+    methods: Sequence[str] | None = None,
+    metrics: Sequence[str] | None = None,
+    save_path: Path | None = None,
+    title: str | None = None,
+):
+    """
+    Plot per-fold PAN metrics as grouped boxplots (grouped by metric, colored by method).
+
+    Reads from MongoDB pan_metrics collection, expecting a document structure:
+    {dataset_name, method_name, pan_metrics: {metric_values: {metric: [values...]}, ...}}
+    """
+    mongo = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
+
+    query: dict = {}
+    if dataset_name is not None:
+        query["dataset_name"] = dataset_name
+    if methods is not None:
+        query["method_name"] = {"$in": list(methods)}
+
+    cursor = mongo.pan_metrics_collection.find(
+        query,
+        {"_id": 0, "method_name": 1, "pan_metrics": 1, "dataset_name": 1},
+    )
+
+    metrics_by_method: dict[str, dict[str, list[float]]] = {}
+    for doc in cursor:
+        method_name = doc.get("method_name")
+        if not method_name:
+            continue
+        pan = doc.get("pan_metrics", {}) or {}
+        if not _looks_like_pan_metrics(pan) and method_name in pan and _looks_like_pan_metrics(pan[method_name]):
+            pan = pan[method_name]
+
+        metric_values = pan.get("metric_values")
+        if not metric_values and "per_split" in pan:
+            metric_values = {}
+            for split in pan["per_split"]:
+                for key, value in split.items():
+                    if key in {
+                        "lower_threshold",
+                        "upper_threshold",
+                        "f1_threshold",
+                        "n_answered_c_at_1",
+                        "n_unanswered_c_at_1",
+                    }:
+                        continue
+                    if isinstance(value, (int, float)):
+                        metric_values.setdefault(key, []).append(float(value))
+
+        if metric_values:
+            metrics_by_method[method_name] = {
+                k: [float(v) for v in vs]
+                for k, vs in metric_values.items()
+            }
+
+    if not metrics_by_method:
+        raise ValueError("No PAN metrics found for the given query.")
+
+    methods_list = sorted(metrics_by_method.keys())
+
+    if metrics is None:
+        default_order = [
+            "precision",
+            "recall",
+            "f1",
+            "accuracy",
+            "c_at_1",
+            "auroc",
+            "auroc_c_at_1",
+        ]
+        available = {m for vals in metrics_by_method.values() for m in vals.keys()}
+        metrics_list = [m for m in default_order if m in available]
+        metrics_list += sorted(m for m in available if m not in metrics_list)
+    else:
+        metrics_list = list(metrics)
+
+    n_methods = len(methods_list)
+    n_metrics = len(metrics_list)
+
+    box_data: list[list[float]] = []
+    box_positions: list[float] = []
+    box_method_idx: list[int] = []
+
+    for metric_idx, metric in enumerate(metrics_list):
+        group_start = metric_idx * (n_methods + 1) + 1
+        for method_idx, method in enumerate(methods_list):
+            values = metrics_by_method[method].get(metric, [])
+            if not values:
+                continue
+            box_positions.append(group_start + method_idx)
+            box_data.append(values)
+            box_method_idx.append(method_idx)
+
+    if not box_data:
+        raise ValueError("No metric values available to plot.")
+
+    fig, ax = plt.subplots(figsize=(max(8, n_metrics * 1.5), 6))
+    bp = ax.boxplot(
+        box_data,
+        positions=box_positions,
+        widths=0.6,
+        patch_artist=True,
+        showfliers=False,
+    )
+
+    cmap = plt.get_cmap("tab10")
+    colors = [cmap(i % 10) for i in range(n_methods)]
+    for box, method_idx in zip(bp["boxes"], box_method_idx):
+        box.set_facecolor(colors[method_idx])
+        box.set_edgecolor("black")
+
+    group_centers = []
+    for metric_idx in range(n_metrics):
+        group_start = metric_idx * (n_methods + 1) + 1
+        center = group_start + (n_methods - 1) / 2
+        group_centers.append(center)
+
+    ax.set_xticks(group_centers)
+    ax.set_xticklabels(metrics_list, rotation=0)
+    ax.set_xlabel("Metric")
+    ax.set_ylabel("Score")
+
+    if title is None:
+        title = "PAN Metrics (per-fold)"
+        if dataset_name is not None:
+            title = f"{title} - {dataset_name}"
+    ax.set_title(title)
+
+    legend_handles = [
+        plt.Line2D([0], [0], color=colors[i], lw=6, label=method)
+        for i, method in enumerate(methods_list)
+    ]
+    ax.legend(handles=legend_handles, title="Method", loc="best")
+    ax.grid(axis="y", linestyle="--", alpha=0.4)
+
+    fig.tight_layout()
+
+    if save_path is not None:
+        suffix = dataset_name if dataset_name is not None else "all"
+        for format in ["svg", "pdf"]:
+            out_path = save_path / f"pan_metrics_boxplot_{suffix}.{format}"
+            fig.savefig(out_path, dpi=200, bbox_inches="tight")
+
+    return fig, ax
