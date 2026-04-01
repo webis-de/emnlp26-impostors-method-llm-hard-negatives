@@ -24,6 +24,7 @@ from sklearn.utils.validation import check_consistent_length
 
 import logging
 
+from genai_detection.config import CONFIG
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 logger = logging.getLogger(__name__)
@@ -865,10 +866,13 @@ def plot_pan_metrics_boxplots(
         widths=0.6,
         patch_artist=True,
         showfliers=False,
+        medianprops={"color": "black"}, #, "linewidth": 1.5
     )
 
-    cmap = plt.get_cmap("tab10")
-    colors = [cmap(i % 10) for i in range(n_methods)]
+    colors = [
+        CONFIG.LABEL_COLORS.get(method, "#4d4d4d")
+        for method in methods_list
+    ]
     for box, method_idx in zip(bp["boxes"], box_method_idx):
         box.set_facecolor(colors[method_idx])
         box.set_edgecolor("black")
@@ -879,21 +883,24 @@ def plot_pan_metrics_boxplots(
         center = group_start + (n_methods - 1) / 2
         group_centers.append(center)
 
+    metric_labels = [CONFIG.SCORE_TRANSLATIONS.get(m, m) for m in metrics_list]
     ax.set_xticks(group_centers)
-    ax.set_xticklabels(metrics_list, rotation=0)
+    ax.set_xticklabels(metric_labels, rotation=0)
     ax.set_xlabel("Metric")
     ax.set_ylabel("Score")
 
     if title is None:
-        title = "PAN Metrics (per-fold)"
+        title = "PAN Metrics (10 Folds, 5 Repetitions)"
         if dataset_name is not None:
-            title = f"{title} - {dataset_name}"
+            title = f"{title} - {CONFIG.DATASET_TRANSLATIONS[dataset_name]}"
     ax.set_title(title)
 
-    legend_handles = [
-        plt.Line2D([0], [0], color=colors[i], lw=6, label=method)
-        for i, method in enumerate(methods_list)
-    ]
+    legend_handles = []
+    for i, method in enumerate(methods_list):
+        label = CONFIG.LABEL_TRANSLATIONS.get(method, method)
+        legend_handles.append(
+            plt.Line2D([0], [0], color=colors[i], lw=6, label=label)
+        )
     ax.legend(handles=legend_handles, title="Method", loc="best")
     ax.grid(axis="y", linestyle="--", alpha=0.4)
 
