@@ -439,7 +439,6 @@ class BinaryVerificationEvaluator:
         split_iter = splitter.split(scores_np, y_true_np)
         logger.info(f"Splitting data with {split_config}.")
 
-
         for split_idx, (train_idx, test_idx) in enumerate(split_iter, start=1):
             y_true_train = y_true_np[train_idx]
             scores_train = scores_np[train_idx]
@@ -448,6 +447,12 @@ class BinaryVerificationEvaluator:
 
             # if (candidate) thresholds are None, scores are used as thresholds
             threshold_values = self._normalize_thresholds(scores=scores_train, thresholds=None)
+            max_thresholds = 100
+            if threshold_values.size > max_thresholds:
+                # avoid extreme thresholds
+                qs = np.linspace(0.01, 0.99, max_thresholds)
+                threshold_values = np.unique(np.quantile(scores_train, qs))
+            # FIXME: why F1 threshold = 0
             try:
                 # one F1 threshold per split/fold (used later for all metrics but c@1)
                 best_f1_threshold, _ = self._optimize_f1_threshold(
