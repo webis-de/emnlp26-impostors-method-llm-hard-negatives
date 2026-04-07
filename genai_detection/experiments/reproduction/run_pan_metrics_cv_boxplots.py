@@ -15,7 +15,7 @@ plot_pan_metrics_boxplots(
     save_path=LOCAL_SAVE_PATH,
 )
 
-# plot_pan_metrics_boxplots(
-#     dataset_name=CONFIG.STUDENT_ESSAYS,
-#     save_path=LOCAL_SAVE_PATH,
-# )
+plot_pan_metrics_boxplots(
+    dataset_name=CONFIG.STUDENT_ESSAYS,
+    save_path=LOCAL_SAVE_PATH,
+)
