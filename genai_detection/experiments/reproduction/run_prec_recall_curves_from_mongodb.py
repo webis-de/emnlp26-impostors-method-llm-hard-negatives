@@ -85,9 +85,11 @@ if __name__ == "__main__":
     ]
 
     run_prec_recall_curves(
-        dataset_name=CONFIG.BLOG, imp_gen_techniques=our_figure_impostor_options, compute_score_fn=compute_prec_recall_f1_acc_dict_on_existing_impostor_scores
+        dataset_name=CONFIG.STUDENT_ESSAYS,
+        imp_gen_techniques=our_figure_impostor_options,
+        compute_score_fn=compute_prec_recall_f1_acc_dict_on_existing_impostor_scores,
     )
 
     run_prec_recall_curves(
-        dataset_name=CONFIG.STUDENT_ESSAYS, imp_gen_techniques=our_figure_impostor_options, compute_score_fn=compute_prec_recall_f1_acc_dict_on_existing_impostor_scores
+        dataset_name=CONFIG.BLOG, imp_gen_techniques=our_figure_impostor_options, compute_score_fn=compute_prec_recall_f1_acc_dict_on_existing_impostor_scores
     )
