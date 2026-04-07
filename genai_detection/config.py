@@ -132,6 +132,16 @@ class BaseConfig:
         "homotopy": "#ff9896",  # light red
     }
 
+    SCORE_TRANSLATIONS = {
+        "precision": "Precision",
+        "recall": "Recall",
+        "f1": "F1",
+        "accuracy": "Accuracy",
+        "c_at_1": "c@1",
+        "auroc": "AUROC",
+        "auroc_c_at_1": "AUROC×c@1",
+    }
+
     DATASET_TRANSLATIONS = {BLOG:"Blog Posts", STUDENT_ESSAYS: "Student Essays"}
 
 CONFIG = BaseConfig()
