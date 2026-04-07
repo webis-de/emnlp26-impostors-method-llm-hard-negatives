@@ -840,7 +840,7 @@ def plot_pan_metrics_boxplots(
     if not box_data:
         raise ValueError("No metric values available to plot.")
 
-    fig, ax = plt.subplots(figsize=(max(8, n_metrics * 1.5), 6))
+    fig, ax = plt.subplots(figsize=(max(10, n_metrics * 2.5), 6))
     bp = ax.boxplot(
         box_data,
         positions=box_positions,
@@ -883,10 +883,18 @@ def plot_pan_metrics_boxplots(
         legend_handles.append(
             plt.Line2D([0], [0], color=colors[i], lw=6, label=label)
         )
-    ax.legend(handles=legend_handles, title="Technique", loc="best", fontsize=13, title_fontsize=13)
+    ax.legend(
+        handles=legend_handles,
+        title="Technique",
+        loc="upper left",
+        bbox_to_anchor=(1.02, 1.0),  # x just outside, y aligned to top
+        borderaxespad=0.0,
+        fontsize=13,
+        title_fontsize=13,
+    )
     ax.grid(axis="y", linestyle="--", alpha=0.4)
 
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0, 0.8, 1))
 
     if save_path is not None:
         suffix = dataset_name if dataset_name is not None else "all"
