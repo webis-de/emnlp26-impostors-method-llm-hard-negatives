@@ -488,8 +488,7 @@ def plot_precision_recall_curve(
         plt.ylabel("Precision $\\frac{TP}{TP + FP}$", fontsize=14)
         if title is None:
             title = "Precision–Recall Curve Across Impostor Generation Techniques"
-        complete_title = title + f"\nDataset: {CONFIG.DATASET_TRANSLATIONS[dataset_name]} ({positive_class})"    #
-        # subtitle
+        complete_title = title + f"\nDataset: {CONFIG.DATASET_TRANSLATIONS[dataset_name]} ({positive_class})"
         plt.title(complete_title)
         plt.xlim(-0.01, 1.01)
         plt.ylim(-0.01, 1.01)
