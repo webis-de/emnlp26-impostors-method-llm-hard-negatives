@@ -447,7 +447,7 @@ class BinaryVerificationEvaluator:
 
             # if (candidate) thresholds are None, scores are used as thresholds
             threshold_values = self._normalize_thresholds(scores=scores_train, thresholds=None)
-            max_thresholds = 100
+            max_thresholds = 300
             if threshold_values.size > max_thresholds:
                 logger.warning(f"Too many thresholds ({threshold_values.size}) for optimization. Using "
                                f"{max_thresholds} many thresholds instead.")
@@ -576,32 +576,6 @@ def get_pan_metrics(predictions, y_true, dataset_name: str):
             },
             upsert=True,
         )
-
-        # pan_metrics[method_name] = {
-        #         "split_config": cv_result.split_config,
-        #         "metrics_mean": cv_result.metrics_mean,
-        #         "metrics_std": cv_result.metrics_std,
-        #         "metric_values": cv_result.metric_values,
-        #         "per_split": [
-        #                 # c@1 and AUROC (and auroc_c_at_1) are computed on the two c@1-optimized thresholds
-        #                 # F1 threshold is used for all other metrics
-        #             {
-        #                 "lower_threshold": result.lower_threshold,
-        #                 "upper_threshold": result.upper_threshold,
-        #                 "f1_threshold": result.f1_threshold,
-        #                 "n_answered_c_at_1": result.n_answered_c_at_1,
-        #                 "n_unanswered_c_at_1": result.n_unanswered_c_at_1,
-        #                 "precision": result.precision,
-        #                 "recall": result.recall,
-        #                 "f1": result.f1,
-        #                 "accuracy": result.accuracy,
-        #                 "c_at_1": result.c_at_1,
-        #                 "auroc": result.auroc,
-        #                 "auroc_c_at_1": result.auroc_c_at_1,
-        #             }
-        #             for result in cv_result.per_split
-        #         ],
-        #         }
         logger.info(f"Obtained summary of PAN metrics for method {method_name}.")
 
     return pan_metrics
