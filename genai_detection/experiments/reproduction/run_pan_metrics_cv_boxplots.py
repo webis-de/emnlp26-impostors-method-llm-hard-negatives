@@ -10,12 +10,24 @@ LOCAL_SAVE_PATH = (
 )
 LOCAL_SAVE_PATH.mkdir(parents=True, exist_ok=True)
 
+metrics = [
+            "precision",
+            "recall",
+            # "f1",
+            # "accuracy",
+            # "c_at_1",
+            # "auroc",
+            "auroc_c_at_1",
+        ]
+
 plot_pan_metrics_boxplots(
     dataset_name=CONFIG.BLOG,
     save_path=LOCAL_SAVE_PATH,
+        metrics=metrics,
 )
 
 plot_pan_metrics_boxplots(
     dataset_name=CONFIG.STUDENT_ESSAYS,
     save_path=LOCAL_SAVE_PATH,
+        metrics=metrics,
 )
