@@ -867,14 +867,15 @@ def plot_pan_metrics_boxplots(
     metric_labels = [CONFIG.SCORE_TRANSLATIONS.get(m, m) for m in metrics_list]
     ax.set_xticks(group_centers)
     ax.set_xticklabels(metric_labels, rotation=0)
-    ax.set_xlabel("Metric")
-    ax.set_ylabel("Score")
+    ax.set_xlabel("Metric", fontsize=14)
+    ax.set_ylabel("Score", fontsize=14)
+    ax.tick_params(axis="both", labelsize=13)
 
     if title is None:
         title = "PAN Metrics (10 Folds, 5 Repetitions)"
         if dataset_name is not None:
             title = f"{title} - {CONFIG.DATASET_TRANSLATIONS[dataset_name]}"
-    ax.set_title(title)
+    ax.set_title(title, fontsize=16)
 
     legend_handles = []
     for i, method in enumerate(methods_list):
@@ -882,7 +883,7 @@ def plot_pan_metrics_boxplots(
         legend_handles.append(
             plt.Line2D([0], [0], color=colors[i], lw=6, label=label)
         )
-    ax.legend(handles=legend_handles, title="Technique", loc="best")
+    ax.legend(handles=legend_handles, title="Technique", loc="best", fontsize=13, title_fontsize=13)
     ax.grid(axis="y", linestyle="--", alpha=0.4)
 
     fig.tight_layout()
