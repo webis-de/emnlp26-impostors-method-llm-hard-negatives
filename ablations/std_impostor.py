@@ -6,14 +6,14 @@ representation to TF-STD (Burrows, 2002) with Caesar-style word/char n-grams.
 
 TF-STD here means:
 1. Build a count vector over fixed-length word/char n-grams.
-2. Convert counts to TF by dividing each document's counts by its length.
-3. Scale each feature (term frequencies) by its corpus standard deviation
+2. Convert counts to relative TF by dividing each document's counts by its length.
+3. Scale each feature (relative term frequencies) by its corpus standard deviation
    (feature-wise std across documents). This boosts stable features
    and is the inverse intuition of TF-IDF.
 4. L2-normalize each document vector.
 
-In short: TF (document-normalized counts) then STD scaling (feature-wise std),
-followed by cosine similarity in the impostor pipeline.
+In short: relative TF (document-normalized counts) then STD scaling (feature-wise std),
+followed by min-max similarity in the impostor pipeline.
 
 Find other implementations:
 - https://computationalstylistics.github.io/docs/imposters (12.02.2026)
@@ -28,7 +28,10 @@ import numpy as np
 import scipy.sparse as sp
 from sklearn.feature_extraction.text import CountVectorizer
 
-from genai_detection.detectors.components.vector_similarity import (cosine_similarity, )
+from genai_detection.detectors.components.vector_similarity import (
+    cosine_similarity,
+    minmax_similarity,
+)
 from genai_detection.detectors.impostor import ImpostorDetector
 
 
@@ -108,7 +111,7 @@ class CaesarTFStdFeatureExtractor:
 
         doc_lengths = counts.sum(axis=1, keepdims=True)
         doc_lengths[doc_lengths == 0] = 1.0
-        tf = counts / doc_lengths
+        tf = counts / doc_lengths   # relative term frequencies
 
         # Feature-wise std across documents. We use inverse-std weighting (tf / std):
         # stable/common features (low std) are boosted, volatile features are down-weighted.
@@ -160,7 +163,7 @@ class StdImpostor(ImpostorDetector):
         )
         # Ensure the length-matching tokenizer aligns with the feature type.
         self.pair_processor.tokenizer = self._std_tokenizer(feature_type, char_n)
-        self.scorer.similarity_fn = cosine_similarity
+        self.scorer.similarity_fn = minmax_similarity   # Tab. 1, O2, min-max > cosine
         # Store outputs in ablation collection.
         self.impostor_output_collection = self.mongoDB.impostor_ablation_output_collection
 
