@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 import numpy as np
+import pandas as pd
 from matplotlib import pyplot as plt
 from scipy.stats import bootstrap, mannwhitneyu, ttest_ind, ttest_rel, wilcoxon
 from sklearn.metrics import (
@@ -25,6 +26,7 @@ from sklearn.utils.validation import check_consistent_length
 import logging
 
 from genai_detection.config import CONFIG
+from genai_detection.experiments.corrected_ttest import repkfold_ttest
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 logger = logging.getLogger(__name__)
@@ -394,6 +396,7 @@ class BinaryVerificationEvaluator:
         random_state: int = 42,
         ci_level: float = 0.95,
         n_boot: int = 10000,
+        splits: Iterable[tuple[np.ndarray, np.ndarray]] | None = None,
     ) -> EvaluationCVResult:
         """
         Tune thresholds on repeated stratified k-fold splits and summarize
@@ -404,6 +407,9 @@ class BinaryVerificationEvaluator:
         For c@1, AUROC, and c@1*AUROC, scores between the thresholds are treated as unanswered.
 
         Returns per-split results plus mean/std and percentile bootstrap CIs.
+        If `splits` is provided, the caller is responsible for ensuring
+        they are derived from the same y_true ordering across methods to
+        make paired comparisons valid.
         Example values: y_true=[0, 1, 0, 1], scores=[0.1, 0.9, 0.4, 0.7],
         thresholds=[0.2, 0.5, 0.8], n_splits=10, n_repeats=5, random_state=42, ci_level=0.95, n_boot=10000.
         """
@@ -433,11 +439,23 @@ class BinaryVerificationEvaluator:
 
         per_split_results: list[EvaluationResult] = []
 
-        splitter = RepeatedStratifiedKFold(
-            n_splits=n_splits, n_repeats=n_repeats, random_state=random_state
-        )
-        split_iter = splitter.split(scores_np, y_true_np)
-        logger.info(f"Splitting data with {split_config}.")
+        # Use caller-provided splits to guarantee paired folds across methods.
+        if splits is None:
+            splitter = RepeatedStratifiedKFold(
+                n_splits=n_splits, n_repeats=n_repeats, random_state=random_state
+            )
+            split_iter = splitter.split(scores_np, y_true_np)
+            logger.info(f"Splitting data with {split_config}.")
+        else:
+            splits = list(splits)
+            expected = int(n_splits) * int(n_repeats)
+            if len(splits) != expected:
+                raise ValueError(
+                    f"Expected {expected} splits (n_splits={n_splits}, n_repeats={n_repeats}), "
+                    f"got {len(splits)}."
+                )
+            split_iter = splits
+            logger.info(f"Using precomputed splits with {split_config}.")
 
         for split_idx, (train_idx, test_idx) in enumerate(split_iter, start=1):
             y_true_train = y_true_np[train_idx]
@@ -533,10 +551,21 @@ class BinaryVerificationEvaluator:
             metrics_ci=metrics_ci,
         )
 
-def get_pan_metrics(predictions, y_true, dataset_name: str):
+def get_pan_metrics(
+    predictions,
+    y_true,
+    dataset_name: str,
+    n_splits: int = 10,
+    n_repeats: int = 5,
+    random_state: int = 42,
+    ci_level: float = 0.95,
+    n_boot: int = 10000,
+):
     """
     Compute PAN metrics for each method name and return a structured summary.
     The predictions are expected to be a dict mapping method names to lists of scores.
+    Scores are assumed to be aligned to the same item order; this function validates
+    length consistency but does not re-order or re-align data.
     If a method/dataset entry exists in MongoDB, reuse it.
     Example values: predictions={"method_a": [0.1, 0.4]}, y_true=[0, 1], dataset_name="blogs".
     Returns a dict mapping method names to dicts containing the summary of the metrics.
@@ -548,31 +577,85 @@ def get_pan_metrics(predictions, y_true, dataset_name: str):
 
     pan_metrics = {}
 
+    # Ensure a flat, aligned target vector for all methods.
+    y_true_np = np.asarray(y_true)
+    if y_true_np.ndim != 1:
+        y_true_np = y_true_np.reshape(-1)
+    n_samples = int(len(y_true_np))
+    if n_samples == 0:
+        raise ValueError("y_true must contain at least one sample.")
+
+    # Validate that every method has a score for each target item.
+    normalized_predictions: dict[str, np.ndarray] = {}
+
     for method_name, method_scores in predictions.items():
+        method_scores_np = np.asarray(method_scores, dtype=float)
+        if method_scores_np.ndim != 1:
+            method_scores_np = method_scores_np.reshape(-1)
+
+        if len(method_scores_np) != n_samples:
+            raise ValueError(
+                f"{method_name}: expected {n_samples} scores, got {len(method_scores_np)}."
+            )
+        normalized_predictions[method_name] = method_scores_np
+
+    # Precompute splits once to ensure fold pairing across methods.
+    split_generator = RepeatedStratifiedKFold(
+        n_splits=n_splits, n_repeats=n_repeats, random_state=random_state
+    )
+    precomputed_splits = list(split_generator.split(np.zeros_like(y_true_np), y_true_np))
+    logger.info(
+        "Precomputed %d splits using %d samples.",
+        len(precomputed_splits),
+        n_samples,
+    )
+
+    for method_name, method_scores in normalized_predictions.items():
         logger.info(f"Starting with method {method_name}.")
 
         existing_doc = mongo.pan_metrics_collection.find_one(
             {"dataset_name": dataset_name, "method_name": method_name},
-            {"_id": 0, "pan_metrics": 1},
+            {"_id": 0, "pan_metrics": 1, "n_samples": 1},
         )
         if existing_doc is not None:
+            stored_n_samples = existing_doc.get("n_samples")
+            if stored_n_samples is not None and int(stored_n_samples) != n_samples:
+                logger.warning(
+                    "Stored PAN metrics for %s use n_samples=%s, but current data has n_samples=%d.",
+                    method_name,
+                    stored_n_samples,
+                    n_samples,
+                )
             pan_metrics[method_name] = existing_doc.get("pan_metrics", {})
             logger.info("Skipping %s (PAN metrics already stored).", method_name)
             continue
 
-        method_scores = np.asarray(method_scores, dtype=float)
         # thresholds are computed on the scores
         cv_result = evaluator.tune_thresholds(
-                y_true=y_true,
+                y_true=y_true_np,
                 scores=method_scores,
+                n_splits=n_splits,
+                n_repeats=n_repeats,
+                random_state=random_state,
+                ci_level=ci_level,
+                n_boot=n_boot,
+                splits=precomputed_splits,
                 )
         pan_metrics[method_name] = asdict(cv_result)
+        # Store mean metrics separately for easy access; avoid duplication in pan_metrics payload.
+        metrics_mean = pan_metrics[method_name].pop("metrics_mean", {})
+        metrics_std = pan_metrics[method_name].pop("metrics_std", {})
+        metrics_ci = pan_metrics[method_name].pop("metrics_ci", {})
         mongo.pan_metrics_collection.replace_one(
             {"dataset_name": dataset_name, "method_name": method_name},
             {
                 "dataset_name": dataset_name,
                 "method_name": method_name,
-                "pan_metrics": _jsonify_value(pan_metrics[method_name]),
+                "n_samples": n_samples,
+                "metrics_mean": _jsonify_value(metrics_mean),
+                "metrics_std": _jsonify_value(metrics_std),
+                "metrics_ci": _jsonify_value(metrics_ci),
+                "pan_metrics_per_split": _jsonify_value(pan_metrics[method_name]),
             },
             upsert=True,
         )
@@ -655,6 +738,47 @@ def _pairwise_p_value(
     raise ValueError(f"Unknown test '{test}'.")
 
 
+def _pairwise_repkfold_p_value(
+    a: np.ndarray,
+    b: np.ndarray,
+    *,
+    n_splits: int,
+    n_repeats: int,
+    n_samples: int,
+) -> float:
+    total = n_splits * n_repeats
+    if len(a) != total or len(b) != total:
+        raise ValueError(
+            f"Expected {total} per-fold values (n_splits={n_splits}, n_repeats={n_repeats}), "
+            f"got {len(a)} and {len(b)}."
+        )
+
+    if not (np.isfinite(a).all() and np.isfinite(b).all()):
+        return float("nan")
+
+    train_set_size = int(round(n_samples / n_splits))
+    test_set_size = int(n_samples - train_set_size)
+    if test_set_size <= 0 or train_set_size <= 0:
+        raise ValueError(
+            f"Invalid test_set_size/train_set_size derived from n_samples={n_samples}, n_splits={n_splits}."
+        )
+
+    rows = []
+    for idx in range(total):
+        k = (idx % n_splits) + 1
+        r = (idx // n_splits) + 1
+        rows.append({"model": "A", "values": float(a[idx]), "k": k, "r": r})
+        rows.append({"model": "B", "values": float(b[idx]), "k": k, "r": r})
+    df = pd.DataFrame(rows)
+
+    result = repkfold_ttest(data=df, n1=test_set_size, n2=train_set_size, k=n_splits, r=n_repeats)
+    if "p_value" in result.columns:
+        return float(result["p_value"].iloc[0])
+    if "p.value" in result.columns:
+        return float(result["p.value"].iloc[0])
+    raise ValueError("correctipy.repkfold_ttest did not return a p-value column.")
+
+
 def compare_pan_metrics_significance(
     pan_metrics: dict,
     metrics: Iterable[str] | None = None,
@@ -670,9 +794,12 @@ def compare_pan_metrics_significance(
     - dataset_name: select a dataset when pan_metrics is dataset-keyed.
     - metrics: subset of metric names; defaults to metrics present in metric_values.
     - alpha_levels: p-value thresholds to report.
-    - test: one of {"wilcoxon", "ttest_rel", "mannwhitney", "ttest_ind"}.
+    - test: one of {"wilcoxon", "ttest_rel", "mannwhitney", "ttest_ind", "repkfold_ttest"}.
+      repkfold_ttest uses correctipy's corrected t-test (for repeated k-fold CV) and requires n_samples in pan_metrics.
+      wilcoxon can only handle single repetition k-fold CV, otherwise model scores are not indpendent,
+      harming wilcoxon's underlying assumptions.
     - alternative: scipy.stats alternative hypothesis parameter.
-    - min_samples: minimum paired samples required to run a test.
+    - min_samples: minimum number of paired samples that are required to run a test.
 
     Returns dict with per-pair, per-metric p-values and significance flags.
     """
@@ -687,6 +814,30 @@ def compare_pan_metrics_significance(
         "alpha_levels": alpha_sorted,
         "pairs": {},
     }
+
+    repkfold_meta: dict[str, int] | None = None
+    if test == "repkfold_ttest":
+        for method_name in method_names:
+            method_metrics = pan_metrics[method_name]
+            split_config = method_metrics.get("split_config")
+            n_samples = method_metrics.get("n_samples")
+            if not split_config or n_samples is None:
+                raise ValueError(
+                    f"Missing split_config or n_samples for method '{method_name}'. "
+                    "Recompute pan_metrics to include n_samples."
+                )
+            current = {
+                "n_splits": int(split_config.get("n_splits")),
+                "n_repeats": int(split_config.get("n_repeats")),
+                "n_samples": int(n_samples),
+            }
+            if repkfold_meta is None:
+                repkfold_meta = current
+            elif repkfold_meta != current:
+                raise ValueError(
+                    f"Split metadata mismatch for method '{method_name}': "
+                    f"expected {repkfold_meta}, got {current}."
+                )
 
     for method_a, method_b in combinations(method_names, 2):
         metrics_a = pan_metrics[method_a].get("metric_values", {})
@@ -708,10 +859,7 @@ def compare_pan_metrics_significance(
             values_a = np.asarray(metrics_a.get(metric, []), dtype=float)
             values_b = np.asarray(metrics_b.get(metric, []), dtype=float)
 
-            if test in {"mannwhitney", "ttest_ind"}:
-                values_a = values_a[np.isfinite(values_a)]
-                values_b = values_b[np.isfinite(values_b)]
-            else:
+            if (test != "repkfold_ttest") or (test in {"mannwhitney", "ttest_ind"}):
                 values_a, values_b = _filter_finite_pairs(values_a, values_b)
             if len(values_a) != len(values_b) and test in {"wilcoxon", "ttest_rel"}:
                 raise ValueError(
@@ -727,7 +875,21 @@ def compare_pan_metrics_significance(
                 continue
 
             try:
-                p_value = _pairwise_p_value(values_a, values_b, test, alternative)
+                if test == "repkfold_ttest":
+                    if alternative != "two-sided":
+                        raise ValueError(
+                            "repkfold_ttest in correctipy only supports two-sided tests in this pipeline."
+                        )
+                    assert repkfold_meta is not None
+                    p_value = _pairwise_repkfold_p_value(
+                        values_a,
+                        values_b,
+                        n_splits=repkfold_meta["n_splits"],
+                        n_repeats=repkfold_meta["n_repeats"],
+                        n_samples=repkfold_meta["n_samples"],
+                    )
+                else:
+                    p_value = _pairwise_p_value(values_a, values_b, test, alternative)
             except ValueError:
                 p_value = float("nan")
 
