@@ -333,47 +333,25 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
 
     n_pairs_per_technique: dict[str, int] = defaultdict(int)
     pan_metrics: dict[str, dict[str, float]] = defaultdict(dict)
+    # Collect raw scores per method keyed by pair id for later alignment.
+    # scores_by_method also includes baseline scores if flag is true
+    scores_by_method: dict[str, Dict[Tuple[ObjectId, ObjectId], float]] = {}
     for technique in imp_gen_techniques:
+        # Scores will be aligned across methods via pair intersection below,
+        # ensuring paired significance tests compare the same items.
         # key: (left_id, right_id)
         loaded_scores_by_technique = _load_scores_for_technique(technique=technique, dataset_name=dataset_name)
         # contains only matching dataset
         n_pairs_per_technique[technique] = len(loaded_scores_by_technique)
         if len(loaded_scores_by_technique) > 0:
-            loaded_keys = list(loaded_scores_by_technique.keys())
-            gt_by_pair = _load_ground_truth_for_pairs(loaded_keys)
-            ordered_keys = sorted(
-                key for key in loaded_keys if key in gt_by_pair
-            )
-            if len(ordered_keys) != len(loaded_scores_by_technique):
-                logger.warning(
-                    "Missing ground-truth for %d pairs (technique=%s, dataset=%s); dropping them.",
-                    len(loaded_scores_by_technique) - len(ordered_keys),
-                    technique, dataset_name,
-                )
-            else:
-                logger.info("All loaded %d pairs (technique=%s) have a ground truth.",
-                    len(loaded_scores_by_technique) ,
-                    technique,)
-            ground_truth = [gt_by_pair[key] for key in ordered_keys]
-            predictions = [loaded_scores_by_technique[key] for key in ordered_keys]
-
-            results[technique] = compute_metrics_for_thresholds(
-                ground_truth=ground_truth,
-                scores=predictions,
-                thresholds=CONFIG.THRESHOLDS,
-            )
-            # already returns dict with key being the technique name
-            pan_metrics[technique] = get_pan_metrics(
-                {technique: predictions}, ground_truth, dataset_name=dataset_name
-            )[technique]
-            logger.info(f"Results for {technique}: {results[technique]}")
+            scores_by_method[technique] = loaded_scores_by_technique
         else:
             logger.warning(f"No scores for technique {technique} found in mongoDB.")
 
     if include_baselines:
         baselines = _build_baselines(dataset_name=dataset_name)
         # load all pairs per dataset
-        text_id_pairs, ground_truth = load_all_pairs(dataset_name)
+        text_id_pairs, _ = load_all_pairs(dataset_name)
         text_id_pairs_len = len(text_id_pairs)
         assert (
             text_id_pairs_len % 2 == 0
@@ -394,19 +372,80 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
             pair_batches=[text_pairs],
         )
 
+        # Baselines score every available pair; build the same pair ids.
+        pair_ids = list(zip(text_id_pairs[0::2], text_id_pairs[1::2]))
         for baseline, pred in baseline_predictions.items():
+            if len(pred) != len(pair_ids):
+                raise ValueError(
+                    f"Baseline {baseline}: expected {len(pair_ids)} scores, got {len(pred)}"
+                )
             n_pairs_per_technique[baseline] = len(pred)
-            results[baseline] = compute_metrics_for_thresholds(
-                ground_truth=ground_truth,
-                scores=baseline_predictions[baseline],
-                thresholds=CONFIG.THRESHOLDS,
-            )
+            scores_by_method[baseline] = {
+                pair_ids[i]: pred[i] for i in range(len(pair_ids))
+            }
 
-            # already returns dict with key being the technique name
-            pan_metrics[baseline] = get_pan_metrics(
-                {baseline: baseline_predictions[baseline]}, ground_truth, dataset_name=dataset_name
-            )[baseline]
-            logger.info(f"Results for {baseline}: {results[baseline]}")
+    if scores_by_method:
+        logger.info(
+            "Pairs per method before intersection (dataset=%s): %s",
+            dataset_name,
+            n_pairs_per_technique,
+        )
+        # Use the intersection of pairs across all methods to ensure shared items.
+        common_keys = set.intersection(
+            *(set(scores.keys()) for scores in scores_by_method.values())
+        )
+        if not common_keys:
+            logger.warning(
+                "No overlapping pairs across methods for dataset=%s; "
+                "skipping paired significance-compatible metrics.",
+                dataset_name,
+            )
+        else:
+            logger.info(
+                "Using %d overlapping pairs across methods for dataset=%s.",
+                len(common_keys),
+                dataset_name,
+            )
+            # Fetch ground truth only for shared pairs, then fix a deterministic order.
+            gt_by_pair = _load_ground_truth_for_pairs(list(common_keys))
+            ordered_keys = sorted(
+                key for key in common_keys if key in gt_by_pair
+            )
+            if len(ordered_keys) != len(common_keys):
+                logger.warning(
+                    "Missing ground-truth for %d overlapping pairs (dataset=%s); dropping them.",
+                    len(common_keys) - len(ordered_keys),
+                    dataset_name,
+                )
+            ground_truth = [gt_by_pair[key] for key in ordered_keys]
+
+            aligned_predictions: dict[str, list[float]] = {}
+            for method_name, scores_by_pair in scores_by_method.items():
+                # Align every method's scores to the same ordered key list.
+                predictions = [scores_by_pair[key] for key in ordered_keys]
+                aligned_predictions[method_name] = predictions
+                n_pairs_per_technique[method_name] = len(ordered_keys)
+                results[method_name] = compute_metrics_for_thresholds(
+                    ground_truth=ground_truth,
+                    scores=predictions,
+                    thresholds=CONFIG.THRESHOLDS,
+                )
+                logger.info(
+                    "Results for %s (shared pairs=%d): %s",
+                    method_name,
+                    len(ordered_keys),
+                    results[method_name],
+                )
+
+            pan_metrics = get_pan_metrics(
+                aligned_predictions,
+                ground_truth,
+                dataset_name=dataset_name,
+            )
+            logger.info(
+                "Computed results for PAN metrics across all metrics (shared pairs=%d).",
+                len(ground_truth),
+            )
 
     if save_artifacts:
         with open(LOCAL_SAVE_PATH / f"prec_rec_{dataset_name}_n_pairs_per_technique.json", "w") as f:
@@ -416,9 +455,10 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
         logger.info("Saved pan_metrics to %s", pan_metrics_save_path)
 
     if pairwise_pan_metric_significance:
+        # Corrected t-test for repeated k-fold CV using correctipy.
         sig = compare_pan_metrics_significance(
             pan_metrics,
-            test="wilcoxon",  # paired test (default), appropriate if folds are shared
+            test="repkfold_ttest",
             alpha_levels=(0.05, 0.01, 0.005),
         )
         # save pairwise significance results (per metric) as one file per comparison
