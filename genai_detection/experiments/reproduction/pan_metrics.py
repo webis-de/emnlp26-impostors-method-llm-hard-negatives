@@ -894,7 +894,7 @@ def plot_pan_metrics_boxplots(
     )
     ax.grid(axis="y", linestyle="--", alpha=0.4)
 
-    fig.tight_layout(rect=(0, 0, 0.8, 1))
+    fig.tight_layout(rect=(0, 0, 1, 1))
 
     if save_path is not None:
         suffix = dataset_name if dataset_name is not None else "all"
