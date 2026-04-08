@@ -421,9 +421,21 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
             test="wilcoxon",  # paired test (default), appropriate if folds are shared
             alpha_levels=(0.05, 0.01, 0.005),
         )
-        # save pairwise significance results (per metric)
-        with open(LOCAL_SAVE_PATH / f"pan_metrics_significance_{dataset_name}.json", "w") as f:
-            json.dump(sig, f, indent=2)
+        # save pairwise significance results (per metric) as one file per comparison
+        significance_dir = LOCAL_SAVE_PATH / "statistical_significance" / dataset_name
+        significance_dir.mkdir(parents=True, exist_ok=True)
+        for pair_key, pair_results in sig.get("pairs", {}).items():
+            safe_pair = pair_key.replace(" ", "_").replace("/", "_")
+            payload = {
+                "dataset_name": dataset_name,
+                "pair": pair_key,
+                "test": sig.get("test"),
+                "alternative": sig.get("alternative"),
+                "alpha_levels": sig.get("alpha_levels"),
+                "metrics": pair_results,
+            }
+            with open(significance_dir / f"pan_metrics_significance_{safe_pair}.json", "w") as f:
+                json.dump(payload, f, indent=2)
 
     return results
 
