@@ -105,6 +105,7 @@ def _compute_for_method(
         ci_level=CI_LEVEL,
         n_boot=N_BOOT,
     )
+    logger.info("Computed PAN metrics for %s (dataset=%s): %s", method_name, dataset_name, cv_result.metrics_mean)
 
     record = PANMetricsRecord(
         dataset_name=dataset_name,

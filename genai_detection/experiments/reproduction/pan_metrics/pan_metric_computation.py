@@ -505,8 +505,6 @@ class PANMetricComputer:
         metrics_mean, metrics_std, metric_values, metrics_ci = self._summarize_metrics(
             per_split_results, ci_level=ci_level, n_boot=n_boot
         )
-        logger.info("Summary of metrics obtained. See metric means: %s", metrics_mean)
-
         return EvaluationCVResult(
             split_config=split_config,
             per_split=per_split_results,

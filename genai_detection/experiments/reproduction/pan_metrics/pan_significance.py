@@ -365,6 +365,12 @@ class PANPairwiseSignificance:
             n_boot=n_boot,
             splits=splits,
         )
+        logger.info(
+            "Computed PAN metrics for %s (dataset=%s): %s",
+            method_name,
+            dataset_name,
+            cv_result.metrics_mean,
+        )
 
         record = self._record_from_cv(
             dataset_name=dataset_name,
