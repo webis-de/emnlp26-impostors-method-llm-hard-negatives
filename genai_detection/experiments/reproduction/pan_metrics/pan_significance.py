@@ -247,6 +247,9 @@ class PANPairwiseSignificance:
                 rounds=rounds,
             )
             y_true, scores_a, scores_b, n_samples = aligned
+            if n_samples == 0:
+                logger.warning(f"{dataset_name} dataset: Skipping {method_a} vs {method_b}, bc no aligned samples.")
+                continue
             logger.info(f"{dataset_name} dataset: Aligned {method_a} vs {method_b} with {n_samples} samples.")
 
             record_a = self._get_or_compute_record(
