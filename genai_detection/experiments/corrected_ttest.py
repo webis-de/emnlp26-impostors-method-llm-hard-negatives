@@ -14,7 +14,8 @@ implementation and is not a verbatim copy.
 
 import numpy as np
 import pandas as pd
-from scipy.stats import stats
+# Change code to fix import error
+from scipy.stats import t
 
 
 def repkfold_ttest(data, n1:int, n2:int, k:int, r:int):
@@ -90,9 +91,9 @@ def repkfold_ttest(data, n1:int, n2:int, k:int, r:int):
     )  # Calculate t-statistic
 
     if statistic < 0:
-        p_value = stats.t.cdf(statistic, (k * r) - 1)  # p-value for left tail
+        p_value = t.cdf(statistic, (k * r) - 1)  # p-value for left tail
     else:
-        p_value = stats.t.sf(statistic, (k * r) - 1)  # p-value for right tail
+        p_value = t.sf(statistic, (k * r) - 1)  # p-value for right tail
 
     stat_df = pd.DataFrame({"statistic": [statistic], "p_value": [p_value]})
     return stat_df
