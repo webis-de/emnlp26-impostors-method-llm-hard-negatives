@@ -443,8 +443,8 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
                 dataset_name=dataset_name,
             )
             logger.info(
-                "Computed results for PAN metrics across all metrics (shared pairs=%d).",
-                len(ground_truth),
+                "Computed results for PAN metrics across all metrics (shared pairs=%d) for dataset %s.",
+                len(ground_truth), dataset_name,
             )
 
     if save_artifacts:
