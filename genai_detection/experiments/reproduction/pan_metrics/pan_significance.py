@@ -233,6 +233,7 @@ class PANPairwiseSignificance:
         alpha_levels: Sequence[float] = (0.05, 0.01, 0.005),
     ) -> dict[str, dict]:
         results: dict[str, dict] = {}
+        methods = list(dict.fromkeys(methods))
 
         # unordered unique pairs
         for method_a, method_b in combinations(methods, 2):
@@ -309,6 +310,14 @@ class PANPairwiseSignificance:
             rounds=rounds,
         )
 
+        logger.info(
+            "Loaded %d scores for %s and %d for %s (dataset=%s).",
+            len(scores_a_by_pair),
+            method_a,
+            len(scores_b_by_pair),
+            method_b,
+            dataset_name,
+        )
         common_keys = set(scores_a_by_pair.keys()) & set(scores_b_by_pair.keys())
         if not common_keys:
             raise ValueError(f"No overlapping pairs for {method_a} vs {method_b}.")
@@ -322,6 +331,12 @@ class PANPairwiseSignificance:
         scores_a = [scores_a_by_pair[key] for key in ordered_keys]
         scores_b = [scores_b_by_pair[key] for key in ordered_keys]
 
+        logger.info(
+            "Aligned %s vs %s with %d shared samples.",
+            method_a,
+            method_b,
+            len(ordered_keys),
+        )
         return y_true, scores_a, scores_b, len(ordered_keys)
 
     def _get_or_compute_record(
