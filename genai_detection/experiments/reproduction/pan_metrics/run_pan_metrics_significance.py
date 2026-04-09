@@ -22,7 +22,7 @@ IMPOSTOR_TECHNIQUE_FOR_ABLATIONS = "in_domain"
 METHODS = [
     "two_step_llm",
     "on_the_fly_chatnoir",
-    "on_the_fly_serpapi",
+    # "on_the_fly_serpapi",
     "on_the_fly_startpage",
     "in_domain",
     "one_step_llm",
