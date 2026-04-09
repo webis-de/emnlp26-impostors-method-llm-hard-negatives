@@ -373,7 +373,11 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
         )
 
         # Baselines score every available pair; build the same pair ids.
-        pair_ids = list(zip(text_id_pairs[0::2], text_id_pairs[1::2]))
+        pair_ids = [
+            (ObjectId(left), ObjectId(right))
+            for left, right in zip(text_id_pairs[0::2], text_id_pairs[1::2])
+        ]
+
         for baseline, pred in baseline_predictions.items():
             if len(pred) != len(pair_ids):
                 raise ValueError(
@@ -455,6 +459,7 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
         logger.info("Saved pan_metrics to %s", pan_metrics_save_path)
 
     if pairwise_pan_metric_significance:
+        # FIXME: needs n_samples or split_config
         # Corrected t-test for repeated k-fold CV using correctipy.
         sig = compare_pan_metrics_significance(
             pan_metrics,
