@@ -14,7 +14,6 @@ if __name__ == "__main__":
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
     logger = logging.getLogger(__name__)
-    print(logger.level)
 
     parser = argparse.ArgumentParser(description="Compare detectors.")
     parser.add_argument(
@@ -78,7 +77,7 @@ if __name__ == "__main__":
         # "on_the_fly_serpapi",
         "on_the_fly_startpage",
         "in_domain",
-        "one_step_llm",   # SAIA URL on betaweb error: httpx.InvalidURL: Invalid port: 'academiccloud:de'
+        # "one_step_llm",   # SAIA URL on betaweb error: httpx.InvalidURL: Invalid port: 'academiccloud:de'
         "two_step_llm",
         # "translation",
         # "mirror_minds",   # raises error
