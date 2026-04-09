@@ -81,21 +81,6 @@ def _iter_batches(items: List, batch_size: int):
     for i in range(0, len(items), batch_size):
         yield items[i:i + batch_size]
 
-# def _jsonify_value(value):
-#     if isinstance(value, np.ndarray):
-#         return value.tolist()
-#     if isinstance(value, (np.floating, np.integer)):
-#         return value.item()
-#     if isinstance(value, (list, tuple)):
-#         return [_jsonify_value(v) for v in value]
-#     if isinstance(value, dict):
-#         return {k: _jsonify_value(v) for k, v in value.items()}
-#     return value
-#
-# def _df_to_serializable_records(df: pd.DataFrame) -> List[Dict]:
-#     records = df.to_dict(orient="records")
-#     return [{k: _jsonify_value(v) for k, v in row.items()} for row in records]
-
 def _score_baselines_for_pair_batches(
     baselines: Dict[str, object],
     pair_batches: Iterable[List[Tuple[str, str]]],
@@ -364,6 +349,7 @@ def plot_precision_recall_curve(
     dataset_name: str,
     save_path: Path = None,
     title: str = None,
+    filename_extra: str= None,
     label_translations: Optional[Dict[str, str]] = CONFIG.LABEL_TRANSLATIONS,
 ):
     """
@@ -425,8 +411,11 @@ def plot_precision_recall_curve(
         for format in ["pdf", "svg"]:
             fname = (
                 f"roc_prec_recall_curve_{dataset_name.replace(' ', '_')}_"
-                f"{positive_class.lower().replace(' ', '_')}.{format}"
+                f"{positive_class.lower().replace(' ', '_')}"
             )
+            if filename_extra:
+                fname = fname + "_" + filename_extra
+            fname = fname + f".{format}"
             if not save_path:
                 logger.warning(f"No save path for {fname}, using default save path: {LOCAL_SAVE_PATH}")
                 save_path = LOCAL_SAVE_PATH
@@ -526,11 +515,6 @@ def run_prec_recall_curves(dataset_name:str, imp_gen_techniques:List[str], compu
     # save precision-recall AUC values
     with open(LOCAL_SAVE_PATH / f"prec_rec_auc_{dataset_name}.json", "w") as f:
         json.dump(pr_aucs, f, indent=2)
-        # serializable_results = {
-        #         approach: _df_to_serializable_records(df)
-        #         for approach, df in pr_aucs.items()
-        #         }
-        # json.dump(serializable_results, f, indent=2)
 
     # best PR operating points
     best_pr_df = _extract_best_pr_points_per_impostor(
