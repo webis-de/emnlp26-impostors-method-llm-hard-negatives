@@ -356,8 +356,8 @@ class PANPairwiseSignificance:
         # Ordering is set before ("aligned") given that method have the same number of samples.
         # Hence, repeated CV scores are based on the same random split given the same number of samples.
         splits = self.split_manager.build_splits(np.asarray(y_true))
-        logger.info(f"About to start {self.split_manager.n_repeats} repetitions of {self.split_manager.n_splits}-fold "
-                    f"CV splits for {method_name}.")
+        logger.info(f"{dataset_name} dataset: About to start {self.split_manager.n_repeats} repetitions of"
+                    f" {self.split_manager.n_splits}-fold CV splits for {method_name}.")
         cv_result = self.evaluator.compute_cv(
             y_true=np.asarray(y_true),
             scores=np.asarray(scores),
