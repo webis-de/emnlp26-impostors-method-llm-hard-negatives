@@ -6,12 +6,8 @@ from dataclasses import asdict
 import json
 import logging
 from pathlib import Path
-from typing import Sequence
 
 import numpy as np
-from matplotlib import pyplot as plt
-
-from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 from .pan_cv import PANEvaluator, SplitManager
 from .pan_metric_computation import PANMetricComputer
@@ -121,123 +117,6 @@ def save_pan_metrics(pan_metrics, save_path: Path, dataset_name: str | None = No
     return save_file
 
 
-def plot_pan_metrics_boxplots(
-    dataset_name: str | None = None,
-    methods: Sequence[str] | None = None,
-    metrics: Sequence[str] | None = None,
-    save_path: Path | None = None,
-    title: str | None = None,
-):
-    """
-    Plot per-fold PAN metrics as grouped boxplots (grouped by metric, colored by method).
-    """
-    mongo = ParaphraseMongoDB(local_ray=True)
-
-    query: dict = {}
-    if dataset_name is not None:
-        query["dataset_name"] = dataset_name
-    if methods is not None:
-        query["method_name"] = {"$in": list(methods)}
-
-    cursor = mongo.pan_metrics_collection.find(
-        query,
-        {
-            "_id": 0,
-            "method_name": 1,
-            "dataset_name": 1,
-            "pan_metrics_per_split": 1,
-            "pan_metrics": 1,
-            "metrics_mean": 1,
-        },
-    )
-
-    metrics_by_method: dict[str, dict[str, list[float]]] = {}
-    for doc in cursor:
-        method_name = doc.get("method_name")
-        if not method_name:
-            continue
-        per_split = doc.get("pan_metrics_per_split") or []
-        if not per_split:
-            pan_payload = doc.get("pan_metrics", {}) or {}
-            if _looks_like_pan_metrics(pan_payload):
-                per_split = pan_payload.get("per_split") or []
-            elif method_name in pan_payload and _looks_like_pan_metrics(pan_payload[method_name]):
-                per_split = pan_payload[method_name].get("per_split") or []
-        metric_values = PANMetricComputer.extract_metric_values(per_split)
-        if metric_values:
-            metrics_by_method[method_name] = metric_values
-
-    if not metrics_by_method:
-        raise ValueError("No PAN metrics found for the given query.")
-
-    methods_list = sorted(metrics_by_method.keys())
-
-    if metrics is None:
-        default_order = [
-            "precision",
-            "recall",
-            "f1",
-            "accuracy",
-            "c_at_1",
-            "auroc",
-            "auroc_c_at_1",
-        ]
-        available = {m for vals in metrics_by_method.values() for m in vals.keys()}
-        metrics_list = [m for m in default_order if m in available]
-        metrics_list += sorted(m for m in available if m not in metrics_list)
-    else:
-        metrics_list = list(metrics)
-
-    n_methods = len(methods_list)
-    n_metrics = len(metrics_list)
-
-    box_data: list[list[float]] = []
-    box_positions: list[float] = []
-    box_method_idx: list[int] = []
-
-    for metric_idx, metric in enumerate(metrics_list):
-        group_start = metric_idx * (n_methods + 1) + 1
-        for method_idx, method in enumerate(methods_list):
-            values = metrics_by_method[method].get(metric, [])
-            if not values:
-                continue
-            box_positions.append(group_start + method_idx)
-            box_data.append(values)
-            box_method_idx.append(method_idx)
-
-    if not box_data:
-        raise ValueError("No metric values found for plotting.")
-
-    fig, ax = plt.subplots(figsize=(max(8, n_metrics * 2), 6))
-    boxplot = ax.boxplot(box_data, positions=box_positions, patch_artist=True)
-
-    colors = plt.cm.tab10.colors
-    for patch, method_idx in zip(boxplot["boxes"], box_method_idx):
-        patch.set_facecolor(colors[method_idx % len(colors)])
-
-    ax.set_xticks([
-        metric_idx * (n_methods + 1) + (n_methods / 2)
-        for metric_idx in range(n_metrics)
-    ])
-    ax.set_xticklabels(metrics_list, rotation=45, ha="right")
-
-    ax.set_ylabel("Metric Value")
-    if title:
-        ax.set_title(title)
-
-    if save_path is not None:
-        save_path.mkdir(parents=True, exist_ok=True)
-        out_path = save_path / "pan_metrics_boxplot.png"
-        fig.savefig(out_path, bbox_inches="tight")
-        logger.info("Saved boxplot to %s", out_path)
-
-    return fig
-
-
-def _looks_like_pan_metrics(value: object) -> bool:
-    return isinstance(value, dict) and (
-        "metrics_mean" in value or "per_split" in value or "split_config" in value
-    )
 
 
 def _record_to_legacy_payload(record: dict) -> dict:
