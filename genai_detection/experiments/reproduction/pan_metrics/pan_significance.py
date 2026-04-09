@@ -342,6 +342,9 @@ class PANPairwiseSignificance:
 
         if stored and decision == "reuse":
             stored = self.store.ensure_metric_values(stored, self.evaluator.extract_metric_values)
+            logger.info(
+                f"Retrieved PAN metrics for {dataset_name} using {method_name} on {n_samples} samples."
+            )
             return stored
         if decision == "error":
             raise ValueError(
@@ -353,6 +356,8 @@ class PANPairwiseSignificance:
         # Ordering is set before ("aligned") given that method have the same number of samples.
         # Hence, repeated CV scores are based on the same random split given the same number of samples.
         splits = self.split_manager.build_splits(np.asarray(y_true))
+        logger.info(f"About to start {self.split_manager.n_repeats} repetitions of {self.split_manager.n_splits}-fold "
+                    f"CV splits for {method_name}.")
         cv_result = self.evaluator.compute_cv(
             y_true=np.asarray(y_true),
             scores=np.asarray(scores),
