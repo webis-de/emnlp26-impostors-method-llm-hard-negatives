@@ -158,6 +158,40 @@ class BinaryVerificationEvaluator:
         return np.unique(threshold_array)
 
     @staticmethod
+    def _summary_metric_names() -> list[str]:
+        return [
+            f.name
+            for f in fields(EvaluationResult)
+            if f.metadata.get("summary", True)
+        ]
+
+    @staticmethod
+    def _extract_metric_values(
+        results: Sequence[EvaluationResult] | Sequence[dict],
+    ) -> dict[str, list[float]]:
+        metric_values: dict[str, list[float]] = defaultdict(list)
+        if not results:
+            return {}
+
+        first = results[0]
+        if isinstance(first, EvaluationResult):
+            for r in results:
+                for f in fields(r):
+                    # thresholds should not part of summary (i.e., computing mean and std makes no sense)
+                    if not f.metadata.get("summary", True):
+                        continue
+                    v = getattr(r, f.name)
+                    metric_values[f.name].append(np.nan if v is None else float(v))
+            return {metric: list(values) for metric, values in metric_values.items()}
+
+        summary_names = BinaryVerificationEvaluator._summary_metric_names()
+        for r in results:
+            for name in summary_names:
+                v = r.get(name)
+                metric_values[name].append(np.nan if v is None else float(v))
+        return {metric: list(values) for metric, values in metric_values.items()}
+
+    @staticmethod
     def _summarize_metrics(
         results: Sequence[EvaluationResult],
         ci_level: float,
@@ -177,15 +211,7 @@ class BinaryVerificationEvaluator:
         Returns mean, std, raw values, and CI dicts.
         Example values: results=[EvaluationResult(...), ...], ci_level=0.95, n_boot=10000.
         """
-        # stores metric values as lists for Bootstrapping code
-        metric_values = defaultdict(list)
-        for r in results:
-            for f in fields(r):
-                # thresholds should not part of summary (i.e., computing mean and std makes no sense)
-                if not f.metadata.get("summary", True):
-                    continue
-                v = getattr(r, f.name)
-                metric_values[f.name].append(np.nan if v is None else float(v))
+        metric_values = BinaryVerificationEvaluator._extract_metric_values(results)
 
         metrics_mean: dict[str, float] = {}
         metrics_std: dict[str, float] = {}
@@ -567,6 +593,8 @@ def get_pan_metrics(
     Scores are assumed to be aligned to the same item order; this function validates
     length consistency but does not re-order or re-align data.
     If a method/dataset entry exists in MongoDB, reuse it.
+    Note: metric_values are not persisted to MongoDB; they are reconstructed from
+    per_split when loading cached results.
     Example values: predictions={"method_a": [0.1, 0.4]}, y_true=[0, 1], dataset_name="blogs".
     Returns a dict mapping method names to dicts containing the summary of the metrics.
     """
@@ -627,6 +655,19 @@ def get_pan_metrics(
                     n_samples,
                 )
             pan_metrics[method_name] = existing_doc.get("pan_metrics", {})
+            if stored_n_samples is not None and "n_samples" not in pan_metrics[method_name]:
+                pan_metrics[method_name]["n_samples"] = int(stored_n_samples)
+            if "metric_values" not in pan_metrics[method_name]:
+                per_split = pan_metrics[method_name].get("per_split")
+                if per_split:
+                    pan_metrics[method_name]["metric_values"] = (
+                        BinaryVerificationEvaluator._extract_metric_values(per_split)
+                    )
+                else:
+                    logger.warning(
+                        "Missing metric_values and per_split for %s; significance tests may fail.",
+                        method_name,
+                    )
             logger.info("Skipping %s (PAN metrics already stored).", method_name)
             continue
 
@@ -646,6 +687,8 @@ def get_pan_metrics(
         metrics_mean = pan_metrics[method_name].pop("metrics_mean", {})
         metrics_std = pan_metrics[method_name].pop("metrics_std", {})
         metrics_ci = pan_metrics[method_name].pop("metrics_ci", {})
+        pan_metrics_payload = dict(pan_metrics[method_name])
+        pan_metrics_payload.pop("metric_values", None)  # subset of per_split, do not store
         mongo.pan_metrics_collection.replace_one(
             {"dataset_name": dataset_name, "method_name": method_name},
             {
@@ -655,7 +698,7 @@ def get_pan_metrics(
                 "metrics_mean": _jsonify_value(metrics_mean),
                 "metrics_std": _jsonify_value(metrics_std),
                 "metrics_ci": _jsonify_value(metrics_ci),
-                "pan_metrics_per_split": _jsonify_value(pan_metrics[method_name]),
+                "pan_metrics": _jsonify_value(pan_metrics_payload),
             },
             upsert=True,
         )
@@ -823,8 +866,7 @@ def compare_pan_metrics_significance(
             n_samples = method_metrics.get("n_samples")
             if not split_config or n_samples is None:
                 raise ValueError(
-                    f"Missing split_config or n_samples for method '{method_name}'. "
-                    "Recompute pan_metrics to include n_samples."
+                    f"Missing 'split_config' or 'n_samples' for method '{method_name}'. "
                 )
             current = {
                 "n_splits": int(split_config.get("n_splits")),
