@@ -5,12 +5,12 @@ from .pan_metric_computation import (
     EvaluationCVResult,
     PANMetricComputer,
 )
-from .pan_cv import SplitManager, PANEvaluator
-from .pan_storage import PANMetricsStore, PANMetricsRecord
-from .pan_data_loader import PANDataLoader, PANMethodConfig
-from .pan_significance import PANPairwiseSignificance
-from .pan_significance import compare_pan_metrics_significance
-from .legacy_api import get_pan_metrics, save_pan_metrics, plot_pan_metrics_boxplots
+from genai_detection.experiments.reproduction.pan_metrics.pan_cv import SplitManager, PANEvaluator
+from genai_detection.experiments.reproduction.pan_metrics.pan_storage import PANMetricsStore, PANMetricsRecord
+from genai_detection.experiments.reproduction.pan_metrics.pan_data_loader import PANDataLoader, PANMethodConfig
+from genai_detection.experiments.reproduction.pan_metrics.pan_significance import PANPairwiseSignificance
+from genai_detection.experiments.reproduction.pan_metrics.pan_significance import compare_pan_metrics_significance
+from genai_detection.experiments.reproduction.pan_metrics.pan_visualization import plot_pan_metrics_boxplots
 
 __all__ = [
     "EvaluationResult",
@@ -24,7 +24,5 @@ __all__ = [
     "PANMethodConfig",
     "PANPairwiseSignificance",
     "compare_pan_metrics_significance",
-    "get_pan_metrics",
-    "save_pan_metrics",
     "plot_pan_metrics_boxplots",
 ]
