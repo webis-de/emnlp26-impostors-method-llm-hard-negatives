@@ -7,7 +7,7 @@ import pandas as pd
 
 from genai_detection.config import CONFIG
 from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENERATORS
-from genai_detection.experiments.prec_recall_curves_ablations import (
+from genai_detection.experiments.run_prec_recall_curves_ablations import (
     LOCAL_SAVE_PATH,
 )
 from genai_detection.experiments.reproduction.ablation_args import ABLATION_DETECTORS
