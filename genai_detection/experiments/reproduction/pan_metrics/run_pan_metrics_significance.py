@@ -25,7 +25,7 @@ METHODS = [
     # "on_the_fly_serpapi",
     "on_the_fly_startpage",
     "in_domain",
-    "one_step_llm",
+    # "one_step_llm",
     # "translation",
     # "mirror_minds",   # raises error
     "out_of_domain",
