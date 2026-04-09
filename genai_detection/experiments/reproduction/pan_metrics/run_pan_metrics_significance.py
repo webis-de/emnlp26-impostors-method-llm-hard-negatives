@@ -74,7 +74,7 @@ if __name__ == "__main__":
         split_manager=split_manager,
     )
 
-    for dataset_name in [CONFIG.BLOG, CONFIG.STUDENT_ESSAYS]:
+    for dataset_name in [CONFIG.STUDENT_ESSAYS, CONFIG.BLOG]:
 
         results = significance.compute_pairwise_significance(
             dataset_name=dataset_name,
