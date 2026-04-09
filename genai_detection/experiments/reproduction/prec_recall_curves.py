@@ -17,12 +17,10 @@ import os
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import DefaultDict, Dict, Iterable, List, Optional, Tuple
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from bson import ObjectId
 from matplotlib import pyplot as plt
 from sklearn.metrics import auc
 
@@ -33,11 +31,14 @@ from genai_detection.detectors.impostor_supervised_baseline import SupervisedImp
 from genai_detection.detectors.impostor_unsupervised_baseline import UnSupervisedImpostorBaseline
 from genai_detection.detectors.ppmd import PPMdDetector
 from genai_detection.detectors.unmasking import UnmaskingDetector
-from genai_detection.experiments.reproduction.impostor_metrics import (compute_metrics_for_thresholds,
-                                                                       compute_metrics_parallel, load_all_pairs, )
-from genai_detection.experiments.reproduction.pan_metrics import (compare_pan_metrics_significance, get_pan_metrics,
-                                                                  save_pan_metrics,
-                                                                  )
+from genai_detection.experiments.reproduction.impostor_metrics import (
+    compute_metrics_for_thresholds,
+    compute_metrics_parallel,
+    load_all_pairs,
+)
+from genai_detection.experiments.reproduction.pan_metrics.pan_data_loader import (
+    PANDataLoader,
+)
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -236,12 +237,12 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
     batch_size: int = 250,
     include_baselines: bool = True,
     save_artifacts: bool = True,
-    pairwise_pan_metric_significance: bool = True,
 ) -> Dict[str, pd.DataFrame]:
     """
     Same as compute_prec_recall_f1_acc_dict, but loads precomputed
     impostor scores from the MongoDB impostor_outputs collection instead of active computation.
     Baselines are computed on the fly unless include_baselines=False.
+    Metrics are computed per method on its available pairs (no cross-method alignment).
     """
     logger.info(
         "Reproducing Figure 4 from stored impostor outputs for %s",
@@ -255,103 +256,61 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
         raise ValueError("imp_gen_techniques must not be empty.")
 
     mongoDB = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
+    loader = PANDataLoader(mongo=mongoDB, batch_size=batch_size)
 
-    results = {}
-
-    def _check_id_type(value):
-        assert isinstance(value, ObjectId), f"{value} is not an ObjectId, but of type {type(value)}"
-        return value
-
-    def _load_scores_for_technique(technique: str, dataset_name:str=None) -> Dict[Tuple[ObjectId, ObjectId], float]:
-        index = None
-        if "on_the_fly" in technique and len("on_the_fly") < len(technique):
-            # different indices are not stored in impostors_output_collection, but on_the_fly_paraphrases -> filter
-            # later
-            index = CONFIG.RETRIEVAL_INDEX_TRANSLATIONS[technique]
-            technique = "on_the_fly"
-            on_the_fly_cursor = mongoDB.on_the_fly_collection.find(
-                    {"index": index},
-                    {"_id": 1, "text_id": 1, "index": 1},
-            )
-            on_the_fly_df = pd.DataFrame(on_the_fly_cursor)
-            if on_the_fly_df.empty:
-                on_the_fly_df = pd.DataFrame(columns=["text_id", "index"])
-                logger.error(f"'{technique}' paraphrases on index '{index}' empty.")
-            else:
-                on_the_fly_df = (
-                    on_the_fly_df.sort_values("_id")
-                    .drop_duplicates(subset=["text_id"], keep="first")
-                )[["text_id", "index"]]
-
-        query = {
-            "impostor_generation_technique": technique,
-            "n_impostors": n_impostors,
-        }
-        if n_potential_impostors is not None:
-            query["n_potential_impostors"] = n_potential_impostors
-        if dataset_name is not None:
-            query["dataset_name"] = dataset_name
-        cursor = mongoDB.impostor_output_collection.find(
-            query,
-            {"left_id": 1, "right_id": 1, "scores_over_different_rounds": 1, "dataset_name":1},
-            batch_size=batch_size,
-        ).sort("_id", 1)
-        scores_by_pair: Dict[Tuple[ObjectId, ObjectId], float] = {}
-        for doc in cursor:
-            left_id = _check_id_type(doc["left_id"])
-            right_id = _check_id_type(doc["right_id"])
-            pair = (left_id, right_id)
-            if technique == "on_the_fly" and index:
-                # duplicates omitted before -> result is only one entry
-                paraphrases = on_the_fly_df[on_the_fly_df["text_id"]==left_id]
-                if paraphrases.empty or not (index == paraphrases["index"].iloc[0]):
-                    continue
-
-            if pair not in scores_by_pair:
-                scores_by_pair[pair] = doc["scores_over_different_rounds"] / rounds
-        logger.info(
-            "Loaded %d scores for technique %s",
-            len(scores_by_pair),
-            technique,
-        )
-        return scores_by_pair
-
-    def _load_ground_truth_for_pairs(
-        keys: List[Tuple[ObjectId, ObjectId]],
-    ) -> Dict[Tuple[ObjectId, ObjectId], int]:
-        gt_by_pair: Dict[Tuple[ObjectId, ObjectId], int] = {}
-        for batch in _iter_batches(keys, batch_size):
-            or_conditions = [{"left_id": l, "right_id": r} for l, r in batch]
-            cursor = mongoDB.all_pairs_collection.find(
-                {"dataset_name": dataset_name, "$or": or_conditions},
-                {"left_id": 1, "right_id": 1, "same": 1},
-                batch_size=batch_size,
-            )
-            for doc in cursor:
-                gt_by_pair[(doc["left_id"], doc["right_id"])] = int(doc["same"])
-        return gt_by_pair
-
+    results: Dict[str, pd.DataFrame] = {}
     n_pairs_per_technique: dict[str, int] = defaultdict(int)
-    pan_metrics: dict[str, dict[str, float]] = defaultdict(dict)
-    # Collect raw scores per method keyed by pair id for later alignment.
-    # scores_by_method also includes baseline scores if flag is true
-    scores_by_method: dict[str, Dict[Tuple[ObjectId, ObjectId], float]] = {}
+
     for technique in imp_gen_techniques:
-        # Scores will be aligned across methods via pair intersection below,
-        # ensuring paired significance tests compare the same items.
-        # key: (left_id, right_id)
-        loaded_scores_by_technique = _load_scores_for_technique(technique=technique, dataset_name=dataset_name)
-        # contains only matching dataset
-        n_pairs_per_technique[technique] = len(loaded_scores_by_technique)
-        if len(loaded_scores_by_technique) > 0:
-            scores_by_method[technique] = loaded_scores_by_technique
-        else:
-            logger.warning(f"No scores for technique {technique} found in mongoDB.")
+        scores_by_pair = loader.load_scores(
+            method_name=technique,
+            dataset_name=dataset_name,
+            n_impostors=n_impostors,
+            n_potential_impostors=n_potential_impostors,
+            rounds=rounds,
+        )
+        n_pairs_per_technique[technique] = len(scores_by_pair)
+        if not scores_by_pair:
+            logger.warning("No scores for technique %s found in MongoDB.", technique)
+            continue
+
+        ordered_pairs = list(scores_by_pair.keys())
+        gt_by_pair = loader.load_ground_truth(ordered_pairs, dataset_name)
+        ordered_pairs = [pair for pair in ordered_pairs if pair in gt_by_pair]
+        if not ordered_pairs:
+            logger.warning(
+                "No ground-truth found for technique %s (dataset=%s).",
+                technique,
+                dataset_name,
+            )
+            continue
+        if len(ordered_pairs) != len(scores_by_pair):
+            logger.warning(
+                "Missing ground-truth for %d/%d pairs for technique %s (dataset=%s).",
+                len(scores_by_pair) - len(ordered_pairs),
+                len(scores_by_pair),
+                technique,
+                dataset_name,
+            )
+
+        ground_truth = [gt_by_pair[pair] for pair in ordered_pairs]
+        scores = [scores_by_pair[pair] for pair in ordered_pairs]
+        results[technique] = compute_metrics_for_thresholds(
+            ground_truth=ground_truth,
+            scores=scores,
+            thresholds=CONFIG.THRESHOLDS,
+        )
+        logger.info(
+            "Results for %s (pairs=%d): %s",
+            technique,
+            len(scores),
+            results[technique],
+        )
 
     if include_baselines:
         baselines = _build_baselines(dataset_name=dataset_name)
         # load all pairs per dataset
-        text_id_pairs, _ = load_all_pairs(dataset_name)
+        text_id_pairs, ground_truth = load_all_pairs(dataset_name)
         text_id_pairs_len = len(text_id_pairs)
         assert (
             text_id_pairs_len % 2 == 0
@@ -372,115 +331,27 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
             pair_batches=[text_pairs],
         )
 
-        # Baselines score every available pair; build the same pair ids.
-        pair_ids = [
-            (ObjectId(left), ObjectId(right))
-            for left, right in zip(text_id_pairs[0::2], text_id_pairs[1::2])
-        ]
-
         for baseline, pred in baseline_predictions.items():
-            if len(pred) != len(pair_ids):
+            if len(pred) != len(ground_truth):
                 raise ValueError(
-                    f"Baseline {baseline}: expected {len(pair_ids)} scores, got {len(pred)}"
+                    f"Baseline {baseline}: expected {len(ground_truth)} scores, got {len(pred)}"
                 )
             n_pairs_per_technique[baseline] = len(pred)
-            scores_by_method[baseline] = {
-                pair_ids[i]: pred[i] for i in range(len(pair_ids))
-            }
-
-    if scores_by_method:
-        logger.info(
-            "Pairs per method before intersection (dataset=%s): %s",
-            dataset_name,
-            n_pairs_per_technique,
-        )
-        # Use the intersection of pairs across all methods to ensure shared items.
-        common_keys = set.intersection(
-            *(set(scores.keys()) for scores in scores_by_method.values())
-        )
-        if not common_keys:
-            logger.warning(
-                "No overlapping pairs across methods for dataset=%s; "
-                "skipping paired significance-compatible metrics.",
-                dataset_name,
-            )
-        else:
-            logger.info(
-                "Using %d overlapping pairs across methods for dataset=%s.",
-                len(common_keys),
-                dataset_name,
-            )
-            # Fetch ground truth only for shared pairs, then fix a deterministic order.
-            gt_by_pair = _load_ground_truth_for_pairs(list(common_keys))
-            ordered_keys = sorted(
-                key for key in common_keys if key in gt_by_pair
-            )
-            if len(ordered_keys) != len(common_keys):
-                logger.warning(
-                    "Missing ground-truth for %d overlapping pairs (dataset=%s); dropping them.",
-                    len(common_keys) - len(ordered_keys),
-                    dataset_name,
-                )
-            ground_truth = [gt_by_pair[key] for key in ordered_keys]
-
-            aligned_predictions: dict[str, list[float]] = {}
-            for method_name, scores_by_pair in scores_by_method.items():
-                # Align every method's scores to the same ordered key list.
-                predictions = [scores_by_pair[key] for key in ordered_keys]
-                aligned_predictions[method_name] = predictions
-                n_pairs_per_technique[method_name] = len(ordered_keys)
-                results[method_name] = compute_metrics_for_thresholds(
-                    ground_truth=ground_truth,
-                    scores=predictions,
-                    thresholds=CONFIG.THRESHOLDS,
-                )
-                logger.info(
-                    "Results for %s (shared pairs=%d): %s",
-                    method_name,
-                    len(ordered_keys),
-                    results[method_name],
-                )
-
-            pan_metrics = get_pan_metrics(
-                aligned_predictions,
-                ground_truth,
-                dataset_name=dataset_name,
+            results[baseline] = compute_metrics_for_thresholds(
+                ground_truth=ground_truth,
+                scores=pred,
+                thresholds=CONFIG.THRESHOLDS,
             )
             logger.info(
-                "Computed results for PAN metrics across all metrics (shared pairs=%d) for dataset %s.",
-                len(ground_truth), dataset_name,
+                "Results for %s (pairs=%d): %s",
+                baseline,
+                len(pred),
+                results[baseline],
             )
 
     if save_artifacts:
         with open(LOCAL_SAVE_PATH / f"prec_rec_{dataset_name}_n_pairs_per_technique.json", "w") as f:
             json.dump(dict(n_pairs_per_technique), f, indent=2)
-
-        pan_metrics_save_path = save_pan_metrics(save_path=LOCAL_SAVE_PATH, pan_metrics=pan_metrics, dataset_name=dataset_name)
-        logger.info("Saved pan_metrics to %s", pan_metrics_save_path)
-
-    if pairwise_pan_metric_significance:
-        # FIXME: needs n_samples or split_config
-        # Corrected t-test for repeated k-fold CV using correctipy.
-        sig = compare_pan_metrics_significance(
-            pan_metrics,
-            test="repkfold_ttest",
-            alpha_levels=(0.05, 0.01, 0.005),
-        )
-        # save pairwise significance results (per metric) as one file per comparison
-        significance_dir = LOCAL_SAVE_PATH / "statistical_significance" / dataset_name
-        significance_dir.mkdir(parents=True, exist_ok=True)
-        for pair_key, pair_results in sig.get("pairs", {}).items():
-            safe_pair = pair_key.replace(" ", "_").replace("/", "_")
-            payload = {
-                "dataset_name": dataset_name,
-                "pair": pair_key,
-                "test": sig.get("test"),
-                "alternative": sig.get("alternative"),
-                "alpha_levels": sig.get("alpha_levels"),
-                "metrics": pair_results,
-            }
-            with open(significance_dir / f"pan_metrics_significance_{safe_pair}.json", "w") as f:
-                json.dump(payload, f, indent=2)
 
     return results
 
