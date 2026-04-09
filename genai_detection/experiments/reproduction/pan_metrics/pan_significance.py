@@ -246,7 +246,7 @@ class PANPairwiseSignificance:
                 rounds=rounds,
             )
             y_true, scores_a, scores_b, n_samples = aligned
-            logger.info(f"Aligned {method_a} vs {method_b} with {n_samples} samples.")
+            logger.info(f"{dataset_name} dataset: Aligned {method_a} vs {method_b} with {n_samples} samples.")
 
             record_a = self._get_or_compute_record(
                 dataset_name,
