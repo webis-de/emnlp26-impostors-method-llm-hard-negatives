@@ -28,7 +28,6 @@ METHODS = [
     # "one_step_llm",
     # "translation",
     # "mirror_minds",   # raises error
-    "out_of_domain",
     "bdi",
     "homotopy",
     "potha2017",
