@@ -158,7 +158,8 @@ def build_table(
     lines[-1] = "\\bottomrule"
     lines.append("\\end{tabular}}")
     lines.append(
-        "\\caption{Wilcoxon test results for the Blog Posts and Student Essays datasets. "
+        "\\caption{Corrected paired t-test based on 10-times 10-fold CV for the Blog Posts and Student Essays "
+        "datasets. "
         "Asterisks indicate statistically significant differences "
         "({\\tiny \\texttt{*, **, ***}} for $p_{\\text{corr}} < 0.05, 0.01, 0.005$, respectively).}"
     )
