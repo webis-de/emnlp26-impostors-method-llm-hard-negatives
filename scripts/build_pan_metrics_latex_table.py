@@ -31,14 +31,27 @@ CITE_ALIAS_LINES = [
 
 
 METRIC_ORDER = [
-    "f1",
     "accuracy",
+    "f1",
     "precision",
     "recall",
     "auroc",
     "c_at_1",
     "auroc_c_at_1",
 ]
+
+
+METRIC_LABELS = {
+    "accuracy": "Acc.",
+    "f1": "F1",
+    "precision": "Prec.",
+    "recall": "Rec.",
+    "auroc": "AUROC",
+    "c_at_1": "c@1",
+    "auroc_c_at_1": (
+        r"\raisebox{0.75ex}[0em][0em]{\begin{tabular}{@{}c@{}}AUROC\\[-0.5ex]$\times$~c@1\end{tabular}}"
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -141,13 +154,16 @@ def _load_metrics_for_method(
     method_keys: Sequence[str],
 ) -> dict[str, float] | None:
     for method_key in method_keys:
-        doc = mongo.pan_metrics_collection.find_one(
-            {"dataset_name": dataset_name, "method_name": method_key},
-            {"_id": 0, "pan_metrics": 1, "metrics_mean": 1},
+        docs = list(
+            mongo.pan_metrics_collection.find(
+                {"dataset_name": dataset_name, "method_name": method_key},
+                {"_id": 0, "pan_metrics": 1, "metrics_mean": 1, "n_samples": 1},
+            )
         )
-        if doc is None:
+        if not docs:
             continue
-        metrics_mean = _extract_metrics_mean(doc, method_key)
+        best_doc = max(docs, key=lambda item: _n_samples_value(item.get("n_samples")))
+        metrics_mean = _extract_metrics_mean(best_doc, method_key)
         if metrics_mean:
             return metrics_mean
         logger.warning(
@@ -156,6 +172,13 @@ def _load_metrics_for_method(
             method_key,
         )
     return None
+
+
+def _n_samples_value(value: float | int | None) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return -1.0
 
 
 def _round_metric(value: float | int | None) -> float | None:
@@ -239,7 +262,9 @@ def build_table(
         r"\cmidrule(r@{\tabcolsep}){1-2}\cmidrule(l@{\tabcolsep}){3-8}"
     )
     lines.append(
-        r"Authors & Year & F1 & Acc. & Prec. & Rec. & AUROC & c@1 & \raisebox{0.75ex}[0em][0em]{\begin{tabular}{@{}c@{}}AUROC\\[-0.5ex]$\times$~c@1\end{tabular}} \\"
+        r"Authors & Year & "
+        + " & ".join(METRIC_LABELS[metric] for metric in METRIC_ORDER)
+        + r" \\"
     )
     lines.append(r"\midrule")
 
