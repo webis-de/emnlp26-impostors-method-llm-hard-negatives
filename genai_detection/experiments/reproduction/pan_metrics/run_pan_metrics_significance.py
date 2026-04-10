@@ -39,8 +39,9 @@ N_IMPOSTORS = 50
 N_POTENTIAL_IMPOSTORS = None
 ROUNDS = 100
 
+# Bouckaert & Frank (2004): 10x 10-fold CV is best in terms of type I and II error as well as replicability..
 N_SPLITS = 10
-N_REPEATS = 5
+N_REPEATS = 10
 RANDOM_STATE = 42
 CI_LEVEL = 0.95
 N_BOOT = 10000
