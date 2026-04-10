@@ -257,18 +257,22 @@ class PANPairwiseSignificance:
                 method_a,
                 y_true,
                 scores_a,
-                n_samples,
-                ci_level,
-                n_boot,
+                n_samples=n_samples,
+                n_splits=self.split_manager.n_splits,
+                n_repeats=self.split_manager.n_repeats,
+                ci_level=ci_level,
+                n_boot=n_boot,
             )
             record_b = self._get_or_compute_record(
                 dataset_name,
                 method_b,
                 y_true,
                 scores_b,
-                n_samples,
-                ci_level,
-                n_boot,
+                n_samples=n_samples,
+                n_splits=self.split_manager.n_splits,
+                n_repeats=self.split_manager.n_repeats,
+                ci_level=ci_level,
+                n_boot=n_boot,
             )
 
             pan_metrics = {
@@ -349,20 +353,26 @@ class PANPairwiseSignificance:
         y_true: list[int],
         scores: list[float],
         n_samples: int,
+        n_splits:int,
+        n_repeats:int,
         ci_level: float,
         n_boot: int,
     ) -> dict:
         stored = self.store.get_record(dataset_name, method_name)
+        if stored:
+            precomputed_n_samples = stored.get("n_samples")
+            precomputed_n_splits = stored.get("split_config", {}).get("n_splits")
+            precomputed_n_repeats = stored.get("split_config", {}).get("n_repeats")
 
-        if stored and not self.store._recompute(
-            stored.get("n_samples") if stored else None,
-            n_samples,
-        ):
-            stored = self.store.ensure_metric_values(stored, self.evaluator.extract_metric_values)
-            logger.info(
-                f"Retrieved PAN metrics for {dataset_name} using {method_name} on {n_samples} samples."
-            )
-            return stored
+            if not self.store._recompute(precomputed_n_samples,n_samples) and not self.store._recompute(
+                    precomputed_n_splits,n_splits) and not self.store._recompute(
+                    precomputed_n_repeats,n_repeats):
+                stored = self.store.ensure_metric_values(stored, self.evaluator.extract_metric_values)
+                logger.info(
+                    f"Retrieved PAN metrics for {dataset_name} using {method_name} on {n_samples} samples ("
+                    f"{n_repeats}x{n_splits}-fold CV). ."
+                )
+                return stored
 
         # guarantees identical repeated CV splits for any methods that share the same sample set and ordering.
         # Ordering is set before ("aligned") given that method have the same number of samples.
