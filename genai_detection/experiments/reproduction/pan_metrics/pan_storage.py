@@ -105,15 +105,6 @@ class PANMetricsStore:
         return record
 
     @staticmethod
-    def _recompute(stored: int | None, requested: int) -> bool:
-        """
-        Compare stored vs requested sample counts.
-
-        Returns True if the stored sample count is different from the requested one.
-        """
-        return stored != requested
-
-    @staticmethod
     def _normalize_doc(doc: dict[str, Any]) -> dict[str, Any]:
         """
         Normalize legacy and new MongoDB record formats into a common shape.

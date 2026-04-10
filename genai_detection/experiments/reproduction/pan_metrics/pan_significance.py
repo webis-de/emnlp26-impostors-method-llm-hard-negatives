@@ -364,9 +364,8 @@ class PANPairwiseSignificance:
             precomputed_n_splits = stored.get("split_config", {}).get("n_splits")
             precomputed_n_repeats = stored.get("split_config", {}).get("n_repeats")
 
-            if not self.store._recompute(precomputed_n_samples,n_samples) and not self.store._recompute(
-                    precomputed_n_splits,n_splits) and not self.store._recompute(
-                    precomputed_n_repeats,n_repeats):
+            if ((precomputed_n_samples==n_samples) and (precomputed_n_splits==n_splits) and
+                    (precomputed_n_repeats==n_repeats)):
                 stored = self.store.ensure_metric_values(stored, self.evaluator.extract_metric_values)
                 logger.info(
                     f"Retrieved PAN metrics for {dataset_name} using {method_name} on {n_samples} samples ("
