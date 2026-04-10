@@ -105,19 +105,13 @@ class PANMetricsStore:
         return record
 
     @staticmethod
-    def validate_n_samples(stored: int | None, requested: int) -> str:
+    def _recompute(stored: int | None, requested: int) -> bool:
         """
         Compare stored vs requested sample counts.
 
-        Returns one of: "reuse", "recompute", "error".
+        Returns True if the stored sample count is different from the requested one.
         """
-        if stored is None:
-            return "recompute"
-        if stored == requested:
-            return "reuse"
-        if stored > requested:
-            return "recompute"
-        return "error"
+        return stored != requested
 
     @staticmethod
     def _normalize_doc(doc: dict[str, Any]) -> dict[str, Any]:

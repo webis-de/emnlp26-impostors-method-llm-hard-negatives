@@ -353,22 +353,16 @@ class PANPairwiseSignificance:
         n_boot: int,
     ) -> dict:
         stored = self.store.get_record(dataset_name, method_name)
-        decision = self.store.validate_n_samples(
+
+        if stored and not self.store._recompute(
             stored.get("n_samples") if stored else None,
             n_samples,
-        )
-
-        if stored and decision == "reuse":
+        ):
             stored = self.store.ensure_metric_values(stored, self.evaluator.extract_metric_values)
             logger.info(
                 f"Retrieved PAN metrics for {dataset_name} using {method_name} on {n_samples} samples."
             )
             return stored
-        if decision == "error":
-            raise ValueError(
-                f"Stored n_samples ({stored.get('n_samples')}) is smaller than requested "
-                f"({n_samples}) for {method_name}."
-            )
 
         # guarantees identical repeated CV splits for any methods that share the same sample set and ordering.
         # Ordering is set before ("aligned") given that method have the same number of samples.
