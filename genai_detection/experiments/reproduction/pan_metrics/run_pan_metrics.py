@@ -43,6 +43,14 @@ ABLATION_METHODS = [
     "ppmd",
 ]
 
+BASELINE_METHODS = [
+    "unsupervised_baseline_min-max",
+    "unsupervised_baseline_cosine",
+    "supervised_baseline",
+    "unmasking",
+    "ppmd",
+]
+
 N_IMPOSTORS = 50
 N_POTENTIAL_IMPOSTORS = None
 ROUNDS = 100
@@ -140,30 +148,27 @@ if __name__ == "__main__":
     store = PANMetricsStore()
 
     for dataset_name in [CONFIG.STUDENT_ESSAYS, CONFIG.BLOG]:
-        # normal methods with different impostor techniques
-        for method in IMPOSTOR_METHODS:
-            _compute_for_method(
-                method,
-                dataset_name=dataset_name,
-                loader=loader,
-                evaluator=evaluator,
-                store=store,
-                impostor_technique=None,
-                n_impostors=N_IMPOSTORS,
-                n_potential_impostors=N_POTENTIAL_IMPOSTORS,
-                rounds=ROUNDS,
-            )
+        input_args = {
+                "dataset_name":dataset_name,
+                "loader":loader,
+                "evaluator":evaluator,
+                "store":store,
+                "impostor_technique":None,
+                "n_impostors":N_IMPOSTORS,
+                "n_potential_impostors":N_POTENTIAL_IMPOSTORS,
+                "rounds":ROUNDS,
+                }
 
-        # ablation methods
-        for method in ABLATION_METHODS:
+        for method in BASELINE_METHODS + IMPOSTOR_METHODS + ABLATION_METHODS:
+            logger.info("Computing PAN metrics for %s method (dataset=%s).", method, dataset_name)
+            # ablation methods
+            if method in ABLATION_METHODS:
+                input_args["impostor_technique"] = IMPOSTOR_TECHNIQUE_FOR_ABLATIONS
+            else:
+                # normal methods with different impostor techniques or baselines
+                input_args["impostor_technique"] = None
+
             _compute_for_method(
                 method,
-                dataset_name=dataset_name,
-                loader=loader,
-                evaluator=evaluator,
-                store=store,
-                impostor_technique=IMPOSTOR_TECHNIQUE_FOR_ABLATIONS,
-                n_impostors=N_IMPOSTORS,
-                n_potential_impostors=N_POTENTIAL_IMPOSTORS,
-                rounds=ROUNDS,
+                **input_args,
             )

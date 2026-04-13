@@ -59,13 +59,20 @@ class PANDataLoader:
                 impostor_technique=impostor_technique,
             )
 
-        return self._load_impostor_scores(
-            technique=method_name,
-            dataset_name=dataset_name,
-            n_impostors=n_impostors,
-            n_potential_impostors=n_potential_impostors,
-            rounds=rounds,
-        )
+        if method_name in IMPOSTOR_GENERATORS:
+            return self._load_impostor_scores(
+                technique=method_name,
+                dataset_name=dataset_name,
+                n_impostors=n_impostors,
+                n_potential_impostors=n_potential_impostors,
+                rounds=rounds,
+            )
+
+        else:
+            return self.load_or_compute_baseline_scores(
+                method_name=method_name,
+                dataset_name=dataset_name
+            )
 
     def _load_impostor_scores(
         self,
@@ -126,6 +133,54 @@ class PANDataLoader:
                 scores_by_pair[pair] = doc["scores_over_different_rounds"] / rounds
 
         return scores_by_pair
+
+    def load_or_compute_baseline_scores(
+        self,
+        method_name: str,
+        dataset_name: str,
+    ) -> Dict[Tuple[ObjectId, ObjectId], float]:
+        from genai_detection.experiments.reproduction.impostor_metrics import (
+            load_all_pairs,
+        )
+        from genai_detection.experiments.reproduction.prec_recall_curves import (
+            _build_baselines,
+            _score_baselines_for_pair_batches,
+        )
+
+        baselines = _build_baselines(dataset_name=dataset_name)
+        baseline = baselines.get(method_name)
+        if baseline is None:
+            raise ValueError(f"Unsupported baseline method: {method_name}")
+
+        text_id_pairs, _ = load_all_pairs(dataset_name)
+        if not text_id_pairs:
+            return {}
+        if len(text_id_pairs) % 2 != 0:
+            raise ValueError(
+                f"Flattened text list must contain even number of elements but length is {len(text_id_pairs)}"
+            )
+
+        text_test_pairs = self.mongo.get_texts_for_ids(text_ids=text_id_pairs)
+        text_pairs = list(zip(text_test_pairs[0::2], text_test_pairs[1::2]))
+        id_pairs = list(zip(text_id_pairs[0::2], text_id_pairs[1::2]))
+
+        predictions = _score_baselines_for_pair_batches(
+            baselines={method_name: baseline},
+            pair_batches=[text_pairs],
+            pair_id_batches=[id_pairs],
+            dataset_name=dataset_name,
+            mongoDB=self.mongo,
+        )
+        scores = predictions.get(method_name, [])
+        if len(scores) != len(id_pairs):
+            raise ValueError(
+                f"Baseline {method_name}: expected {len(id_pairs)} scores, got {len(scores)}"
+            )
+
+        return {
+            (ObjectId(left_id), ObjectId(right_id)): score
+            for (left_id, right_id), score in zip(id_pairs, scores)
+        }
 
     def _load_ablation_scores(
         self,
