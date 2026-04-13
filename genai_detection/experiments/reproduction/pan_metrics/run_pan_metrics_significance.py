@@ -32,7 +32,7 @@ METHODS = [
     "homotopy",
     "potha2017",
     "asgalf",
-    # "std_impostor",
+    "std_impostor",
 ]
 
 N_IMPOSTORS = 50
@@ -75,6 +75,7 @@ if __name__ == "__main__":
     )
 
     for dataset_name in [CONFIG.STUDENT_ESSAYS, CONFIG.BLOG]:
+
 
         results = significance.compute_pairwise_significance(
             dataset_name=dataset_name,
