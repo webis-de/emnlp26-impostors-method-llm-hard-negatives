@@ -7,12 +7,17 @@ import logging
 from dataclasses import asdict
 from itertools import combinations
 from typing import Iterable, Sequence
+# Add effect size computation via Cohen's d_z
+# https://pingouin-stats.org/generated/pingouin.compute_effsize.html#pingouin.compute_effsize (13.04.2026)
+
+import pingouin as pg
 
 import numpy as np
 import pandas as pd
 from scipy.stats import mannwhitneyu, ttest_ind, ttest_rel, wilcoxon
 
 from genai_detection.experiments.corrected_ttest import repkfold_ttest
+
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +88,7 @@ def _pairwise_repkfold_p_value(
     df = pd.DataFrame(rows)
 
     result = repkfold_ttest(data=df, train_set_size=train_set_size, test_set_size=test_set_size, k=n_splits, r=n_repeats)
+
     if "p_value" in result.columns:
         return float(result["p_value"].iloc[0])
     if "p.value" in result.columns:
@@ -157,13 +163,14 @@ def compare_pan_metrics_significance(
             values_a = np.asarray(metrics_a.get(metric, []), dtype=float)
             values_b = np.asarray(metrics_b.get(metric, []), dtype=float)
 
-            if (test != "repkfold_ttest") or (test in {"mannwhitney", "ttest_ind"}):
+            if test in {"wilcoxon", "ttest_rel"}:
+                # paired tests which do not exactly k (# folds) x r (# repetitions) observations
                 values_a, values_b = _filter_finite_pairs(values_a, values_b)
-            if len(values_a) != len(values_b) and test in {"wilcoxon", "ttest_rel"}:
-                raise ValueError(
-                    f"Paired test '{test}' requires equal-length samples for "
-                    f"metric '{metric}' ({method_a} vs {method_b})."
-                )
+                if len(values_a) != len(values_b):
+                    raise ValueError(
+                        f"Paired test '{test}' requires equal-length samples for "
+                        f"metric '{metric}' ({method_a} vs {method_b})."
+                    )
             if len(values_a) < min_samples or len(values_b) < min_samples:
                 pair_results[metric] = {
                     "p_value": float("nan"),
@@ -193,11 +200,29 @@ def compare_pan_metrics_significance(
 
             # bonferroni correction
             p_value_bonf = min(p_value * bonf_correction_factor, 1.0)
+
+            # Match effect size to design
+            if test in {"repkfold_ttest", "wilcoxon", "ttest_rel"}:
+                # Cohen's d_z for paired samples (also: one-sample)
+                effect_size = float(
+                    pg.compute_effsize(
+                        values_a, values_b, paired=True, eftype="cohen_dz"
+                    )
+                )
+            elif test in {"mannwhitney", "ttest_ind"}:
+                # Cohen's d for independent samples
+                effect_size = float(
+                    pg.compute_effsize(values_a, values_b, paired=False, eftype="cohen")
+                )
+            else:
+                effect_size = float("nan")
+
             pair_results[metric] = {
                 "p_value": float(p_value),
                 "p_value_bonf": p_value_bonf,
                 "n": int(min(len(values_a), len(values_b))),
                 "significant": {str(a): bool(p_value_bonf <= a) for a in alpha_sorted},
+                "effect_size": effect_size,
             }
 
         results["pairs"][pair_key] = pair_results
