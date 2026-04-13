@@ -97,6 +97,7 @@ def compare_pan_metrics_significance(
     test: str = "repkfold_ttest",
     alternative: str = "two-sided",
     min_samples: int = 2,
+    bonf_correction_factor:float=1.0
 ) -> dict[str, dict]:
     """
     Assess pairwise significance between approaches per metric using per-fold values.
@@ -190,10 +191,13 @@ def compare_pan_metrics_significance(
             except ValueError:
                 p_value = float("nan")
 
+            # bonferroni correction
+            p_value_bonf = min(p_value * bonf_correction_factor, 1.0)
             pair_results[metric] = {
                 "p_value": float(p_value),
+                "p_value_bonf": p_value_bonf,
                 "n": int(min(len(values_a), len(values_b))),
-                "significant": {str(a): bool(p_value <= a) for a in alpha_sorted},
+                "significant": {str(a): bool(p_value_bonf <= a) for a in alpha_sorted},
             }
 
         results["pairs"][pair_key] = pair_results
@@ -234,9 +238,14 @@ class PANPairwiseSignificance:
     ) -> dict[str, dict]:
         results: dict[str, dict] = {}
         methods = list(dict.fromkeys(methods))
+        method_combinations = list(combinations(methods, 2))
+
+        # multiple testing correction via Bonferroni correction
+        # Bonferroni controls the family‑wise error rate across all pairwise comparisons for a single metric within a dataset.
+        m = len(method_combinations)
 
         # unordered unique pairs
-        for method_a, method_b in combinations(methods, 2):
+        for method_a, method_b in method_combinations:
             aligned = self._align_pairwise(
                 dataset_name=dataset_name,
                 method_a=method_a,
@@ -284,6 +293,7 @@ class PANPairwiseSignificance:
                 pan_metrics,
                 test=test,
                 alpha_levels=alpha_levels,
+                bonf_correction_factor=m
             )
             logger.info(f"Computed pairwise {test} significance for {method_a} vs {method_b}.")
 
