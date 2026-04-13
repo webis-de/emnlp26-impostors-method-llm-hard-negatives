@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import datetime
 import json
 import logging
 import os
@@ -23,6 +24,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from sklearn.metrics import auc
+from bson import ObjectId
 
 from genai_detection.config import CONFIG
 from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENERATORS
@@ -81,20 +83,144 @@ def _iter_batches(items: List, batch_size: int):
     for i in range(0, len(items), batch_size):
         yield items[i:i + batch_size]
 
+def _baseline_config_for(
+    baseline_name: str,
+    baseline: object,
+) -> Dict[str, object]:
+    if isinstance(baseline, UnSupervisedImpostorBaseline):
+        return {"use_cosine_simiarity": "cosine" in baseline_name}
+    if isinstance(baseline, SupervisedImpostorBaseline):
+        return {"model": "LinearSVC"}
+    if isinstance(baseline, UnmaskingDetector):
+        return {
+            "rounds": baseline.rounds,
+            "top_n": baseline.top_n,
+            "cv_folds": baseline.cv_folds,
+            "n_delete": baseline.n_delete,
+            "shared_vocab_only": baseline.shared_vocab_only,
+            "chunk_size": baseline.chunk_size,
+            "relative_freqs": baseline.relative_freqs,
+            "bootstrap": baseline.bootstrap,
+            "n_chunks": baseline.n_chunks,
+            "smoothing_kernel_size": baseline.smoothing_kernel_size,
+            "strict": baseline.strict,
+        }
+    if isinstance(baseline, PPMdDetector):
+        return {"strict": baseline.strict}
+    return {}
+
 def _score_baselines_for_pair_batches(
     baselines: Dict[str, object],
     pair_batches: Iterable[List[Tuple[str, str]]],
+    *,
+    pair_id_batches: Optional[Iterable[List[Tuple[ObjectId, ObjectId]]]] = None,
+    dataset_name: Optional[str] = None,
+    mongoDB: Optional[ParaphraseMongoDB] = None,
 ) -> Dict[str, List[float]]:
     predictions: Dict[str, List[float]] = {name: [] for name in baselines.keys()}
+    if pair_id_batches is None or dataset_name is None or mongoDB is None:
+        for batch in pair_batches:
+            if not batch:
+                continue
+            flat_texts = [text for pair in batch for text in pair]
+            for name, baseline in baselines.items():
+                preds = baseline.get_score(flat_texts)
+                preds = preds.tolist() if hasattr(preds, "tolist") else preds
+                predictions[name].extend(np.asarray(preds).ravel().tolist())
+        return predictions
 
-    for batch in pair_batches:
+    baseline_configs = {
+        name: _baseline_config_for(name, baseline)
+        for name, baseline in baselines.items()
+    }
+    for batch, id_batch in zip(pair_batches, pair_id_batches):
         if not batch:
             continue
-        flat_texts = [text for pair in batch for text in pair]
+        if len(batch) != len(id_batch):
+            raise ValueError(
+                f"Text and ID batches must align, got {len(batch)} texts and {len(id_batch)} ids."
+            )
+        id_pairs = [(ObjectId(l), ObjectId(r)) for l, r in id_batch]
         for name, baseline in baselines.items():
-            preds = baseline.get_score(flat_texts)
-            preds = preds.tolist() if hasattr(preds, "tolist") else preds
-            predictions[name].extend(np.asarray(preds).ravel().tolist())
+            config = baseline_configs[name]
+            existing_scores: Dict[Tuple[ObjectId, ObjectId], float] = {}
+            for id_sub_batch in _iter_batches(id_pairs, 500):
+                if not id_sub_batch:
+                    continue
+                or_conditions = [
+                    {"left_id": left_id, "right_id": right_id}
+                    for left_id, right_id in id_sub_batch
+                ]
+                cursor = mongoDB.baseline_output_collection.find(
+                    {
+                        "baseline": name,
+                        "dataset_name": dataset_name,
+                        "config": config,
+                        "$or": or_conditions,
+                    },
+                    {"left_id": 1, "right_id": 1, "score": 1},
+                ).sort("_id", 1)
+                for doc in cursor:
+                    existing_scores[(doc["left_id"], doc["right_id"])] = doc["score"]
+
+            missing_pairs: List[Tuple[str, str]] = []
+            missing_ids: List[Tuple[ObjectId, ObjectId]] = []
+            for pair_texts, pair_ids in zip(batch, id_pairs):
+                if pair_ids not in existing_scores:
+                    missing_pairs.append(pair_texts)
+                    missing_ids.append(pair_ids)
+
+            computed_scores: List[float] = []
+            if missing_pairs:
+                missing_flat_texts = [
+                    text for pair in missing_pairs for text in pair
+                ]
+                preds = baseline.get_score(missing_flat_texts)
+                preds = preds.tolist() if hasattr(preds, "tolist") else preds
+                computed_scores = np.asarray(preds).ravel().tolist()
+                if len(computed_scores) != len(missing_pairs):
+                    raise ValueError(
+                        f"Baseline {name}: expected {len(missing_pairs)} scores, got {len(computed_scores)}"
+                    )
+                created_at = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                docs = [
+                    {
+                        "baseline": name,
+                        "created_at": created_at,
+                        "dataset_name": dataset_name,
+                        "left_id": left_id,
+                        "right_id": right_id,
+                        "score": float(score),
+                        "config": config,
+                    }
+                    for (left_id, right_id), score in zip(missing_ids, computed_scores)
+                ]
+                if docs:
+                    try:
+                        mongoDB.insert_documents(
+                            collection=mongoDB.baseline_output_collection,
+                            insert_data=docs,
+                        )
+                        logger.info(
+                            "Inserted %d baseline scores into MongoDB collection %s.",
+                            len(docs),
+                            mongoDB.baseline_output_collection.name,
+                        )
+                    except Exception as e:
+                        logger.error(
+                            "Failed to insert baseline scores into MongoDB: %s",
+                            e,
+                        )
+
+            computed_iter = iter(computed_scores)
+            ordered_scores: List[float] = []
+            for pair_ids in id_pairs:
+                score = existing_scores.get(pair_ids)
+                if score is None:
+                    score = next(computed_iter)
+                ordered_scores.append(score)
+
+            predictions[name].extend(ordered_scores)
 
     return predictions
 
@@ -196,9 +322,13 @@ def compute_prec_recall_f1_acc_dict(
     text_test_pairs = mongoDB.get_texts_for_ids(text_ids=text_id_pairs)
 
     text_pairs = list(zip(text_test_pairs[0::2], text_test_pairs[1::2]))
+    id_pairs = list(zip(text_id_pairs[0::2], text_id_pairs[1::2]))
     baseline_predictions = _score_baselines_for_pair_batches(
         baselines=baselines,
         pair_batches=[text_pairs],
+        pair_id_batches=[id_pairs],
+        dataset_name=dataset_name,
+        mongoDB=mongoDB,
     )
     predictions.update(baseline_predictions)
     # -----------------------------------------------------------------
@@ -311,9 +441,13 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
         text_test_pairs = mongoDB.get_texts_for_ids(text_ids=text_id_pairs)
 
         text_pairs = list(zip(text_test_pairs[0::2], text_test_pairs[1::2]))
+        id_pairs = list(zip(text_id_pairs[0::2], text_id_pairs[1::2]))
         baseline_predictions = _score_baselines_for_pair_batches(
             baselines=baselines,
             pair_batches=[text_pairs],
+            pair_id_batches=[id_pairs],
+            dataset_name=dataset_name,
+            mongoDB=mongoDB,
         )
 
         for baseline, pred in baseline_predictions.items():
