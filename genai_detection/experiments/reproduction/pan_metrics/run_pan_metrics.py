@@ -36,6 +36,11 @@ ABLATION_METHODS = [
     "potha2017",
     "asgalf",
     "std_impostor",
+    "unmasking",
+    "unsupervised_baseline_min-max",
+    "unsupervised_baseline_cosine",
+    "supervised_baseline",
+    "ppmd",
 ]
 
 N_IMPOSTORS = 50
