@@ -310,7 +310,7 @@ def build_effect_size_table(
     lines[-1] = "\\bottomrule"
     lines.append("\\end{tabular}}")
     lines.append(
-        "\\caption{Pairwise effect sizes for each metric. "
+        "\\caption{Pairwise effect sizes (Cohens $d_z$) for each metric. "
         "Effect sizes are reported for the same corrected paired tests used in the significance table.}"
     )
     lines.append("\\label{tab:permutation-effect-sizes}")
