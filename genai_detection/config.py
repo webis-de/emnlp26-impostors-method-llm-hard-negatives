@@ -67,6 +67,7 @@ class BaseConfig:
     MONGO_PARAPHRASE_SCORE_COLLECTION = "paraphrase_scores"  # collection (!= db)
     MONGO_IMPOSTOR_OUTPUT_COLLECTION = "impostors_outputs" # collection (!= db)
     MONGO_IMPOSTOR_ABLATION_OUTPUT_COLLECTION = "impostors_outputs_ablations" # collection (!= db)
+    MONGO_BASELINE_OUTPUT_COLLECTION = "baseline_outputs" # collection (!= db)
     MONGO_PAN_METRICS_COLLECTION = "pan_metrics"
     MONGO_TEST_PAIRS_COLLECTION = "test_pairs" # collection (!= db); for IDs of texts and their ground truth (
     # reproducibility of evaluation)
