@@ -12,23 +12,28 @@ This file therefore contains a modified version of the original
 implementation and is not a verbatim copy.
 """
 
+import logging
+
 import numpy as np
 import pandas as pd
 # Change code to fix import error
 from scipy.stats import t
 
+logger = logging.getLogger(__name__)
 
-def repkfold_ttest(data, n1:int, n2:int, k:int, r:int):
+# renamed variables to avoid confusion
+def repkfold_ttest(data, train_set_size:int, test_set_size:int, k:int, r:int):
     """
     Compute correlated t-statistic and p-value for repeated k-fold cross-validated results.
     Args:
         data (dataframe): dataframe of values for model A and model B over repeated k-fold cross-validation
-        n1 (int): train set size
-        n2 (int): test set size
+        train_set_size (int): train set size
+        test_set_size (int): test set size
         k (int): number of folds used in k-fold
         r (int): number of repeats per fold
 
     Returns:
+
         dataframe: Pandas dataframe containing the test statistic and the p-value.
     """
 
@@ -60,12 +65,12 @@ def repkfold_ttest(data, n1:int, n2:int, k:int, r:int):
         )
 
     if not (
-        np.isscalar(n1)
-        and np.isscalar(n2)
+        np.isscalar(train_set_size)
+        and np.isscalar(test_set_size)
         and np.isscalar(k)
         and np.isscalar(r)
-        and np.isreal(n1)
-        and np.isreal(n2)
+        and np.isreal(train_set_size)
+        and np.isreal(test_set_size)
         and np.isreal(k)
         and np.isreal(r)
     ):
@@ -84,10 +89,30 @@ def repkfold_ttest(data, n1:int, n2:int, k:int, r:int):
             model_values = x.groupby(by="model").agg({"values": "mean"})
             d.append(model_values.values[0, 0] - model_values.values[1, 0])
 
+    d = np.asarray(d, dtype=float)
+    if len(d) < 2 or not np.isfinite(d).all():
+        logger.debug(
+            "repkfold_ttest: insufficient or non-finite diffs; len=%s, non_finite=%s",
+            len(d),
+            int(np.size(d) - np.isfinite(d).sum()),
+        )
+        stat_df = pd.DataFrame({"statistic": [np.nan], "p_value": [np.nan]})
+        return stat_df
+
+    var_d = np.var(d, ddof=1, keepdims=True)
+    if np.all(var_d == 0):
+        logger.debug(
+            "repkfold_ttest: zero variance in diffs; len=%s, mean=%s",
+            len(d),
+            float(np.mean(d)),
+        )
+        stat_df = pd.DataFrame({"statistic": [0.0], "p_value": [1.0]})
+        return stat_df
+
     # altered code from https://github.com/hendersontrent/correctipy/blob/main/correctipy/statistics.py#L126C31-L126C53
     # to fix obsolete sqrt (cf. Section 3.3. in https://ml.cms.waikato.ac.nz/publications/2004/bouckaert-frank.pdf)
     statistic = np.mean(d) / (
-        np.sqrt(np.var(d, ddof=1, keepdims=True) * ((1 / (k * r)) + (n2 / n1)))
+        np.sqrt(var_d * ((1 / (k * r)) + (test_set_size / train_set_size)))
     )  # Calculate t-statistic
 
     if statistic < 0:
