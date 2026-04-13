@@ -82,7 +82,7 @@ def _pairwise_repkfold_p_value(
         rows.append({"model": "B", "values": float(b[idx]), "k": k, "r": r})
     df = pd.DataFrame(rows)
 
-    result = repkfold_ttest(data=df, n1=test_set_size, n2=train_set_size, k=n_splits, r=n_repeats)
+    result = repkfold_ttest(data=df, train_set_size=train_set_size, test_set_size=test_set_size, k=n_splits, r=n_repeats)
     if "p_value" in result.columns:
         return float(result["p_value"].iloc[0])
     if "p.value" in result.columns:
