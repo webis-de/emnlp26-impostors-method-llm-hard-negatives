@@ -88,5 +88,5 @@ if __name__ == "__main__":
             n_boot=N_BOOT,
         )
 
-        out_path = _save_results(results, store.save_dir, dataset_name=dataset_name)
+        out_path = _save_results(results, store.save_dir / "statistical_significance", dataset_name=dataset_name)
         logger.info("Saved significance results to %s", out_path)
