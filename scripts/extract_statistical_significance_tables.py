@@ -39,7 +39,6 @@ def extract_tables(base_dir: Path) -> None:
     if not base_dir or not base_dir.exists():
         raise ValueError(f"No dataset directory '{base_dir}' found")
 
-
     json_files = sorted(base_dir.glob("pan_metrics_significance_*.json"))
     if not json_files:
         raise FileNotFoundError(f"No pan_metrics_significance_*.json files found in {base_dir}")
@@ -49,16 +48,11 @@ def extract_tables(base_dir: Path) -> None:
     for path in json_files:
         with open(path, "r") as f:
             payload = json.load(f)
-
-        print(payload)
-        # FIXME: format incorrect
-        pair = payload.get("pair")
-        metrics = payload.get("metrics", {})
-        if not pair or not metrics:
-            continue
-        left, right = _parse_pair(pair)
-        methods.update([left, right])
-        entries.append((left, right, metrics))
+        for pair in list(payload.keys()):
+            left, right = _parse_pair(pair)
+            metrics = payload.get("metrics", {})
+            methods.update([left, right])
+            entries.append((left, right, metrics))
 
     if not entries:
         raise ValueError(f"No significant entries found in {base_dir}")
