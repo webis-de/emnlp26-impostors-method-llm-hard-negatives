@@ -10,8 +10,7 @@ import numpy as np
 from scipy.stats import bootstrap
 from sklearn.metrics import (
     accuracy_score,
-    f1_score,
-    precision_score,
+    f1_score, precision_recall_curve, precision_score,
     recall_score,
     roc_auc_score,
 )
@@ -268,29 +267,25 @@ class PANMetricComputer:
         self,
         y_true: np.ndarray,
         scores: np.ndarray,
-        thresholds: Iterable[float] | None,
     ) -> tuple[float, float]:
-        best_threshold = float(thresholds[0])
-        best_f1 = -np.inf
-        best_recall = -np.inf
-        best_precision = -np.inf
 
-        for threshold in thresholds:
-            preds = (scores > threshold).astype(int)
-            precision = precision_score(y_true, preds, zero_division=0)
-            recall = recall_score(y_true, preds, zero_division=0)
-            f1 = f1_score(y_true, preds, zero_division=0)
+        precision, recall, pr_thresholds = precision_recall_curve(y_true, scores)
 
-            if f1 > best_f1 or (
-                np.isclose(f1, best_f1)
-                and (recall > best_recall or (np.isclose(recall, best_recall) and precision > best_precision))
-            ):
-                best_f1 = float(f1)
-                best_recall = float(recall)
-                best_precision = float(precision)
-                best_threshold = float(threshold)
+        prec = precision[1:]
+        rec = recall[1:]
+        thr = pr_thresholds
 
-        return best_threshold, best_f1
+        # avoid division by zero
+        f1 = 2 * (prec * rec) / (prec + rec + 1e-12)
+
+        # apply your constraint: exclude degenerate cases
+        mask = (prec > 0) & (prec < 1) & (rec > 0) & (rec < 1)
+        if not np.any(mask):
+            best = int(np.argmax(f1))  # fallback to unconstrained best
+            return float(thr[best]), float(f1[best])
+
+        best = int(np.argmax(f1[mask]))
+        return float(thr[mask][best]), float(f1[mask][best])
 
     def evaluate_at_threshold(
         self,
@@ -453,8 +448,7 @@ class PANMetricComputer:
 
             best_f1_threshold, _ = self._optimize_f1_threshold(
                 y_true=y_true_train,
-                scores=scores_train,
-                thresholds=threshold_values,
+                scores=scores_train
             )
 
             best_lower_threshold: float | None = None
