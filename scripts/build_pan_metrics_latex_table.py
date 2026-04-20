@@ -107,11 +107,11 @@ ROW_SPECS: Sequence[RowSpec] = [
         year="",
         method_keys=("unsupervised_baseline_cosine",),
     ),
-    RowSpec(
-        label="  SVM (B)",
-        year="",
-        method_keys=("supervised_baseline",),
-    ),
+    # RowSpec(
+    #     label="  SVM (B)",
+    #     year="",
+    #     method_keys=("supervised_baseline",),
+    # ),
     RowSpec(
         label="  Unmasking (B)",
         year="",
@@ -294,7 +294,7 @@ def build_table(
     lines.append(r"\end{tabular}")
     lines.append(
         r"\caption{Reproduction\,of\,the\,Impostors\,Method\,variants and baselines. The Scores are computed as mean "
-        r"over ten 10-fold CVs. \textcolor{red}{TODO: update std}}"
+        r"over ten 10-fold CVs.}"
     )
     lines.append(r"\label{table-impostor-method-reproduction-results}")
     lines.append(r"\end{table}")
