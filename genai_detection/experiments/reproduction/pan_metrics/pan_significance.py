@@ -393,7 +393,7 @@ class PANPairwiseSignificance:
         ci_level: float,
         n_boot: int,
     ) -> dict:
-        stored = self.store.get_record(dataset_name, method_name)
+        stored = self.store.get_record(dataset_name=dataset_name, method_name=method_name, n_samples=n_samples)
         if stored:
             precomputed_n_samples = stored.get("n_samples")
             precomputed_n_splits = stored.get("split_config", {}).get("n_splits")

@@ -100,8 +100,8 @@ def _compute_for_method(
     logger.info("Loaded %d ground truth and scores for %s (dataset=%s).", len(y_true), method_name, dataset_name)
 
     # Skip if Mongo already has matching record (dataset, method, n_samples).
-    existing = store.get_record(dataset_name, method_name)
-    if existing and int(existing.get("n_samples", -1)) == len(ordered_keys):
+    existing = store.get_record(dataset_name=dataset_name, method_name=method_name, n_samples=len(ordered_keys))
+    if existing:
         logger.info(
             "Skipping %s (dataset=%s) - cached PAN metrics for n_samples=%d.",
             method_name,

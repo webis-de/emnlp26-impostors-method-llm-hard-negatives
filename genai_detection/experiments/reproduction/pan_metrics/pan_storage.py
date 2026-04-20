@@ -66,9 +66,17 @@ class PANMetricsStore:
         repo_root = Path(__file__).resolve().parents[4]
         return repo_root / CONFIG.SAVE_PATH / "reproduction" / "pan_metrics"
 
-    def get_record(self, dataset_name: str, method_name: str) -> dict[str, Any] | None:
+    def get_record(
+        self,
+        dataset_name: str,
+        method_name: str,
+        n_samples: int | None = None,
+    ) -> dict[str, Any] | None:
+        query: dict[str, Any] = {"dataset_name": dataset_name, "method_name": method_name}
+        if n_samples is not None:
+            query["n_samples"] = n_samples
         doc = self.mongo.pan_metrics_collection.find_one(
-            {"dataset_name": dataset_name, "method_name": method_name},
+            query,
             {"_id": 0},
             sort=[("_id", -1)],
         )
