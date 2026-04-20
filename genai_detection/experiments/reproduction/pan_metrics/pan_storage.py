@@ -70,6 +70,7 @@ class PANMetricsStore:
         doc = self.mongo.pan_metrics_collection.find_one(
             {"dataset_name": dataset_name, "method_name": method_name},
             {"_id": 0},
+            sort=[("_id", -1)],
         )
         if doc is None:
             return None
@@ -77,11 +78,7 @@ class PANMetricsStore:
 
     def save_record(self, record: PANMetricsRecord, persist_disk: bool = True) -> None:
         payload = record.to_mongo_dict()
-        self.mongo.pan_metrics_collection.replace_one(
-            {"dataset_name": record.dataset_name, "method_name": record.method_name},
-            payload,
-            upsert=True,
-        )
+        self.mongo.pan_metrics_collection.insert_one(payload)
         if persist_disk:
             self.save_record_to_disk(record)
 
