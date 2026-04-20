@@ -140,6 +140,8 @@ def _load_dataset_effect_sizes(
 ) -> Dict[str, Dict[Tuple[str, str], float]]:
     data: Dict[str, Dict[Tuple[str, str], float]] = {}
     json_files = sorted(dataset_dir.glob("pan_metrics_significance_*.json"))
+    if len(json_files) < 1:
+        print(f"No pan_metrics_significance_*.json files found in {dataset_dir}")
     for path in json_files:
         with open(path, "r") as f:
             payload = json.load(f)
@@ -281,7 +283,7 @@ def build_effect_size_table(
     lines.append("\\midrule")
 
     for dataset in datasets:
-        dataset_dir = base_dir / dataset
+        dataset_dir = base_dir.parents[2] / dataset
         if not dataset_dir.exists():
             continue
         metrics_data = _load_dataset_effect_sizes(dataset_dir, metric_list)
@@ -321,7 +323,7 @@ def build_effect_size_table(
 
 def main() -> None:
     LOCAL_SAVE_PATH = (
-        Path(__file__).resolve().parents[1] / CONFIG.SAVE_PATH / "reproduction"
+        Path(__file__).resolve().parents[1] / CONFIG.SAVE_PATH / "reproduction/pan_metrics"
     )
     print(f"Local save path: {LOCAL_SAVE_PATH}")
     parser = argparse.ArgumentParser(
