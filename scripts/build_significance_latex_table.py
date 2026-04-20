@@ -81,6 +81,7 @@ def _load_dataset_metrics(
     for metric in metrics:
         csv_path = dataset_dir / "extracted_per_metric" / f"significance_{dataset_dir.name}_{metric}.csv"
         if not csv_path.exists():
+            print(f"No significance CSV found for {metric} in {dataset_dir}")
             continue
         data[metric] = _read_metric_csv(csv_path)
     return data
