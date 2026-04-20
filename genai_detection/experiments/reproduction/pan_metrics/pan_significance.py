@@ -4,9 +4,9 @@ import logging
 
 """Pairwise significance testing for PAN metrics."""
 
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from itertools import combinations
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence
 # Add effect size computation via Cohen's d_z
 # https://pingouin-stats.org/generated/pingouin.compute_effsize.html#pingouin.compute_effsize (13.04.2026)
 
@@ -25,6 +25,44 @@ from genai_detection.experiments.reproduction.pan_metrics.pan_cv import PANEvalu
 from genai_detection.experiments.reproduction.pan_metrics.pan_metric_computation import EvaluationCVResult
 from genai_detection.experiments.reproduction.pan_metrics.pan_storage import PANMetricsRecord, PANMetricsStore
 from genai_detection.experiments.reproduction.pan_metrics.pan_data_loader import PANDataLoader
+
+
+@dataclass(frozen=True)
+class PANPairwiseMetricSignificanceResult:
+    """
+    Pairwise significance outcome for a single metric (A vs B).
+    """
+
+    p_value: float
+    p_value_bonf: float
+    n_samples: int
+    significant: dict[str, bool]
+    effect_size: float
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "p_value": float(self.p_value),
+            "p_value_bonf": float(self.p_value_bonf),
+            "n_samples": int(self.n_samples),
+            "significant": dict(self.significant),
+            "effect_size": float(self.effect_size),
+        }
+
+    @classmethod
+    def nan_result(
+        cls,
+        *,
+        n_samples: int,
+        alpha_levels: Sequence[float],
+    ) -> "PANPairwiseMetricSignificanceResult":
+        alpha_sorted = sorted(set(float(a) for a in alpha_levels))
+        return cls(
+            p_value=float("nan"),
+            p_value_bonf=float("nan"),
+            n_samples=int(n_samples),
+            significant={str(a): False for a in alpha_sorted},
+            effect_size=float("nan"),
+        )
 
 
 def _filter_finite_pairs(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -117,7 +155,7 @@ def compare_pan_metrics_significance(
         "test": test,
         "alternative": alternative,
         "alpha_levels": alpha_sorted,
-        "pairs": {},
+        "metrics": {},
     }
 
     repkfold_meta: dict[str, int] | None = None
@@ -156,7 +194,6 @@ def compare_pan_metrics_significance(
         else:
             metric_names = list(metrics)
 
-        pair_key = f"{method_a} vs {method_b}"
         pair_results: dict[str, dict] = {}
 
         for metric in metric_names:
@@ -171,12 +208,12 @@ def compare_pan_metrics_significance(
                         f"Paired test '{test}' requires equal-length samples for "
                         f"metric '{metric}' ({method_a} vs {method_b})."
                     )
+            n_pair_samples = int(min(len(values_a), len(values_b)))
             if len(values_a) < min_samples or len(values_b) < min_samples:
-                pair_results[metric] = {
-                    "p_value": float("nan"),
-                    "n": int(min(len(values_a), len(values_b))),
-                    "significant": {str(a): False for a in alpha_sorted},
-                }
+                pair_results[metric] = PANPairwiseMetricSignificanceResult.nan_result(
+                    n_samples=n_pair_samples,
+                    alpha_levels=alpha_sorted,
+                ).to_dict()
                 continue
 
             try:
@@ -217,15 +254,15 @@ def compare_pan_metrics_significance(
             else:
                 effect_size = float("nan")
 
-            pair_results[metric] = {
-                "p_value": float(p_value),
-                "p_value_bonf": p_value_bonf,
-                "n": int(min(len(values_a), len(values_b))),
-                "significant": {str(a): bool(p_value_bonf <= a) for a in alpha_sorted},
-                "effect_size": effect_size,
-            }
+            pair_results[metric] = PANPairwiseMetricSignificanceResult(
+                p_value=float(p_value),
+                p_value_bonf=float(p_value_bonf),
+                n_samples=n_pair_samples,
+                significant={str(a): bool(p_value_bonf <= a) for a in alpha_sorted},
+                effect_size=float(effect_size),
+            ).to_dict()
 
-        results["pairs"][pair_key] = pair_results
+        results["metrics"] = pair_results
 
     return results
 
