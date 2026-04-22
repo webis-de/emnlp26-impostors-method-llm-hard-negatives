@@ -205,6 +205,22 @@ def plot_pan_metrics_heatmap_per_split(
             n_repeats=n_repeats,
         )
 
+        if methods is None:
+            methods_list = [m for m in methods_list if m in pan_metrics_across_splits]
+        else:
+            missing = [m for m in methods_list if m not in pan_metrics_across_splits]
+            if missing:
+                logger.warning(
+                    "Missing per-split PAN metrics for dataset=%s methods=%s; plotting empty columns.",
+                    dataset_name,
+                    missing,
+                )
+
+        if not methods_list:
+            raise ValueError(
+                f"No per-split PAN metrics available for dataset={dataset_name!r} and the requested methods."
+            )
+
         n_total_splits = _infer_total_splits(
             pan_metrics_across_splits,
             n_folds=n_folds,
@@ -216,8 +232,7 @@ def plot_pan_metrics_heatmap_per_split(
             )
         split_labels = _split_labels(n_splits=n_folds, n_repeats=n_repeats, n_total=n_total_splits)
 
-        method_labels = [CONFIG.LABEL_TRANSLATIONS.get(m, m) for m in methods_list if m in
-                         list(pan_metrics_across_splits.keys())]
+        method_labels = [CONFIG.LABEL_TRANSLATIONS.get(m, m) for m in methods_list]
         metric_labels = [CONFIG.SCORE_TRANSLATIONS.get(m, m) for m in metrics_list]
         xticklabels = method_labels * len(metrics_list)
         matrix = _build_heatmap_matrix(
