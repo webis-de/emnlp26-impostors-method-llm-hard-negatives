@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import math
 from pathlib import Path
-from typing import Sequence
+from typing import Mapping, Sequence
 
 import numpy as np
 import seaborn as sns
@@ -38,14 +38,59 @@ def _valid_metric_names(names: Sequence[str]) -> list[str]:
     return ordered
 
 
-def _split_labels(n_splits: int, n_repeats: int | None) -> list[str]:
-    if n_splits > 0 and n_repeats > 0:
+def _split_labels(n_splits: int | None, n_repeats: int | None, n_total: int | None = None) -> list[str]:
+    if n_splits is not None and n_repeats is not None and n_splits > 0 and n_repeats > 0:
         labels: list[str] = []
         for idx in range(n_repeats * n_splits):
             repeat = idx // n_splits + 1
             fold = idx % n_splits + 1
             labels.append(f"r{repeat:02d}-f{fold:02d}")
         return labels
+
+    if n_total is None or n_total <= 0:
+        return []
+    return [f"s{idx + 1:03d}" for idx in range(n_total)]
+
+
+def _infer_total_splits(
+    pan_metrics_across_splits: Mapping[str, Mapping[str, Sequence[float]]],
+    *,
+    n_folds: int | None,
+    n_repeats: int | None,
+) -> int:
+    if n_folds is not None and n_repeats is not None and n_folds > 0 and n_repeats > 0:
+        return int(n_folds * n_repeats)
+    max_len = 0
+    for metric_values in pan_metrics_across_splits.values():
+        for values in metric_values.values():
+            try:
+                max_len = max(max_len, len(values))
+            except TypeError:
+                continue
+    return max_len
+
+
+def _build_heatmap_matrix(
+    pan_metrics_across_splits: Mapping[str, Mapping[str, Sequence[float]]],
+    *,
+    methods: Sequence[str],
+    metrics: Sequence[str],
+    n_total_splits: int,
+) -> np.ndarray:
+    matrix = np.full((n_total_splits, len(methods) * len(metrics)), np.nan, dtype=float)
+    for metric_idx, metric in enumerate(metrics):
+        for method_idx, method_name in enumerate(methods):
+            per_method = pan_metrics_across_splits.get(method_name) or {}
+            values = per_method.get(metric) or []
+            col = metric_idx * len(methods) + method_idx
+            for split_idx, raw in enumerate(values[:n_total_splits]):
+                if raw is None:
+                    continue
+                try:
+                    matrix[split_idx, col] = float(raw)
+                except (TypeError, ValueError):
+                    continue
+    return matrix
 
 
 def _load_pan_metrics_across_splits(
@@ -65,31 +110,39 @@ def _load_pan_metrics_across_splits(
         {"_id": 0},
     )
     docs = list(cursor)
-    n_samples_per_method : dict[str, dict[str, int]] = {}
     if docs:
-        per_split_by_method: dict[str, dict[list[float]]] = {m: {} for m in methods}
+        best_payload_by_method: dict[str, tuple[int, list[dict]]] = {}
         for doc in docs:
-            method_name = doc.get("method_name")
-            if method_name not in per_split_by_method:
-                continue
-            payload = doc.get(per_split_feature_name)
-            split_config = doc.get("split_config")
-            n_samples = doc.get("n_samples")
-
-            if n_folds != split_config.get("n_splits") or n_repeats != split_config.get("n_repeats"):
+            normalized = store._normalize_doc(doc)
+            method_name = normalized.get("method_name")
+            if method_name not in methods:
                 continue
 
-            for metric in list(CONFIG.SCORE_TRANSLATIONS.keys()):
-                if (method_name in n_samples_per_method and
-                    n_samples_per_method[method_name].get(metric, 0) >= n_samples):
-                    continue
-                if method_name not in n_samples_per_method:
-                    n_samples_per_method[method_name] = {}
-                    per_split_by_method[method_name] = {}
-                # payload is list of dicts, each dict is a split's metrics'
-                per_split_by_method[method_name][metric] = [split.get(method_name, 0.0) for split in payload]
-                n_samples_per_method[method_name][metric] = n_samples
+            split_config = normalized.get("split_config") or {}
+            if n_folds is not None and split_config.get("n_splits") != n_folds:
+                continue
+            if n_repeats is not None and split_config.get("n_repeats") != n_repeats:
+                continue
 
+            payload = normalized.get(per_split_feature_name)
+            if payload is None and per_split_feature_name != "pan_metrics_per_split":
+                payload = normalized.get("pan_metrics_per_split")
+            if payload is None and per_split_feature_name != "per_split":
+                payload = normalized.get("per_split")
+            if not payload:
+                continue
+
+            n_samples_raw = normalized.get("n_samples")
+            n_samples = int(n_samples_raw) if isinstance(n_samples_raw, (int, float)) else 0
+
+            best = best_payload_by_method.get(method_name)
+            if best is None or n_samples > best[0]:
+                # payload is list[dict], each dict is a split's metrics
+                best_payload_by_method[method_name] = (n_samples, payload)
+
+        per_split_by_method: dict[str, dict[str, list[float]]] = {}
+        for method_name, (_, payload) in best_payload_by_method.items():
+            per_split_by_method[method_name] = PANMetricComputer.extract_metric_values(payload)
         return per_split_by_method
 
     logger.warning(
@@ -136,6 +189,13 @@ def plot_pan_metrics_heatmap_per_split(
     for dataset_name in dataset_names:
         methods_list = _ordered_methods(methods)
 
+        if metrics is None:
+            metrics_list = list(CONFIG.SCORE_TRANSLATIONS.keys())
+        else:
+            metrics_list = _valid_metric_names(list(metrics))
+        if not metrics_list:
+            raise ValueError("No valid PAN metrics requested for heatmap plotting.")
+
         pan_metrics_across_splits = _load_pan_metrics_across_splits(
             store=store,
             dataset_name=dataset_name,
@@ -145,30 +205,27 @@ def plot_pan_metrics_heatmap_per_split(
             n_repeats=n_repeats,
         )
 
-        split_labels = _split_labels(n_splits=n_folds, n_repeats=n_repeats)
+        n_total_splits = _infer_total_splits(
+            pan_metrics_across_splits,
+            n_folds=n_folds,
+            n_repeats=n_repeats,
+        )
+        if n_total_splits <= 0:
+            raise ValueError(
+                f"No per-split PAN metrics available for dataset={dataset_name!r} (check MongoDB records)."
+            )
+        split_labels = _split_labels(n_splits=n_folds, n_repeats=n_repeats, n_total=n_total_splits)
 
-        method_labels = [CONFIG.LABEL_TRANSLATIONS.get(m, m) for m in methods_list]
-        metric_labels = []
-        n_metrics = len(list(CONFIG.SCORE_TRANSLATIONS.keys()))
-
-        xticklabels = method_labels * n_metrics
-
-        matrix = np.full((n_repeats * n_folds, len(methods_list) * n_metrics), np.nan, dtype=float)
-        for metric_idx, (metric, metric_label) in enumerate(CONFIG.SCORE_TRANSLATIONS.items()):
-            metric_labels.append(metric_label)
-            for method_idx, method_name in enumerate(methods_list):
-                per_split_rows = pan_metrics_across_splits.get(method_name, {})
-                col = metric_idx * len(methods_list) + method_idx
-                for split_idx in range(min(n_repeats * n_folds, len(per_split_rows))):
-                    if metric not in per_split_rows.keys():
-                        raise ValueError(f"Metric {metric} not found in per_split_rows: {per_split_rows.keys()}")
-                    raw = per_split_rows[metric][split_idx]
-                    if raw is None:
-                        continue
-                    try:
-                        matrix[split_idx, col] = float(raw)
-                    except (TypeError, ValueError):
-                        continue
+        method_labels = [CONFIG.LABEL_TRANSLATIONS.get(m, m) for m in methods_list if m in
+                         list(pan_metrics_across_splits.keys())]
+        metric_labels = [CONFIG.SCORE_TRANSLATIONS.get(m, m) for m in metrics_list]
+        xticklabels = method_labels * len(metrics_list)
+        matrix = _build_heatmap_matrix(
+            pan_metrics_across_splits,
+            methods=methods_list,
+            metrics=metrics_list,
+            n_total_splits=n_total_splits,
+        )
 
         # Figure sizing: keep readable but avoid extreme layouts.
         fig_w = max(14.0, min(60.0, 0.22 * matrix.shape[1]))
@@ -189,10 +246,10 @@ def plot_pan_metrics_heatmap_per_split(
 
         # Reduce y tick density for large numbers of splits.
         max_yticks = 30
-        if n_repeats * n_folds > max_yticks:
-            step = int(math.ceil(n_repeats * n_folds / max_yticks))
-            ax.set_yticks([i + 0.5 for i in range(0, n_repeats * n_folds, step)])
-            ax.set_yticklabels([split_labels[i] for i in range(0, n_repeats * n_folds, step)], fontsize=12)
+        if n_total_splits > max_yticks:
+            step = int(math.ceil(n_total_splits / max_yticks))
+            ax.set_yticks([i + 0.5 for i in range(0, n_total_splits, step)])
+            ax.set_yticklabels([split_labels[i] for i in range(0, n_total_splits, step)], fontsize=12)
         else:
             ax.tick_params(axis="y", labelsize=12)
 
@@ -213,7 +270,7 @@ def plot_pan_metrics_heatmap_per_split(
         top = ax.secondary_xaxis("top")
         centers = [(i * n_methods) + (n_methods / 2) for i in range(len(metric_labels))]
         top.set_xticks(centers)
-        top.set_xticklabels([CONFIG.SCORE_TRANSLATIONS.get(s, s) for s in metric_labels], fontsize=10)
+        top.set_xticklabels(metric_labels, fontsize=10)
         top.tick_params(axis="x", length=0)
         top.set_xlabel("Metric", fontsize=12)
 
