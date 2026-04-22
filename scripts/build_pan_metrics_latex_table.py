@@ -293,7 +293,7 @@ def build_table(
 
     lines.append(r"\end{tabular}")
     lines.append(
-        r"\caption{Reproduction\,of\,the\,Impostors\,Method\,variants and baselines. The Scores are computed as mean "
+        r"\caption{Reproduction\,of\,the\,Impostors\,Method\,variants and baselines. The scores are computed as mean "
         r"over ten 10-fold CVs.}"
     )
     lines.append(r"\label{table-impostor-method-reproduction-results}")
