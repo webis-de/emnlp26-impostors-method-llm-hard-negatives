@@ -25,7 +25,7 @@ from genai_detection.experiments.reproduction.pan_metrics.pan_cv import PANEvalu
 from genai_detection.experiments.reproduction.pan_metrics.pan_metric_computation import EvaluationCVResult
 from genai_detection.experiments.reproduction.pan_metrics.pan_storage import PANMetricsRecord, PANMetricsStore
 from genai_detection.experiments.reproduction.pan_metrics.pan_data_loader import PANDataLoader
-
+from genai_detection.experiments.reproduction.pan_metrics.pan_metric_computation import PANMetricComputer
 
 @dataclass(frozen=True)
 class PANPairwiseMetricSignificanceResult:
@@ -276,12 +276,10 @@ class PANPairwiseSignificance:
         self,
         data_loader: PANDataLoader,
         evaluator: PANEvaluator,
-        store: PANMetricsStore,
         split_manager: SplitManager,
     ) -> None:
         self.data_loader = data_loader
         self.evaluator = evaluator
-        self.store = store
         self.split_manager = split_manager
 
     def compute_pairwise_significance(
@@ -323,22 +321,22 @@ class PANPairwiseSignificance:
                 continue
             logger.info(f"{dataset_name} dataset: Aligned {method_a} vs {method_b} with {n_samples} samples.")
 
-            record_a = self._get_or_compute_record(
-                dataset_name,
-                method_a,
-                y_true,
-                scores_a,
+            record_a = self.evaluator.get_or_compute_record(
+                dataset_name=dataset_name,
+                method_name=method_a,
+                y_true=y_true,
+                scores=scores_a,
                 n_samples=n_samples,
                 n_splits=self.split_manager.n_splits,
                 n_repeats=self.split_manager.n_repeats,
                 ci_level=ci_level,
                 n_boot=n_boot,
             )
-            record_b = self._get_or_compute_record(
-                dataset_name,
-                method_b,
-                y_true,
-                scores_b,
+            record_b = self.evaluator.get_or_compute_record(
+                dataset_name=dataset_name,
+                method_name=method_b,
+                y_true=y_true,
+                scores=scores_b,
                 n_samples=n_samples,
                 n_splits=self.split_manager.n_splits,
                 n_repeats=self.split_manager.n_repeats,
@@ -417,82 +415,3 @@ class PANPairwiseSignificance:
             len(ordered_keys),
         )
         return y_true, scores_a, scores_b, len(ordered_keys)
-
-    def _get_or_compute_record(
-        self,
-        dataset_name: str,
-        method_name: str,
-        y_true: list[int],
-        scores: list[float],
-        n_samples: int,
-        n_splits:int,
-        n_repeats:int,
-        ci_level: float,
-        n_boot: int,
-    ) -> dict:
-        stored = self.store.get_record(dataset_name=dataset_name, method_name=method_name, n_samples=n_samples)
-        if stored:
-            precomputed_n_samples = stored.get("n_samples")
-            precomputed_n_splits = stored.get("split_config", {}).get("n_splits")
-            precomputed_n_repeats = stored.get("split_config", {}).get("n_repeats")
-
-            if ((precomputed_n_samples==n_samples) and (precomputed_n_splits==n_splits) and
-                    (precomputed_n_repeats==n_repeats)):
-                stored = self.store.ensure_metric_values(stored, self.evaluator.extract_metric_values)
-                logger.info(
-                    f"Retrieved PAN metrics for {dataset_name} using {method_name} on {n_samples} samples ("
-                    f"{n_repeats}x{n_splits}-fold CV). ."
-                )
-                return stored
-
-        # guarantees identical repeated CV splits for any methods that share the same sample set and ordering.
-        # Ordering is set before ("aligned") given that method have the same number of samples.
-        # Hence, repeated CV scores are based on the same random split given the same number of samples.
-        splits = self.split_manager.build_splits(np.asarray(y_true))
-        logger.info(f"{dataset_name} dataset: About to start {self.split_manager.n_repeats} repetitions of"
-                    f" {self.split_manager.n_splits}-fold CV splits for {method_name}.")
-        cv_result = self.evaluator.compute_cv(
-            y_true=np.asarray(y_true),
-            scores=np.asarray(scores),
-            ci_level=ci_level,
-            n_boot=n_boot,
-            splits=splits,
-        )
-        logger.info(
-            "Computed PAN metrics for %s (dataset=%s): %s",
-            method_name,
-            dataset_name,
-            cv_result.metrics_mean,
-        )
-
-        record = self._record_from_cv(
-            dataset_name=dataset_name,
-            method_name=method_name,
-            n_samples=n_samples,
-            cv_result=cv_result,
-        )
-        self.store.save_record(record)
-
-        record_dict = record.to_mongo_dict()
-        record_dict["metric_values"] = cv_result.metric_values
-        return record_dict
-
-    @staticmethod
-    def _record_from_cv(
-        *,
-        dataset_name: str,
-        method_name: str,
-        n_samples: int,
-        cv_result: EvaluationCVResult,
-    ) -> PANMetricsRecord:
-        per_split = [asdict(result) for result in cv_result.per_split]
-        return PANMetricsRecord(
-            dataset_name=dataset_name,
-            method_name=method_name,
-            n_samples=n_samples,
-            metrics_mean=cv_result.metrics_mean,
-            metrics_std=cv_result.metrics_std,
-            metrics_ci=cv_result.metrics_ci,
-            pan_metrics_per_split=per_split,
-            split_config=cv_result.split_config,
-        )

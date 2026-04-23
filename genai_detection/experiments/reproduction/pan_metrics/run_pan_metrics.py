@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
 import logging
 
 import numpy as np
@@ -11,7 +10,7 @@ from genai_detection.config import CONFIG
 from genai_detection.experiments.reproduction.pan_metrics.pan_cv import PANEvaluator, SplitManager
 from genai_detection.experiments.reproduction.pan_metrics.pan_data_loader import PANDataLoader
 from genai_detection.experiments.reproduction.pan_metrics.pan_metric_computation import PANMetricComputer
-from genai_detection.experiments.reproduction.pan_metrics.pan_storage import PANMetricsRecord, PANMetricsStore
+from genai_detection.experiments.reproduction.pan_metrics.pan_storage import PANMetricsStore
 
 logger = logging.getLogger(__name__)
 
@@ -97,42 +96,20 @@ def _compute_for_method(
 
     y_true = np.asarray([gt_by_pair[key] for key in ordered_keys])
     scores = np.asarray([scores_by_pair[key] for key in ordered_keys])
-    logger.info("Loaded %d ground truth and scores for %s (dataset=%s).", len(y_true), method_name, dataset_name)
+    n_samples = len(ordered_keys)
+    logger.info("Loaded %d ground truth and scores for %s (dataset=%s).", n_samples, method_name, dataset_name)
 
-    # Skip if Mongo already has matching record (dataset, method, n_samples).
-    existing = store.get_record(dataset_name=dataset_name, method_name=method_name, n_samples=len(ordered_keys))
-    if existing:
-        logger.info(
-            "Skipping %s (dataset=%s) - cached PAN metrics for n_samples=%d.",
-            method_name,
-            dataset_name,
-            len(ordered_keys),
-        )
-        return
-
-    # guarantees identical repeated CV splits for any methods that share the same sample set and ordering.
-    # Ordering is set above given that method have the same number of samples.
-    # Hence, repeated CV scores are based on the same random split given the same number of samples.
-    cv_result = evaluator.compute_cv(
+    _ = evaluator.get_or_compute_record(
+        dataset_name=dataset_name,
+        method_name=method_name,
         y_true=y_true,
         scores=scores,
+        n_samples=n_samples,
+        n_splits=split_manager.n_splits,
+        n_repeats=split_manager.n_repeats,
         ci_level=CI_LEVEL,
         n_boot=N_BOOT,
     )
-    logger.info("Computed PAN metrics for %s (dataset=%s): %s", method_name, dataset_name, cv_result.metrics_mean)
-
-    record = PANMetricsRecord(
-        dataset_name=dataset_name,
-        method_name=method_name,
-        n_samples=int(len(ordered_keys)),
-        metrics_mean=cv_result.metrics_mean,
-        metrics_std=cv_result.metrics_std,
-        metrics_ci=cv_result.metrics_ci,
-        pan_metrics_per_split=[asdict(result) for result in cv_result.per_split],
-        split_config=cv_result.split_config,
-    )
-    store.save_record(record)
-    logger.info("Saved PAN metrics for %s (%d samples).", method_name, len(ordered_keys))
 
 
 if __name__ == "__main__":
@@ -144,8 +121,8 @@ if __name__ == "__main__":
         n_repeats=N_REPEATS,
         random_state=RANDOM_STATE,
     )
-    evaluator = PANEvaluator(PANMetricComputer(), split_manager)
     store = PANMetricsStore()
+    evaluator = PANEvaluator(metric_computer=PANMetricComputer(), split_manager=split_manager, store=store)
 
     for dataset_name in [CONFIG.STUDENT_ESSAYS, CONFIG.BLOG]:
         input_args = {

@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+from genai_detection.experiments.reproduction.pan_metrics import (PANMetricsRecord, PANMetricsStore, )
+
 """Cross-validation helpers for PAN metrics."""
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Iterable
 
 import numpy as np
 from sklearn.model_selection import RepeatedStratifiedKFold
+
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 from genai_detection.experiments.reproduction.pan_metrics.pan_metric_computation import EvaluationCVResult, PANMetricComputer
 
@@ -47,9 +54,10 @@ class PANEvaluator:
     Orchestrates PAN metric computation with consistent splits.
     """
 
-    def __init__(self, metric_computer: PANMetricComputer, split_manager: SplitManager) -> None:
+    def __init__(self, metric_computer: PANMetricComputer, split_manager: SplitManager, store: PANMetricsStore) -> None:
         self.metric_computer = metric_computer
         self.split_manager = split_manager
+        self.store = store
 
     def compute_cv(
         self,
@@ -78,3 +86,94 @@ class PANEvaluator:
         per_split: list[dict] | list,
     ) -> dict[str, list[float]]:
         return self.metric_computer.extract_metric_values(per_split)
+
+    def get_or_compute_record(
+        self,
+        dataset_name: str,
+        method_name: str,
+        y_true: list[int],
+        scores: list[float],
+        n_samples: int,
+        n_splits: int,
+        n_repeats: int,
+        ci_level: float,
+        n_boot: int,
+    ) -> dict:
+        stored = self.store.get_record(
+            dataset_name=dataset_name, method_name=method_name, n_samples=n_samples
+        )
+        if stored:
+            precomputed_n_samples = stored.get("n_samples")
+            precomputed_n_splits = stored.get("split_config", {}).get("n_splits")
+            precomputed_n_repeats = stored.get("split_config", {}).get("n_repeats")
+
+            if (
+                (precomputed_n_samples == n_samples)
+                and (precomputed_n_splits == n_splits)
+                and (precomputed_n_repeats == n_repeats)
+            ):
+                stored = self.store.ensure_metric_values(
+                    stored, self.extract_metric_values
+                )
+                logger.info(
+                    f"Retrieved pre-computed PAN metrics for {dataset_name} using {method_name} on {n_samples} "
+                    f"samples ("
+                    f"{n_repeats}x{n_splits}-fold CV)."
+                )
+                return stored
+
+        # guarantees identical repeated CV splits for any methods that share the same sample set and ordering.
+        # Ordering is set before ("aligned") given that method have the same number of samples.
+        # Hence, repeated CV scores are based on the same random split given the same number of samples.
+        logger.info(
+            f"{dataset_name} dataset: About to start {self.split_manager.n_repeats} repetitions of"
+            f" {self.split_manager.n_splits}-fold CV splits for {method_name}."
+        )
+        cv_result = self.compute_cv(
+            y_true=np.asarray(y_true),
+            scores=np.asarray(scores),
+            ci_level=ci_level,
+            n_boot=n_boot,
+        )
+        logger.info(
+            "Computed PAN metrics for %s (dataset=%s): %s",
+            method_name,
+            dataset_name,
+            cv_result.metrics_mean,
+        )
+
+        record = self._record_from_cv(
+            dataset_name=dataset_name,
+            method_name=method_name,
+            n_samples=n_samples,
+            cv_result=cv_result,
+        )
+        # only newly computed records are saved
+        self.store.save_record(record)
+        logger.info(
+            "Saved PAN metrics for %s on %s (%d samples).", method_name, dataset_name, len(n_samples)
+        )
+
+        record_dict = record.to_mongo_dict()
+        record_dict["metric_values"] = cv_result.metric_values
+        return record_dict
+
+    @staticmethod
+    def _record_from_cv(
+        *,
+        dataset_name: str,
+        method_name: str,
+        n_samples: int,
+        cv_result: EvaluationCVResult,
+    ) -> PANMetricsRecord:
+        per_split = [asdict(result) for result in cv_result.per_split]
+        return PANMetricsRecord(
+            dataset_name=dataset_name,
+            method_name=method_name,
+            n_samples=n_samples,
+            metrics_mean=cv_result.metrics_mean,
+            metrics_std=cv_result.metrics_std,
+            metrics_ci=cv_result.metrics_ci,
+            pan_metrics_per_split=per_split,
+            split_config=cv_result.split_config,
+        )

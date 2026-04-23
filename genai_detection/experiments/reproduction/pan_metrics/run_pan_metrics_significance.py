@@ -64,18 +64,16 @@ if __name__ == "__main__":
         n_repeats=N_REPEATS,
         random_state=RANDOM_STATE,
     )
-    evaluator = PANEvaluator(PANMetricComputer(), split_manager)
     store = PANMetricsStore()
+    evaluator = PANEvaluator(metric_computer=PANMetricComputer(), split_manager=split_manager, store=store)
 
     significance = PANPairwiseSignificance(
         data_loader=loader,
         evaluator=evaluator,
-        store=store,
         split_manager=split_manager,
     )
 
     for dataset_name in [CONFIG.STUDENT_ESSAYS, CONFIG.BLOG]:
-
 
         results = significance.compute_pairwise_significance(
             dataset_name=dataset_name,
