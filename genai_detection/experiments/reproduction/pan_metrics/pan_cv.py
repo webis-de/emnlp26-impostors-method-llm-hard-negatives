@@ -1,21 +1,18 @@
 from __future__ import annotations
 
-from genai_detection.experiments.reproduction.pan_metrics import (PANMetricsRecord, PANMetricsStore, )
-
 """Cross-validation helpers for PAN metrics."""
 
 from dataclasses import asdict, dataclass
+import logging
 from typing import Iterable
 
 import numpy as np
 from sklearn.model_selection import RepeatedStratifiedKFold
 
-import logging
+from .pan_metric_computation import EvaluationCVResult, PANMetricComputer
+from .pan_storage import PANMetricsRecord, PANMetricsStore
 
 logger = logging.getLogger(__name__)
-
-
-from genai_detection.experiments.reproduction.pan_metrics.pan_metric_computation import EvaluationCVResult, PANMetricComputer
 
 
 @dataclass
@@ -151,7 +148,7 @@ class PANEvaluator:
         # only newly computed records are saved
         self.store.save_record(record)
         logger.info(
-            "Saved PAN metrics for %s on %s (%d samples).", method_name, dataset_name, len(n_samples)
+            "Saved PAN metrics for %s on %s (%d samples).", method_name, dataset_name, n_samples
         )
 
         record_dict = record.to_mongo_dict()
