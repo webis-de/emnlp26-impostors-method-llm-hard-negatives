@@ -141,7 +141,8 @@ def _load_pan_metrics_across_splits(
                 best_payload_by_method[method_name] = (n_samples, payload)
 
         per_split_by_method: dict[str, dict[str, list[float]]] = {}
-        for method_name, (_, payload) in best_payload_by_method.items():
+        for method_name, (n_samples, payload) in best_payload_by_method.items():
+            logger.info(f"Metric {method_name} has {n_samples:,} samples for {dataset_name!r}.")
             per_split_by_method[method_name] = PANMetricComputer.extract_metric_values(payload)
         return per_split_by_method
 
