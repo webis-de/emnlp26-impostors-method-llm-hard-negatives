@@ -35,9 +35,10 @@ DEFAULT_METRICS = [
 ]
 
 STAR_MAP = {
-    "0.05": "*",
-    "0.01": "**",
-    "0.005": "***",
+    "0.1": "*",
+    "0.05": "**",
+    "0.01": "***",
+    "0.005": "****",
 }
 
 
@@ -235,7 +236,7 @@ def build_table(
         "\\caption{Corrected paired t-test based on 10-times 10-fold CV for the Blog Posts and Student Essays "
         "datasets. "
         "Asterisks indicate statistically significant differences "
-        "({\\tiny \\texttt{*, **, ***}} for $p_{\\text{corr}} < 0.05, 0.01, 0.005$, respectively).}"
+        "({\\tiny \\texttt{*, **, ***, ****}} for $p_{\\text{corr}} < 0.1, 0.05, 0.01, 0.005$, respectively).}"
     )
     lines.append("\\label{tab:permutation-significance-stat-inf}")
     lines.append("\\end{table}")
