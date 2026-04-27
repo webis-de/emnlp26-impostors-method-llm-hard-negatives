@@ -43,51 +43,56 @@ def extract_tables(base_dir: Path) -> None:
     if not json_files:
         raise FileNotFoundError(f"No pan_metrics_significance_*.json files found in {base_dir}")
 
-    entries = []
-    methods = set()
+    out_dir = base_dir / "extracted_per_metric"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    entries = {}    # keys: dataset_name, values: (left, right, metrics)
+    methods = {}    # keys: dataset_name, values: set of method names
     for path in json_files:
+        dataset_name = "_".join(path.stem.split("_")[3:])
         with open(path, "r") as f:
             payload = json.load(f)
+            print(payload.keys())
         for pair in list(payload.keys()):
+            values = payload.get(pair, {})
             left, right = _parse_pair(pair)
-            metrics = payload.get("metrics", {})
-            methods.update([left, right])
-            entries.append((left, right, metrics))
+            metrics = values.get("metrics", {})
+            methods.setdefault(dataset_name, set()).update([left, right])
+            entries.setdefault(dataset_name, []).append((left, right, metrics))
+        method_order = sorted(methods[dataset_name])
 
     if not entries:
         raise ValueError(f"No significant entries found in {base_dir}")
 
-    method_order = sorted(methods)
     method_index = {name: idx for idx, name in enumerate(method_order)}
 
     rows_by_metric: Dict[str, List[Tuple[str, str]]] = {}
 
-    for left, right, metrics in entries:
-        canon_left, canon_right = _canonical_pair((left, right), method_index)
-        # only keep upper diagonal comparisons
-        if method_index[canon_left] >= method_index[canon_right]:
-            continue
-        pair_label = f"{canon_left} vs {canon_right}"
-        for metric, metric_payload in metrics.items():
-            significant = metric_payload.get("significant", {})
-            min_level = _min_significance_level(significant) if significant else "ns"
-            rows_by_metric.setdefault(metric, []).append((pair_label, min_level))
+    for dataset_name, entries in entries.items():
+        entries = sorted(entries, key=lambda x: method_index[x[0]])
+        for left, right, metrics in entries:
+            canon_left, canon_right = _canonical_pair((left, right), method_index)
+            # only keep upper diagonal comparisons
+            if method_index[canon_left] >= method_index[canon_right]:
+                continue
+            pair_label = f"{canon_left} vs {canon_right}"
+            for metric, metric_payload in metrics.items():
+                significant = metric_payload.get("significant", {})
+                min_level = _min_significance_level(significant) if significant else "ns"
+                rows_by_metric.setdefault(metric, []).append((pair_label, min_level))
 
-    if not rows_by_metric:
-        raise ValueError("No significant rows found")
+        if not rows_by_metric:
+            raise ValueError(f"No significant rows found in {base_dir} for any metric")
 
-    out_dir = base_dir / "extracted_per_metric"
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    dataset_name = base_dir.name
-    for metric, rows in rows_by_metric.items():
-        out_path = out_dir / f"significance_{dataset_name}_{metric}.csv"
-        with open(out_path, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["pair", "min_significance_level"])
-            for pair_label, min_level in sorted(rows):
-                writer.writerow([pair_label, min_level])
-    print(f"Extracted significance tables for {dataset_name} to {out_dir}")
+        print(f"save for {dataset_name} to {out_dir}")
+        for metric, rows in rows_by_metric.items():
+            out_path = out_dir / f"significance_{dataset_name}_{metric}.csv"
+            with open(out_path, "w", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(["pair", "min_significance_level"])
+                for pair_label, min_level in sorted(rows):
+                    writer.writerow([pair_label, min_level])
+        print(f"Extracted significance tables for {dataset_name} to {out_dir}")
 
 
 def main() -> None:

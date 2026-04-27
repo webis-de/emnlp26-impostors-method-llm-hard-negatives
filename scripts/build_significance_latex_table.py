@@ -76,12 +76,15 @@ def _stars(min_level: str) -> str:
 def _load_dataset_metrics(
     dataset_dir: Path,
     metrics: Iterable[str],
+    dataset_name: str
 ) -> Dict[str, Dict[Tuple[str, str], str]]:
     data: Dict[str, Dict[Tuple[str, str], str]] = {}
     for metric in metrics:
-        csv_path = dataset_dir / "extracted_per_metric" / f"significance_{dataset_dir.name}_{metric}.csv"
+        # reproduction/pan_metrics/statistical_significance/extracted_per_metric
+        csv_path = dataset_dir / f"significance_{dataset_name}_{metric}.csv"
         if not csv_path.exists():
-            print(f"No significance CSV found for {metric} in {dataset_dir}")
+            print(f"[{dataset_name}]: No significance CSV found for {metric} in {csv_path}. Run `python3 "
+                  f"scripts/extract_statistical_significance_tables.py` first. Skipping this metric.")
             continue
         data[metric] = _read_metric_csv(csv_path)
     return data
@@ -213,15 +216,15 @@ def build_table(
     lines.append(f" & {header_metrics} \\\\")
     lines.append("\\midrule")
 
-    for dataset in datasets:
-        dataset_dir = base_dir / dataset
-        if not dataset_dir.exists():
+    for dataset_name in datasets:
+        if not base_dir.exists():
+            print(f"[{dataset_name}]: No such dataset directory: {base_dir}")
             continue
-        metrics_data = _load_dataset_metrics(dataset_dir, metric_list)
+        metrics_data = _load_dataset_metrics(base_dir, metric_list, dataset_name)
         if not metrics_data:
             continue
 
-        lines.append(f"\\multicolumn{{{ncols}}}{{@{{}}c@{{}}}}{{\\emph{{{_dataset_display(dataset)}}}}} \\\\")
+        lines.append(f"\\multicolumn{{{ncols}}}{{@{{}}c@{{}}}}{{\\emph{{{_dataset_display(dataset_name)}}}}} \\\\")
 
         for i, method_row in enumerate(method_list):
             row_cells: List[str] = []
@@ -332,7 +335,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--base-dir",
-        default=LOCAL_SAVE_PATH / "statistical_significance",
+        default=LOCAL_SAVE_PATH / "statistical_significance/extracted_per_metric",
         help="Base directory containing dataset subdirectories.",
     )
     parser.add_argument(
@@ -358,7 +361,7 @@ def main() -> None:
     if args.datasets:
         datasets = args.datasets
     else:
-        datasets = sorted(p.name for p in base_dir.iterdir() if p.is_dir())
+        datasets = list(CONFIG.DATASET_TRANSLATIONS.keys())
 
     latex = build_table(
         base_dir=base_dir,
