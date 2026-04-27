@@ -130,6 +130,7 @@ def _collect_effect_sizes(
         metric_payload = metrics_payload.get(metric, {})
         effect_size = metric_payload.get("effect_size")
         if effect_size is None:
+            raise ValueError(f"Missing effect_size for metric '{metric}' in pair '{pair_label}'.")
             continue
         try:
             value = float(effect_size)
@@ -141,37 +142,22 @@ def _collect_effect_sizes(
 def _load_dataset_effect_sizes(
     dataset_dir: Path,
     metric_list: Iterable[str],
+    dataset_name: str
 ) -> Dict[str, Dict[Tuple[str, str], float]]:
     data: Dict[str, Dict[Tuple[str, str], float]] = {}
-    json_files = sorted(dataset_dir.glob("pan_metrics_significance_*.json"))
-    if len(json_files) < 1:
-        print(f"No pan_metrics_significance_*.json files found in {dataset_dir}")
-    for path in json_files:
-        with open(path, "r") as f:
-            payload = json.load(f)
-        if isinstance(payload, dict):
-            if "pair" in payload and "metrics" in payload:
-                _collect_effect_sizes(
-                    payload.get("pair", ""),
-                    payload.get("metrics", {}),
-                    metric_list,
-                    data,
-                )
-                continue
-            if "pairs" in payload:
-                for pair_label, metrics_payload in payload.get("pairs", {}).items():
-                    if isinstance(metrics_payload, dict):
-                        _collect_effect_sizes(
-                            pair_label, metrics_payload, metric_list, data
-                        )
-                continue
-            for value in payload.values():
-                if isinstance(value, dict) and "pairs" in value:
-                    for pair_label, metrics_payload in value.get("pairs", {}).items():
-                        if isinstance(metrics_payload, dict):
-                            _collect_effect_sizes(
-                                pair_label, metrics_payload, metric_list, data
-                            )
+    json_file = f"pan_metrics_significance_{dataset_name}.json"
+    if not (dataset_dir / json_file).exists():
+        print(f"No {json_file} found in {dataset_dir}")
+
+    with open(dataset_dir / json_file, "r") as f:
+        payload = json.load(f)
+
+    for pair_label, payload in payload.items():
+        metrics_payload = payload.get("metrics", {})
+        if isinstance(metrics_payload, dict):
+            _collect_effect_sizes(
+                pair_label, metrics_payload, metric_list, data
+            )
     return data
 
 
@@ -287,10 +273,10 @@ def build_effect_size_table(
     lines.append("\\midrule")
 
     for dataset in datasets:
-        dataset_dir = base_dir.parents[2] / dataset
+        dataset_dir = base_dir
         if not dataset_dir.exists():
             continue
-        metrics_data = _load_dataset_effect_sizes(dataset_dir, metric_list)
+        metrics_data = _load_dataset_effect_sizes(dataset_dir, metric_list, dataset_name=dataset)
         if not metrics_data:
             continue
 
@@ -370,13 +356,13 @@ def main() -> None:
         method_order=DEFAULT_METHOD_ORDER,
     )
     effect_size_latex = build_effect_size_table(
-        base_dir=base_dir,
+        base_dir=base_dir.parent,
         datasets=datasets,
         metrics=args.metrics,
         method_order=DEFAULT_METHOD_ORDER,
     )
 
-    out_dir = base_dir / "to_tex"
+    out_dir = base_dir.parent / "to_tex"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / args.out_name
     with open(out_path, "w") as f:
