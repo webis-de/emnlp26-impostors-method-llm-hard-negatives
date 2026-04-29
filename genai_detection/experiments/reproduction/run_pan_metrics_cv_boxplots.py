@@ -31,19 +31,19 @@ metrics = [
     "auroc_c_at_1",
 ]
 
-# plot_pan_metrics_boxplots(
-#     dataset_name=CONFIG.BLOG,
-#     save_path=LOCAL_SAVE_PATH,
-#     metrics=metrics,
-# )
-# logger.info("Done with blog.")
-#
-# plot_pan_metrics_boxplots(
-#     dataset_name=CONFIG.STUDENT_ESSAYS,
-#     save_path=LOCAL_SAVE_PATH,
-#     metrics=metrics,
-# )
-# logger.info("Done with student essays.")
+plot_pan_metrics_boxplots(
+    dataset_name=CONFIG.BLOG,
+    save_path=LOCAL_SAVE_PATH,
+    metrics=metrics,
+)
+logger.info("Done with blog.")
+
+plot_pan_metrics_boxplots(
+    dataset_name=CONFIG.STUDENT_ESSAYS,
+    save_path=LOCAL_SAVE_PATH,
+    metrics=metrics,
+)
+logger.info("Done with student essays.")
 
 plot_pan_metrics_heatmap_per_split(dataset_names=[CONFIG.BLOG, CONFIG.STUDENT_ESSAYS],
     save_path=None,
