@@ -110,8 +110,8 @@ def _pairwise_repkfold_p_value(
     if not (np.isfinite(a).all() and np.isfinite(b).all()):
         return float("nan")
 
-    train_set_size = int(round(n_samples / n_splits))
-    test_set_size = int(n_samples - train_set_size)
+    test_set_size = int(round(n_samples / n_splits))
+    train_set_size = int(n_samples - test_set_size)
     if test_set_size <= 0 or train_set_size <= 0:
         raise ValueError(
             f"Invalid test_set_size/train_set_size derived from n_samples={n_samples}, n_splits={n_splits}."
@@ -257,7 +257,7 @@ def compare_pan_metrics_significance(
             pair_results[metric] = PANPairwiseMetricSignificanceResult(
                 p_value=float(p_value),
                 p_value_bonf=float(p_value_bonf),
-                n_samples=n_pair_samples,
+                n_samples=n_pair_samples,   # one value per CV split
                 significant={str(a): bool(p_value_bonf <= a) for a in alpha_sorted},
                 effect_size=float(effect_size),
             ).to_dict()
@@ -301,8 +301,10 @@ class PANPairwiseSignificance:
         method_combinations = list(combinations(methods, 2))
 
         # multiple testing correction via Bonferroni correction
-        # Bonferroni controls the family‑wise error rate across all pairwise comparisons for a single metric within a dataset.
+        # Bonferroni controls the family‑wise error rate across all pairwise comparisons for a single metric
+        # within a dataset.
         m = len(method_combinations)
+        logger.info(f"Computing Bonferroni correction with factor {m}.")
 
         # unordered unique pairs
         for method_a, method_b in method_combinations:
