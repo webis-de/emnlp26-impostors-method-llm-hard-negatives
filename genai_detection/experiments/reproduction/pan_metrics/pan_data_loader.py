@@ -7,7 +7,6 @@ from typing import Dict, List, Tuple
 
 import os
 from bson import ObjectId
-import pandas as pd
 from genai_detection.config import CONFIG
 from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENERATORS
 from genai_detection.experiments.reproduction.ablation_args import ABLATION_ARGS, ABLATION_DETECTORS
@@ -86,31 +85,22 @@ class PANDataLoader:
         if technique not in IMPOSTOR_GENERATORS and "on_the_fly" not in technique:
             raise ValueError(f"Unsupported impostor technique: {technique}")
 
-        index = None
-        on_the_fly_df = None
+        # on the fly impostor generation uses different indices, which are stored in mongodb collection
         if "on_the_fly" in technique and technique != "on_the_fly":
             index = CONFIG.RETRIEVAL_INDEX_TRANSLATIONS.get(technique)
             if index is None:
                 raise ValueError(f"Unknown retrieval index for {technique}.")
             technique = "on_the_fly"
-            cursor = self.mongo.on_the_fly_collection.find(
-                {"index": index},
-                {"_id": 1, "text_id": 1, "index": 1},
-            )
-            on_the_fly_df = pd.DataFrame(cursor)
-            if on_the_fly_df.empty:
-                on_the_fly_df = pd.DataFrame(columns=["text_id", "index"])
-            else:
-                on_the_fly_df = (
-                    on_the_fly_df.sort_values("_id")
-                    .drop_duplicates(subset=["text_id"], keep="first")
-                )[["text_id", "index"]]
+        else:
+            index = None
 
         query = {
             "impostor_generation_technique": technique,
             "n_impostors": n_impostors,
             "dataset_name": dataset_name,
         }
+        if index is not None:
+            query["retrieval_index"] = index
         if n_potential_impostors is not None:
             query["n_potential_impostors"] = n_potential_impostors
 
@@ -125,10 +115,6 @@ class PANDataLoader:
             left_id = doc["left_id"]
             right_id = doc["right_id"]
             pair = (left_id, right_id)
-            if index and on_the_fly_df is not None:
-                matches = on_the_fly_df[on_the_fly_df["text_id"] == left_id]
-                if matches.empty or not (index == matches["index"].iloc[0]):
-                    continue
             if pair not in scores_by_pair:
                 scores_by_pair[pair] = doc["scores_over_different_rounds"] / rounds
 
