@@ -126,7 +126,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run paraphrase evaluation experiments.")
     parser.add_argument(
         "--label-mode",
-        default="model_prompt_approach",
+        default="model",
         choices=TECHNIQUE_LABEL_MODES,
         help=(
             "How to build paraphrase-technique labels for boxplots: "
