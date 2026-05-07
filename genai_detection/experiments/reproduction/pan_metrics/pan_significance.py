@@ -290,7 +290,7 @@ class PANPairwiseSignificance:
         ci_level: float = 0.95,
         n_boot: int = 10000,
         test: str = "repkfold_ttest",
-        alpha_levels: Sequence[float] = (0.1, 0.05, 0.01, 0.005),
+        alpha_levels: Sequence[float] = (0.05, 0.01, 0.005),
     ) -> dict[str, dict]:
         results: dict[str, dict] = {}
         methods = list(dict.fromkeys(methods))
