@@ -69,7 +69,7 @@ class ParaphrasingEvaluator:
         self.ground_truth = ground_truth or {}
         self.data_category = data_category or "unknown"
         self.paraphrases_save_base_path = (
-            Path(__file__).resolve().parents[2]
+            Path(__file__).resolve().parents[3]
             / CONFIG.SAVE_PATH
             / "paraphrasing"
             / "paraphrase_evaluation"
