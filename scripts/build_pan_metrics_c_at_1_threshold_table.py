@@ -275,6 +275,12 @@ def _format_threshold(value: float | None, decimals: int) -> str:
     return f"{value:.{decimals}f}"
 
 
+def _format_n_samples_comment(summary: ThresholdSummary | None) -> str:
+    if summary is None or summary.n_samples < 0:
+        return "% n_sample=--"
+    return f"% n_sample={summary.n_samples}"
+
+
 def build_latex_table(
     thresholds: Mapping[tuple[str, str], ThresholdSummary],
     *,
@@ -315,9 +321,10 @@ def build_latex_table(
                 summary.upper_threshold if summary else None,
                 decimals,
             )
+            n_samples_comment = _format_n_samples_comment(summary)
             lines.append(
                 f"{citation} & {_dataset_display(dataset_name)} & "
-                f"{lower_threshold} & {upper_threshold} \\\\"
+                f"{lower_threshold} & {upper_threshold} \\\\ {n_samples_comment}"
             )
 
     lines.append(r" \bottomrule")
