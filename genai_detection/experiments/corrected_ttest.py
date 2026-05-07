@@ -101,7 +101,7 @@ def repkfold_ttest(data, train_set_size:int, test_set_size:int, k:int, r:int, al
         stat_df = pd.DataFrame({"statistic": [np.nan], "p_value": [np.nan]})
         return stat_df
 
-    var_d = np.var(d, ddof=1, keepdims=True)
+    var_d = float(np.var(d, ddof=1, keepdims=True))
     if np.all(var_d == 0):
         logger.debug(
             "repkfold_ttest: zero variance in diffs; len=%s, mean=%s",
@@ -117,16 +117,16 @@ def repkfold_ttest(data, train_set_size:int, test_set_size:int, k:int, r:int, al
         np.sqrt(var_d * ((1 / (k * r)) + (test_set_size / train_set_size)))
     )  # Calculate t-statistic
 
-    if alternative != "two-sided":
-        # one-sided test
-        if statistic < 0:
-            p_value = t.cdf(statistic, (k * r) - 1)  # p-value for left tail
-        else:
-            p_value = t.sf(statistic, (k * r) - 1)  # p-value for right tail
+    degrees_of_freedom = (k * r) - 1
+
+    if alternative == "two-sided":
+        p_value = float(2 * t.sf(abs(statistic), degrees_of_freedom))
+    elif alternative == "less":
+        p_value = float(t.cdf(statistic, degrees_of_freedom))
+    elif alternative == "greater":
+        p_value = float(t.sf(statistic, degrees_of_freedom))
     else:
-        # two-sided test
-        degrees_of_freedom = (k * r) - 1
-        p_value = float(2 * t.sf(abs(float(statistic)), degrees_of_freedom))
+        raise ValueError(f"Alternative must be one of: 'two-sided', 'less', 'greater', but got {alternative}.")
 
     stat_df = pd.DataFrame({"statistic": [statistic], "p_value": [p_value]})
     return stat_df
