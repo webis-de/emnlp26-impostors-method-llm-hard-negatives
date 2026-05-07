@@ -250,6 +250,27 @@ class ParaphrasePlotter:
         prompt_words: int = 6,
         include_approaches: tuple[str, ...] = ("non_naive", "naive"),
     ) -> tuple[pd.DataFrame, str]:
+        """Filter rows and resolve the grouping column used by boxplots.
+
+        ``group_by`` chooses the actual DataFrame column used for grouping. The
+        ``technique_label_mode`` and ``prompt_words`` options only matter when
+        ``group_by`` is ``"paraphrase_technique"``; in that case the function
+        builds a synthetic label from approach/model/prompt metadata.
+
+        Args:
+            df: Source rows containing metric values and paraphrase metadata.
+            data_category: Optional dataset name used to filter ``dataset_name``.
+            group_by: Existing column to group by, or ``"paraphrase_technique"``
+                to build technique labels dynamically.
+            technique_label_mode: Label detail used only for dynamic
+                ``paraphrase_technique`` grouping.
+            prompt_words: Maximum number of prompt words included in dynamic
+                prompt signatures.
+            include_approaches: Paraphrase approaches retained before plotting.
+
+        Returns:
+            Filtered plotting data and the resolved grouping column name.
+        """
         data = df.copy()
         if data_category and "dataset_name" in data.columns:
             data = data[data["dataset_name"] == data_category].copy()
@@ -273,11 +294,13 @@ class ParaphrasePlotter:
 
     @staticmethod
     def _normalize_prompt(prompt: str) -> str:
+        """Normalize a prompt before turning it into a compact plot label."""
         prompt = str(prompt).replace("<TEXT>", "").strip()
         prompt = re.sub(r"\s+", " ", prompt)
         return prompt
 
     def _prompt_signature(self, prompt: str, words: int = 6) -> str:
+        """Return a shortened prompt label using at most ``words`` words."""
         norm = self._normalize_prompt(prompt)
         if not norm:
             return "prompt: n/a"
@@ -289,6 +312,25 @@ class ParaphrasePlotter:
     def _build_technique_labels(
         self, data: pd.DataFrame, label_mode: str, prompt_words: int
     ) -> pd.Series:
+        """Build labels for synthetic ``paraphrase_technique`` grouping.
+
+        This does not choose whether the plot groups by model, prompt, or
+        approach directly. That choice is made by ``group_by`` in the caller.
+        This helper only controls how much detail appears in labels after
+        ``group_by="paraphrase_technique"`` has already selected synthetic
+        technique grouping.
+
+        Args:
+            data: Plotting rows with available ``model``/``llm``, ``prompt``,
+                and ``paraphrase_approach`` metadata.
+            label_mode: One of ``"model"``, ``"prompt"``,
+                ``"model_prompt"``, or ``"model_prompt_approach"``.
+            prompt_words: Maximum number of prompt words to keep when
+                ``label_mode`` includes prompt information.
+
+        Returns:
+            A label series aligned with ``data.index``.
+        """
         valid_modes = {"model", "prompt", "model_prompt", "model_prompt_approach"}
         if label_mode not in valid_modes:
             raise ValueError(
@@ -345,6 +387,26 @@ class ParaphrasePlotter:
         prompt_words: int = 6,
         display_plot: bool = True,
     ):
+        """Plot paraphrase length as percentage of original text length.
+
+        ``group_by`` determines the grouping variable. Use ``group_by="model"``
+        to group directly by the model column, or keep
+        ``group_by="paraphrase_technique"`` to synthesize grouped labels from
+        paraphrase metadata. ``technique_label_mode`` and ``prompt_words`` only
+        affect that synthesized ``paraphrase_technique`` case.
+
+        Args:
+            df: Evaluation rows with length columns or source text columns.
+            data_category: Optional dataset name used to filter and title the
+                plot.
+            group_by: Existing column to group by, or ``"paraphrase_technique"``
+                for synthesized technique labels.
+            technique_label_mode: Detail level for synthesized technique labels;
+                ignored when ``group_by`` is any other column.
+            prompt_words: Maximum number of prompt words shown in synthesized
+                labels; ignored when prompt information is not used.
+            display_plot: Whether to show the plot interactively after saving.
+        """
         data, group_by = self._prepare_plot_data(
             df=df,
             data_category=data_category,
@@ -434,6 +496,28 @@ class ParaphrasePlotter:
         prompt_words: int = 6,
         display_plot: bool = True,
     ):
+        """Plot one metric-distribution boxplot per metric.
+
+        ``group_by`` is the grouping switch: it selects the column used on the
+        x-axis. ``technique_label_mode`` is only a label-construction switch for
+        the special ``group_by="paraphrase_technique"`` case. Therefore
+        ``group_by="model"`` groups by model and ignores
+        ``technique_label_mode``/``prompt_words``.
+
+        Args:
+            df: Evaluation rows containing metric values and grouping metadata.
+            metric_names: Candidate metric columns to plot; missing columns are
+                skipped.
+            data_category: Optional dataset name used to filter and title the
+                plot.
+            group_by: Existing column to group by, or ``"paraphrase_technique"``
+                for synthesized technique labels.
+            technique_label_mode: Detail level for synthesized technique labels;
+                ignored unless ``group_by`` is ``"paraphrase_technique"``.
+            prompt_words: Maximum number of prompt words shown in synthesized
+                labels; ignored when prompt information is not used.
+            display_plot: Whether to show each plot interactively after saving.
+        """
         data, group_by = self._prepare_plot_data(
             df=df,
             data_category=data_category,
