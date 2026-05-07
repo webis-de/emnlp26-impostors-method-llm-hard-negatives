@@ -467,6 +467,25 @@ class ParaphrasingEvaluator:
         prompt_words: int = 6,
         display_plot: bool = True,
     ):
+        """Plot paraphrase length percentages via ``ParaphrasePlotter``.
+
+        ``group_by`` selects the grouping column. ``technique_label_mode`` and
+        ``prompt_words`` are only used when ``group_by`` is
+        ``"paraphrase_technique"``, where labels are synthesized from
+        approach/model/prompt metadata.
+
+        Args:
+            df: Evaluation rows with length columns or source text columns.
+            data_category: Optional dataset name used to filter and title the
+                plot.
+            group_by: Existing column to group by, or ``"paraphrase_technique"``
+                for synthesized technique labels.
+            technique_label_mode: Detail level for synthesized technique labels;
+                ignored for other ``group_by`` values.
+            prompt_words: Maximum number of prompt words shown in synthesized
+                labels.
+            display_plot: Whether to show the plot interactively after saving.
+        """
         self.plotter.plot_length_percentage_boxplot(
             df=df,
             data_category=data_category,
@@ -485,6 +504,25 @@ class ParaphrasingEvaluator:
         prompt_words: int = 6,
         display_plot: bool = True,
     ):
+        """Plot metric boxplots via ``ParaphrasePlotter``.
+
+        ``group_by`` selects the grouping column. ``technique_label_mode`` and
+        ``prompt_words`` only change the generated labels for
+        ``group_by="paraphrase_technique"``; they do not override grouping when
+        ``group_by`` points to a real column such as ``"model"``.
+
+        Args:
+            df: Evaluation rows containing metric values and grouping metadata.
+            data_category: Optional dataset name used to filter and title the
+                plot.
+            group_by: Existing column to group by, or ``"paraphrase_technique"``
+                for synthesized technique labels.
+            technique_label_mode: Detail level for synthesized technique labels;
+                ignored for other ``group_by`` values.
+            prompt_words: Maximum number of prompt words shown in synthesized
+                labels.
+            display_plot: Whether to show each plot interactively after saving.
+        """
         self.plotter.plot_metric_boxplots_per_metric(
             df=df,
             metric_names=self.get_metric_names(),

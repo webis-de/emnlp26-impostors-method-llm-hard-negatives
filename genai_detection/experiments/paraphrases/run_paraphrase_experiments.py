@@ -25,6 +25,10 @@ Technique label modes available for boxplots:
 - ``model_prompt``: combine model and prompt signature.
 - ``model_prompt_approach``: combine approach (naive/non_naive), model, and prompt
   signature; this is the most descriptive mode for paper figures.
+
+These modes only control labels when the plotter groups by the synthetic
+``paraphrase_technique`` field. They are different from ``group_by``, which
+chooses the actual grouping column.
 """
 
 import argparse
@@ -59,14 +63,17 @@ def run_paraphrase_experiments(
 
     Args:
         display_plot: If ``True``, show figures interactively in addition to saving.
-        technique_label_mode: Label strategy used for boxplot grouping.
+        technique_label_mode: Label strategy used when plots group by the
+            synthetic ``paraphrase_technique`` field. This does not choose the
+            grouping column; the plotter's ``group_by`` parameter does that.
             Supported values:
             - ``model``: Only model/LLM name.
             - ``prompt``: Only prompt signature.
             - ``model_prompt``: Model plus prompt signature.
             - ``model_prompt_approach``: Approach (naive/non_naive) plus model and
               prompt signature.
-        prompt_words: Max number of prompt words kept in prompt signatures.
+        prompt_words: Max number of prompt words kept in prompt signatures when
+            ``technique_label_mode`` includes prompt information.
 
     Returns:
         Tuple of (full evaluation dataframe, dataframe with min/max examples per
