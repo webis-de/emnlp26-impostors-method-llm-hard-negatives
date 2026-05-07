@@ -22,10 +22,7 @@ from genai_detection.experiments.corrected_ttest import repkfold_ttest
 logger = logging.getLogger(__name__)
 
 from genai_detection.experiments.reproduction.pan_metrics.pan_cv import PANEvaluator, SplitManager
-from genai_detection.experiments.reproduction.pan_metrics.pan_metric_computation import EvaluationCVResult
-from genai_detection.experiments.reproduction.pan_metrics.pan_storage import PANMetricsRecord, PANMetricsStore
 from genai_detection.experiments.reproduction.pan_metrics.pan_data_loader import PANDataLoader
-from genai_detection.experiments.reproduction.pan_metrics.pan_metric_computation import PANMetricComputer
 
 @dataclass(frozen=True)
 class PANPairwiseMetricSignificanceResult:
@@ -98,6 +95,7 @@ def _pairwise_repkfold_p_value(
     n_splits: int,
     n_repeats: int,
     n_samples: int,
+    alternative: str = "two-sided",
 ) -> float:
 
     total = n_splits * n_repeats
@@ -125,7 +123,8 @@ def _pairwise_repkfold_p_value(
         rows.append({"model": "B", "values": float(b[idx]), "k": k, "r": r})
     df = pd.DataFrame(rows)
 
-    result = repkfold_ttest(data=df, train_set_size=train_set_size, test_set_size=test_set_size, k=n_splits, r=n_repeats)
+    result = repkfold_ttest(data=df, train_set_size=train_set_size, test_set_size=test_set_size, k=n_splits,
+                            r=n_repeats, alternative=alternative)
 
     if "p_value" in result.columns:
         return float(result["p_value"].iloc[0])
@@ -218,10 +217,6 @@ def compare_pan_metrics_significance(
 
             try:
                 if test == "repkfold_ttest":
-                    if alternative != "two-sided":
-                        raise ValueError(
-                            "repkfold_ttest only supports two-sided tests in this pipeline."
-                        )
                     assert repkfold_meta is not None
                     p_value = _pairwise_repkfold_p_value(
                         values_a,
@@ -229,6 +224,7 @@ def compare_pan_metrics_significance(
                         n_splits=repkfold_meta["n_splits"],
                         n_repeats=repkfold_meta["n_repeats"],
                         n_samples=repkfold_meta["n_samples"],
+                        alternative=alternative,
                     )
                 else:
                     p_value = _pairwise_p_value(values_a, values_b, test, alternative)

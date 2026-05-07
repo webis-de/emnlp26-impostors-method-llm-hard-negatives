@@ -7,6 +7,7 @@ Original code is licensed under the MIT License.
 Modifications:
 - Fixed an error in the variance / standard error computation
   (removed an extra square root in the denominator).
+- Additionally supports two-sided tests where p-values must be doubled.
 
 This file therefore contains a modified version of the original
 implementation and is not a verbatim copy.
@@ -22,7 +23,7 @@ from scipy.stats import t
 logger = logging.getLogger(__name__)
 
 # renamed variables to avoid confusion
-def repkfold_ttest(data, train_set_size:int, test_set_size:int, k:int, r:int):
+def repkfold_ttest(data, train_set_size:int, test_set_size:int, k:int, r:int, alternative:str="two-sided"):
     """
     Compute correlated t-statistic and p-value for repeated k-fold cross-validated results.
     Args:
@@ -31,6 +32,7 @@ def repkfold_ttest(data, train_set_size:int, test_set_size:int, k:int, r:int):
         test_set_size (int): test set size
         k (int): number of folds used in k-fold
         r (int): number of repeats per fold
+        alternative (str): alternative hypothesis, either "two-sided" or "one-sided"
 
     Returns:
 
@@ -115,10 +117,16 @@ def repkfold_ttest(data, train_set_size:int, test_set_size:int, k:int, r:int):
         np.sqrt(var_d * ((1 / (k * r)) + (test_set_size / train_set_size)))
     )  # Calculate t-statistic
 
-    if statistic < 0:
-        p_value = t.cdf(statistic, (k * r) - 1)  # p-value for left tail
+    if alternative != "two-sided":
+        # one-sided test
+        if statistic < 0:
+            p_value = t.cdf(statistic, (k * r) - 1)  # p-value for left tail
+        else:
+            p_value = t.sf(statistic, (k * r) - 1)  # p-value for right tail
     else:
-        p_value = t.sf(statistic, (k * r) - 1)  # p-value for right tail
+        # two-sided test
+        degrees_of_freedom = (k * r) - 1
+        p_value = float(2 * t.sf(abs(float(statistic)), degrees_of_freedom))
 
     stat_df = pd.DataFrame({"statistic": [statistic], "p_value": [p_value]})
     return stat_df
