@@ -218,7 +218,7 @@ def compare_pan_metrics_significance(
 
             try:
                 if test == "repkfold_ttest":
-                    assert repkfold_meta is not None
+                    assert repkfold_meta is not None, f"Missing repkfold_meta for method '{method_a}' and '{method_b}'."
                     p_value = _pairwise_repkfold_p_value(
                         values_a,
                         values_b,
