@@ -20,11 +20,11 @@ IMPOSTOR_TECHNIQUE_FOR_ABLATIONS = "in_domain"
 
 # Comment out methods you don't want to run.
 METHODS = [
-    "two_step_llm",
     "on_the_fly_chatnoir",
     # "on_the_fly_serpapi",
     "on_the_fly_startpage",
     "in_domain",
+    "two_step_llm",
     # "one_step_llm",
     # "translation",
     # "mirror_minds",   # raises error
