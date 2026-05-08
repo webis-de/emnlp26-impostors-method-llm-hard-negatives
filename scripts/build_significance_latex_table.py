@@ -11,22 +11,22 @@ from typing import Dict, Iterable, List, Tuple
 from genai_detection.config import CONFIG
 
 DEFAULT_METHOD_ORDER = [
-    "on_the_fly_chatnoir",
-    "on_the_fly_startpage",
+    # "on_the_fly_chatnoir",
+    # "on_the_fly_startpage",
+    # "two_step_llm",
     "in_domain",
-    "two_step_llm",
 
-    "ppmd",
-    "unmasking",
+    # "ppmd",
+    # "unmasking",
     # "supervised_baseline",
     # "unsupervised_baseline_cosine",
     # "unsupervised_baseline_min-max",
+
     "bdi",
     "homotopy",
     "potha2017",
     "asgalf",
     "std_impostor",
-
 ]
 
 # Comment out any metrics you do not want to include in the LaTeX output.
@@ -242,7 +242,7 @@ def build_table(
         "\\caption{Corrected paired t-test based on 10-times 10-fold CV for the Blog Posts and Student Essays "
         "datasets. "
         "Asterisks indicate statistically significant differences "
-        "({\\tiny \\texttt{*, **, ***, ****}} for $p_{\\text{corr}} < 0.1, 0.05, 0.01, 0.005$, respectively).}"
+        "({\\tiny \\texttt{*, **, ***}} for $p_{\\text{corr}} < 0.05, 0.01, 0.005$, respectively).}"
     )
     lines.append("\\label{tab:permutation-significance-stat-inf}")
     lines.append("\\end{table}")
