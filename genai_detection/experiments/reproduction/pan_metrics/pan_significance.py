@@ -186,6 +186,7 @@ def compare_pan_metrics_significance(
                 )
 
     for method_a, method_b in combinations(method_names, 2):
+        # metric_values stores per-fold metric scores (e.g., per-fold accuracy)
         metrics_a = pan_metrics[method_a].get("metric_values", {})
         metrics_b = pan_metrics[method_b].get("metric_values", {})
         if not metrics_a or not metrics_b:
