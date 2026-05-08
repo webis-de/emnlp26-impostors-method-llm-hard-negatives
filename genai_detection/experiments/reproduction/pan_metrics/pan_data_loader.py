@@ -81,6 +81,7 @@ class PANDataLoader:
         n_impostors: int,
         rounds: int,
         n_potential_impostors: int | None = None,
+        feature_name: str = "scores_over_different_rounds"
     ) -> Dict[Tuple[ObjectId, ObjectId], float]:
         if technique not in IMPOSTOR_GENERATORS and "on_the_fly" not in technique:
             raise ValueError(f"Unsupported impostor technique: {technique}")
@@ -106,7 +107,7 @@ class PANDataLoader:
 
         cursor = self.mongo.impostor_output_collection.find(
             query,
-            {"left_id": 1, "right_id": 1, "scores_over_different_rounds": 1},
+            {"left_id": 1, "right_id": 1, feature_name: 1},
             batch_size=self.batch_size,
         ).sort("_id", 1)
 
@@ -116,7 +117,10 @@ class PANDataLoader:
             right_id = doc["right_id"]
             pair = (left_id, right_id)
             if pair not in scores_by_pair:
-                scores_by_pair[pair] = doc["scores_over_different_rounds"] / rounds
+                value = doc[feature_name]
+                if "score" in feature_name:
+                    value = value / rounds
+                scores_by_pair[pair] = float(value)
 
         return scores_by_pair
 
@@ -174,6 +178,7 @@ class PANDataLoader:
         dataset_name: str,
         *,
         impostor_technique: str | None,
+        feature_name: str = "scores_over_different_rounds"
     ) -> Dict[Tuple[ObjectId, ObjectId], float]:
         if impostor_technique is None:
             raise ValueError("impostor_technique must be provided for ablation methods.")
@@ -202,7 +207,7 @@ class PANDataLoader:
 
         cursor = self.mongo.impostor_ablation_output_collection.find(
             query,
-            {"left_id": 1, "right_id": 1, "scores_over_different_rounds": 1},
+            {"left_id": 1, "right_id": 1, feature_name: 1},
             batch_size=self.batch_size,
         ).sort("_id", 1)
 
@@ -210,7 +215,10 @@ class PANDataLoader:
         for doc in cursor:
             pair = (doc["left_id"], doc["right_id"])
             if pair not in scores_by_pair:
-                scores_by_pair[pair] = doc["scores_over_different_rounds"] / rounds
+                value = doc[feature_name]
+                if "score" in feature_name:
+                    value = value / rounds
+                scores_by_pair[pair] = float(value)
 
         return scores_by_pair
 
