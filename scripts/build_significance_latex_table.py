@@ -11,10 +11,10 @@ from typing import Dict, Iterable, List, Tuple
 from genai_detection.config import CONFIG
 
 DEFAULT_METHOD_ORDER = [
-    # "on_the_fly_chatnoir",
-    # "on_the_fly_startpage",
-    # "two_step_llm",
+    "on_the_fly_chatnoir",
+    "on_the_fly_startpage",
     "in_domain",
+    "two_step_llm",
 
     # "ppmd",
     # "unmasking",
@@ -22,11 +22,11 @@ DEFAULT_METHOD_ORDER = [
     # "unsupervised_baseline_cosine",
     # "unsupervised_baseline_min-max",
 
-    "bdi",
-    "homotopy",
-    "potha2017",
-    "asgalf",
-    "std_impostor",
+    # "bdi",
+    # "homotopy",
+    # "potha2017",
+    # "asgalf",
+    # "std_impostor",
 ]
 
 # Comment out any metrics you do not want to include in the LaTeX output.
