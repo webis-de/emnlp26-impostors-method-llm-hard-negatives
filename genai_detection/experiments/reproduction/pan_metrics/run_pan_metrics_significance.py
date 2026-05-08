@@ -28,6 +28,13 @@ METHODS = [
     # "one_step_llm",
     # "translation",
     # "mirror_minds",   # raises error
+
+    "ppmd",
+    "unmasking",
+    # "supervised_baseline",
+    # "unsupervised_baseline_cosine",
+    # "unsupervised_baseline_min-max",
+
     "bdi",
     "homotopy",
     "potha2017",
