@@ -413,6 +413,7 @@ class PANMetricComputer:
         per_split_results: list[EvaluationResult] = []
 
         if splits is None:
+            # cannot access split manager here, so we need to do it manually
             splitter = RepeatedStratifiedKFold(
                 n_splits=n_splits, n_repeats=n_repeats, random_state=random_state
             )
@@ -443,6 +444,9 @@ class PANMetricComputer:
                     threshold_values.size,
                     max_thresholds,
                 )
+                # Create evenly spaced quantile levels between 1% and 99%,
+                # then compute the corresponding score thresholds from the training scores.
+                # np.unique removes duplicate threshold values.
                 qs = np.linspace(0.01, 0.99, max_thresholds)
                 threshold_values = np.unique(np.quantile(scores_train, qs))
 
@@ -464,6 +468,7 @@ class PANMetricComputer:
                 upper_threshold = float(params["upper_threshold"])
                 if lower_threshold > upper_threshold:
                     continue
+                # give F1 none value to avoid computing F1, recall, precision each time
                 result = self.evaluate_at_threshold(
                     y_true=y_true_train,
                     scores=scores_train,
@@ -483,9 +488,10 @@ class PANMetricComputer:
                     best_upper_threshold = upper_threshold
 
             logger.info("Finished split %d/%d", split_idx, n_splits * n_repeats)
-            assert best_lower_threshold is not None
-            assert best_upper_threshold is not None
+            assert best_lower_threshold is not None, f"Best lower c@1 threshold is None for split {split_idx}."
+            assert best_upper_threshold is not None, f"Best upper c@1 threshold is None for split {split_idx}."
 
+            # obtain final scores using tunes F1 (for F1, recall, precision) and c@1 (for c@1) thresholds
             per_split_results.append(
                 self.evaluate_at_threshold(
                     y_true=y_true_test,
