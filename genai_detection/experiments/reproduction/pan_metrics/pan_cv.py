@@ -80,6 +80,8 @@ class PANEvaluator:
         splits: Iterable[tuple[np.ndarray, np.ndarray]] | None = None,
     ) -> EvaluationCVResult:
         if splits is None:
+            logger.info(f"Building splits for {self.split_manager.n_repeats} repeated "
+                        f"{self.split_manager.n_splits}-fold stratified CV with random state {self.split_manager.random_state}")
             splits = self.split_manager.build_splits(y_true)
         return self.metric_computer.tune_thresholds(
             y_true=y_true,

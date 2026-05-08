@@ -376,7 +376,7 @@ class PANMetricComputer:
         y_true: Sequence[int] | np.ndarray,
         scores: Sequence[float] | np.ndarray,
         n_splits: int = 10,
-        n_repeats: int = 5,
+        n_repeats: int = 10,
         random_state: int = 42,
         ci_level: float = 0.95,
         n_boot: int = 10000,
@@ -386,14 +386,6 @@ class PANMetricComputer:
         Tune thresholds on repeated stratified k-fold splits and summarize
         performance on held-out folds.
         """
-        y_true_np, scores_np = self._validate_binary_inputs(y_true=y_true, scores=scores)
-
-        class_counts = np.bincount(y_true_np)
-        if (class_counts < n_splits).any():
-            raise ValueError(
-                f"Each class must have at least n_splits={n_splits} samples. "
-                f"Counts: {class_counts.tolist()}"
-            )
         if n_splits < 2:
             raise ValueError("n_splits must be >= 2 for cross-validation.")
         if n_repeats < 1:
@@ -402,6 +394,16 @@ class PANMetricComputer:
             raise ValueError("ci_level must be between 0 and 1.")
         if n_boot < 1:
             raise ValueError("n_boot must be >= 1.")
+        assert splits, f"Splits must be provided for tuning thresholds."
+
+        y_true_np, scores_np = self._validate_binary_inputs(y_true=y_true, scores=scores)
+
+        class_counts = np.bincount(y_true_np)
+        if (class_counts < n_splits).any():
+            raise ValueError(
+                f"Each class must have at least n_splits={n_splits} samples. "
+                f"Counts: {class_counts.tolist()}"
+            )
 
         split_config = {
             "n_splits": int(n_splits),
@@ -412,25 +414,15 @@ class PANMetricComputer:
 
         per_split_results: list[EvaluationResult] = []
 
-        if splits is None:
-            # cannot access split manager here, so we need to do it manually
-            splitter = RepeatedStratifiedKFold(
-                n_splits=n_splits, n_repeats=n_repeats, random_state=random_state
+        splits = list(splits)
+        expected = int(n_splits) * int(n_repeats)
+        if len(splits) != expected:
+            raise ValueError(
+                f"Expected {expected} splits (n_splits={n_splits}, n_repeats={n_repeats}), "
+                f"got {len(splits)}."
             )
-            split_iter = splitter.split(scores_np, y_true_np)
-            logger.info("Splitting data with %s.", split_config)
-        else:
-            splits = list(splits)
-            expected = int(n_splits) * int(n_repeats)
-            if len(splits) != expected:
-                raise ValueError(
-                    f"Expected {expected} splits (n_splits={n_splits}, n_repeats={n_repeats}), "
-                    f"got {len(splits)}."
-                )
-            split_iter = splits
-            logger.info("Using precomputed splits with %s.", split_config)
 
-        for split_idx, (train_idx, test_idx) in enumerate(split_iter, start=1):
+        for split_idx, (train_idx, test_idx) in enumerate(splits, start=1):
             y_true_train = y_true_np[train_idx]
             scores_train = scores_np[train_idx]
             y_true_test = y_true_np[test_idx]
