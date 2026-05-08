@@ -361,7 +361,7 @@ class PANPairwiseSignificance:
                 alpha_levels=alpha_levels,
                 bonf_correction_factor=m
             )
-            logger.info(f"Computed pairwise {test} significance for {method_a} vs {method_b}.")
+            logger.info(f"Computed pairwise {test} significance for {method_a} vs {method_b} and bonferroni corrected (factor {m}).")
 
         return results
 
