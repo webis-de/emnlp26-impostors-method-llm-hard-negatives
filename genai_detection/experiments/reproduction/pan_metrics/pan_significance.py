@@ -154,6 +154,7 @@ def compare_pan_metrics_significance(
         "test": test,
         "alternative": alternative,
         "alpha_levels": alpha_sorted,
+        "bonf_correction_factor": bonf_correction_factor,
         "metrics": {},
     }
 
