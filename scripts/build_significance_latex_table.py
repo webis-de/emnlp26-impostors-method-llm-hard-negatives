@@ -244,7 +244,7 @@ def build_table(
         "Asterisks indicate statistically significant differences "
         "({\\tiny \\texttt{*, **, ***}} for $p_{\\text{corr}} < 0.05, 0.01, 0.005$, respectively).}"
     )
-    lines.append("\\label{tab:permutation-significance-stat-inf}")
+    lines.append("\\label{tab:pan-significance-stat-inf}")
     lines.append("\\end{table}")
 
     return "\n".join(lines)
