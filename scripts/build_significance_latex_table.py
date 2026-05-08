@@ -16,17 +16,17 @@ DEFAULT_METHOD_ORDER = [
     "in_domain",
     "two_step_llm",
 
-    # "ppmd",
-    # "unmasking",
+    "ppmd",
+    "unmasking",
     # "supervised_baseline",
     # "unsupervised_baseline_cosine",
     # "unsupervised_baseline_min-max",
 
-    # "bdi",
-    # "homotopy",
-    # "potha2017",
-    # "asgalf",
-    # "std_impostor",
+    "bdi",
+    "homotopy",
+    "potha2017",
+    "asgalf",
+    "std_impostor",
 ]
 
 # Comment out any metrics you do not want to include in the LaTeX output.
@@ -312,7 +312,7 @@ def build_effect_size_table(
         "\\caption{Pairwise effect sizes (Cohens $d_z$) for each metric. "
         "Effect sizes are reported for the same corrected paired tests used in the significance table.}"
     )
-    lines.append("\\label{tab:permutation-effect-sizes}")
+    lines.append("\\label{tab:pan-effect-sizes}")
     lines.append("\\end{table}")
 
     return "\n".join(lines)
