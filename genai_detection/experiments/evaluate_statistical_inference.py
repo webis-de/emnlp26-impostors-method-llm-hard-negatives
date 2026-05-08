@@ -28,7 +28,6 @@ from genai_detection.experiments.reproduction.pan_metrics.pan_metric_computation
 )
 from genai_detection.experiments.reproduction.pan_metrics.run_pan_metrics import (
     CI_LEVEL,
-    IMPOSTOR_METHODS,
     N_BOOT,
     N_IMPOSTORS,
     N_POTENTIAL_IMPOSTORS,
@@ -62,6 +61,25 @@ METRIC_LABELS = {
         r"\raisebox{0.75ex}[0em][0em]{\begin{tabular}{@{}c@{}}AUROC\\[-0.5ex]$\times$~c@1\end{tabular}}"
     ),
 }
+
+DEFAULT_METHOD_ORDER = [
+    "on_the_fly_chatnoir",
+    "on_the_fly_startpage",
+    "in_domain",
+    "two_step_llm",
+
+    # "ppmd",
+    # "unmasking",
+    # "supervised_baseline",
+    # "unsupervised_baseline_cosine",
+    # "unsupervised_baseline_min-max",
+
+    # "bdi",
+    # "homotopy",
+    # "potha2017",
+    # "asgalf",
+    # "std_impostor",
+]
 
 
 def _repo_root() -> Path:
@@ -496,8 +514,10 @@ def build_latex_table(
         r"\centering",
         r"\small",
         r"\resizebox{\linewidth}{!}{%",
-        r"\begin{tabular}{llrrrrrrr}",
+        r"\begin{tabular}{@{}llrrrrrrr@{}}",
         r"\toprule",
+        r" & & \multicolumn{6}{@{}c@{}}{\textbf{Reproduction Scores}} \\",
+        r"\cmidrule(l@{\tabcolsep}){3-8}",
         "Dataset & Method & "
         + " & ".join(METRIC_LABELS[metric] for metric in METRIC_ORDER)
         + r" \\",
@@ -564,7 +584,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         )
     )
     parser.add_argument("--datasets", nargs="+", default=[CONFIG.BLOG, CONFIG.STUDENT_ESSAYS])
-    parser.add_argument("--methods", nargs="+", default=list(IMPOSTOR_METHODS))
+    parser.add_argument("--methods", nargs="+", default=list(DEFAULT_METHOD_ORDER))
     parser.add_argument("--prediction-field", default=DEFAULT_PREDICTION_FIELD)
     parser.add_argument("--n-impostors", type=int, default=N_IMPOSTORS)
     parser.add_argument("--n-potential-impostors", type=int, default=N_POTENTIAL_IMPOSTORS)
