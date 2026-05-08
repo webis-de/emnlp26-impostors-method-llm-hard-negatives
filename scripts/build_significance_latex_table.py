@@ -15,11 +15,17 @@ DEFAULT_METHOD_ORDER = [
     "on_the_fly_startpage",
     "in_domain",
     "two_step_llm",
+
     "ppmd",
     "unmasking",
     # "supervised_baseline",
     # "unsupervised_baseline_cosine",
     # "unsupervised_baseline_min-max",
+    "bdi",
+    "homotopy",
+    "potha2017",
+    "asgalf",
+    "std_impostor",
 
 ]
 
@@ -47,7 +53,7 @@ def _dataset_display(name: str) -> str:
 
 
 def _method_display(name: str) -> str:
-    return CONFIG.LABEL_TRANSLATIONS.get(name, name.replace("_", " ").title())
+    return CONFIG.LABEL_TRANSLATIONS.get(name, name.replace("_", " ").title()).replace("&", r"\&")
 
 
 def _metric_display(name: str) -> str:
