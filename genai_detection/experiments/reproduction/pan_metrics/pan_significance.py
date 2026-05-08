@@ -21,7 +21,11 @@ from genai_detection.experiments.corrected_ttest import repkfold_ttest
 
 logger = logging.getLogger(__name__)
 
-from genai_detection.experiments.reproduction.pan_metrics.pan_cv import PANEvaluator, SplitManager
+from genai_detection.experiments.reproduction.pan_metrics.pan_cv import (
+    PANEvaluator,
+    SplitManager,
+    compute_aligned_pair_keys_hash,
+)
 from genai_detection.experiments.reproduction.pan_metrics.pan_data_loader import PANDataLoader
 
 @dataclass(frozen=True)
@@ -314,7 +318,7 @@ class PANPairwiseSignificance:
                 n_potential_impostors=n_potential_impostors,
                 rounds=rounds,
             )
-            y_true, scores_a, scores_b, n_samples = aligned
+            y_true, scores_a, scores_b, n_samples, aligned_pair_keys_hash = aligned
             if n_samples == 0:
                 logger.warning(f"{dataset_name} dataset: Skipping {method_a} vs {method_b}, bc no aligned samples.")
                 continue
@@ -330,6 +334,7 @@ class PANPairwiseSignificance:
                 n_repeats=self.split_manager.n_repeats,
                 ci_level=ci_level,
                 n_boot=n_boot,
+                aligned_pair_keys_hash=aligned_pair_keys_hash,
             )
             record_b = self.evaluator.get_or_compute_record(
                 dataset_name=dataset_name,
@@ -341,6 +346,7 @@ class PANPairwiseSignificance:
                 n_repeats=self.split_manager.n_repeats,
                 ci_level=ci_level,
                 n_boot=n_boot,
+                aligned_pair_keys_hash=aligned_pair_keys_hash,
             )
 
             pan_metrics = {
@@ -368,7 +374,7 @@ class PANPairwiseSignificance:
         n_impostors: int,
         n_potential_impostors: int | None,
         rounds: int,
-    ) -> tuple[list[int], list[float], list[float], int]:
+    ) -> tuple[list[int], list[float], list[float], int, str]:
         scores_a_by_pair = self.data_loader.load_scores(
             method_a,
             dataset_name,
@@ -406,6 +412,7 @@ class PANPairwiseSignificance:
         y_true = [gt_by_pair[key] for key in ordered_keys]
         scores_a = [scores_a_by_pair[key] for key in ordered_keys]
         scores_b = [scores_b_by_pair[key] for key in ordered_keys]
+        aligned_pair_keys_hash = compute_aligned_pair_keys_hash(ordered_keys)
 
         logger.info(
             "Aligned %s vs %s with %d shared samples.",
@@ -413,4 +420,4 @@ class PANPairwiseSignificance:
             method_b,
             len(ordered_keys),
         )
-        return y_true, scores_a, scores_b, len(ordered_keys)
+        return y_true, scores_a, scores_b, len(ordered_keys), aligned_pair_keys_hash

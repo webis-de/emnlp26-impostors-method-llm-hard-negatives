@@ -7,7 +7,11 @@ import logging
 import numpy as np
 
 from genai_detection.config import CONFIG
-from genai_detection.experiments.reproduction.pan_metrics.pan_cv import PANEvaluator, SplitManager
+from genai_detection.experiments.reproduction.pan_metrics.pan_cv import (
+    PANEvaluator,
+    SplitManager,
+    compute_aligned_pair_keys_hash,
+)
 from genai_detection.experiments.reproduction.pan_metrics.pan_data_loader import PANDataLoader
 from genai_detection.experiments.reproduction.pan_metrics.pan_metric_computation import PANMetricComputer
 from genai_detection.experiments.reproduction.pan_metrics.pan_storage import PANMetricsStore
@@ -97,6 +101,7 @@ def _compute_for_method(
     y_true = np.asarray([gt_by_pair[key] for key in ordered_keys])
     scores = np.asarray([scores_by_pair[key] for key in ordered_keys])
     n_samples = len(ordered_keys)
+    aligned_pair_keys_hash = compute_aligned_pair_keys_hash(ordered_keys)
     logger.info("Loaded %d ground truth and scores for %s (dataset=%s).", n_samples, method_name, dataset_name)
 
     _ = evaluator.get_or_compute_record(
@@ -109,6 +114,7 @@ def _compute_for_method(
         n_repeats=split_manager.n_repeats,
         ci_level=CI_LEVEL,
         n_boot=N_BOOT,
+        aligned_pair_keys_hash=aligned_pair_keys_hash,
     )
 
 

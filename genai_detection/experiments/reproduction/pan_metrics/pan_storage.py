@@ -29,6 +29,7 @@ class PANMetricsRecord:
     metrics_ci: dict[str, dict[str, float | int | str]]
     pan_metrics_per_split: list[dict]
     split_config: dict[str, float | int] | None = None
+    aligned_pair_keys_hash: str | None = None
 
     def to_mongo_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -71,10 +72,13 @@ class PANMetricsStore:
         dataset_name: str,
         method_name: str,
         n_samples: int | None = None,
+        aligned_pair_keys_hash: str | None = None,
     ) -> dict[str, Any] | None:
         query: dict[str, Any] = {"dataset_name": dataset_name, "method_name": method_name}
         if n_samples is not None:
             query["n_samples"] = n_samples
+        if aligned_pair_keys_hash is not None:
+            query["aligned_pair_keys_hash"] = aligned_pair_keys_hash
         doc = self.mongo.pan_metrics_collection.find_one(
             query,
             {"_id": 0},
@@ -125,6 +129,8 @@ class PANMetricsStore:
             "dataset_name": doc.get("dataset_name"),
             "method_name": doc.get("method_name"),
             "n_samples": doc.get("n_samples"),
+            "aligned_pair_keys_hash": doc.get("aligned_pair_keys_hash")
+            or pan_payload.get("aligned_pair_keys_hash"),
             "metrics_mean": doc.get("metrics_mean") or pan_payload.get("metrics_mean") or {},
             "metrics_std": doc.get("metrics_std") or pan_payload.get("metrics_std") or {},
             "metrics_ci": doc.get("metrics_ci") or pan_payload.get("metrics_ci") or {},

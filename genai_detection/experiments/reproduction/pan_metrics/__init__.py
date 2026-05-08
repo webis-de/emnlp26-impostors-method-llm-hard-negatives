@@ -5,7 +5,11 @@ from .pan_metric_computation import (
     EvaluationCVResult,
     PANMetricComputer,
 )
-from genai_detection.experiments.reproduction.pan_metrics.pan_cv import SplitManager, PANEvaluator
+from genai_detection.experiments.reproduction.pan_metrics.pan_cv import (
+    SplitManager,
+    PANEvaluator,
+    compute_aligned_pair_keys_hash,
+)
 from genai_detection.experiments.reproduction.pan_metrics.pan_storage import PANMetricsStore, PANMetricsRecord
 from genai_detection.experiments.reproduction.pan_metrics.pan_data_loader import PANDataLoader, PANMethodConfig
 from genai_detection.experiments.reproduction.pan_metrics.pan_significance import PANPairwiseSignificance
@@ -18,6 +22,7 @@ __all__ = [
     "PANMetricComputer",
     "SplitManager",
     "PANEvaluator",
+    "compute_aligned_pair_keys_hash",
     "PANMetricsStore",
     "PANMetricsRecord",
     "PANDataLoader",

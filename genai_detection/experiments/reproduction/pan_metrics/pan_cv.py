@@ -3,8 +3,10 @@ from __future__ import annotations
 """Cross-validation helpers for PAN metrics."""
 
 from dataclasses import asdict, dataclass
+import hashlib
+import json
 import logging
-from typing import Iterable
+from typing import Iterable, Sequence
 
 import numpy as np
 from sklearn.model_selection import RepeatedStratifiedKFold
@@ -13,6 +15,18 @@ from .pan_metric_computation import EvaluationCVResult, PANMetricComputer
 from .pan_storage import PANMetricsRecord, PANMetricsStore
 
 logger = logging.getLogger(__name__)
+
+
+def compute_aligned_pair_keys_hash(pair_keys: Sequence[tuple[object, object]]) -> str:
+    """
+    Return a stable, order-sensitive hash for aligned PAN pair keys.
+
+    Repeated CV splits are index based, so the same pair set in a different
+    order is a different cache identity.
+    """
+    canonical_keys = [[str(left_id), str(right_id)] for left_id, right_id in pair_keys]
+    payload = json.dumps(canonical_keys, ensure_ascii=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 @dataclass
@@ -95,19 +109,30 @@ class PANEvaluator:
         n_repeats: int,
         ci_level: float,
         n_boot: int,
+        aligned_pair_keys_hash: str | None = None,
     ) -> dict:
+        if not aligned_pair_keys_hash:
+            raise ValueError("aligned_pair_keys_hash is required for PAN metric cache identity.")
+
         stored = self.store.get_record(
-            dataset_name=dataset_name, method_name=method_name, n_samples=n_samples
+            dataset_name=dataset_name,
+            method_name=method_name,
+            n_samples=n_samples,
+            aligned_pair_keys_hash=aligned_pair_keys_hash,
         )
         if stored:
             precomputed_n_samples = stored.get("n_samples")
             precomputed_n_splits = stored.get("split_config", {}).get("n_splits")
             precomputed_n_repeats = stored.get("split_config", {}).get("n_repeats")
+            precomputed_random_state = stored.get("split_config", {}).get("random_state")
+            precomputed_aligned_pair_keys_hash = stored.get("aligned_pair_keys_hash")
 
             if (
                 (precomputed_n_samples == n_samples)
                 and (precomputed_n_splits == n_splits)
                 and (precomputed_n_repeats == n_repeats)
+                and (precomputed_random_state == self.split_manager.random_state)
+                and (precomputed_aligned_pair_keys_hash == aligned_pair_keys_hash)
             ):
                 stored = self.store.ensure_metric_values(
                     stored, self.extract_metric_values
@@ -143,6 +168,7 @@ class PANEvaluator:
             dataset_name=dataset_name,
             method_name=method_name,
             n_samples=n_samples,
+            aligned_pair_keys_hash=aligned_pair_keys_hash,
             cv_result=cv_result,
         )
         # only newly computed records are saved
@@ -161,6 +187,7 @@ class PANEvaluator:
         dataset_name: str,
         method_name: str,
         n_samples: int,
+        aligned_pair_keys_hash: str,
         cv_result: EvaluationCVResult,
     ) -> PANMetricsRecord:
         per_split = [asdict(result) for result in cv_result.per_split]
@@ -168,6 +195,7 @@ class PANEvaluator:
             dataset_name=dataset_name,
             method_name=method_name,
             n_samples=n_samples,
+            aligned_pair_keys_hash=aligned_pair_keys_hash,
             metrics_mean=cv_result.metrics_mean,
             metrics_std=cv_result.metrics_std,
             metrics_ci=cv_result.metrics_ci,
