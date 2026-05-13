@@ -795,7 +795,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--latex-caption",
         default=(
-            "PAN metrics for statistical-inference impostor predictions "
+            "PAN metrics for statistical-inference formulation of the Impostors Method "
             r"($\alpha=0.05$)."
         ),
     )
