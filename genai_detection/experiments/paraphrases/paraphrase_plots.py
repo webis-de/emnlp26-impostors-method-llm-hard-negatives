@@ -459,7 +459,7 @@ class ParaphrasePlotter:
         if ax.legend_ is not None:
             ax.legend_.remove()
         ax.axhline(100, color="gray", linestyle="--", linewidth=1, alpha=0.8)
-        ax.set_xlabel("Paraphrase technique")
+        ax.set_xlabel(group_by.capitalize())
         ax.set_ylabel("Paraphrase length (% of original words)")
 
         dataset_name = CONFIG.DATASET_TRANSLATIONS[data_category] if data_category else ""
@@ -574,7 +574,7 @@ class ParaphrasePlotter:
                 ax.legend_.remove()
 
             metric_for_title = " ".join([t.capitalize() for t in metric.split("_")])
-            ax.set_xlabel("Paraphrase technique")
+            ax.set_xlabel(group_by.capitalize())
             ax.set_ylabel(metric_for_title)
             title = (
                 f"{metric_for_title} by Paraphrase Technique\n{CONFIG.DATASET_TRANSLATIONS[data_category]} Dataset"
