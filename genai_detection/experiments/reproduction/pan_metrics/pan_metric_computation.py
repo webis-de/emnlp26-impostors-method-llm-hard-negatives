@@ -271,8 +271,10 @@ class PANMetricComputer:
 
         precision, recall, pr_thresholds = precision_recall_curve(y_true, scores)
 
-        prec = precision[1:]
-        rec = recall[1:]
+        # precision_recall_curve returns one extra terminal point without a
+        # threshold. thresholds[i] corresponds to precision[i] and recall[i].
+        prec = precision[:-1]
+        rec = recall[:-1]
         thr = pr_thresholds
 
         # avoid division by zero
@@ -300,7 +302,7 @@ class PANMetricComputer:
 
         Scores in (lower_threshold, upper_threshold) are treated as unanswered (0.5).
         If f1_threshold is provided, precision/recall/F1/accuracy are computed
-        on all samples using that threshold (no rejection band).
+        on all samples using that threshold (scores >= threshold; no rejection band).
         """
 
         y_true_np, scores_np = self._validate_binary_inputs(y_true=y_true, scores=scores)
@@ -346,7 +348,7 @@ class PANMetricComputer:
                 )
                 accuracy = accuracy_score(y_true_answered, y_pred_answered)
         else:
-            preds_f1 = (scores_np > float(f1_threshold)).astype(int)
+            preds_f1 = (scores_np >= float(f1_threshold)).astype(int)
             precision = precision_score(y_true_np, preds_f1, zero_division=0)
             recall = recall_score(y_true_np, preds_f1, zero_division=0)
             f1 = f1_score(y_true_np, preds_f1, zero_division=0)
