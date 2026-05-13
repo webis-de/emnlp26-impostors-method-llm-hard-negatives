@@ -461,8 +461,10 @@ class ParaphrasePlotter:
         ax.axhline(100, color="gray", linestyle="--", linewidth=1, alpha=0.8)
         ax.set_xlabel("Paraphrase technique")
         ax.set_ylabel("Paraphrase length (% of original words)")
+
+        dataset_name = CONFIG.DATASET_TRANSLATIONS[data_category] if data_category else ""
         title = (
-            f"Paraphrase Length in Words (% of Original)\n{data_category} Dataset"
+            f"Paraphrase Length in Words (% of Original)\n{dataset_name} Dataset"
             if data_category
             else "Paraphrase Length in Words (% of Original)"
         )
