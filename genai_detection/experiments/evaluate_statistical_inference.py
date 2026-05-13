@@ -14,6 +14,7 @@ from typing import Any, Iterable, Sequence
 
 import numpy as np
 from bson import ObjectId
+from sklearn.metrics import cohen_kappa_score
 
 from genai_detection.config import CONFIG
 from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENERATORS
@@ -39,7 +40,7 @@ from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_PREDICTION_FIELD = "corr_pred_over_different_rounds"
+DEFAULT_PREDICTION_FIELD = "pred_both_hypothesis_directions"
 METRIC_ORDER = [
     "accuracy",
     "f1",
