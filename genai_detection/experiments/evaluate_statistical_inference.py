@@ -41,6 +41,15 @@ from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 logger = logging.getLogger(__name__)
 
 DEFAULT_PREDICTION_FIELD = "pred_both_hypothesis_directions"
+RIGHT_DISPUTED_LEFT_CANDIDATE_PREDICTION_FIELD = (
+    "right_disputed_left_candidate_uncorrected_p_value_pred"
+)
+LEFT_DISPUTED_RIGHT_CANDIDATE_PREDICTION_FIELD = (
+    "left_disputed_right_candidate_uncorrected_p_value_pred"
+)
+KAPPA_LATEX_OUTPUT_FILENAME = (
+    "kappa_annotator_agreement_directional_uncorrected_p_value_predictions.tex"
+)
 METRIC_ORDER = [
     "accuracy",
     "f1",
@@ -152,6 +161,18 @@ class StatisticalInferenceMetrics:
     metrics_std: dict[str, float]
     metrics_ci: dict[str, dict[str, float | int | str]]
     metric_values: dict[str, list[float]]
+
+
+@dataclass(frozen=True)
+class StatisticalInferenceAgreement:
+    dataset_name: str
+    method_name: str
+    right_prediction_field: str
+    left_prediction_field: str
+    n_samples: int
+    aligned_pair_keys_hash: str
+    cohen_kappa: float | None
+    observed_agreement: float | None
 
 
 class StatisticalInferencePredictionLoader(PANDataLoader):
@@ -434,6 +455,102 @@ class StatisticalInferenceExperiment:
                     results.append(result)
         return results
 
+    def evaluate_directional_agreement_method(
+        self,
+        method_name: str,
+        *,
+        dataset_name: str,
+        right_prediction_field: str = RIGHT_DISPUTED_LEFT_CANDIDATE_PREDICTION_FIELD,
+        left_prediction_field: str = LEFT_DISPUTED_RIGHT_CANDIDATE_PREDICTION_FIELD,
+        n_impostors: int,
+        n_potential_impostors: int | None,
+    ) -> StatisticalInferenceAgreement | None:
+        right_predictions_by_pair = self.loader.load_predictions(
+            method_name,
+            dataset_name,
+            prediction_field=right_prediction_field,
+            n_impostors=n_impostors,
+            n_potential_impostors=n_potential_impostors,
+        )
+        left_predictions_by_pair = self.loader.load_predictions(
+            method_name,
+            dataset_name,
+            prediction_field=left_prediction_field,
+            n_impostors=n_impostors,
+            n_potential_impostors=n_potential_impostors,
+        )
+        ordered_keys = sorted(
+            set(right_predictions_by_pair) & set(left_predictions_by_pair)
+        )
+        if not ordered_keys:
+            logger.warning(
+                "No aligned directional predictions found for method=%s dataset=%s fields=%s/%s.",
+                method_name,
+                dataset_name,
+                right_prediction_field,
+                left_prediction_field,
+            )
+            return None
+
+        right_predictions = np.asarray(
+            [right_predictions_by_pair[key] for key in ordered_keys],
+            dtype=int,
+        )
+        left_predictions = np.asarray(
+            [left_predictions_by_pair[key] for key in ordered_keys],
+            dtype=int,
+        )
+        observed_agreement = float(np.mean(right_predictions == left_predictions))
+        kappa = _float_or_none(
+            cohen_kappa_score(right_predictions, left_predictions, labels=[0, 1])
+        )
+
+        logger.info(
+            "Computed directional prediction agreement for %s/%s on %d samples: "
+            "kappa=%s, agreement=%.3f",
+            dataset_name,
+            method_name,
+            len(ordered_keys),
+            "--" if kappa is None else f"{kappa:.3f}",
+            observed_agreement,
+        )
+
+        return StatisticalInferenceAgreement(
+            dataset_name=dataset_name,
+            method_name=method_name,
+            right_prediction_field=right_prediction_field,
+            left_prediction_field=left_prediction_field,
+            n_samples=len(ordered_keys),
+            aligned_pair_keys_hash=compute_aligned_pair_keys_hash(ordered_keys),
+            cohen_kappa=kappa,
+            observed_agreement=observed_agreement,
+        )
+
+    def evaluate_directional_agreement(
+        self,
+        *,
+        datasets: Iterable[str],
+        methods: Iterable[str],
+        right_prediction_field: str = RIGHT_DISPUTED_LEFT_CANDIDATE_PREDICTION_FIELD,
+        left_prediction_field: str = LEFT_DISPUTED_RIGHT_CANDIDATE_PREDICTION_FIELD,
+        n_impostors: int,
+        n_potential_impostors: int | None,
+    ) -> list[StatisticalInferenceAgreement]:
+        results: list[StatisticalInferenceAgreement] = []
+        for dataset_name in datasets:
+            for method_name in methods:
+                result = self.evaluate_directional_agreement_method(
+                    method_name,
+                    dataset_name=dataset_name,
+                    right_prediction_field=right_prediction_field,
+                    left_prediction_field=left_prediction_field,
+                    n_impostors=n_impostors,
+                    n_potential_impostors=n_potential_impostors,
+                )
+                if result is not None:
+                    results.append(result)
+        return results
+
 
 def metrics_to_rows(results: Sequence[StatisticalInferenceMetrics]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
@@ -529,7 +646,9 @@ def build_latex_table(
     for dataset_idx, (dataset_name, dataset_results) in enumerate(dataset_items):
         maxima = _metric_maxima(dataset_results) if bold_max else {}
         for method_idx, result in enumerate(dataset_results):
-            dataset_cell = _latex_escape(_display_dataset(dataset_name)) if method_idx == 0 else ""
+            dataset_cell = (
+                _latex_escape(_display_dataset(dataset_name)) if method_idx == 0 else ""
+            )
             method_cell = _latex_escape(_display_method(result.method_name))
             metric_cells = []
             for metric in METRIC_ORDER:
@@ -569,6 +688,72 @@ def write_latex_table(
         caption=caption,
         label=label,
         bold_max=bold_max,
+    )
+    out_path.write_text(latex, encoding="utf-8")
+    return out_path
+
+
+def build_kappa_latex_table(
+    results: Sequence[StatisticalInferenceAgreement],
+    *,
+    caption: str,
+    label: str,
+) -> str:
+    by_dataset: dict[str, list[StatisticalInferenceAgreement]] = defaultdict(list)
+    for result in results:
+        by_dataset[result.dataset_name].append(result)
+
+    lines = [
+        "% Auto-generated by genai_detection.experiments.evaluate_statistical_inference.",
+        r"\begin{table}[t]",
+        r"\centering",
+        r"\small",
+        r"\resizebox{\linewidth}{!}{%",
+        r"\begin{tabular}{@{}llrr@{}}",
+        r"\toprule",
+        r"Dataset & Method & $n$ & Cohen's $\kappa$ \\",
+        r"\midrule",
+    ]
+
+    dataset_items = list(by_dataset.items())
+    for dataset_idx, (dataset_name, dataset_results) in enumerate(dataset_items):
+        for method_idx, result in enumerate(dataset_results):
+            dataset_cell = (
+                _latex_escape(_display_dataset(dataset_name)) if method_idx == 0 else ""
+            )
+            method_cell = _latex_escape(_display_method(result.method_name))
+            lines.append(
+                f"{dataset_cell} & {method_cell} & {result.n_samples} & "
+                f"{_format_metric(result.cohen_kappa)}" + r" \\"
+            )
+        if dataset_idx < len(dataset_items) - 1:
+            lines.append(r"\midrule")
+
+    lines.extend(
+        [
+            r"\bottomrule",
+            r"\end{tabular}",
+            r"}",
+            rf"\caption{{{caption}}}",
+            rf"\label{{{label}}}",
+            r"\end{table}",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def write_kappa_latex_table(
+    results: Sequence[StatisticalInferenceAgreement],
+    out_path: Path,
+    *,
+    caption: str,
+    label: str,
+) -> Path:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    latex = build_kappa_latex_table(
+        results,
+        caption=caption,
+        label=label,
     )
     out_path.write_text(latex, encoding="utf-8")
     return out_path
@@ -618,6 +803,22 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--latex-label",
         default="tab:statistical-inference-impostor-pan-metrics",
     )
+    parser.add_argument(
+        "--kappa-latex-output",
+        type=Path,
+        default=output_dir / KAPPA_LATEX_OUTPUT_FILENAME,
+    )
+    parser.add_argument(
+        "--kappa-latex-caption",
+        default=(
+            r"Cohen's $\kappa$ for agreement between the two directional statistical-inference decisions; "
+            r"$n$ denotes the number of aligned pairs."
+        ),
+    )
+    parser.add_argument(
+        "--kappa-latex-label",
+        default="tab:statistical-inference-directional-kappa-agreement",
+    )
     parser.add_argument("--no-bold-max", action="store_true")
     parser.add_argument("--log-level", default="INFO")
     return parser.parse_args(argv)
@@ -631,6 +832,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         args.csv_output = args.output_dir / f"pan_metrics_statistical_inference_{_safe_filename(args.prediction_field)}.csv"
     if args.latex_output == _default_output_dir() / f"pan_metrics_statistical_inference_{_safe_filename(DEFAULT_PREDICTION_FIELD)}.tex":
         args.latex_output = args.output_dir / f"pan_metrics_statistical_inference_{_safe_filename(args.prediction_field)}.tex"
+    if args.kappa_latex_output == _default_output_dir() / KAPPA_LATEX_OUTPUT_FILENAME:
+        args.kappa_latex_output = args.output_dir / KAPPA_LATEX_OUTPUT_FILENAME
 
     mongo = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
     loader = StatisticalInferencePredictionLoader(mongo=mongo, batch_size=args.batch_size)
@@ -654,13 +857,23 @@ def main(argv: Sequence[str] | None = None) -> None:
         ci_level=args.ci_level,
         n_boot=args.n_boot,
     )
-    if not results:
-        raise SystemExit("No statistical-inference metrics were computed.")
+    agreement_results = experiment.evaluate_directional_agreement(
+        datasets=args.datasets,
+        methods=args.methods,
+        n_impostors=args.n_impostors,
+        n_potential_impostors=args.n_potential_impostors,
+    )
 
-    csv_path = write_csv(results, args.csv_output)
-    logger.info("Wrote statistical-inference PAN metrics CSV to %s.", csv_path)
+    if not results and not agreement_results:
+        raise SystemExit("No statistical-inference metrics or agreement results were computed.")
 
-    if args.latex:
+    if results:
+        csv_path = write_csv(results, args.csv_output)
+        logger.info("Wrote statistical-inference PAN metrics CSV to %s.", csv_path)
+    else:
+        logger.warning("No statistical-inference PAN metrics were computed.")
+
+    if args.latex and results:
         latex_path = write_latex_table(
             results,
             args.latex_output,
@@ -669,6 +882,20 @@ def main(argv: Sequence[str] | None = None) -> None:
             bold_max=not args.no_bold_max,
         )
         logger.info("Wrote statistical-inference PAN metrics LaTeX table to %s.", latex_path)
+
+    if agreement_results:
+        kappa_latex_path = write_kappa_latex_table(
+            agreement_results,
+            args.kappa_latex_output,
+            caption=args.kappa_latex_caption,
+            label=args.kappa_latex_label,
+        )
+        logger.info(
+            "Wrote directional prediction kappa agreement LaTeX table to %s.",
+            kappa_latex_path,
+        )
+    else:
+        logger.warning("No directional prediction agreement results were computed.")
 
 
 if __name__ == "__main__":
