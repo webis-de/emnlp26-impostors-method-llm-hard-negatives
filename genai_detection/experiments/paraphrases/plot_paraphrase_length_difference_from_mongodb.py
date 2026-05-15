@@ -145,6 +145,7 @@ class MongoParaphraseLengthPercentagePlotter:
         for dataset_name in dataset_values:
             df_subset = data[data["dataset_name"] == dataset_name].copy()
             if df_subset.empty:
+                logger.warning(f"Skipping empty dataset={dataset_name!r}.")
                 continue
             logger.info(
                 "Plotting dataset=%s rows=%d grouped by model.",
