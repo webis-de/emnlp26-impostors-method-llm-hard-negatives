@@ -59,6 +59,7 @@ class RowSpec:
     label: str
     year: str
     method_keys: Sequence[str]
+    is_baseline: bool = False
 
 
 ROW_SPECS: Sequence[RowSpec] = [
@@ -93,19 +94,21 @@ ROW_SPECS: Sequence[RowSpec] = [
         method_keys=("bdi",),
     ),
     RowSpec(
-        label="LLM-based (we)",
+        label="LLM impostors",
         year="2026",
         method_keys=("two_step_llm", "one_step_llm"),
     ),
     RowSpec(
-        label="  Min-max (B)",
+        label="Min-max (B)",
         year="",
         method_keys=("unsupervised_baseline_min-max",),
+        is_baseline=True,
     ),
     RowSpec(
-        label="  Cosine (B)",
+        label="Cosine (B)",
         year="",
         method_keys=("unsupervised_baseline_cosine",),
+        is_baseline=True,
     ),
     # RowSpec(
     #     label="  SVM (B)",
@@ -113,14 +116,16 @@ ROW_SPECS: Sequence[RowSpec] = [
     #     method_keys=("supervised_baseline",),
     # ),
     RowSpec(
-        label="  Unmasking (B)",
+        label="Unmasking (B)",
         year="",
         method_keys=("unmasking",),
+        is_baseline=True,
     ),
     RowSpec(
-        label="  PPMd (B)",
+        label="PPMd (B)",
         year="",
         method_keys=("ppmd",),
+        is_baseline=True,
     ),
 ]
 
@@ -272,18 +277,38 @@ def build_table(
     for idx, dataset_name in enumerate(dataset_list):
         rows_with_metrics = _collect_dataset_metrics(mongo, dataset_name, ROW_SPECS)
         maxima = _compute_bold_maxima(rows_with_metrics) if bold_max else {}
+        baseline_row_count = sum(1 for row, _ in rows_with_metrics if row.is_baseline)
+        baseline_label_written = False
 
         lines.append(
             f"  \\multicolumn{{9}}{{@{{}}c@{{}}}}{{\\emph{{{_dataset_title(dataset_name)}}}}}  \\\\"
         )
-        for row, metrics in rows_with_metrics:
+        for row_index, (row, metrics) in enumerate(rows_with_metrics):
+            if row_index > 0:
+                previous_row = rows_with_metrics[row_index - 1][0]
+                if row.method_keys == ("two_step_llm", "one_step_llm"):
+                    lines.append(r"\addlinespace[0.75ex]")
+                elif row.is_baseline and not previous_row.is_baseline:
+                    lines.append(r"\addlinespace[0.5ex]")
+
             cells: list[str] = []
             for metric in METRIC_ORDER:
                 value = _round_metric(metrics.get(metric) if metrics else None)
                 is_bold = bold_max and (value is not None) and (value == maxima.get(metric))
                 cells.append(_format_metric(value, is_bold))
+
+            year = row.year
+            if row.is_baseline and not baseline_label_written:
+                year = (
+                    rf"\multirow{{{baseline_row_count}}}{{*}}"
+                    r"{\rotatebox[origin=l]{-90}{Baselines}}"
+                )
+                baseline_label_written = True
+            elif row.is_baseline:
+                year = ""
+
             lines.append(
-                f"  {row.label} & {row.year} & " + " & ".join(cells) + r" \\"
+                f"  {row.label} & {year} & " + " & ".join(cells) + r" \\"
             )
 
         if idx < len(dataset_list) - 1:
