@@ -56,7 +56,7 @@ TECHNIQUE_LABEL_MODES: tuple[str, ...] = (
 
 def run_paraphrase_experiments(
     display_plot: bool = False,
-    technique_label_mode: TechniqueLabelMode = "model_prompt_approach",
+    technique_label_mode: TechniqueLabelMode = "model",
     prompt_words: int = 6,
 ):
     """Run scoring + visualization for paraphrase experiments.

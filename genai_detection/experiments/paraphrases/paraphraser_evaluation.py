@@ -463,7 +463,7 @@ class ParaphrasingEvaluator:
         df: pd.DataFrame,
         data_category: Optional[str] = None,
         group_by: Optional[str] = "paraphrase_technique",
-        technique_label_mode: str = "model_prompt_approach",
+        technique_label_mode: str = "model",
         prompt_words: int = 6,
         display_plot: bool = True,
     ):
@@ -500,7 +500,7 @@ class ParaphrasingEvaluator:
         df: pd.DataFrame,
         data_category: Optional[str] = None,
         group_by: Optional[str] = "paraphrase_technique",
-        technique_label_mode: str = "model_prompt_approach",
+        technique_label_mode: str = "model",
         prompt_words: int = 6,
         display_plot: bool = True,
     ):

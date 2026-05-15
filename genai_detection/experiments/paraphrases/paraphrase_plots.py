@@ -494,7 +494,7 @@ class ParaphrasePlotter:
         metric_names: list[str],
         data_category: Optional[str] = None,
         group_by: str = "paraphrase_technique",
-        technique_label_mode: str = "model_prompt_approach",
+        technique_label_mode: str = "model",
         prompt_words: int = 6,
         display_plot: bool = True,
     ):
