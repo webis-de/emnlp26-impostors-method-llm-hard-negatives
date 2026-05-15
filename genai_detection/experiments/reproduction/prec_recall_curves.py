@@ -72,9 +72,10 @@ def _build_baselines(dataset_name: str):
             use_cosine_simiarity=True,
             dataset_name=dataset_name,
         ),
-        "supervised_baseline": SupervisedImpostorBaseline(
-            dataset_name=dataset_name
-        ),
+        # TODO: uncomment
+        # "supervised_baseline": SupervisedImpostorBaseline(
+        #     dataset_name=dataset_name
+        # ),
         "unmasking": UnmaskingDetector(),
         "ppmd": PPMdDetector(),
     }
