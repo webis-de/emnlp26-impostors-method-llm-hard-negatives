@@ -66,6 +66,7 @@ FIELD_DESCRIPTIONS = {
         "A list of concise bullet points summarizing the main ideas or arguments of the text, written in plain language, focusing on meaning rather than wording."
     ),
     "length": "The approximate target length of the generated text, in number of words.",
+    "language": "The language of the text.",
 }
 
 
@@ -99,12 +100,13 @@ class GenerateText(dspy.Signature):
     author: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["author"])
     bulletpoints: list[str] = dspy.InputField(desc=FIELD_DESCRIPTIONS["bulletpoints"])
     length: int = dspy.InputField(desc=FIELD_DESCRIPTIONS["length"])
+    language: str = dspy.InputField(desc=FIELD_DESCRIPTIONS["language"])
     text: str = dspy.OutputField(
         desc=(
             "A single, complete paraphrased text written in the style defined by the provided parameters. "
             "The text must integrate **all** bullet points into one coherent composition, follow the specified "
             "**heading**, **topic**, **genre**, **tone**, **authorial task** **register**, **century**, **audience**, "
-            "and **author profile**, and approximately match the requested word length."
+            "and **author profile**, written in **language** and approximately match the requested word length."
         )
     )
 
@@ -139,7 +141,7 @@ class TwoStepParaphraser(Paraphraser):
             api_key=CONFIG.OPENAI_KEY if os.path.exists("/Users/klara") else os.environ['OPENAI_KEY'],
             model_type="chat",  # better for structured output such as extracted information
             cache=False, # to avoid reusing the same response
-            temperature=1.0 if is_reasoning_model else temperature, # TODO: change to non-reasoning for less deterministic results?
+            temperature=1.0 if is_reasoning_model else temperature,
             max_tokens=16000 if is_reasoning_model else CONFIG.MAX_LENGTH,
         )
         self.model_id = model_id
@@ -232,6 +234,7 @@ class TwoStepParaphraser(Paraphraser):
         extractor = dspy.Predict(ExtractInfo)
         extracted_info = extractor(text=text).toDict()
         extracted_info["length"] = len(text.split())
+        extracted_info["language"] = "English"
         cost_after_extractor = sum(
             [x["cost"] for x in self.lm.history if x["cost"] is not None]
         )  # in USD, as calculated by LiteLLM for certain providers
