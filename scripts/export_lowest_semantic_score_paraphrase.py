@@ -1,8 +1,9 @@
-"""Export the paraphrase with the lowest semantic similarity score.
+"""Export the English paraphrase with the lowest semantic similarity score.
 
 Reads the ``paraphrase_scores`` MongoDB collection, finds the row with the
-lowest ``sem_sim_avg`` value, resolves its reference and paraphrase texts, and
-writes a human-readable summary to
+lowest ``sem_sim_avg`` value whose resolved paraphrase is classified as
+English, resolves its reference and paraphrase texts, and writes a
+human-readable summary to
 ``results/paraphrasing/examples/lowest_semantic_score_paraphrase.txt``.
 """
 
@@ -14,15 +15,17 @@ import logging
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from bson import ObjectId
+from langdetect import DetectorFactory, LangDetectException, detect_langs
 from pymongo.collection import Collection
 
 from genai_detection.config import CONFIG
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 logger = logging.getLogger(__name__)
+DetectorFactory.seed = 0
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_PATH = (
@@ -32,13 +35,15 @@ DEFAULT_OUTPUT_PATH = (
     / "examples"
     / "lowest_semantic_score_paraphrase.txt"
 )
+MAX_LANGUAGE_DETECTION_CHARACTERS = 20_000
 
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Find the paraphrase_scores row with the lowest sem_sim_avg and "
-            "write the corresponding original/paraphrase texts to a summary file."
+            "Find the paraphrase_scores row with the lowest semantic score "
+            "whose resolved paraphrase is classified as English and write the "
+            "corresponding original/paraphrase texts to a summary file."
         )
     )
     parser.add_argument(
@@ -50,7 +55,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--score-field",
         default="sem_sim_avg",
-        help="Numeric score field to minimize. Defaults to sem_sim_avg.",
+        help=(
+            "Numeric score field to minimize while searching for an English "
+            "paraphrase. Defaults to sem_sim_avg."
+        ),
     )
     parser.add_argument(
         "--non-naive-model",
@@ -96,26 +104,33 @@ def _find_by_id(collection: Collection, value: Any) -> dict[str, Any] | None:
     return None
 
 
-def _find_lowest_score_row(
+def _validate_score_row(score_doc: dict[str, Any]) -> None:
+    for required_field in ["dataset_name", "paraphrase_id", "reference_id"]:
+        if required_field not in score_doc:
+            raise ValueError(
+                f"Score row is missing required field {required_field!r}: "
+                f"{score_doc}"
+            )
+
+
+def _iter_score_rows_by_score(
     mongo: ParaphraseMongoDB, score_field: str
-) -> dict[str, Any]:
-    score_doc = mongo.paraphrase_score_collection.find_one(
+) -> Iterator[dict[str, Any]]:
+    cursor = mongo.paraphrase_score_collection.find(
         {score_field: {"$exists": True, "$ne": None}},
         sort=[(score_field, 1), ("_id", 1)],
     )
-    if score_doc is None:
+    found_any = False
+    for score_doc in cursor:
+        found_any = True
+        _validate_score_row(score_doc)
+        yield score_doc
+
+    if not found_any:
         raise ValueError(
             f"No rows with a non-null {score_field!r} value found in "
             f"{CONFIG.MONGO_PARAPHRASE_SCORE_COLLECTION!r}."
         )
-
-    for required_field in ["dataset_name", "paraphrase_id", "reference_id"]:
-        if required_field not in score_doc:
-            raise ValueError(
-                f"Lowest score row is missing required field {required_field!r}: "
-                f"{score_doc}"
-            )
-    return score_doc
 
 
 def _resolve_original_doc(
@@ -168,6 +183,69 @@ def _resolve_paraphrase_doc(
     )
 
 
+def _require_paraphrase_text(paraphrase_doc: dict[str, Any]) -> str:
+    paraphrase_text = paraphrase_doc.get("paraphrase")
+    if not isinstance(paraphrase_text, str) or not paraphrase_text.strip():
+        raise ValueError(
+            f"Paraphrase document has no non-empty paraphrase field: {paraphrase_doc}"
+        )
+    return paraphrase_text
+
+
+def _classify_text_language(text: str) -> str:
+    text = text.strip()
+    if not text:
+        return "unknown"
+
+    try:
+        candidates = detect_langs(text[:MAX_LANGUAGE_DETECTION_CHARACTERS])
+    except LangDetectException:
+        return "unknown"
+
+    if not candidates:
+        return "unknown"
+    return candidates[0].lang
+
+
+def _resolve_lowest_english_paraphrase(
+    mongo: ParaphraseMongoDB,
+    score_field: str,
+    non_naive_model: str,
+) -> tuple[dict[str, Any], dict[str, Any], str, str, int]:
+    skipped_non_english = 0
+    for score_doc in _iter_score_rows_by_score(mongo=mongo, score_field=score_field):
+        paraphrase_doc, paraphrase_collection_name = _resolve_paraphrase_doc(
+            mongo=mongo,
+            paraphrase_id=score_doc["paraphrase_id"],
+            score_doc=score_doc,
+            non_naive_model=non_naive_model,
+        )
+        paraphrase_text = _require_paraphrase_text(paraphrase_doc)
+        paraphrase_language = _classify_text_language(paraphrase_text)
+        if paraphrase_language == "en":
+            return (
+                score_doc,
+                paraphrase_doc,
+                paraphrase_collection_name,
+                paraphrase_language,
+                skipped_non_english,
+            )
+
+        skipped_non_english += 1
+        logger.info(
+            "Skipping paraphrase_id=%s with %s=%s because detected language is %s.",
+            _format_scalar(score_doc.get("paraphrase_id")),
+            score_field,
+            _format_scalar(score_doc.get(score_field)),
+            paraphrase_language,
+        )
+
+    raise ValueError(
+        "No English paraphrase found among rows with a non-null "
+        f"{score_field!r} value in {CONFIG.MONGO_PARAPHRASE_SCORE_COLLECTION!r}."
+    )
+
+
 def _format_scalar(value: Any) -> str:
     if isinstance(value, ObjectId):
         return str(value)
@@ -204,19 +282,17 @@ def _build_summary(
     original_doc: dict[str, Any],
     paraphrase_doc: dict[str, Any],
     paraphrase_collection_name: str,
+    paraphrase_language: str,
+    skipped_non_english: int,
 ) -> str:
     original_text = original_doc.get("text")
-    paraphrase_text = paraphrase_doc.get("paraphrase")
+    paraphrase_text = _require_paraphrase_text(paraphrase_doc)
     if not isinstance(original_text, str) or not original_text.strip():
         raise ValueError(f"Original document has no non-empty text field: {original_doc}")
-    if not isinstance(paraphrase_text, str) or not paraphrase_text.strip():
-        raise ValueError(
-            f"Paraphrase document has no non-empty paraphrase field: {paraphrase_doc}"
-        )
 
     lines = [
-        "Lowest Semantic Similarity Paraphrase",
-        "====================================",
+        "Lowest English Semantic Similarity Paraphrase",
+        "=============================================",
         f"Generated at: {datetime.now().isoformat(timespec='seconds')}",
         "",
         "Score Entry",
@@ -229,6 +305,8 @@ def _build_summary(
         f"paraphrase_collection: {paraphrase_collection_name}",
         f"original_id: {_format_scalar(original_doc.get('_id'))}",
         f"paraphrase_id: {_format_scalar(paraphrase_doc.get('_id'))}",
+        f"paraphrase_language: {paraphrase_language}",
+        f"non_english_lower_score_candidates_skipped: {skipped_non_english}",
     ]
 
     if paraphrase_collection_name == CONFIG.MONGO_NAIVE_PARAPHRASE_COLLECTION:
@@ -269,15 +347,19 @@ def export_lowest_semantic_score_summary(
     local_ray: bool,
 ) -> Path:
     mongo = ParaphraseMongoDB(local_ray=local_ray)
-    score_doc = _find_lowest_score_row(mongo=mongo, score_field=score_field)
+    (
+        score_doc,
+        paraphrase_doc,
+        paraphrase_collection_name,
+        paraphrase_language,
+        skipped_non_english,
+    ) = _resolve_lowest_english_paraphrase(
+        mongo=mongo,
+        score_field=score_field,
+        non_naive_model=non_naive_model,
+    )
     original_doc = _resolve_original_doc(
         mongo=mongo, reference_id=score_doc["reference_id"]
-    )
-    paraphrase_doc, paraphrase_collection_name = _resolve_paraphrase_doc(
-        mongo=mongo,
-        paraphrase_id=score_doc["paraphrase_id"],
-        score_doc=score_doc,
-        non_naive_model=non_naive_model,
     )
 
     summary = _build_summary(
@@ -285,6 +367,8 @@ def export_lowest_semantic_score_summary(
         original_doc=original_doc,
         paraphrase_doc=paraphrase_doc,
         paraphrase_collection_name=paraphrase_collection_name,
+        paraphrase_language=paraphrase_language,
+        skipped_non_english=skipped_non_english,
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(summary, encoding="utf-8")
