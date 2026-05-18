@@ -9,6 +9,7 @@ writes a human-readable summary to
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 from datetime import datetime
@@ -173,6 +174,14 @@ def _format_scalar(value: Any) -> str:
     return "" if value is None else str(value)
 
 
+def _format_extracted_info(value: Any) -> str:
+    if value in (None, ""):
+        return ""
+    if isinstance(value, (dict, list, tuple)):
+        return json.dumps(value, indent=2, sort_keys=True, default=str)
+    return str(value)
+
+
 def _score_metadata_lines(score_doc: dict[str, Any]) -> list[str]:
     primary_fields = {"_id", "dataset_name", "paraphrase_id", "reference_id"}
     skip_fields = primary_fields | {"hashcode", "bertscore_hash"}
@@ -226,6 +235,16 @@ def _build_summary(
         lines.append(f"naive_llm: {_format_scalar(paraphrase_doc.get('llm'))}")
     else:
         lines.append(f"non_naive_model: {_format_scalar(paraphrase_doc.get('llm'))}")
+        extracted_info = _format_extracted_info(paraphrase_doc.get("extracted_info"))
+        if extracted_info:
+            lines.extend(
+                [
+                    "",
+                    "Extracted Info",
+                    "--------------",
+                    extracted_info,
+                ]
+            )
 
     lines.extend(
         [
