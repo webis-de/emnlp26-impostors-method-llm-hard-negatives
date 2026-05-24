@@ -16,12 +16,6 @@ DEFAULT_METHOD_ORDER = [
     "in_domain",
     "two_step_llm",
 
-    "ppmd",
-    "unmasking",
-    # "supervised_baseline",
-    # "unsupervised_baseline_cosine",
-    # "unsupervised_baseline_min-max",
-
     "bdi",
     "homotopy",
     "potha2017",
@@ -198,8 +192,9 @@ def build_table(
 
     lines: List[str] = []
     lines.append("% Auto-generated; do not edit by hand.")
-    lines.append("\\begin{table}[t]\\small")
-    lines.append("  \\tabcolsep=0.11cm")
+    lines.append("\\begin{table}[t]")
+    lines.append("\\fontsize{7.5pt}{8pt}\\selectfont")
+    lines.append("\\renewcommand{\\tabcolsep}{2pt}")
     lines.append("\\centering")
     lines.append("\\resizebox{\\linewidth}{!}{%")
     col_groups = "|".join(["".join(["c"] * len(metric_list)) for _ in method_list])
