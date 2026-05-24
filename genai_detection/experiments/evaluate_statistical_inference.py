@@ -798,7 +798,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--latex-caption",
         default=(
             "PAN metrics for statistical-inference formulation of the Impostors Method "
-            r"($\alpha=0.05$)."
+            r"($\alpha=0.05$). ChatNoir and Startpage are retrieval-based approaches."
         ),
     )
     parser.add_argument(
