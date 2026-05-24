@@ -631,6 +631,8 @@ def build_latex_table(
         r"\begin{table}[t]",
         r"\centering",
         r"\small",
+        r"\fontsize{7.5pt}{8pt}\selectfont",
+        r"\renewcommand{\tabcolsep}{2pt}",
         r"\resizebox{\linewidth}{!}{%",
         r"\begin{tabular}{@{}llrrrrrrr@{}}",
         r"\toprule",
