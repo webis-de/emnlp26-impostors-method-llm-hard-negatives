@@ -86,7 +86,7 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Classify the language of paraphrase texts in MongoDB collections and "
-            "write one CSV summary per collection."
+            "write CSV and LaTeX summaries per collection."
         )
     )
     parser.add_argument(
@@ -99,7 +99,7 @@ def _parse_args() -> argparse.Namespace:
         "--output-dir",
         type=Path,
         default=DEFAULT_OUTPUT_DIR,
-        help="Directory where the per-collection CSV files are written.",
+        help="Directory where the per-collection CSV and TeX files are written.",
     )
     parser.add_argument(
         "--text-field",
@@ -207,6 +207,138 @@ def _write_summary(
         writer.writerows(rows)
 
 
+def _is_non_naive_collection(collection_name: str) -> bool:
+    return collection_name == CONFIG.MONGO_PARAPHRASE_COLLECTION
+
+
+def _latex_escape(value: Any) -> str:
+    replacements = {
+        "\\": r"\textbackslash{}",
+        "&": r"\&",
+        "%": r"\%",
+        "$": r"\$",
+        "#": r"\#",
+        "_": r"\_",
+        "{": r"\{",
+        "}": r"\}",
+        "~": r"\textasciitilde{}",
+        "^": r"\textasciicircum{}",
+    }
+    return "".join(replacements.get(char, char) for char in str(value))
+
+
+def _latex_label(collection_name: str) -> str:
+    slug = collection_name.replace("_", "-")
+    return f"tab:{slug}-language-distribution"
+
+
+def _latex_caption(collection_name: str, include_llm: bool) -> str:
+    collection_label = _latex_escape(collection_name)
+    if include_llm:
+        return f"Language distribution of paraphrases in {collection_label} by LLM."
+    return f"Language distribution of paraphrases in {collection_label}."
+
+
+def _write_latex_table(
+    output_path: Path,
+    collection_name: str,
+    counts: Counter[tuple[str, str]],
+    llm_totals: Counter[str],
+    collection_total: int,
+    percentage_denominator: str,
+) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    include_llm = not _is_non_naive_collection(collection_name)
+
+    rows: list[dict[str, Any]] = []
+    if include_llm:
+        for (llm, language), count in sorted(
+            counts.items(), key=lambda item: (item[0][0], -item[1], item[0][1])
+        ):
+            denominator = (
+                llm_totals[llm]
+                if percentage_denominator == "llm"
+                else collection_total
+            )
+            percentage = (count / denominator * 100) if denominator else 0.0
+            rows.append(
+                {
+                    "llm": llm,
+                    "language": language,
+                    "relative_percentage": f"{percentage:.4f}",
+                    "absolute_count": count,
+                }
+            )
+    else:
+        language_counts: Counter[str] = Counter()
+        for (_, language), count in counts.items():
+            language_counts[language] += count
+
+        for language, count in sorted(
+            language_counts.items(), key=lambda item: (-item[1], item[0])
+        ):
+            percentage = (count / collection_total * 100) if collection_total else 0.0
+            rows.append(
+                {
+                    "language": language,
+                    "relative_percentage": f"{percentage:.4f}",
+                    "absolute_count": count,
+                }
+            )
+
+    column_format = "llrr" if include_llm else "lrr"
+    header = (
+        r"LLM & Language & Relative percentage (\%) & Count \\"
+        if include_llm
+        else r"Language & Relative percentage (\%) & Count \\"
+    )
+
+    body_lines = []
+    for row in rows:
+        if include_llm:
+            body_lines.append(
+                " & ".join(
+                    [
+                        _latex_escape(row["llm"]),
+                        _latex_escape(row["language"]),
+                        row["relative_percentage"],
+                        str(row["absolute_count"]),
+                    ]
+                )
+                + r" \\"
+            )
+        else:
+            body_lines.append(
+                " & ".join(
+                    [
+                        _latex_escape(row["language"]),
+                        row["relative_percentage"],
+                        str(row["absolute_count"]),
+                    ]
+                )
+                + r" \\"
+            )
+
+    table_lines = [
+        r"\begin{table}",
+        r"\centering",
+        r"\resizebox{\linewidth}{!}{%",
+        rf"\begin{{tabular}}{{{column_format}}}",
+        r"\toprule",
+        header,
+        r"\midrule",
+        *body_lines,
+        r"\bottomrule",
+        r"\end{tabular}%",
+        r"}",
+        r"\caption{" + _latex_caption(collection_name, include_llm) + "}",
+        r"\label{" + _latex_label(collection_name) + "}",
+        r"\end{table}",
+        "",
+    ]
+    output_path.write_text("\n".join(table_lines), encoding="utf-8")
+
+
 def _analyze_collection(
     mongo: ParaphraseMongoDB,
     collection_name: str,
@@ -241,7 +373,19 @@ def _analyze_collection(
         collection_total=collection_total,
         percentage_denominator=args.percentage_denominator,
     )
+    latex_output_path = output_path.with_suffix(".tex")
+    _write_latex_table(
+        output_path=latex_output_path,
+        collection_name=collection_name,
+        counts=counts,
+        llm_totals=llm_totals,
+        collection_total=collection_total,
+        percentage_denominator=args.percentage_denominator,
+    )
     logger.info("Wrote %s with %d analyzed documents.", output_path, collection_total)
+    logger.info(
+        "Wrote %s with %d analyzed documents.", latex_output_path, collection_total
+    )
     return output_path
 
 
