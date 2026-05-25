@@ -1,5 +1,6 @@
 # LLM-based Impostor Generation & Reframing the Impostors Method as a Hypothesis Test
-This repository contains the code associated with ARR May submission about authorship verification of human-authored texts.
+This repository contains the code associated with ARR May submission "The Impostors Method as a Statistical Test for Authorship Verification
+with Large Language Models as Sampling Source for Hard Negatives" about authorship verification of human-authored texts.
 We (1) reinterpret the Impostors Method for authorship verification as a statistical hypothesis test and (2) 
 investigate LLM-generated texts as controllable in-domain impostors. 
 We re-implement the orginal Impostors Method by 
