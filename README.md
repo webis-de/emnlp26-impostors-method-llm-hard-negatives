@@ -59,7 +59,7 @@ certain paraphrases.
 
 ---
 ## Impostor UI
-The UI in `ui/impostor_ui` is not the focus of this repository, but still a work in progress.
+The UI in `ui/impostor_ui` is not the focus of this repository, it is still a work in progress.
 
 Our experiments do not depend on the UI, but are run via 
 `genai_detection/experiments/reproduction/run_prec_recall_curves.py`. 
