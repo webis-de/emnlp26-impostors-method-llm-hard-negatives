@@ -53,66 +53,6 @@ def run_student_essay():
     dataset.save_to_disk(output_dir)
 
 
-def run_pan23(base_dir: str, save_path: str):
-    base_dir = Path(__file__).resolve().parent / base_dir
-    train_dir = os.path.join(base_dir, "pan23-authorship-verification-training-dataset")
-    test_dir = os.path.join(base_dir, "pan23-authorship-verification-test-dataset")
-    output_dir = os.path.join(save_path, "pan23-dataset-converted")
-
-    loader = Pan23DatasetLoader(train_dir=train_dir, test_dir=test_dir)
-    dataset = loader.load()
-    dataset.save_to_disk(output_dir)
-
-
-def run_pan20():
-    base_dir = (
-        Path(__file__).resolve().parent.parent
-        / CONFIG.DATA_BASE_PATH
-        / "pan20-authorship-verification/"
-    )
-    train_dir = os.path.join(base_dir, "pan20-authorship-verification-training-dataset")
-    test_dir = os.path.join(base_dir, "pan20-authorship-verification-test-dataset")
-    output_dir = os.path.join(base_dir, "pan20-dataset-converted")
-
-    loader = Pan20DatasetLoader(train_dir=train_dir, test_dir=test_dir)
-    dataset = loader.load()
-    dataset.save_to_disk(output_dir)
-
-
-def run_pan25():
-    base_dir = (
-        Path(__file__).resolve().parent
-        / CONFIG.DATA_BASE_PATH
-        / "dataset-extended-2025-part/"
-    )
-    human_dir = os.path.join(base_dir, "human")
-    machine_dir = os.path.join(base_dir, "machines")
-    train_ids_path = os.path.join(base_dir, "ids-train.txt")
-    test_ids_path = os.path.join(base_dir, "ids-test.txt")
-    output_dir = os.path.join(base_dir, "pan25-dataset-converted")
-
-    loader = Pan25DatasetLoader(human_dir, machine_dir, train_ids_path, test_ids_path)
-    dataset = loader.load()
-    dataset.save_to_disk(output_dir)
-
-
-class KoppelWebisDatasetLoader:
-    pass
-
-
-def run_koppel_webis():
-    base_dir = (
-        Path(__file__).resolve().parent.parent
-        / CONFIG.DATA_BASE_PATH
-        / "corpus-webis-authorship/koppel/"
-    )
-    output_dir = os.path.join(base_dir, "koppel-webis-dataset-converted")
-
-    loader = KoppelWebisDatasetLoader(path=base_dir)
-    dataset = loader.load()
-    dataset.save_to_disk(output_dir)
-
-
 def run_blog_corpus():
     base_dir = (
         Path(__file__).resolve().parents[2] / CONFIG.DATA_BASE_PATH / "Blog_corpus/"
@@ -154,25 +94,6 @@ if __name__ == "__main__":
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
 
-    parser = argparse.ArgumentParser(description="Run Dataset creation.")
-    parser.add_argument(
-        "--path",
-        type=str,
-        default="data/datasets/pan23-authorship-verification/",
-        help="Path to the input dataset (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--out",
-        type=str,
-        default="data/datasets/pan23-authorship-verification/",
-        help="Path where Huggingface dataset should be saved (default: %(default)s)",
-    )
-    args = parser.parse_args()
-
-    # run_pan23(base_dir=args.path, save_path=args.out)
-    # # run_pan25()
-    # run_pan20()
-    # run_koppel_webis()
     # run_blog_corpus()
     # delete_blog_from_mongoDB()
     # run_gutenberg_corpus()
