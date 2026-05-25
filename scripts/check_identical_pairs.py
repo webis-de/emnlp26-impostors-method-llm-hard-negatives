@@ -1,10 +1,22 @@
-# scripts/check_identical_pairs.py (or run in a python shell)
+# Copyright 2026 Klara M. Gutekunst, Webis
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 from pathlib import Path
 
-from bson import ObjectId
-from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 from genai_detection.config import CONFIG
+from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 mongo = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
 dataset = CONFIG.BLOG  # or CONFIG.STUDENT_ESSAYS

@@ -1,4 +1,4 @@
-# Copyright 2025 Klara M. Gutekunst, Webis
+# Copyright 2026 Klara M. Gutekunst, Webis
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,9 +22,9 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+from bson import ObjectId
 from matplotlib import pyplot as plt
 from sklearn.metrics import auc
-from bson import ObjectId
 
 from genai_detection.config import CONFIG
 from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENERATORS

@@ -15,9 +15,9 @@
 """Run end-to-end paraphrase evaluation and plotting experiments.
 
 This module is the CLI/runner entrypoint for the paraphrase experiment pipeline:
-1) load scored paraphrases (naive + non_naive),
-2) compute missing metrics,
-3) render plots globally and per dataset.
+1. load scored paraphrases (naive + non_naive),
+2. compute missing metrics,
+3. render plots globally and per dataset.
 
 Technique label modes available for boxplots:
 - ``model``: group only by the model/LLM name.

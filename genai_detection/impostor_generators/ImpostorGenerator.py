@@ -1,4 +1,4 @@
-# Copyright 2025 Klara M. Gutekunst, Webis
+# Copyright 2026 Klara M. Gutekunst, Webis
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-# FIXME: make compatible with new mongodb idea
 import os
 import random
 import sys

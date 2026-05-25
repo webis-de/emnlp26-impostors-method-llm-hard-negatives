@@ -1,4 +1,17 @@
-import argparse
+# Copyright 2026 Klara M. Gutekunst, Webis
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import logging
 import os
 from typing import Dict
@@ -7,9 +20,6 @@ import pandas as pd
 
 from genai_detection.config import CONFIG
 from genai_detection.detectors.components.impostor_factory import IMPOSTOR_GENERATORS
-from genai_detection.experiments.run_prec_recall_curves_ablations import (
-    LOCAL_SAVE_PATH,
-)
 from genai_detection.experiments.reproduction.ablation_args import ABLATION_DETECTORS
 from genai_detection.experiments.reproduction.impostor_metrics import compute_metrics_for_thresholds
 from genai_detection.experiments.reproduction.pan_metrics import PANDataLoader
@@ -17,8 +27,9 @@ from genai_detection.experiments.reproduction.prec_recall_curves import (
     compute_prec_recall_f1_acc_dict_on_existing_impostor_scores,
     plot_precision_recall_curve,
 )
-import logging
-
+from genai_detection.experiments.run_prec_recall_curves_ablations import (
+    LOCAL_SAVE_PATH,
+)
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 logging.basicConfig(

@@ -1,4 +1,4 @@
-# Copyright 2025 Janek Bevendorff, Webis
+# Copyright 2026 Janek Bevendorff, Webis
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
-
 
 __all__ = [
     "compute_metrics",

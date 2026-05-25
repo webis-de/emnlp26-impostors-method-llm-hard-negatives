@@ -1,4 +1,4 @@
-# Copyright 2025 Janek Bevendorff and Klara M. Gutekunst, Webis
+# Copyright 2026 Klara M. Gutekunst, Webis
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,19 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """Find original code base: https://git.webis.de/code-research/web-search/affiliate-marketing-and-search/-/blob/main/serp_crawler/serp_crawler/crawler.py?ref_type=heads (28.11.2025)"""
 import logging
-import random
 from random import choice
 from typing import List, Dict
 from urllib import parse as urlparse
 
 import httpx
-from nltk.corpus import wordnet as wn
 from resiliparse.parse.html import HTMLTree
 
 from genai_detection.config import CONFIG
-from genai_detection.impostor_generators.chatnoir_impostor_generator import ChatNoirSearchImpostorGenerator
 from genai_detection.impostor_generators.search_generator_base import SearchImpostorGeneratorBase
 
 logger = logging.getLogger(__name__)

@@ -1,4 +1,4 @@
-# Copyright 2024 Klara M. Gutekunst, Webis
+# Copyright 2026 Klara M. Gutekunst, Webis
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,17 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import random
 from pathlib import Path
 
 from genai_detection.dataset.blog_corpus_dataset_loader import BlogCorpusDatasetLoader
 from genai_detection.dataset.gutenberg_dataset_loader import GutenbergDatasetLoader
-from genai_detection.dataset.pan_dataset_loader import (
-    Pan23DatasetLoader,
-    Pan20DatasetLoader,
-    Pan25DatasetLoader,
-)
 from genai_detection.dataset.student_essays_dataset_loader import StudentEssayDatasetLoader
 from genai_detection.paraphrasing.two_step_paraphrasers import *
 

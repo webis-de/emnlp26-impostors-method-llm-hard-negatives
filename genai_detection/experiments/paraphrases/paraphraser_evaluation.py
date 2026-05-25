@@ -1,4 +1,4 @@
-# Copyright 2024 Klara M. Gutekunst, Webis
+# Copyright 2026 Klara M. Gutekunst, Webis
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,24 +13,18 @@
 # limitations under the License.
 
 import difflib
-import json
-import logging
-from collections import defaultdict
 from pathlib import Path
-from typing import Any, List, Optional
 
 import numpy as np
 import pandas as pd
-import torch
 
-from genai_detection.config import CONFIG
-from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
-from genai_detection.paraphrasing.one_step_paraphrasers import *
 from genai_detection.experiments.paraphrases.paraphrase_data_loader import ParaphraseDataLoader
 from genai_detection.experiments.paraphrases.paraphrase_metrics import (
     ParaphraseMetricCalculator,
 )
 from genai_detection.experiments.paraphrases.paraphrase_plots import ParaphrasePlotter
+from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
+from genai_detection.paraphrasing.one_step_paraphrasers import *
 from genai_detection.paraphrasing.two_step_paraphrasers import *
 from genai_detection.util import preprocess_text as _preprocess_text
 

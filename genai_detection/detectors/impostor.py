@@ -1,3 +1,16 @@
+# Copyright 2026 Klara M. Gutekunst, Webis
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import datetime
 import logging
 import os
@@ -9,7 +22,7 @@ import numpy as np
 import torch
 from bson import ObjectId
 from statsmodels.stats.multitest import multipletests
-from statsmodels.stats.proportion import binom_test, proportion_effectsize
+from statsmodels.stats.proportion import proportion_effectsize
 
 from genai_detection.detectors.components.feature_extractor import TfidfFeatureExtractor
 from genai_detection.detectors.components.impostor_factory import create_impostor_generator

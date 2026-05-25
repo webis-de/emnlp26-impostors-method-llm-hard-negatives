@@ -1,4 +1,4 @@
-# Copyright 2025 Klara M. Gutekunst, Webis
+# Copyright 2026 Klara M. Gutekunst, Webis
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ from typing import Dict, List
 
 import numpy as np
 import pandas as pd
-from bson import ObjectId, Int64
+from bson import ObjectId
 from matplotlib import pyplot as plt
 
 from genai_detection.config import CONFIG

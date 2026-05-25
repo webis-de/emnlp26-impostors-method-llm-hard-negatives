@@ -1,4 +1,4 @@
-# Copyright 2024 Janek Bevendorff, Webis
+# Copyright 2026 Janek Bevendorff, Webis
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from more_itertools import ichunked
-from typing import Iterable, List
+from typing import Iterable
 
 import numpy as np
 import pyppmd
+from more_itertools import ichunked
 
 from genai_detection.detectors.detector_base import DetectorBase
 

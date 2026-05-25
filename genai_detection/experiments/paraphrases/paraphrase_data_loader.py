@@ -1,4 +1,4 @@
-# Copyright 2024 Klara M. Gutekunst, Webis
+# Copyright 2026 Klara M. Gutekunst, Webis
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ import os
 import re
 from itertools import chain, zip_longest
 from pathlib import Path
+
 import chardet
 import pandas as pd
 from bson import ObjectId

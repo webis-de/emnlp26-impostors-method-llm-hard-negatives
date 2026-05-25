@@ -1,22 +1,33 @@
+# Copyright 2026 Klara M. Gutekunst, Webis
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Pairwise significance testing for PAN metrics."""
 from __future__ import annotations
 
 import logging
-
-"""Pairwise significance testing for PAN metrics."""
-
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from itertools import combinations
 from typing import Any, Iterable, Sequence
-# Add effect size computation via Cohen's d_z
-# https://pingouin-stats.org/generated/pingouin.compute_effsize.html#pingouin.compute_effsize (13.04.2026)
-
-import pingouin as pg
 
 import numpy as np
 import pandas as pd
+import pingouin as pg
 from scipy.stats import mannwhitneyu, ttest_ind, ttest_rel, wilcoxon
 
 from genai_detection.experiments.corrected_ttest import repkfold_ttest
+
+# Add effect size computation via Cohen's d_z
+# https://pingouin-stats.org/generated/pingouin.compute_effsize.html#pingouin.compute_effsize (13.04.2026)
 
 
 logger = logging.getLogger(__name__)
