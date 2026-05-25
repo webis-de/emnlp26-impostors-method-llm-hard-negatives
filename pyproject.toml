@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "artificial-authorship-verification"
 version = "0.1.0"
-description = "Generative AI Detection Research Code"
+description = "Authorship Verification Research Code"
 authors = ["Klara M. Gutekunst <klara.gutekunst@uni-kassel.de>", "Janek Bevendorff <janek.bevendorff@uni-weimar.de>"]
 readme = "README.md"
 packages = [
@@ -41,13 +41,10 @@ dotenv = "^0.9.9"
 cmake = "3.31.6"
 tokenizers= ">=0.21,<0.22"
 sentencepiece = "^0.2.0"
-# simpletransformers = "^0.70.1"
 evaluate = "^0.4.3"
 bert-score = "^0.3.13"
-# absl-py = "^2.3.0"
 nltk = "^3.9.1"
 rouge-score = "^0.1.2"
-# pip-system-certs = "^5.2"
 word-mover-distance = "^0.0.3"
 gensim = "^4.3.3"
 dirtyjson = "^1.0.8"
