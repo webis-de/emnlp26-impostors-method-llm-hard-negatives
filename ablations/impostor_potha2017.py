@@ -3,9 +3,9 @@ Improved Impostors method (Potha & Stamatatos, 2017).
 
 This module provides a drop-in variant of the existing ImpostorDetector with
 three targeted changes:
-  1) Impostor selection: keep the most similar impostors to the known document in terms of min-max similarity.
-  2) Only consider candidate + impostor - disputed document (omit role swap)
-  3) Ranking-based scoring: use the rank position of the known document among
+  1. Impostor selection: keep the most similar impostors to the known document in terms of min-max similarity.
+  2. Only consider candidate + impostor - disputed document (omit role swap)
+  3. Ranking-based scoring: use the rank position of the known document among
      impostors when comparing to the disputed document instead of only considering the first rank.
 
  High scores correspond to a higher likelihood of the input texts being authored by the same person.
@@ -14,13 +14,10 @@ from __future__ import annotations
 
 import logging
 import random
-from typing import Any, Dict, Iterable, List, Optional
+import typing as t
+from typing import Any, Dict, List, Optional
 
 import numpy as np
-import torch
-import typing as t
-
-from bson import ObjectId
 
 from genai_detection.detectors.components.scorer import Scorer, ScoreResult
 from genai_detection.detectors.components.vector_similarity import minmax_similarity
