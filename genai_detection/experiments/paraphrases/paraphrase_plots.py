@@ -373,9 +373,26 @@ class ParaphrasePlotter:
         self, counts: pd.Series, words_per_line: int = 4
     ) -> dict[str, str]:
         label_map = {}
+        translate_to_readable = {
+                "meta" : "LLama 3.1 8B",
+                "mistral" : "Mistral 675B",
+                "gpt-oss": "GPT OSS 120B",
+                "gpt-5": "GPT-5 Nano",
+                "qwen": "Qwen 3 32B",
+                }
         for label, count in counts.items():
-            wrapped = self._wrap_label(str(label), words_per_line=words_per_line)
-            label_map[label] = f"{wrapped}\n[n={int(count)}]"
+            # wrapped = self._wrap_label(str(label), words_per_line=words_per_line)
+            label_str = str(label)
+
+            readable_label = next(
+                (
+                    readable
+                    for key, readable in translate_to_readable.items()
+                    if key.lower() in label_str.lower()
+                ),
+                label_str,
+            )
+            label_map[label] = readable_label#f"{wrapped}\n[n={int(count)}]"
         return label_map
 
     def plot_length_percentage_boxplot(
@@ -567,6 +584,7 @@ class ParaphrasePlotter:
                 palette=label_to_color,
                 dodge=False,
                 showfliers=False,
+                width=0.4,
                 linewidth=1.1,
                 ax=ax,
             )
