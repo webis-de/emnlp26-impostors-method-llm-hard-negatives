@@ -77,6 +77,11 @@ RETRIEVAL_INDEX_TO_METHOD = {
     for method_key, retrieval_index in CONFIG.RETRIEVAL_INDEX_TRANSLATIONS.items()
 }
 PLOT_EXCLUDED_METHODS = {"on_the_fly_serpapi"}
+PLOT_TITLE_FONT_SIZE = 15
+PLOT_LABEL_FONT_SIZE = 13
+PLOT_TICK_FONT_SIZE = 11
+PLOT_LEGEND_FONT_SIZE = 11
+PLOT_LEGEND_TITLE_FONT_SIZE = 12
 
 
 def _safe_filename(value: str) -> str:
@@ -413,23 +418,30 @@ def save_type_one_error_plots(
                 )
 
         display_dataset = _display_dataset(dataset_name)
-        ax.set_title(f"Alpha Calibration: {display_dataset}")
-        ax.set_xlabel(r"Alpha threshold ($\alpha$)")
+        ax.set_title(
+            r"$\alpha$" + f" Calibration on the {display_dataset} Dataset",
+            fontsize=PLOT_TITLE_FONT_SIZE,
+        )
+        ax.set_xlabel(r"Significance level $\alpha$", fontsize=PLOT_LABEL_FONT_SIZE)
         ax.set_ylabel(
-            "Type I error rate "
-            r"$\frac{\#\ \mathrm{rejected}\ H_0\ \mathrm{among\ different-author\ pairs}}"
-            r"{\#\ \mathrm{different-author\ pairs}}$"
+            "Type I Error Rate ",
+            # r"$\frac{\#\ \mathrm{rejected}\ H_0\ \mathrm{among\ different-author\ pairs}}"
+            # r"{\#\ \mathrm{different-author\ pairs}}$"
+        fontsize=PLOT_LABEL_FONT_SIZE,
         )
         ax_right.set_ylabel(
-            "Type II rate "
-            r"$\frac{\#\ \neg\mathrm{reject}\ H_0\ \mathrm{among\ same-author\ pairs}}"
-            r"{\#\ \mathrm{same-author\ pairs}}$"
+            "Type II Error Rate ",
+            # r"$\frac{\#\ \neg\mathrm{reject}\ H_0\ \mathrm{among\ same-author\ pairs}}"
+            # r"{\#\ \mathrm{same-author\ pairs}}$"
+            fontsize=PLOT_LABEL_FONT_SIZE,
         )
         ax.set_xlim(alpha_min, alpha_max)
         ax.set_ylim(0, min(1.0, max(0.105, max_error * 1.1)))
         ax_right.set_ylim(0, min(1.0, max(0.105, max_same_non_rejection * 1.1)))
         ax.yaxis.set_major_formatter(PercentFormatter(xmax=1.0))
         ax_right.yaxis.set_major_formatter(PercentFormatter(xmax=1.0))
+        ax.tick_params(axis="both", labelsize=PLOT_TICK_FONT_SIZE)
+        ax_right.tick_params(axis="y", labelsize=PLOT_TICK_FONT_SIZE)
         ax.grid(True, linestyle="--", alpha=0.5)
 
         method_handles = [
@@ -462,19 +474,19 @@ def save_type_one_error_plots(
         ]
         fig.legend(
             handles=method_handles,
-            title="Impostor generation",
+            title="Impostor Generation",
             frameon=False,
             loc="lower center",
-            bbox_to_anchor=(0.5, 0.06),
+            bbox_to_anchor=(0.5, 0.12),
             borderaxespad=0,
             ncol=min(3, len(method_handles)),
         )
         fig.legend(
             handles=style_handles,
-            title="Curve",
+            title="Error Rate",
             frameon=False,
             loc="lower center",
-            bbox_to_anchor=(0.5, 0.0),
+            bbox_to_anchor=(0.5, 0.06),
             borderaxespad=0,
             ncol=len(style_handles),
         )
