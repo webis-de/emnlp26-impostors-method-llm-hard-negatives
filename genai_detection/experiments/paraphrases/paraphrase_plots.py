@@ -457,6 +457,9 @@ class ParaphrasePlotter:
         label_to_color = {
             label: palette[i % len(palette)] for i, label in enumerate(order)
         }
+        title_fontsize = 21
+        label_fontsize = 18
+        tick_fontsize = 16
 
         fig, ax = plt.subplots(
             figsize=(max(10, len(order) * 1.2), 6), constrained_layout=True
@@ -470,14 +473,17 @@ class ParaphrasePlotter:
             palette=label_to_color,
             dodge=False,
             showfliers=False,
+            width=0.4,
             linewidth=1.1,
             ax=ax,
         )
         if ax.legend_ is not None:
             ax.legend_.remove()
         ax.axhline(100, color="gray", linestyle="--", linewidth=1, alpha=0.8)
-        ax.set_xlabel(group_by.capitalize())
-        ax.set_ylabel("Paraphrase length (% of original words)")
+        ax.set_xlabel(group_by.capitalize(), fontsize=label_fontsize)
+        ax.set_ylabel(
+            "Paraphrase length (% of original words)", fontsize=label_fontsize
+        )
 
         dataset_name = CONFIG.DATASET_TRANSLATIONS[data_category] if data_category else ""
         title = (
@@ -485,7 +491,8 @@ class ParaphrasePlotter:
             if data_category
             else "Paraphrase Length in Words (% of Original)"
         )
-        ax.set_title(title)
+        ax.set_title(title, fontsize=title_fontsize)
+        ax.tick_params(axis="both", labelsize=tick_fontsize)
         plt.setp(ax.get_xticklabels(), rotation=20, ha="right")
         ax.grid(axis="y", linestyle="--", alpha=0.35)
         sns.despine(ax=ax)
@@ -555,6 +562,9 @@ class ParaphrasePlotter:
             if data_category
             else "all_datasets"
         )
+        title_fontsize = 21
+        label_fontsize = 18
+        tick_fontsize = 16
 
         for metric in metric_names:
             plot_df = data[[group_by, metric]].dropna().copy()
@@ -591,15 +601,21 @@ class ParaphrasePlotter:
             if ax.legend_ is not None:
                 ax.legend_.remove()
 
-            metric_for_title = " ".join([t.capitalize() for t in metric.split("_")])
-            ax.set_xlabel(group_by.capitalize())
-            ax.set_ylabel(metric_for_title)
+            metric_for_title = " ".join(
+                t.capitalize()
+                if "gohsen" in t.lower() or "score" in t.lower()
+                else t.upper()
+                for t in metric.split("_")
+            )
+            ax.set_xlabel(group_by.capitalize(), fontsize=label_fontsize)
+            ax.set_ylabel(metric_for_title, fontsize=label_fontsize)
             title = (
                 f"{metric_for_title} by Paraphrase Technique\n{CONFIG.DATASET_TRANSLATIONS[data_category]} Dataset"
                 if data_category
                 else f"{metric_for_title} by Paraphrase Technique"
             )
-            ax.set_title(title)
+            ax.set_title(title, fontsize=title_fontsize)
+            ax.tick_params(axis="both", labelsize=tick_fontsize)
             plt.setp(ax.get_xticklabels(), rotation=20, ha="right")
             ax.grid(axis="y", linestyle="--", alpha=0.35)
             sns.despine(ax=ax)
