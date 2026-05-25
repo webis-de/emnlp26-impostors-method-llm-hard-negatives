@@ -243,9 +243,8 @@ kubectl run --namespace webisservices artificial-authorship-verification-mongodb
 ```
 
 ### Part forwarding
-There are two options, (1) via terminal or (2) via Pycharm.
 
-(1) Via terminal:
+Via terminal:
 ```bash
 kubectl port-forward -n webisservices deployment/artificial-authorship-verification-mongodb 27018:27017
 ```
@@ -258,17 +257,6 @@ while ! kubectl port-forward -n webisservices deployment/artificial-authorship-v
 ```
 This will rerun the command in case it breaks (because your WIFI is turned off or something else happened).
 You can stop it via `Ctrl + C`.
-
-(2) Via Pycharm:
-
-  (2.1) Go to `Database` > `+` > `Data Source` > `MongoDB` tab.
-
-  (2.2) Configure Kubernetes (tab on the right side): `Deployment` as Resource Type, `webisservices` as Namespace ~~, `artificial-authorship-verification-mongodb` as Resource Name, `27017` as Port.~~
-
-- Note that, usually [do not use deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) but [stateful sets](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) for databases, but it is common practice at Webis.
-2.3 Configure the connection (tab on the left side): `root` as User, your password, change port to forwarded port `2701x` (not x=7 or x=8 if already used), `localhost` as Host.
-![General Settings for path forwarding via Pycharm](explanations/pycharm_path_forwarding_mongodb_general.png)
-![Kubernetes Settings for path forwarding via Pycharm](explanations/pycharm_path_forwarding_mongodb_k8s.png)
 
 # 📝 Impostor Generation*
 ## Paraphrases
