@@ -275,5 +275,5 @@ DSPy expands the signatures into prompts automatically using the input, output f
 Find more papers about DSPy [here](https://github.com/stanfordnlp/dspy?tab=readme-ov-file#-citation--reading-more).
 
 ### Openai
-Remember checking [billing](https://platform.openai.com/settings/organization/billing/overview) and [API usage]
-(https://platform.openai.com/settings/organization/usage).
+Remember checking [billing](https://platform.openai.com/settings/organization/billing/overview) and 
+[API usage](https://platform.openai.com/settings/organization/usage).
