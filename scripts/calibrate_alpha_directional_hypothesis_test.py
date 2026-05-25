@@ -10,7 +10,7 @@ For on-the-fly impostors, ``retrieval_index`` is mapped back to the configured
 method key so ``LABEL_TRANSLATIONS`` and ``LABEL_COLORS`` can be reused.
 
 Usage:
-    poetry run python scripts/calibrate_alpha_directional_type_one_error.py
+    poetry run python scripts/calibrate_alpha_directional_hypothesis_test.py
 """
 
 import argparse
@@ -70,12 +70,13 @@ RIGHT_DISPUTED_LEFT_P_VALUE_FIELD = (
 DEFAULT_OUTPUT_DIR = (
     Path(__file__).resolve().parents[1]
     / CONFIG.SAVE_PATH
-    / "type_one_err_calibration"
+    / "alpha_calibration"
 )
 RETRIEVAL_INDEX_TO_METHOD = {
     retrieval_index: method_key
     for method_key, retrieval_index in CONFIG.RETRIEVAL_INDEX_TRANSLATIONS.items()
 }
+PLOT_EXCLUDED_METHODS = {"on_the_fly_serpapi"}
 
 
 def _safe_filename(value: str) -> str:
@@ -366,7 +367,19 @@ def save_type_one_error_plots(
         alpha_min = math.inf
         alpha_max = 0.0
 
-        technique_order = _method_order(set(dataset_curves) | set(same_dataset_curves))
+        technique_order = [
+            technique
+            for technique in _method_order(set(dataset_curves) | set(same_dataset_curves))
+            if technique not in PLOT_EXCLUDED_METHODS
+        ]
+        if not technique_order:
+            logger.warning(
+                "Skipping %s because no plottable methods remain after exclusions.",
+                dataset_name,
+            )
+            plt.close(fig)
+            continue
+
         for technique in technique_order:
             color = CONFIG.LABEL_COLORS.get(technique, "#4c4c4c")
             if technique in dataset_curves:
@@ -447,34 +460,29 @@ def save_type_one_error_plots(
                 label=r"Type II",
             ),
         ]
-        method_legend = ax.legend(
+        fig.legend(
             handles=method_handles,
             title="Impostor generation",
             frameon=False,
-            loc="lower left",
-            bbox_to_anchor=(0.02, 0.08),
+            loc="lower center",
+            bbox_to_anchor=(0.5, 0.06),
             borderaxespad=0,
+            ncol=min(3, len(method_handles)),
         )
-        ax.add_artist(method_legend)
-        ax_right.legend(
+        fig.legend(
             handles=style_handles,
             title="Curve",
             frameon=False,
-            loc="lower right",
-            bbox_to_anchor=(0.98, 0.08),
+            loc="lower center",
+            bbox_to_anchor=(0.5, 0.0),
             borderaxespad=0,
+            ncol=len(style_handles),
         )
 
-        # caption = (
-        #     "Caption: Empirical Type I error on different-author pairs "
-        #     "(all_pairs.same = false). $H_0$ is rejected only when both corrected "
-        #     "directional p-values are below alpha."
-        # )
-        # fig.text(0.5, 0.01, caption, ha="center", va="bottom", fontsize=8, wrap=True)
-        fig.tight_layout(rect=(0, 0.08, 1, 1))
+        fig.tight_layout(rect=(0, 0.24, 1, 1))
 
         filename = (
-            "type_one_error_alpha_calibration_directional_hypothesis_tests_"
+            "alpha_calibration_directional_hypothesis_tests_"
             f"{_safe_filename(dataset_name)}"
         )
         for file_format in ("pdf", "svg"):
