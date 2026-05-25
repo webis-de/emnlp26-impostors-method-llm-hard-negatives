@@ -1,4 +1,4 @@
-# Copyright 2024 Klara M. Gutekunst, Webis
+# Copyright 2026 Klara M. Gutekunst, Webis
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import torch
 from genai_detection.detectors.detector_base import DetectorBase
 from genai_detection.detectors.impostor import ImpostorDetector
 from genai_detection.detectors.ppmd import PPMdDetector
-from genai_detection.paraphrasing.paraphraser import T5ChatGPTParaphraser
+from genai_detection.paraphrasing.one_step_paraphrasers import T5ChatGPTParaphraser
 
 nltk.download("punkt")
 from nltk.tokenize import sent_tokenize, word_tokenize
