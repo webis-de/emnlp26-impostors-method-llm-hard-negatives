@@ -11,8 +11,13 @@ as well as several of its existing variants and extensions.
 ## Impostors Method
 You may find the re-implementaion of the original Impostors Method in the `genai_detection/detectors` directory.
 This directory also contains some additional baseline detectors (e.g., PPMd, Unmasking, etc.).
-Traditional mpostor generation techniques are implemented in the `genai_detection/impostor_generators` directory, while LLM-based paraphrasing techniques are implemented in the `
+Traditional impostor generation techniques are implemented in the `genai_detection/impostor_generators` directory, 
+while LLM-based paraphrasing techniques are implemented in the `
 genai_detection/paraphrasers` directory.
+
+### In-Domain Impostor Selection
+
+You may find the code for in-domain impostor selection in the `genai_detection/impostor_generators/in_domain_impostor_generator.py` directory.
 
 ### Retrieval-based Impostor Generation
 We use (1) the Google Search API via SerpAPI, (2) ChatNoir, (3) Startpage to retrieve on-topic impostors from the web.
