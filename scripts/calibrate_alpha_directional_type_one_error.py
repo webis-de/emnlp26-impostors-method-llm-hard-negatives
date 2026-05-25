@@ -50,6 +50,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.lines import Line2D
 from matplotlib.ticker import PercentFormatter
 from pymongo.collection import Collection
 
@@ -118,14 +119,14 @@ def _alpha_grid(alpha_min: float, alpha_max: float, alpha_step: float) -> np.nda
     return alphas[alphas <= alpha_max + 1e-12]
 
 
-def _load_different_author_pairs(
+def _load_author_pairs(
     collection: Collection,
     *,
+    same_value: bool,
     dataset_names: list[str] | None,
     batch_size: int,
 ) -> set[tuple[Any, Any, str]]:
-    # keep only different author pairs
-    query: dict[str, Any] = {"same": {"$eq": False, "$type": "bool"}}
+    query: dict[str, Any] = {"same": {"$eq": same_value, "$type": "bool"}}
     if dataset_names:
         query["dataset_name"] = {"$in": dataset_names}
 
@@ -137,19 +138,21 @@ def _load_different_author_pairs(
     pairs = {
         (doc["left_id"], doc["right_id"], doc["dataset_name"])
         for doc in cursor
-        if doc.get("same") is False
+        if doc.get("same") is same_value
         and "left_id" in doc
         and "right_id" in doc
         and "dataset_name" in doc
     }
-    logger.info("Loaded %d different-author pairs from %s.", len(pairs), collection.name)
+    pair_label = "same-author" if same_value else "different-author"
+    logger.info("Loaded %d %s pairs from %s.", len(pairs), pair_label, collection.name)
     return pairs
 
 
 def _load_impostor_outputs_for_pairs(
     collection: Collection,
     *,
-    different_author_pairs: set[tuple[Any, Any, str]],
+    pair_keys: set[tuple[Any, Any, str]],
+    pair_label: str,
     dataset_names: list[str] | None,
     techniques: list[str] | None,
     left_p_value_field: str,
@@ -185,7 +188,7 @@ def _load_impostor_outputs_for_pairs(
     cursor = collection.find(query, projection, batch_size=batch_size).sort("_id", 1)
     for doc in cursor:
         pair_key = (doc["left_id"], doc["right_id"], doc["dataset_name"])
-        if pair_key not in different_author_pairs:
+        if pair_key not in pair_keys:
             skipped_missing_pair += 1
             continue
 
@@ -208,8 +211,9 @@ def _load_impostor_outputs_for_pairs(
 
     if skipped_missing_pair:
         logger.info(
-            "Skipped %d impostor-output records without a matching different-author pair.",
+            "Skipped %d impostor-output records without a matching %s pair.",
             skipped_missing_pair,
+            pair_label,
         )
     if skipped_invalid_p_values:
         logger.warning(
@@ -227,6 +231,39 @@ def _load_impostor_outputs_for_pairs(
 def compute_type_one_error_curves(
     df: pd.DataFrame,
     alphas: np.ndarray,
+) -> dict[str, dict[str, pd.DataFrame]]:
+    return _compute_alpha_curves(
+        df=df,
+        alphas=alphas,
+        rate_column="type_one_error",
+        count_column="n_different_author_pairs",
+        use_non_rejection_rate=False,
+        record_label="different-author",
+    )
+
+
+def compute_same_author_non_rejection_curves(
+    df: pd.DataFrame,
+    alphas: np.ndarray,
+) -> dict[str, dict[str, pd.DataFrame]]:
+    return _compute_alpha_curves(
+        df=df,
+        alphas=alphas,
+        rate_column="same_author_non_rejection_rate",
+        count_column="n_same_author_pairs",
+        use_non_rejection_rate=True,
+        record_label="same-author",
+    )
+
+
+def _compute_alpha_curves(
+    df: pd.DataFrame,
+    alphas: np.ndarray,
+    *,
+    rate_column: str,
+    count_column: str,
+    use_non_rejection_rate: bool,
+    record_label: str,
 ) -> dict[str, dict[str, pd.DataFrame]]:
     curves: dict[str, dict[str, pd.DataFrame]] = {}
     if df.empty:
@@ -249,19 +286,23 @@ def compute_type_one_error_curves(
                 (left_p_values[None, :] < alphas[:, None])
                 & (right_p_values[None, :] < alphas[:, None])
             )
-            type_one_error = rejected.sum(axis=1) / len(technique_df)
+            if use_non_rejection_rate:
+                rate = (~rejected).sum(axis=1) / len(technique_df)
+            else:
+                rate = rejected.sum(axis=1) / len(technique_df)
             dataset_curves[technique] = pd.DataFrame(
                 {
                     "alpha": alphas,
-                    "type_one_error": type_one_error,
-                    "n_different_author_pairs": len(technique_df),
+                    rate_column: rate,
+                    count_column: len(technique_df),
                 }
             )
             logger.info(
-                "%s / %s: %d different-author records.",
+                "%s / %s: %d %s records.",
                 dataset_name,
                 technique,
                 len(technique_df),
+                record_label,
             )
         if dataset_curves:
             curves[dataset_name] = dataset_curves
@@ -271,30 +312,57 @@ def compute_type_one_error_curves(
 
 def save_type_one_error_plots(
     curves: dict[str, dict[str, pd.DataFrame]],
+    same_author_non_rejection_curves: dict[str, dict[str, pd.DataFrame]] | None = None,
     *,
     output_dir: Path,
 ) -> list[Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     saved_paths: list[Path] = []
+    same_author_non_rejection_curves = same_author_non_rejection_curves or {}
 
-    for dataset_name, dataset_curves in curves.items():
+    dataset_names = sorted(set(curves) | set(same_author_non_rejection_curves))
+    for dataset_name in dataset_names:
+        dataset_curves = curves.get(dataset_name, {})
+        same_dataset_curves = same_author_non_rejection_curves.get(dataset_name, {})
         fig, ax = plt.subplots(figsize=(7.2, 4.8))
+        ax_right = ax.twinx()
         max_error = 0.0
+        max_same_non_rejection = 0.0
         alpha_min = math.inf
         alpha_max = 0.0
 
-        for technique in _method_order(dataset_curves.keys()):
-            curve = dataset_curves[technique]
-            max_error = max(max_error, float(curve["type_one_error"].max()))
-            alpha_min = min(alpha_min, float(curve["alpha"].min()))
-            alpha_max = max(alpha_max, float(curve["alpha"].max()))
-            ax.plot(
-                curve["alpha"],
-                curve["type_one_error"],
-                color=CONFIG.LABEL_COLORS.get(technique, "#4c4c4c"),
-                linewidth=2,
-                label=_display_method(technique),
-            )
+        technique_order = _method_order(set(dataset_curves) | set(same_dataset_curves))
+        for technique in technique_order:
+            color = CONFIG.LABEL_COLORS.get(technique, "#4c4c4c")
+            if technique in dataset_curves:
+                curve = dataset_curves[technique]
+                max_error = max(max_error, float(curve["type_one_error"].max()))
+                alpha_min = min(alpha_min, float(curve["alpha"].min()))
+                alpha_max = max(alpha_max, float(curve["alpha"].max()))
+                ax.plot(
+                    curve["alpha"],
+                    curve["type_one_error"],
+                    color=color,
+                    linewidth=2,
+                    linestyle="-",
+                    label=_display_method(technique),
+                )
+
+            if technique in same_dataset_curves:
+                same_curve = same_dataset_curves[technique]
+                max_same_non_rejection = max(
+                    max_same_non_rejection,
+                    float(same_curve["same_author_non_rejection_rate"].max()),
+                )
+                alpha_min = min(alpha_min, float(same_curve["alpha"].min()))
+                alpha_max = max(alpha_max, float(same_curve["alpha"].max()))
+                ax_right.plot(
+                    same_curve["alpha"],
+                    same_curve["same_author_non_rejection_rate"],
+                    color=color,
+                    linewidth=2,
+                    linestyle=":",
+                )
 
         display_dataset = _display_dataset(dataset_name)
         ax.set_title(f"Alpha Calibration: {display_dataset}")
@@ -304,11 +372,63 @@ def save_type_one_error_plots(
             r"$\frac{\#\ \mathrm{rejected}\ H_0\ \mathrm{among\ different-author\ pairs}}"
             r"{\#\ \mathrm{different-author\ pairs}}$"
         )
+        ax_right.set_ylabel(
+            "Type II rate "
+            r"$\frac{\#\ \neg\mathrm{reject}\ H_0\ \mathrm{among\ same-author\ pairs}}"
+            r"{\#\ \mathrm{same-author\ pairs}}$"
+        )
         ax.set_xlim(alpha_min, alpha_max)
         ax.set_ylim(0, min(1.0, max(0.105, max_error * 1.1)))
+        ax_right.set_ylim(0, min(1.0, max(0.105, max_same_non_rejection * 1.1)))
         ax.yaxis.set_major_formatter(PercentFormatter(xmax=1.0))
+        ax_right.yaxis.set_major_formatter(PercentFormatter(xmax=1.0))
         ax.grid(True, linestyle="--", alpha=0.5)
-        ax.legend(title="Impostor generation", frameon=False)
+
+        method_handles = [
+            Line2D(
+                [0],
+                [0],
+                color=CONFIG.LABEL_COLORS.get(technique, "#4c4c4c"),
+                linewidth=2,
+                label=_display_method(technique),
+            )
+            for technique in technique_order
+        ]
+        style_handles = [
+            Line2D(
+                [0],
+                [0],
+                color="#333333",
+                linewidth=2,
+                linestyle="-",
+                label=r"Type I",
+            ),
+            Line2D(
+                [0],
+                [0],
+                color="#333333",
+                linewidth=2,
+                linestyle=":",
+                label=r"Type II",
+            ),
+        ]
+        method_legend = ax.legend(
+            handles=method_handles,
+            title="Impostor generation",
+            frameon=False,
+            loc="lower left",
+            bbox_to_anchor=(0.02, 0.08),
+            borderaxespad=0,
+        )
+        ax.add_artist(method_legend)
+        ax_right.legend(
+            handles=style_handles,
+            title="Curve",
+            frameon=False,
+            loc="lower right",
+            bbox_to_anchor=(0.98, 0.08),
+            borderaxespad=0,
+        )
 
         # caption = (
         #     "Caption: Empirical Type I error on different-author pairs "
@@ -415,14 +535,32 @@ def main() -> None:
     impostor_output_collection = mongo.db[args.impostor_output_collection]
     all_pairs_collection = mongo.db[args.all_pairs_collection]
 
-    different_author_pairs = _load_different_author_pairs(
+    different_author_pairs = _load_author_pairs(
         all_pairs_collection,
+        same_value=False,
+        dataset_names=args.dataset_names,
+        batch_size=args.batch_size,
+    )
+    same_author_pairs = _load_author_pairs(
+        all_pairs_collection,
+        same_value=True,
         dataset_names=args.dataset_names,
         batch_size=args.batch_size,
     )
     df = _load_impostor_outputs_for_pairs(
         impostor_output_collection,
-        different_author_pairs=different_author_pairs,
+        pair_keys=different_author_pairs,
+        pair_label="different-author",
+        dataset_names=args.dataset_names,
+        techniques=args.techniques,
+        left_p_value_field=args.left_p_value_field,
+        right_p_value_field=args.right_p_value_field,
+        batch_size=args.batch_size,
+    )
+    same_author_df = _load_impostor_outputs_for_pairs(
+        impostor_output_collection,
+        pair_keys=same_author_pairs,
+        pair_label="same-author",
         dataset_names=args.dataset_names,
         techniques=args.techniques,
         left_p_value_field=args.left_p_value_field,
@@ -434,9 +572,22 @@ def main() -> None:
             "No matched different-author impostor-output records found. Check "
             "the MongoDB collection names, p-value field names, and filters."
         )
+    if same_author_df.empty:
+        logger.warning(
+            "No matched same-author impostor-output records found; right-axis "
+            "same-author non-rejection curves will be omitted."
+        )
 
     curves = compute_type_one_error_curves(df=df, alphas=alphas)
-    saved_paths = save_type_one_error_plots(curves, output_dir=args.output_dir)
+    same_author_non_rejection_curves = compute_same_author_non_rejection_curves(
+        df=same_author_df,
+        alphas=alphas,
+    )
+    saved_paths = save_type_one_error_plots(
+        curves,
+        same_author_non_rejection_curves=same_author_non_rejection_curves,
+        output_dir=args.output_dir,
+    )
     print("Saved plots:")
     for path in saved_paths:
         print(path)
