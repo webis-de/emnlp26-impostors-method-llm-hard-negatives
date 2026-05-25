@@ -36,7 +36,7 @@ It replaces tools like `pip`, `virtualenv`, and `setuptools` with a single, stre
 - Provides a clean CLI for common tasks (`install`, `add`, `build`, etc.)
 
 
-### ✅ Requirements*
+### Requirements*
 
 - **Python ≥3.10 and <3.13**
   - Word Mover's Distance (WMD) requires Python <3.13, I use Python 3.11.9
@@ -258,7 +258,7 @@ while ! kubectl port-forward -n webisservices deployment/artificial-authorship-v
 This will rerun the command in case it breaks (because your WIFI is turned off or something else happened).
 You can stop it via `Ctrl + C`.
 
-# 📝 Impostor Generation*
+# Impostor Generation*
 ## Paraphrases
 We use LLMs to generate paraphrases of texts as impostors.
 We found that prompt engineering and open-source models hosted by Webis and GWDG produce too simple impostors.
