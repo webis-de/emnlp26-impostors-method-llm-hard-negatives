@@ -20,10 +20,11 @@ genai_detection/paraphrasers` directory.
 You may find the code for in-domain impostor selection in the `genai_detection/impostor_generators/in_domain_impostor_generator.py` directory.
 
 ### Retrieval-based Impostor Generation
-We use (1) the Google Search API via SerpAPI, (2) ChatNoir, (3) Startpage to retrieve on-topic impostors from the web.
+We use (1) the Google Search API via SerpAPI, (2) ChatNoir, (3) Startpage to retrieve on-topic impostors from the 
+web (cf. `genai_detection/impostor_generators`).
 
-### Paraphrases
-We use LLMs to generate paraphrases of texts as impostors.
+### LLM-based Paraphrasing
+We use LLMs to generate paraphrases of texts as impostors (cf. `genai_detection/paraphrasers`).
 We compare prompted open-source models hosted by GWDG with two-step OpenAI GPT5 Nano for impostor generation.
 
 #### DSPy
