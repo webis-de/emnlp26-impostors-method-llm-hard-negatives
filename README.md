@@ -1,4 +1,4 @@
-# artificial-authorship-verification
+# LLM-based Impostor Generation & Reframing the Impostors Method as a Hypothesis Test
 This repository contains the code associated with ARR May submission about authorship verification of human-authored texts.
 We (1) reinterpret the Impostors Method for authorship verification as a statistical hypothesis test and (2) 
 investigate LLM-generated texts as controllable in-domain impostors. 
@@ -7,10 +7,36 @@ We re-implement the orginal Impostors Method by
 as well as several of its existing variants and extensions.
 
 ---
+## Impostors Method
 You may find the re-implementaion of the original Impostors Method in the `genai_detection/detectors` directory.
 This directory also contains some additional baseline detectors (e.g., PPMd, Unmasking, etc.).
+Traditional mpostor generation techniques are implemented in the `genai_detection/impostor_generators` directory, while LLM-based paraphrasing techniques are implemented in the `
+genai_detection/paraphrasers` directory.
+
+### Retrieval-based Impostor Generation
+We use (1) the Google Search API via SerpAPI, (2) ChatNoir, (3) Startpage to retrieve on-topic impostors from the web.
+
+### Paraphrases
+We use LLMs to generate paraphrases of texts as impostors.
+We compare prompted open-source models hosted by GWDG with two-step OpenAI GPT5 Nano for impostor generation.
+
+#### DSPy
+[DSPy](https://dspy.ai/) is a declarative framework for building modular AI software.
+DSPy is short for _Declarative Self-improving Python_.
+When designing AI systems with LLMs, one often has to deal with prompt engineering and choosing the right model or prompting strategy.
+DSPy makes LLMs easily interchangeable and omits the need for prompting according to the LLMs preferences.
+Instead of engineering prompts directly, one uses structured and declarative natural language:
+Every AI component (i.e., component that interacts with LLMs) needs a _signature_ (i.e., input and output parameter specification) and a _module_ (e.g., `Predict`) to invoke the LM based on the signature.
+DSPy expands the signatures into prompts automatically using the input, output fields and the docstring.
+[DSPy](https://arxiv.org/abs/2310.03714) is the second version of DSP, which was developed at Stanford University.
+Find more papers about DSPy [here](https://github.com/stanfordnlp/dspy?tab=readme-ov-file#-citation--reading-more).
+
+### OpenAI
+Remember checking [billing](https://platform.openai.com/settings/organization/billing/overview) and 
+[API usage](https://platform.openai.com/settings/organization/usage).
 
 ---
+## Extensions of the Impostors Method
 You may find the extensions to the Impostors Method in the `genai_detection/ablations` directory.
 We re-implemented:
 - [Khonji & Iraqi (2014)](https://downloads.webis.de/pan/publications/papers/khonji_2014.pdf)
@@ -21,6 +47,24 @@ We re-implemented:
 
 
 ---
+## `Scripts` Directory
+The `scripts` directory contains convenience scripts including generating LaTex tables for results, generating 
+certain paraphrases.
+
+---
+## Impostor UI
+The UI in `ui/impostor_ui` is not the focus of this repository, but still a work in progress.
+
+Our experiments do not depend on the UI, but are run via 
+`genai_detection/experiments/reproduction/run_prec_recall_curves.py`. 
+
+Note: The mongoDB needs to be populated with the text pairs for the experiments to run.
+
+---
+## Results
+Once you run scripts and experiments, you can find the results in the `results` directory.
+
+---
 
 ## Getting Started
 
@@ -28,7 +72,7 @@ The project uses [**Poetry**](https://python-poetry.org/) for dependency managem
 [**Poetry**](https://python-poetry.org/) is a modern Python tool for **dependency management** and **packaging**. 
 It replaces tools like `pip`, `virtualenv`, and `setuptools` with a single, streamlined workflow.
 
-#### Key Benefits*
+#### Key Benefits
 
 - Manages dependencies via `pyproject.toml`
 - Automatically creates isolated virtual environments
@@ -36,7 +80,7 @@ It replaces tools like `pip`, `virtualenv`, and `setuptools` with a single, stre
 - Provides a clean CLI for common tasks (`install`, `add`, `build`, etc.)
 
 
-### Requirements*
+### Requirements
 
 - **Python ≥3.10 and <3.13**
   - Word Mover's Distance (WMD) requires Python <3.13, I use Python 3.11.9
@@ -66,7 +110,7 @@ For the paraphrasers used in the impostor generation, you need to set up the fol
    poetry install
    ```
 
-### Common Poetry Commands*
+### Common Poetry Commands
 - Add a new dependency:
   ```bash
   poetry add <package-name>
@@ -261,22 +305,5 @@ while ! kubectl port-forward -n webisservices deployment/artificial-authorship-v
 This will rerun the command in case it breaks (because your WIFI is turned off or something else happened).
 You can stop it via `Ctrl + C`.
 
-# Impostor Generation
-## Paraphrases
-We use LLMs to generate paraphrases of texts as impostors.
-We found that prompt engineering and open-source models hosted by Webis and GWDG produce too simple impostors.
 
-### DSPy
-[DSPy](https://dspy.ai/) is a declarative framework for building modular AI software.
-DSPy is short for _Declarative Self-improving Python_.
-When designing AI systems with LLMs, one often has to deal with prompt engineering and choosing the right model or prompting strategy.
-DSPy makes LLMs easily interchangeable and omits the need for prompting according to the LLMs preferences.
-Instead of engineering prompts directly, one uses structured and declarative natural language:
-Every AI component (i.e., component that interacts with LLMs) needs a _signature_ (i.e., input and output parameter specification) and a _module_ (e.g., `Predict`) to invoke the LM based on the signature.
-DSPy expands the signatures into prompts automatically using the input, output fields and the docstring.
-[DSPy](https://arxiv.org/abs/2310.03714) is the second version of DSP, which was developed at Stanford University.
-Find more papers about DSPy [here](https://github.com/stanfordnlp/dspy?tab=readme-ov-file#-citation--reading-more).
 
-### Openai
-Remember checking [billing](https://platform.openai.com/settings/organization/billing/overview) and 
-[API usage](https://platform.openai.com/settings/organization/usage).
