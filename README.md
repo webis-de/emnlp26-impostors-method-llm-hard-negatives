@@ -77,17 +77,10 @@ Once you run scripts and experiments, you can find the results in the `results` 
 The project uses [**Poetry**](https://python-poetry.org/) for dependency management and packaging. 
 [**Poetry**](https://python-poetry.org/) is a modern Python tool for **dependency management** and **packaging**. 
 It replaces tools like `pip`, `virtualenv`, and `setuptools` with a single, streamlined workflow.
-
-#### Key Benefits
-
-- Manages dependencies via `pyproject.toml`
-- Automatically creates isolated virtual environments
-- Simplifies package building and publishing
-- Provides a clean CLI for common tasks (`install`, `add`, `build`, etc.)
+Poetry manages dependencies via `pyproject.toml`.
 
 
-### Requirements
-
+### Dependencies
 - **Python ≥3.10 and <3.13**
   - Word Mover's Distance (WMD) requires Python <3.13, I use Python 3.11.9
 - **Poetry ≥1.3**
@@ -101,6 +94,8 @@ Install poetry using the following command for MacOS:
 ```bash
 brew install poetry
 ```
+
+### API Keys
 
 For the paraphrasers used in the impostor generation, you need to set up the following API keys in your `.env` file:
 - [DEEPL_KEY](https://www.deepl.com/) (for Translation via DeepL: 500,000 characters/month in free plan)
@@ -141,7 +136,7 @@ Note that you have to comment dataset methods you do not need at the bottom of t
   - The dataset is in CSV format.
 - **Koppel et al. (2014) Student Essays**: not publicly available
   - Contains student essays with authorship information.
-- **Gutenberg**: [Gutenberg dataset](https://www.gutenberg.org/)
+- Optional: **Gutenberg**: [Gutenberg dataset](https://www.gutenberg.org/)
   - Contains texts from the Gutenberg project with authorship information.
   - The dataset is in TXT format.
 
