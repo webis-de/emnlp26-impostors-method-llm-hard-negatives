@@ -236,11 +236,14 @@ kubectl rollout restart -n webisservices deployment/artificial-authorship-verifi
 ```
 Also, you may need to restart the path forwarding.
 
-### Populate the database
-You can populate the database with paraphrased texts and their evaluation scores using the scripts provided in the `genai_detection/paraphrasers` directory.
-```bash 
-kubectl run --namespace webisservices artificial-authorship-verification-mongodb-client --rm --tty -i --restart='Never' --env="MONGODB_ROOT_PASSWORD=PW01010" --image registry.webis.de/code-teaching/theses/artificial-authorship-verification:latest --command -- bash -c "python3 /src/genai_detection/mongo_db/collection_orginal_text_student_essays.py"
-```
+### Populate the database with original texts
+You can populate the database with paraphrased texts and their evaluation scores using the scripts provided in the 
+`genai_detection/dataset` directory.
+When running 
+```bash
+python3 genai_detection/dataset/dataset_util.py
+``` 
+locally, with the correct `run_DATASET_NAME` function, you will populate the database with the text pairs.
 
 ### Part forwarding
 
@@ -258,7 +261,7 @@ while ! kubectl port-forward -n webisservices deployment/artificial-authorship-v
 This will rerun the command in case it breaks (because your WIFI is turned off or something else happened).
 You can stop it via `Ctrl + C`.
 
-# Impostor Generation*
+# Impostor Generation
 ## Paraphrases
 We use LLMs to generate paraphrases of texts as impostors.
 We found that prompt engineering and open-source models hosted by Webis and GWDG produce too simple impostors.
