@@ -603,7 +603,7 @@ class ParaphrasePlotter:
 
             metric_for_title = " ".join(
                 t.capitalize()
-                if "gohsen" in t.lower() or "score" in t.lower()
+                if "gohsen" in t.lower() or "score" in t.lower() or "delta" in t.lower()
                 else t.upper()
                 for t in metric.split("_")
             )
