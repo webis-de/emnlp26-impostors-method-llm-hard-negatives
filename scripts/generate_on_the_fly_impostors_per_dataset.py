@@ -1,25 +1,23 @@
-import argparse
-import logging
-import math
-import os
-import random
-from typing import Dict, List
+# Copyright 2026 Klara M. Gutekunst, Webis
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-from bson import ObjectId
+
+import logging
 
 from genai_detection.config import CONFIG
 from genai_detection.detectors.impostor import ImpostorDetector
 from genai_detection.experiments.reproduction.impostor_metrics import load_all_pairs
-from genai_detection.impostor_generators.chatnoir_impostor_generator import (
-    ChatNoirSearchImpostorGenerator,
-)
-from genai_detection.impostor_generators.google_search_impostor_generator import (
-    GoogleSearchImpostorGenerator,
-)
-from genai_detection.impostor_generators.startpage_impostor_generator import (
-    StartPageSearchImpostorGenerator,
-)
-from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 
 logger = logging.getLogger(__name__)
 
