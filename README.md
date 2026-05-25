@@ -166,10 +166,11 @@ This script will read the `pairs.jsonl` and `truth.jsonl` files and convert them
 
 ---
 ## Mongo DB
-The project uses a MongoDB database to store paraphrased texts and their evaluation scores.
+The project uses a MongoDB database to store text pairs used in experiments, paraphrased texts, scores outputted and 
+their paraphrase scores, etc.
 
 The database is located on the Webis Kubernetes cluster.
-![ERD_authorship_mongo_db.svg](explanations/ERD_authorship_mongo_db.svg)
+
 ### Kubernetes
 We used [Kubernetes](https://kubernetes.io/) to deploy the MongoDB database on the Webis cluster.
 - [Pods](https://kubernetes.io/docs/concepts/workloads/pods/) are the smallest deployable units of computing that you can create and manage in Kubernetes.
