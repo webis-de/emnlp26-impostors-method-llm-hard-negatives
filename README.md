@@ -291,7 +291,7 @@ python3 genai_detection/dataset/dataset_util.py
 ``` 
 locally, with the correct `run_DATASET_NAME` function, you will populate the database with the text pairs.
 
-### Part forwarding
+### Port forwarding
 
 Via terminal:
 ```bash
