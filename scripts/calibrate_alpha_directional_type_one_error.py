@@ -6,6 +6,8 @@ from __future__ import annotations
 The script reads corrected directional p-values from MongoDB impostor outputs,
 keeps only pairs marked as different-author pairs in ``all_pairs``, and plots
 the empirical Type I error rate for alpha values from 0.001 to 0.1.
+For on-the-fly impostors, ``retrieval_index`` is mapped back to the configured
+method key so ``LABEL_TRANSLATIONS`` and ``LABEL_COLORS`` can be reused.
 
 Usage:
     poetry run python scripts/calibrate_alpha_directional_type_one_error.py
@@ -70,6 +72,10 @@ DEFAULT_OUTPUT_DIR = (
     / CONFIG.SAVE_PATH
     / "type_one_err_calibration"
 )
+RETRIEVAL_INDEX_TO_METHOD = {
+    retrieval_index: method_key
+    for method_key, retrieval_index in CONFIG.RETRIEVAL_INDEX_TRANSLATIONS.items()
+}
 
 
 def _safe_filename(value: str) -> str:
@@ -94,6 +100,27 @@ def _method_order(methods: Iterable[str]) -> list[str]:
     configured = [method for method in CONFIG.LABEL_TRANSLATIONS if method in method_set]
     remaining = sorted(method_set - set(configured))
     return configured + remaining
+
+
+def _method_column(df: pd.DataFrame) -> str:
+    return "method_key" if "method_key" in df.columns else "impostor_generation_technique"
+
+
+def _technique_query_values(techniques: list[str] | None) -> list[str] | None:
+    if not techniques:
+        return None
+    query_values = set(techniques)
+    if any(technique in CONFIG.RETRIEVAL_INDEX_TRANSLATIONS for technique in techniques):
+        query_values.add("on_the_fly")
+    return sorted(query_values)
+
+
+def _impostor_method_key(doc: dict[str, Any]) -> str:
+    technique = doc["impostor_generation_technique"]
+    if technique == "on_the_fly":
+        retrieval_index = doc.get("retrieval_index")
+        return RETRIEVAL_INDEX_TO_METHOD.get(retrieval_index, technique)
+    return technique
 
 
 def _float_or_none(value: Any) -> float | None:
@@ -169,8 +196,9 @@ def _load_impostor_outputs_for_pairs(
     }
     if dataset_names:
         query["dataset_name"] = {"$in": dataset_names}
-    if techniques:
-        query["impostor_generation_technique"] = {"$in": techniques}
+    technique_query_values = _technique_query_values(techniques)
+    if technique_query_values:
+        query["impostor_generation_technique"] = {"$in": technique_query_values}
 
     projection = {
         "_id": 0,
@@ -178,6 +206,7 @@ def _load_impostor_outputs_for_pairs(
         "right_id": 1,
         "dataset_name": 1,
         "impostor_generation_technique": 1,
+        "retrieval_index": 1,
         left_p_value_field: 1,
         right_p_value_field: 1,
     }
@@ -192,6 +221,13 @@ def _load_impostor_outputs_for_pairs(
             skipped_missing_pair += 1
             continue
 
+        method_key = _impostor_method_key(doc)
+        if techniques and (
+            doc["impostor_generation_technique"] not in techniques
+            and method_key not in techniques
+        ):
+            continue
+
         left_p_value = _float_or_none(doc.get(left_p_value_field))
         right_p_value = _float_or_none(doc.get(right_p_value_field))
         if left_p_value is None or right_p_value is None:
@@ -201,9 +237,9 @@ def _load_impostor_outputs_for_pairs(
         rows.append(
             {
                 "dataset_name": doc["dataset_name"],
-                "impostor_generation_technique": doc[
-                    "impostor_generation_technique"
-                ],
+                "impostor_generation_technique": doc["impostor_generation_technique"],
+                "retrieval_index": doc.get("retrieval_index"),
+                "method_key": method_key,
                 "left_p_value": left_p_value,
                 "right_p_value": right_p_value,
             }
@@ -269,14 +305,13 @@ def _compute_alpha_curves(
     if df.empty:
         return curves
 
+    method_col = _method_column(df)
     for dataset_name, dataset_df in df.groupby("dataset_name", sort=False):
         dataset_curves: dict[str, pd.DataFrame] = {}
         for technique in _method_order(
-            dataset_df["impostor_generation_technique"].dropna().unique()
+            dataset_df[method_col].dropna().unique()
         ):
-            technique_df = dataset_df[
-                dataset_df["impostor_generation_technique"] == technique
-            ]
+            technique_df = dataset_df[dataset_df[method_col] == technique]
             if technique_df.empty:
                 continue
 
