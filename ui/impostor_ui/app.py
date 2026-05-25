@@ -1,7 +1,6 @@
 import threading
 from datetime import datetime
-from tkinter import END, BooleanVar, DoubleVar, IntVar, StringVar, Text, Tk, filedialog, messagebox
-from tkinter import ttk
+from tkinter import END, BooleanVar, DoubleVar, IntVar, StringVar, Text, Tk, filedialog, messagebox, ttk
 from typing import Any, Dict, Optional, Tuple
 
 from ablations.impostor_asgalf import ASGALFImpostorDetector
@@ -11,15 +10,8 @@ from ablations.std_impostor import StdImpostor
 from genai_detection.config import CONFIG
 from genai_detection.detectors.impostor import ImpostorDetector
 
-
 TECHNIQUE_LABEL_TO_VALUE = {
-    "Two-step LLM": "two_step_llm",
-    "One-step LLM": "one_step_llm",
-    "Translation": "translation",
-    "In-domain": "in_domain",
-    "On-the-fly (ChatNoir)": "on_the_fly_chatnoir",
-    "On-the-fly (SerpAPI)": "on_the_fly_serpapi",
-    "On-the-fly (Startpage)": "on_the_fly_startpage",
+    val: key for key, val in CONFIG.LABEL_TRANSLATIONS.items()
 }
 
 
