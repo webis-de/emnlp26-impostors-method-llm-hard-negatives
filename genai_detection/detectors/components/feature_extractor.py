@@ -20,7 +20,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 
 class TfidfFeatureExtractor:
-    def __init__(self, top_n_freq_words: int, ngram_n: int = 4, min_df: int = 1):
+    def __init__(self, top_n_freq_words: int=None, ngram_n: int = 4, min_df: int = 1):
         # Koppel et al. (2014): space-free character 4-grams.
         # do not use built-in analyzer="char_wb",
         # bc for input "hello to" it returns: "hello": " hel", "hell", "ello", "llo ", " to ",
