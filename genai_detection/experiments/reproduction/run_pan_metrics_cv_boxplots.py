@@ -42,7 +42,7 @@ metrics = [
     # "accuracy",
     # "c_at_1",
     # "auroc",
-    "auroc_c_at_1",
+    # "auroc_c_at_1",
 ]
 
 plot_pan_metrics_boxplots(
