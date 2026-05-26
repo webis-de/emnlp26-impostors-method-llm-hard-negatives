@@ -161,10 +161,10 @@ preproc_impact.loc["1 decode any html entities"] = [
 # strip out html tags such as <p>, <br>, etc.
 student_step2 = [re.sub(r"<[^>]+>", "", single_text) for single_text in student_step1]
 blog_step2 = [re.sub(r"<[^>]+>", "", single_text) for single_text in blog_step1]
-gutenberg_step2 = [
-    re.sub(r"<[^>]+>", "", single_text) for single_text in gutenberg_step1
-]
-pan_step2 = [re.sub(r"<[^>]+>", "", single_text) for single_text in pan_step1]
+# gutenberg_step2 = [
+#     re.sub(r"<[^>]+>", "", single_text) for single_text in gutenberg_step1
+# ]
+# pan_step2 = [re.sub(r"<[^>]+>", "", single_text) for single_text in pan_step1]
 step2_student_essay_length = get_vocab_size(student_step2)
 step2_blog_length = get_vocab_size(blog_step2)
 # step2_gutenberg_length = get_vocab_size(gutenberg_step2)
@@ -184,10 +184,10 @@ student_step3 = [
     re.sub(header_pattern, "", single_text) for single_text in student_step2
 ]
 blog_step3 = [re.sub(header_pattern, "", single_text) for single_text in blog_step2]
-gutenberg_step3 = [
-    re.sub(header_pattern, "", single_text) for single_text in gutenberg_step2
-]
-pan_step3 = [re.sub(header_pattern, "", single_text) for single_text in pan_step2]
+# gutenberg_step3 = [
+#     re.sub(header_pattern, "", single_text) for single_text in gutenberg_step2
+# ]
+# pan_step3 = [re.sub(header_pattern, "", single_text) for single_text in pan_step2]
 step3_student_essay_length = get_vocab_size(student_step3)
 step3_blog_length = get_vocab_size(blog_step3)
 # step3_gutenberg_length = get_vocab_size(gutenberg_step3)
@@ -209,11 +209,11 @@ chapter_pattern = re.compile(
 student_step4 = [
     re.sub(chapter_pattern, "", single_text) for single_text in student_step3
 ]
-gutenberg_step4 = [
-    re.sub(chapter_pattern, "", single_text) for single_text in gutenberg_step3
-]
+# gutenberg_step4 = [
+#     re.sub(chapter_pattern, "", single_text) for single_text in gutenberg_step3
+# ]
 blog_step4 = [re.sub(chapter_pattern, "", single_text) for single_text in blog_step3]
-pan_step4 = [re.sub(chapter_pattern, "", single_text) for single_text in pan_step3]
+# pan_step4 = [re.sub(chapter_pattern, "", single_text) for single_text in pan_step3]
 step4_student_essay_length = get_vocab_size(student_step4)
 step4_blog_length = get_vocab_size(blog_step4)
 # step4_gutenberg_length = get_vocab_size(gutenberg_step4)
