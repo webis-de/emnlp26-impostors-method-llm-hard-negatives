@@ -546,7 +546,7 @@ def plot_precision_recall_curve(
         # plt.title(complete_title)
         plt.xlim(-0.01, 1.01)
         plt.ylim(-0.01, 1.01)
-        plt.legend()
+        plt.legend(fontsize=FONTSIZE_TICKS)
 
         for format in ["pdf", "svg"]:
             fname = (
