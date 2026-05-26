@@ -530,15 +530,20 @@ def plot_precision_recall_curve(
                     label=label,
                 )
 
+        FONTSIZE_AXIS = 16
+        FONTSIZE_TICKS = 14
+
         plt.grid(True, linestyle="--", alpha=0.6)
         plt.ylim(0, 1)
-        plt.gca().set_aspect("equal")
-        plt.xlabel("Recall $\\frac{TP}{TP + FN}$", fontsize=14)
-        plt.ylabel("Precision $\\frac{TP}{TP + FP}$", fontsize=14)
+        ax = plt.gca()
+        ax.set_aspect("equal")
+        ax.tick_params(axis="both", labelsize=FONTSIZE_TICKS)
+        plt.xlabel("Recall", fontsize=FONTSIZE_AXIS) # $\\frac{TP}{TP + FN}$
+        plt.ylabel("Precision", fontsize=FONTSIZE_AXIS) # $\\frac{TP}{TP + FP}$
         if title is None:
             title = "Precision–Recall Curve Across Impostor Generation Techniques"
         complete_title = title + f"\nDataset: {CONFIG.DATASET_TRANSLATIONS[dataset_name]} ({positive_class})"
-        plt.title(complete_title)
+        # plt.title(complete_title)
         plt.xlim(-0.01, 1.01)
         plt.ylim(-0.01, 1.01)
         plt.legend()
