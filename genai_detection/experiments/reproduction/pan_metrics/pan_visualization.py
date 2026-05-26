@@ -335,6 +335,9 @@ def plot_pan_metrics_boxplots(
         query["dataset_name"] = dataset_name
     if methods is not None:
         query["method_name"] = {"$in": list(methods)}
+    else:
+        # comment if you want to include supervised baseline
+        query["method_name"] = {"$nin": ["supervised_baseline"]}
 
     cursor = store.mongo.pan_metrics_collection.find(query, {"_id": 0})
 
@@ -356,7 +359,7 @@ def plot_pan_metrics_boxplots(
                 split_config = normalized.get("split_config")
 
     if not metrics_by_method:
-        raise ValueError("No PAN metrics found for the given query.")
+        raise ValueError(f"No PAN metrics found for the given query: {query}.")
 
     if methods is None:
         methods_list = sorted(metrics_by_method.keys())
