@@ -104,15 +104,23 @@ def load_dataset_pairs(
     ).sort("_id", 1)
 
     rows = []
+    # if maximum number of samples is specified, ensure same number for both class (equal class distribution)
+    targets = None if limit_pairs is None else {0: limit_pairs // 2, 1: limit_pairs - limit_pairs // 2}
+    counts = {0: 0, 1: 0}
+
     for doc in cursor:
-        rows.append(
-            {
-                "left_id": ObjectId(doc["left_id"]),
-                "right_id": ObjectId(doc["right_id"]),
-                "same": int(doc["same"]),
-            }
-        )
-        if limit_pairs is not None and len(rows) >= limit_pairs:
+        label = int(doc["same"])
+
+        if targets is not None:
+            if counts[label] >= targets[label]:
+                continue
+            counts[label] += 1
+
+        rows.append({
+                "left_id": ObjectId(doc["left_id"]), "right_id": ObjectId(doc["right_id"]), "same": label,
+                })
+
+        if targets is not None and counts == targets:
             break
     return rows
 
