@@ -375,7 +375,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--random-state", type=int, default=42)
     parser.add_argument("--ci-level", type=float, default=0.95)
     parser.add_argument("--n-boot", type=int, default=10000)
-    parser.add_argument("--limit-pairs", type=int, default=1500)    # None
+    parser.add_argument("--limit-pairs", type=int, default=None)
     parser.add_argument("--save-dir", type=Path, default=default_save_dir())
     return parser.parse_args()
 
