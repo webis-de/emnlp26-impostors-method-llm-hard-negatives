@@ -381,7 +381,7 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
         scores_by_pair = loader.load_scores(
             method_name=technique,
             dataset_name=dataset_name,
-            n_impostors=n_impostors,
+            n_impostors=10 if technique == "one_step_llm" else n_impostors,
             n_potential_impostors=n_potential_impostors,
             rounds=rounds,
         )
