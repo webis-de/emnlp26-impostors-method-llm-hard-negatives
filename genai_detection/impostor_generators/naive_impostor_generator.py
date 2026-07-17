@@ -241,6 +241,7 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
                 )
                 impostors.append(impostor_text)
                 seen.add(impostor_text.lower())
+                logging.info(f"Generated impostor: {len(impostors)}/{self.n_impostors}")
             except Exception as e:
                 logging.warning(f"Error generating impostor with {paraphraser}: {e}")
             attempts += 1
