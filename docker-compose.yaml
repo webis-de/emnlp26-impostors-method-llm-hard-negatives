@@ -14,6 +14,7 @@ services:
         MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
         MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
         MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
+        SAIA_KEY: ${SAIA_KEY}
       volumes:
         - mongo-data:/data/db # persistent storage of DB data; data survives container recreation
 volumes:
