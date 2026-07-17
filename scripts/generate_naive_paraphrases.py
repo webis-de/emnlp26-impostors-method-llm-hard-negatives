@@ -87,7 +87,7 @@ def main() -> None:
     parser.add_argument(
         "--n-impostors",
         type=int,
-        default=10,
+        default=50,
         help="Number of naive paraphrases to generate per text.",
     )
     parser.add_argument(

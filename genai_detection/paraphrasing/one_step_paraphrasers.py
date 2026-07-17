@@ -15,13 +15,18 @@ import json
 import logging
 import os
 import re
-from typing import List
+from typing import List, Optional
 
 import openai
 import torch
 from nltk import sent_tokenize
 from openai import OpenAI
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import (
+    AutoModelForSeq2SeqLM,
+    AutoTokenizer,
+    T5ForConditionalGeneration,
+    T5Tokenizer,
+)
 
 from genai_detection.config import CONFIG
 from genai_detection.paraphrasing.paraphraser import Paraphraser
@@ -223,6 +228,138 @@ class T5GooglePAWSParaphraser(OneStepParaphraser):
             )
             res.append(line)
         return res
+
+
+class DipperParaphraser(OneStepParaphraser):
+    """
+    DIPPER paraphrasing model.
+
+    The model expects a short context/prefix plus one sentence to paraphrase, marked
+    with ``<sent>...</sent>``. Longer texts are processed sentence by sentence, feeding
+    the previously generated output back as context.
+
+    References
+    ==========
+    - DIPPER Model: https://huggingface.co/kalpeshk2011/dipper-paraphraser-xxl
+    - DIPPER paper: https://aclanthology.org/2023.eacl-main.117/
+    """
+
+    def __init__(
+        self,
+        model_id: str = "kalpeshk2011/dipper-paraphraser-xxl",
+        tokenizer_id: str = "google/t5-v1_1-xxl",
+        lexical_diversity: int = 60,
+        order_diversity: int = 0,
+        sent_interval: int = 1,
+        device: Optional[str] = None,
+    ):
+        self.model_id = model_id
+        self.tokenizer_id = tokenizer_id
+        self.lexical_diversity = lexical_diversity
+        self.order_diversity = order_diversity
+        self.sent_interval = sent_interval
+
+        if device is not None:
+            self.device = torch.device(device)
+        elif torch.cuda.is_available() and torch.version.cuda is not None:
+            self.device = torch.device("cuda")
+        elif torch.backends.mps.is_available():
+            self.device = torch.device("mps")
+        else:
+            self.device = torch.device("cpu")
+
+        logging.info("Using DipperParaphraser on %s", self.device)
+        self.tokenizer = T5Tokenizer.from_pretrained(self.tokenizer_id)
+        logging.info("Loaded DipperParaphraser tokenizer")
+        self.model = T5ForConditionalGeneration.from_pretrained(self.model_id).to(
+            self.device
+        )
+        self.model.eval()
+        logging.info("Loaded DipperParaphraser model")
+
+    @staticmethod
+    def _validate_diversity(value: int, name: str) -> int:
+        if value not in {0, 20, 40, 60, 80, 100}:
+            raise ValueError(f"{name} must be one of 0, 20, 40, 60, 80, 100.")
+        return 100 - value
+
+    def paraphrase(
+        self,
+        text: str,
+        prompt: str = "",
+        max_length: int = CONFIG.MAX_LENGTH,
+        lexical_diversity: Optional[int] = None,
+        order_diversity: Optional[int] = None,
+        sent_interval: Optional[int] = None,
+        do_sample: bool = True,
+        top_p: float = 0.75,
+        top_k: Optional[int] = None,
+    ) -> str:
+        """
+        Generate a paraphrase with DIPPER.
+
+        :param text: The input text to be paraphrased.
+        :param prompt: Optional context prepended before the text.
+        :param max_length: Maximum number of output tokens per generation step.
+        :param lexical_diversity: DIPPER lexical diversity control in {0, 20, 40, 60, 80, 100}.
+        :param order_diversity: DIPPER order diversity control in {0, 20, 40, 60, 80, 100}.
+        :param sent_interval: Number of sentences paraphrased per generation step.
+        :param do_sample: Whether to sample during generation.
+        :param top_p: Nucleus sampling value.
+        :param top_k: Top-k sampling value.
+        :return: A paraphrased version of the input text.
+        """
+        lex_code = self._validate_diversity(
+            self.lexical_diversity if lexical_diversity is None else lexical_diversity,
+            "lexical_diversity",
+        )
+        order_code = self._validate_diversity(
+            self.order_diversity if order_diversity is None else order_diversity,
+            "order_diversity",
+        )
+        interval = self.sent_interval if sent_interval is None else sent_interval
+        if interval < 1:
+            raise ValueError("sent_interval must be at least 1.")
+
+        sentences = sent_tokenize(text)
+        prefix = prompt.strip()
+        output_text = ""
+
+        for sent_idx in range(0, len(sentences), interval):
+            curr_sent_window = " ".join(sentences[sent_idx : sent_idx + interval])
+            final_input_text = f"lexical = {lex_code}, order = {order_code}"
+            if prefix:
+                final_input_text += f" {prefix}"
+            final_input_text += f" <sent> {curr_sent_window} </sent>"
+
+            tokenized = self.tokenizer(
+                [final_input_text],
+                return_tensors="pt",
+                truncation=True,
+                max_length=max_length,
+            )
+            tokenized = {
+                key: value.to(self.device) for key, value in tokenized.items()
+            }
+
+            generation_args = {
+                "max_length": max_length,
+                "do_sample": do_sample,
+                "top_p": top_p,
+            }
+            if top_k is not None:
+                generation_args["top_k"] = top_k
+
+            with torch.no_grad():
+                generated = self.model.generate(**tokenized, **generation_args)
+            decoded = self.tokenizer.batch_decode(
+                generated, skip_special_tokens=True
+            )[0].strip()
+
+            output_text = f"{output_text} {decoded}".strip()
+            prefix = f"{prefix} {decoded}".strip()
+
+        return output_text
 
 
 class SAIAParaphraser(OneStepParaphraser):
