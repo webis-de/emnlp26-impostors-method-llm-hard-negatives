@@ -110,16 +110,16 @@ def main() -> None:
 
     api_key = resolve_saia_api_key()
     if not api_key:
-        logger.error(
+        logger.warning(
             "No SAIA API key configured. Set SAIA_KEY (or SAIA_KEY_K) in your environment."
         )
-        raise SystemExit(1)
+        # raise SystemExit(1)
     try:
         validate_saia_api_key(api_key=api_key)
         logger.info("SAIA key preflight check passed.")
     except Exception as e:
-        logger.error("SAIA key preflight check failed: %s", e)
-        raise SystemExit(1)
+        logger.warning("SAIA key preflight check failed: %s", e)
+        # raise SystemExit(1)
 
     mongo = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
     logger.info("Running in sequential mode (no parallel workers).")
