@@ -121,7 +121,7 @@ def main() -> None:
         logger.warning("SAIA key preflight check failed: %s", e)
         # raise SystemExit(1)
 
-    mongo = ParaphraseMongoDB(local_ray=True)#os.path.exists("/Users/klara"))
+    mongo = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
     logger.info("Running in sequential mode (no parallel workers).")
 
     def _init_saia_clients(

@@ -38,7 +38,9 @@ class ParaphraseMongoDB:
             # uri = f"mongodb://{CONFIG.MONGO_USER}:{CONFIG.MONGO_PASSWORD}@{CONFIG.MONGO_HOST}:{CONFIG.MONGO_PORT}/"
         else:
             # Ray on betaweb server
-            self.mongodb_uri = f"mongodb://{os.environ['MONGO_USER']}:{os.environ['MONGO_PASSWORD']}@artificial-authorship-verification-mongodb.webisservices.svc.cluster.local:27017/"
+            self.mongodb_uri = f"mongodb://{CONFIG.MONGO_USER}:{CONFIG.MONGO_PASSWORD}@artificial-authorship-verification-mongodb.webisservices.svc.cluster.local:27017/"
+
+            # self.mongodb_uri = f"mongodb://{os.environ['MONGO_USER']}:{os.environ['MONGO_PASSWORD']}@artificial-authorship-verification-mongodb.webisservices.svc.cluster.local:27017/"
 
         self.client = MongoClient(self.mongodb_uri)
         try:
