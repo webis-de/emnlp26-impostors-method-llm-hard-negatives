@@ -21,6 +21,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+print(load_dotenv())          # True = Datei gefunden
+print(os.getcwd())            # aktuelles Arbeitsverzeichnis
+print(os.getenv("MONGO_INITDB_ROOT_USERNAME"))
+
 
 class BaseConfig:
     SERVER = False
