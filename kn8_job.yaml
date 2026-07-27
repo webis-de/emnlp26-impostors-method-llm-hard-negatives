@@ -1,0 +1,24 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dipper-test
+spec:
+  ttlSecondsAfterFinished: 600   # Job nach 10 Minuten automatisch löschen
+  backoffLimit: 0                # Bei Fehler nicht erneut starten
+
+  template:
+    spec:
+      restartPolicy: Never
+
+      containers:
+      - name: dipper
+        image: registry.webis.de/code-teaching/theses/artificial-authorship-verification:latest
+        imagePullPolicy: Always
+
+#        resources:
+#          limits:
+#            nvidia.com/gpu: 1 # DIPPER braucht eine GPU
+
+        command:
+          - python3
+          - scripts/generate_naive_paraphrases.py
