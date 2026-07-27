@@ -17,6 +17,7 @@ from genai_detection.impostor_generators.chatnoir_impostor_generator import Chat
 from genai_detection.impostor_generators.google_search_impostor_generator import GoogleSearchImpostorGenerator
 from genai_detection.impostor_generators.in_domain_impostor_generator import InDomainImpostorGenerator
 from genai_detection.impostor_generators.naive_impostor_generator import NaiveImpostorGenerator
+from genai_detection.impostor_generators.random_word_impostor_generator import RandomWordImpostorGenerator
 from genai_detection.impostor_generators.startpage_impostor_generator import StartPageSearchImpostorGenerator
 from genai_detection.impostor_generators.translation_impostor_generator import TranslationImpostorGenerator
 from genai_detection.impostor_generators.two_step_impostor_generator import TwoStepImpostorGenerator
@@ -30,6 +31,7 @@ IMPOSTOR_GENERATORS = {
     "on_the_fly_chatnoir": ChatNoirSearchImpostorGenerator,
     "on_the_fly_serpapi": GoogleSearchImpostorGenerator,
     "on_the_fly_startpage": StartPageSearchImpostorGenerator,
+    "random_words": RandomWordImpostorGenerator,
     # "mirror_minds": MirrorMindsGenerator
 }
 

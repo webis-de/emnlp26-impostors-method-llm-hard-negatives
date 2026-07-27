@@ -22,64 +22,8 @@ if __name__ == "__main__":
     )
     logger = logging.getLogger(__name__)
 
-    parser = argparse.ArgumentParser(description="Compare detectors.")
-    parser.add_argument(
-        "--rounds",
-        type=int,
-        default=100,
-        help="Number of rounds (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--top_n",
-        type=int,
-        default=100000,
-        help="Number of top space-free ngrams to consider (default: %(default)s)",
-    )
-
-    parser.add_argument(
-        "--n_impostors",
-        type=int,
-        default=50,
-        help="Number of impostors to generate per candidate (default: %(default)s)",
-    )
-
-    parser.add_argument(
-        "--dataset_name",
-        type=str,
-        choices=[CONFIG.STUDENT_ESSAYS, CONFIG.BLOG],
-        default=CONFIG.BLOG,
-        help="Dataset to use for visualization (default: %(default)s)",
-    )
-
-    parser.add_argument(
-        "--impostor_technique",
-        type=str,
-        choices=[
-            "translation",
-            "on-the-fly",   # Startpage by default
-            "on_the_fly_chatnoir",
-            "on_the_fly_serpapi",
-            "on_the_fly_startpage",
-            "in_domain",
-            "one_step_llm",
-            "two_step_llm",
-            "mirror_minds",
-        ],
-        default="in_domain",
-        help="impostor technique to use (default: %(default)s)",
-    )
-
-    parser.add_argument(
-        "--upsample",
-        type=bool,
-        default=True,
-        help="Whether texts below 500 words should be skipped or upsampled (default: %(default)s)",
-    )
-
-    args = parser.parse_args()
-    logging.info(f"Arguments for impostor detector: {args}")
-
     our_figure_impostor_options = [
+        "random_words",
         "two_step_llm",
         "on_the_fly_chatnoir",
         # "on_the_fly_serpapi",

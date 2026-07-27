@@ -75,6 +75,7 @@ class ImpostorDetector(ImpostorBase):
             "in_domain",
             "one_step_llm",
             "two_step_llm",
+            "random_words",
             "mirror_minds",
         ] = "two_step_llm",
         dataset_name: str = "student_essays",
@@ -92,6 +93,7 @@ class ImpostorDetector(ImpostorBase):
             - "translation": use LLMs to generate impostors (i.e., English to x and x to English)
             - "one_step_llm": use a naive LLM approach to generate impostors
             - "two_step_llm": use two-step LLM approach to generate impostors (i.e., first extracting information and then, generating paraphrases based on these information)
+            - "random_words": sample random English words from an empirical unigram frequency distribution
             - "in_domain": use a fixed set of in-domain impostors (Koppel et. A. (2014), not implemented yet),
             impostors are not related to the input text
             - "on_the_fly": generate same-topic impostors on-the-fly (Koppel et al. (2014))

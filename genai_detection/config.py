@@ -117,6 +117,7 @@ class BaseConfig:
         "on_the_fly_startpage": "Retrieval-Based (Startpage)",
         "one_step_llm": "One-Step Paraphraser (LLM)",
         "two_step_llm": "Two-Step Paraphraser (LLM)",
+        "random_words": "Random English Words",
         "unsupervised_baseline_min-max": "Unsup. Min-Max (B)",
         "unsupervised_baseline_cosine": "Unsup. Cosine (B)",
         "supervised_baseline": "Sup. SVM (B)",
@@ -139,6 +140,7 @@ class BaseConfig:
         "on_the_fly_startpage": "#7bccc4",  # light teal
         "one_step_llm": "#8c564b",  # brown
         "two_step_llm": "#e377c2",  # pink
+        "random_words": "#4daf4a",  # green
         "unsupervised_baseline_min-max": "#ff7f0e",  # orange
         "unsupervised_baseline_cosine": "#2ca02c",  # green
         "supervised_baseline": "#d62728",  # red

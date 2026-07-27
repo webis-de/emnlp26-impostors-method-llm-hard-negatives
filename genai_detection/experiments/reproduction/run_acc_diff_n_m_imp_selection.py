@@ -66,6 +66,7 @@ if __name__ == "__main__":
             "in_domain",
             "one_step_llm",
             "two_step_llm",
+            "random_words",
             "mirror_minds",
         ],
         default="in_domain",
