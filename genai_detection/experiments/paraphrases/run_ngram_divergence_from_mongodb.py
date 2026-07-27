@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 class MongoNGramDivergenceExperiment:
     """Load paraphrases from MongoDB, compute divergences, and plot aggregates."""
 
-    DEFAULT_FEATURES = ("assignment", "ethnicity", "teacher", "political_orientation")
+    DEFAULT_FEATURES = ("assignment", "ethnicity", "teacher", "political_orientation", "gender", "age", "sign")
     METRICS = ("kl_divergence", "js_divergence")
 
     def __init__(
