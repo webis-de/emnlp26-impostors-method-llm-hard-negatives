@@ -1,5 +1,5 @@
 # Ignore everything,
-*
+#*
 
 # Whitelist Python modules
 !genai_detection/**
