@@ -74,7 +74,7 @@ class BaseConfig:
     SAIA_MODEL = "openai-gpt-oss-120b"
     OPENAI_URL = "https://api.openai.com/v1"
     OPENAI_MODEL = "openai/gpt-5-nano-2025-08-07"  # specify snapshot for consistency: https://platform.openai.com/docs/models/gpt-5-nano (30.10.2025)
-
+    # "gpt-5.4-nano-2026-03-17"     # https://developers.openai.com/api/docs/models/gpt-5.4-nano
     PROMPT = "Paraphrase the text above without changing its meaning. Use different words and vary the sentence structure while maintaining a consistent tone. Your paraphrase should be three times as long than the original. Output only the paraphrased sentence, with NO explanations or extra text."
 
     MONGO_DATABASE = "impostors"  # initial db (!= collection in db)
