@@ -56,9 +56,9 @@ llmdet = {git = "https://github.com/TrustedLLM/LLMDet.git"}
 pyreadstat = "^1.3.0"
 chardet = "^5.2.0"
 deepl = "^1.22.0"
-torch = { version = "^2.5.0", source = "pypi" }
-torchvision = { version = "^0.20.0", source = "pypi" }
-torchaudio = { version = "^2.5.0", source = "pypi" }
+torch = { version = "2.7.1+cu128", source = "torch-cu128" }
+torchvision = { version = "0.22.1+cu128", source = "torch-cu128" }
+torchaudio = { version = "2.7.1+cu128", source = "torch-cu128" }
 dspy = "^3.0.3"
 resiliparse = "^0.15.2"
 ray = "^2.53.0"
