@@ -279,7 +279,6 @@ class FinetunedParaphraser(OneStepParaphraser):
         self.model.eval()
         logging.info("Loaded %s paraphraser model", self.model_id)
 
-
     def paraphrase(
         self,
         text: str,
@@ -289,10 +288,10 @@ class FinetunedParaphraser(OneStepParaphraser):
         order_diversity: Optional[int] = None,
         sent_interval: Optional[int] = 1,
         do_sample: bool = True,
-        temperature: float = 1.2,
-        top_p: float = 0.95,
-        top_k: Optional[int] = 100,
-        num_return_sequences: int = 4,
+        temperature: float = 1.1,
+        top_p: float = 0.98,
+        top_k: Optional[int] = 120,
+        num_return_sequences: int = 8,
     ) -> str:
         """
         Generate one sampled paraphrase with the local Pegasus paraphraser.
