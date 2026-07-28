@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: dipper-test
 spec:
-  ttlSecondsAfterFinished: 30000   # Job nach 5h automatisch löschen
+  ttlSecondsAfterFinished: 86400   # Job nach 24h automatisch löschen
   backoffLimit: 0                # Bei Fehler nicht erneut starten
 
   template:
@@ -41,6 +41,8 @@ spec:
               secretKeyRef:
                 name: dipper-secrets
                 key: MONGO_INITDB_ROOT_PASSWORD
+          - name: CUDA_LAUNCH_BLOCKING
+            value: "1"
 
         command:
           - python3
