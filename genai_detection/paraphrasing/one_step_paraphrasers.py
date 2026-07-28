@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import re
+import dspy
 from typing import List, Optional
 
 import openai
@@ -282,6 +283,13 @@ class DipperParaphraser(OneStepParaphraser):
 
         self.model = PegasusForConditionalGeneration.from_pretrained(self.model_id, torch_dtype=dtype,
                 low_cpu_mem_usage=True, ).to(self.device)
+        self.max_model_input_length = min(
+            getattr(self.tokenizer, "model_max_length", 1024),
+            getattr(self.model.config, "max_position_embeddings", 1024),
+        )
+        self.max_model_output_length = getattr(
+            self.model.config, "max_position_embeddings", self.max_model_input_length
+        )
 
         self.model.eval()
         logging.info("Loaded %s paraphraser model", self.model_id)
@@ -298,13 +306,13 @@ class DipperParaphraser(OneStepParaphraser):
         self,
         text: str,
         prompt: str = "",
-        max_length: int = CONFIG.MAX_LENGTH,
+        max_length: int = 128,#CONFIG.MAX_LENGTH,
         lexical_diversity: Optional[int] = None,
         order_diversity: Optional[int] = None,
-        sent_interval: Optional[int] = None,
+        sent_interval: Optional[int] = 1,
         do_sample: bool = True,
         top_p: float = 0.75,
-        top_k: Optional[int] = None,
+        top_k: Optional[int] = 50,
     ) -> str:
         """
         Generate a paraphrase with DIPPER.
@@ -320,57 +328,98 @@ class DipperParaphraser(OneStepParaphraser):
         :param top_k: Top-k sampling value.
         :return: A paraphrased version of the input text.
         """
-        lex_code = self._validate_diversity(
-            self.lexical_diversity if lexical_diversity is None else lexical_diversity,
-            "lexical_diversity",
-        )
-        order_code = self._validate_diversity(
-            self.order_diversity if order_diversity is None else order_diversity,
-            "order_diversity",
-        )
+        # lex_code = self._validate_diversity(
+        #     self.lexical_diversity if lexical_diversity is None else lexical_diversity,
+        #     "lexical_diversity",
+        # )
+        # order_code = self._validate_diversity(
+        #     self.order_diversity if order_diversity is None else order_diversity,
+        #     "order_diversity",
+        # )
+        # interval = self.sent_interval if sent_interval is None else sent_interval
+        # if interval < 1:
+        #     raise ValueError("sent_interval must be at least 1.")
+        #
+        # sentences = sent_tokenize(text)
+        # prefix = prompt.strip()
+        # output_text = ""
+        #
+        # for sent_idx in range(0, len(sentences), interval):
+        #     curr_sent_window = " ".join(sentences[sent_idx : sent_idx + interval])
+        #     final_input_text = f"lexical = {lex_code}, order = {order_code}"
+        #     if prefix:
+        #         final_input_text += f" {prefix}"
+        #     final_input_text += f" <sent> {curr_sent_window} </sent>"
+        #
+        #     tokenized = self.tokenizer(
+        #         [final_input_text],
+        #         return_tensors="pt",
+        #         truncation=True,
+        #         max_length=max_length,
+        #     )
+        #     tokenized = {
+        #         key: value.to(self.device) for key, value in tokenized.items()
+        #     }
+        #
+        #     generation_args = {
+        #         "max_length": max_length,
+        #         "do_sample": do_sample,
+        #         "top_p": top_p,
+        #     }
+        #     if top_k is not None:
+        #         generation_args["top_k"] = top_k
+        #
+        #     with torch.no_grad():
+        #         generated = self.model.generate(**tokenized, **generation_args)
+        #     decoded = self.tokenizer.batch_decode(
+        #         generated, skip_special_tokens=True
+        #     )[0].strip()
+        #
+        #     output_text = f"{output_text} {decoded}".strip()
+        #     prefix = f"{prefix} {decoded}".strip()
+        #
+        # return output_text
         interval = self.sent_interval if sent_interval is None else sent_interval
         if interval < 1:
             raise ValueError("sent_interval must be at least 1.")
 
         sentences = sent_tokenize(text)
-        prefix = prompt.strip()
-        output_text = ""
+
+        if not sentences:
+            return ""
+
+        paraphrased_windows = []
+        input_max_length = min(max_length, self.max_model_input_length)
+        output_max_length = min(max_length, self.max_model_output_length)
 
         for sent_idx in range(0, len(sentences), interval):
-            curr_sent_window = " ".join(sentences[sent_idx : sent_idx + interval])
-            final_input_text = f"lexical = {lex_code}, order = {order_code}"
-            if prefix:
-                final_input_text += f" {prefix}"
-            final_input_text += f" <sent> {curr_sent_window} </sent>"
+            sentence_window = " ".join(sentences[sent_idx: sent_idx + interval])
 
-            tokenized = self.tokenizer(
-                [final_input_text],
-                return_tensors="pt",
-                truncation=True,
-                max_length=max_length,
-            )
-            tokenized = {
-                key: value.to(self.device) for key, value in tokenized.items()
-            }
+            # Pegasus expects ordinary text, not chat instructions or DIPPER control tokens.
+            input_text = sentence_window
+
+            tokenized = self.tokenizer(input_text, return_tensors="pt", truncation=True, padding=True,
+                    max_length=input_max_length, ).to(self.device)
 
             generation_args = {
-                "max_length": max_length,
-                "do_sample": do_sample,
-                "top_p": top_p,
-            }
-            if top_k is not None:
-                generation_args["top_k"] = top_k
+                    "max_length": output_max_length, "do_sample": do_sample,
+                    }
 
-            with torch.no_grad():
-                generated = self.model.generate(**tokenized, **generation_args)
-            decoded = self.tokenizer.batch_decode(
-                generated, skip_special_tokens=True
-            )[0].strip()
+            if do_sample:
+                generation_args["top_p"] = top_p
 
-            output_text = f"{output_text} {decoded}".strip()
-            prefix = f"{prefix} {decoded}".strip()
+                if top_k is not None:
+                    generation_args["top_k"] = top_k
 
-        return output_text
+            with torch.inference_mode():
+                generated = self.model.generate(**tokenized, **generation_args, )
+
+            decoded = self.tokenizer.decode(generated[0], skip_special_tokens=True,
+                    clean_up_tokenization_spaces=True, ).strip()
+
+            paraphrased_windows.append(decoded)
+
+        return " ".join(paraphrased_windows)
 
 
 class SAIAParaphraser(OneStepParaphraser):
@@ -462,3 +511,47 @@ class OllamaParaphraser(SAIAParaphraser):
             base_url=CONFIG.OLLAMA_URL if os.path.exists("/Users/klara") else os.environ['OLLAMA_URL'],
             api_key=CONFIG.OLLAMA_KEY if os.path.exists("/Users/klara") else os.environ['OLLAMA_KEY'],
         )
+
+
+
+
+class DSPyOneStepSignature(dspy.Signature):
+    """Rewrite the input text as a faithful paraphrase."""
+
+    text: str = dspy.InputField(desc="The original text to paraphrase.")
+    prompt: str = dspy.InputField(desc="Additional paraphrasing instruction.")
+    paraphrase: str = dspy.OutputField(
+        desc="Only the final paraphrased text, preserving meaning and tone."
+    )
+
+
+class DSPyOneStepParaphraser(OneStepParaphraser):
+    def __init__(
+        self,
+        model_id: str = CONFIG.OPENAI_MODEL,
+        temperature: float = CONFIG.TEMPERATURE,
+    ):
+        super().__init__(n_paraphrases=1, model_id=model_id)
+
+        is_reasoning_model = any(name in model_id.lower() for name in ["gpt-5"])
+
+        self.lm = dspy.LM(
+            model_id,
+            api_base=CONFIG.OPENAI_URL if os.path.exists("/Users/klara") else os.environ["OPENAI_URL"],
+            api_key=CONFIG.OPENAI_KEY if os.path.exists("/Users/klara") else os.environ["OPENAI_KEY"],
+            model_type="chat",
+            cache=False,
+            temperature=1.0 if is_reasoning_model else temperature,
+            max_tokens=16000 if is_reasoning_model else CONFIG.MAX_LENGTH,
+        )
+        dspy.configure(lm=self.lm)
+        self.generator = dspy.Predict(DSPyOneStepSignature)
+
+    def paraphrase(
+        self,
+        text: str,
+        prompt: str = CONFIG.PROMPT,
+        max_length: int = CONFIG.MAX_LENGTH,
+    ) -> str:
+        result = self.generator(text=text, prompt=prompt)
+        return result.paraphrase.strip()
