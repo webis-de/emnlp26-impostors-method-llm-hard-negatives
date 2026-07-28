@@ -271,9 +271,10 @@ class DipperParaphraser(OneStepParaphraser):
         logging.info("Using DipperParaphraser on %s", self.device)
         self.tokenizer = T5Tokenizer.from_pretrained(self.tokenizer_id)
         logging.info("Loaded DipperParaphraser tokenizer")
-        self.model = T5ForConditionalGeneration.from_pretrained(self.model_id).to(
-            self.device
-        )
+        # load in FP16
+        dtype = torch.float16 if self.device.type == "cuda" else torch.float32
+        self.model = T5ForConditionalGeneration.from_pretrained(self.model_id, torch_dtype=dtype,
+                low_cpu_mem_usage=True, ).to(self.device)
         self.model.eval()
         logging.info("Loaded DipperParaphraser model")
 
