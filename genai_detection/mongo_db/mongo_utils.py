@@ -68,7 +68,8 @@ class ParaphraseMongoDB:
             CONFIG.MONGO_TRAIN_PAIRS_COLLECTION,
             CONFIG.MONGO_ALL_PAIRS_COLLECTION,
             CONFIG.MONGO_SUP_BASELINE_CONFIG_PREDS,
-            CONFIG.MONGO_PAN_METRICS_COLLECTION
+            CONFIG.MONGO_PAN_METRICS_COLLECTION,
+            CONFIG.MONGO_JOB_COLLECTION_NAME,
 
         ]:
             if collection_name not in self.db.list_collection_names():
@@ -99,6 +100,7 @@ class ParaphraseMongoDB:
         self.supervised_baseline_diff_config_preds_collection = self.db[CONFIG.MONGO_SUP_BASELINE_CONFIG_PREDS] # predictions of supervised baseline for different configurations
         self.supervised_baseline_diff_config_scores_collection = self.db[CONFIG.MONGO_SUP_BASELINE_CONFIG_SCORES]
         self.pan_metrics_collection = self.db[CONFIG.MONGO_PAN_METRICS_COLLECTION]
+        self.job_collection = self.db[CONFIG.MONGO_JOB_COLLECTION_NAME]
 
 
     def reset_collection(self, collection_name:str):
