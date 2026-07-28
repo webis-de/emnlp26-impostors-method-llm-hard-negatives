@@ -25,7 +25,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -36,6 +35,7 @@ from openai import OpenAI
 from pymongo.collection import Collection
 
 from genai_detection.config import CONFIG
+from genai_detection.paraphrasing.batch_signatures import DSPyOneStepBatchSignature
 from genai_detection.paraphrasing.one_step_paraphrasers import OneStepParaphraser
 
 logger = logging.getLogger(__name__)
@@ -57,11 +57,12 @@ class BatchParaphraser(OneStepParaphraser):
     def __init__(
         self,
         model_id: str = CONFIG.BATCH_OPENAI_MODEL,
+        n_paraphrases: int = 50,
         job_collection_name: str = CONFIG.MONGO_JOB_COLLECTION_NAME,
         endpoint: str = ENDPOINT,
         completion_window: str = COMPLETION_WINDOW,
     ) -> None:
-        super().__init__(n_paraphrases=1, model_id=model_id)
+        super().__init__(n_paraphrases=n_paraphrases, model_id=model_id)
         self.endpoint = endpoint
         self.completion_window = completion_window
         self.job_collection_name = job_collection_name
@@ -105,8 +106,8 @@ class BatchParaphraser(OneStepParaphraser):
         top_p: Optional[float] = None,
         frequency_penalty: Optional[float] = None,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> str:
-        """Add one text to the in-memory request queue and return its custom id."""
+    ) -> List[str]:
+        """Add one text to the queue and return the generated custom ids."""
         original_text, original_text_id = self.mongoDB.get_text_or_id_from_orginal_collection(
             text=text,
             text_id=ObjectId(text_id),
@@ -117,40 +118,45 @@ class BatchParaphraser(OneStepParaphraser):
         if isinstance(original_text, tuple):
             original_text = original_text[0]
 
-        custom_id = self._build_custom_id(
-            text_id=ObjectId(original_text_id),
-            request_index=len(self.pending_requests),
-        )
-        body = self._build_request_body(
-            text=original_text,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            top_p=top_p,
-            frequency_penalty=frequency_penalty,
-        )
-        self.pending_requests.append(
-            {
-                "custom_id": custom_id,
-                "text_id": ObjectId(original_text_id),
-                "original_text": original_text,
-                "dataset_name": dataset_name,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-                "top_p": top_p,
-                "frequency_penalty": frequency_penalty,
-                "metadata": metadata or {},
-                "request": {
+        custom_ids = []
+        for paraphrase_index in range(self.n_paraphrases):
+            custom_id = self._build_custom_id(
+                text_id=ObjectId(original_text_id),
+                request_index=len(self.pending_requests),
+                paraphrase_index=paraphrase_index,
+            )
+            body = self._build_request_body(
+                text=original_text,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                top_p=top_p,
+                frequency_penalty=frequency_penalty,
+            )
+            self.pending_requests.append(
+                {
                     "custom_id": custom_id,
-                    "method": "POST",
-                    "url": self.endpoint,
-                    "body": body,
-                },
-                "saved": False,
-                "saved_paraphrase_id": None,
-                "error": None,
-            }
-        )
-        return custom_id
+                    "text_id": ObjectId(original_text_id),
+                    "original_text": original_text,
+                    "dataset_name": dataset_name,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "top_p": top_p,
+                    "frequency_penalty": frequency_penalty,
+                    "paraphrase_index": paraphrase_index,
+                    "metadata": metadata or {},
+                    "request": {
+                        "custom_id": custom_id,
+                        "method": "POST",
+                        "url": self.endpoint,
+                        "body": body,
+                    },
+                    "saved": False,
+                    "saved_paraphrase_id": None,
+                    "error": None,
+                }
+            )
+            custom_ids.append(custom_id)
+        return custom_ids
 
     def add_texts(
         self,
@@ -165,7 +171,7 @@ class BatchParaphraser(OneStepParaphraser):
         """Add multiple MongoDB original text ids to the in-memory queue."""
         custom_ids = []
         for text_id in text_ids:
-            custom_ids.append(
+            custom_ids.extend(
                 self.add_text(
                     text_id=text_id,
                     dataset_name=dataset_name,
@@ -378,50 +384,16 @@ class BatchParaphraser(OneStepParaphraser):
             "messages": [
                 {
                     "role": "system",
-                    "content": (
-                        "You are a paraphrasing assistant implementing this "
-                        "DSPy-style signature:\n"
-                        "text: original text to paraphrase.\n"
-                        "paraphrase: only the final paraphrased text, preserving "
-                        "meaning and tone while using different wording and "
-                        "sentence structure.\n"
-                        "Return valid JSON with exactly one key: paraphrase."
-                    ),
+                    "content": DSPyOneStepBatchSignature.system_instruction(),
                 },
                 {
                     "role": "user",
-                    "content": json.dumps(
-                        {
-                            "text": text[:30000],
-                        },
-                        ensure_ascii=True,
-                    ),
+                    "content": DSPyOneStepBatchSignature.input_content(text),
                 },
             ],
             "temperature": 1.0 if is_reasoning_model else temperature,
             "max_tokens": 16000 if is_reasoning_model else max_tokens,
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "dspy_one_step_paraphrase",
-                    "strict": True,
-                    "schema": {
-                        "type": "object",
-                        "properties": {
-                            "paraphrase": {
-                                "type": "string",
-                                "description": (
-                                    "A faithful paraphrase of the input text "
-                                    "using different wording and sentence "
-                                    "structure while preserving meaning and tone."
-                                ),
-                            }
-                        },
-                        "required": ["paraphrase"],
-                        "additionalProperties": False,
-                    },
-                },
-            },
+            "response_format": DSPyOneStepBatchSignature.response_format(),
             "reasoning_effort": "minimal",
         }
         if top_p is not None:
@@ -430,8 +402,13 @@ class BatchParaphraser(OneStepParaphraser):
             body["frequency_penalty"] = frequency_penalty
         return body
 
-    def _build_custom_id(self, text_id: ObjectId, request_index: int) -> str:
-        return f"naive-paraphrase-{text_id}-{request_index}"
+    def _build_custom_id(
+        self,
+        text_id: ObjectId,
+        request_index: int,
+        paraphrase_index: int,
+    ) -> str:
+        return f"naive-paraphrase-{text_id}-{paraphrase_index}-{request_index}"
 
     def _write_jsonl_input_file(self, requests: List[Dict[str, Any]]) -> Path:
         with tempfile.NamedTemporaryFile(
@@ -527,23 +504,7 @@ class BatchParaphraser(OneStepParaphraser):
 
     def _extract_paraphrase(self, response_row: Dict[str, Any]) -> str:
         response_body = response_row.get("response", {}).get("body", {})
-        choices = response_body.get("choices", [])
-        if not choices:
-            return ""
-        content = choices[0].get("message", {}).get("content", "")
-        if isinstance(content, list):
-            content = " ".join(
-                part.get("text", "") if isinstance(part, dict) else str(part)
-                for part in content
-            )
-        content = str(content).strip()
-        try:
-            parsed = json.loads(content)
-            if isinstance(parsed, dict):
-                content = str(parsed.get("paraphrase", ""))
-        except json.JSONDecodeError:
-            pass
-        return re.sub(r"\s+", " ", content).strip()
+        return DSPyOneStepBatchSignature.parse_chat_completion_body(response_body)
 
     def _save_finished_paraphrase(
         self,
@@ -565,12 +526,7 @@ class BatchParaphraser(OneStepParaphraser):
             "endpoint": self.endpoint,
             "completion_window": self.completion_window,
             "request_metadata": request_state.get("metadata", {}),
-            "signature": {
-                "framework": "dspy",
-                "name": "DSPyOneStepSignature",
-                "input_fields": ["text"],
-                "output_fields": ["paraphrase"],
-            },
+            "signature": DSPyOneStepBatchSignature.metadata(),
             "openai_response_id": response_body.get("id"),
             "openai_usage": usage,
             "decoding": {
