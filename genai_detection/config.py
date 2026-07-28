@@ -74,7 +74,8 @@ class BaseConfig:
     SAIA_MODEL = "openai-gpt-oss-120b"
     OPENAI_URL = "https://api.openai.com/v1"
     OPENAI_MODEL = "openai/gpt-5-nano-2025-08-07"  # specify snapshot for consistency: https://platform.openai.com/docs/models/gpt-5-nano (30.10.2025)
-    # "gpt-5.4-nano-2026-03-17"     # https://developers.openai.com/api/docs/models/gpt-5.4-nano
+    # too expensive without batching:
+    BATCH_OPENAI_MODEL =  "gpt-5.4-nano-2026-03-17"     # https://developers.openai.com/api/docs/models/gpt-5.4-nano
     PROMPT = "Paraphrase the text above without changing its meaning. Use different words and vary the sentence structure while maintaining a consistent tone. Your paraphrase should be three times as long than the original. Output only the paraphrased sentence, with NO explanations or extra text."
 
     MONGO_DATABASE = "impostors"  # initial db (!= collection in db)
@@ -96,6 +97,7 @@ class BaseConfig:
     MONGO_ALL_PAIRS_COLLECTION = "all_pairs"
     MONGO_SUP_BASELINE_CONFIG_PREDS = "supervised_baseline_diff_config_preds"
     MONGO_SUP_BASELINE_CONFIG_SCORES = "supervised_baseline_diff_config_scores"
+    MONGO_JOB_COLLECTION_NAME = "openai_batch_paraphrase_jobs"
     MONGO_USER = os.getenv("MONGO_INITDB_ROOT_USERNAME")
     MONGO_PASSWORD = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
     MONGO_HOST = "localhost"  # Local, but forwarded to server
