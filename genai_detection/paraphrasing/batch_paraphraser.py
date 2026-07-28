@@ -188,11 +188,12 @@ class BatchParaphraser(OneStepParaphraser):
         self,
         description: Optional[str] = None,
         clear_pending: bool = True,
-    ) -> str:
+    ) -> Optional[str]:
         """Upload queued requests, create an OpenAI batch, and store job state."""
         if not self.pending_requests:
             raise ValueError("No pending paraphrase requests to submit.")
-        self._raise_if_pending_requests_already_active()
+        if self._has_pending_requests_already_active():
+            return None
 
         input_file_path = self._write_jsonl_input_file(self.pending_requests)
         try:
@@ -326,13 +327,13 @@ class BatchParaphraser(OneStepParaphraser):
             logger.info("Created MongoDB collection: %s", collection_name)
         return self.mongoDB.db[collection_name]
 
-    def _raise_if_pending_requests_already_active(self) -> None:
+    def _has_pending_requests_already_active(self) -> bool:
         pending_text_ids = {
             ObjectId(request_state["text_id"])
             for request_state in self.pending_requests
         }
         if not pending_text_ids:
-            return
+            return False
 
         active_jobs = self.job_collection.find(
             {
@@ -365,10 +366,13 @@ class BatchParaphraser(OneStepParaphraser):
                 )
 
         if overlaps:
-            raise ValueError(
+            logger.warning(
                 "Refusing to submit duplicate OpenAI batch paraphrase requests. "
-                f"Active overlapping jobs exist: {overlaps}"
+                "Active overlapping jobs exist: %s",
+                overlaps,
             )
+            return True
+        return False
 
     def _build_request_body(
         self,
