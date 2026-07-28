@@ -519,7 +519,6 @@ def plot_precision_recall_curve(
                 unique_pairs = set(zip(recalls, precisions))
 
                 logger.info("%s: class %d", key, positive_class_id)
-                logger.info("Number of unique (x, y) pairs: %d", len(unique_pairs))
 
                 plt.plot(
                     recalls,
@@ -529,6 +528,7 @@ def plot_precision_recall_curve(
                     color=color,
                     label=label,
                 )
+                logger.info("Plotted %d unique (x, y) pairs for %s", len(unique_pairs), label)
 
         FONTSIZE_AXIS = 16
         FONTSIZE_TICKS = 14
