@@ -21,12 +21,8 @@ import openai
 import torch
 from nltk import sent_tokenize
 from openai import OpenAI
-from transformers import (
-    AutoModelForSeq2SeqLM,
-    AutoTokenizer,
-    T5ForConditionalGeneration,
-    T5Tokenizer,
-)
+from transformers import (AutoModelForSeq2SeqLM, AutoTokenizer, PegasusForConditionalGeneration, PegasusTokenizer,
+                          T5ForConditionalGeneration, T5Tokenizer, )
 
 from genai_detection.config import CONFIG
 from genai_detection.paraphrasing.paraphraser import Paraphraser
@@ -246,7 +242,7 @@ class DipperParaphraser(OneStepParaphraser):
 
     def __init__(
         self,
-        model_id: str = "kalpeshk2011/dipper-paraphraser-xxl",
+        model_id: str = "tuner007/pegasus_paraphrase",#"kalpeshk2011/dipper-paraphraser-xxl",
         tokenizer_id: str = "google/t5-v1_1-xxl",
         lexical_diversity: int = 60,
         order_diversity: int = 0,
@@ -268,15 +264,29 @@ class DipperParaphraser(OneStepParaphraser):
         else:
             self.device = torch.device("cpu")
 
-        logging.info("Using DipperParaphraser on %s", self.device)
-        self.tokenizer = T5Tokenizer.from_pretrained(self.tokenizer_id)
-        logging.info("Loaded DipperParaphraser tokenizer")
-        # load in FP16
+        logging.info("Using %s Paraphraser on %s", self.model_id, self.device)
+
+        ## DIPPER
+        # self.tokenizer = T5Tokenizer.from_pretrained(self.tokenizer_id)
+        # logging.info("Loaded DipperParaphraser tokenizer")
+        # # load in FP16
+        # dtype = torch.float16 if self.device.type == "cuda" else torch.float32
+        # self.model = T5ForConditionalGeneration.from_pretrained(self.model_id, torch_dtype=dtype,
+        #         low_cpu_mem_usage=True, ).to(self.device)
+
+
+        ## smaller paraphraser
+        self.tokenizer = PegasusTokenizer.from_pretrained(self.model_id)
+
         dtype = torch.float16 if self.device.type == "cuda" else torch.float32
-        self.model = T5ForConditionalGeneration.from_pretrained(self.model_id, torch_dtype=dtype,
+
+        self.model = PegasusForConditionalGeneration.from_pretrained(self.model_id, torch_dtype=dtype,
                 low_cpu_mem_usage=True, ).to(self.device)
+
         self.model.eval()
-        logging.info("Loaded DipperParaphraser model")
+        logging.info("Loaded %s paraphraser model", self.model_id)
+
+
 
     @staticmethod
     def _validate_diversity(value: int, name: str) -> int:
