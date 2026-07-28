@@ -474,12 +474,14 @@ class OllamaParaphraser(SAIAParaphraser):
 
 
 class DSPyOneStepSignature(dspy.Signature):
-    """Rewrite the input text as a faithful paraphrase."""
+    """Rewrite the input text as a faithful paraphrase with different wording."""
 
     text: str = dspy.InputField(desc="The original text to paraphrase.")
-    prompt: str = dspy.InputField(desc="Additional paraphrasing instruction.")
     paraphrase: str = dspy.OutputField(
-        desc="Only the final paraphrased text, preserving meaning and tone."
+        desc=(
+            "Only the final paraphrased text, preserving meaning and tone while "
+            "using different wording and sentence structure."
+        )
     )
 
 
@@ -511,5 +513,5 @@ class DSPyOneStepParaphraser(OneStepParaphraser):
         prompt: str = CONFIG.PROMPT,
         max_length: int = CONFIG.MAX_LENGTH,
     ) -> str:
-        result = self.generator(text=text, prompt=prompt)
+        result = self.generator(text=text)
         return result.paraphrase.strip()
