@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: dipper-test
 spec:
-  ttlSecondsAfterFinished: 1200   # Job nach 10 Minuten automatisch löschen
+  ttlSecondsAfterFinished: 30000   # Job nach 5h automatisch löschen
   backoffLimit: 0                # Bei Fehler nicht erneut starten
 
   template:
