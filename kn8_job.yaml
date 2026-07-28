@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: dipper-test
 spec:
-  ttlSecondsAfterFinished: 600   # Job nach 10 Minuten automatisch löschen
+  ttlSecondsAfterFinished: 1200   # Job nach 10 Minuten automatisch löschen
   backoffLimit: 0                # Bei Fehler nicht erneut starten
 
   template:
@@ -15,10 +15,45 @@ spec:
         image: registry.webis.de/code-teaching/theses/artificial-authorship-verification:latest
         imagePullPolicy: Always
 
-#        resources:
+        resources:
+          requests:
+            nvidia.com/mig-2g.10gb: 1
+          limits:
+            nvidia.com/mig-2g.10gb: 1
+
+        #          requests:
+#            nvidia.com/gpu: 1
 #          limits:
 #            nvidia.com/gpu: 1 # DIPPER braucht eine GPU
+        env:
+          - name: SAIA_KEY
+            valueFrom:
+              secretKeyRef:
+                name: dipper-secrets
+                key: SAIA_KEY
+          - name: MONGO_INITDB_ROOT_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: dipper-secrets
+                key: MONGO_INITDB_ROOT_USERNAME
+          - name: MONGO_INITDB_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: dipper-secrets
+                key: MONGO_INITDB_ROOT_PASSWORD
 
         command:
           - python3
           - scripts/generate_naive_paraphrases.py
+      tolerations:
+        - key: "special"
+          operator: "Equal"
+          value: "gpu"
+          effect: "NoSchedule"
+        - key: "special"
+          operator: "Equal"
+          value: "gpu"
+          effect: "NoExecute"
+      nodeSelector:
+        accelerator: nvidia-a100 #nvidia-1080
+      runtimeClassName: nvidia
