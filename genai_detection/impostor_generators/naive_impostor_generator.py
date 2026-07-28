@@ -20,7 +20,7 @@ from bson import ObjectId
 
 from genai_detection.config import CONFIG
 from genai_detection.impostor_generators.ImpostorGenerator import LLMImpostorGenerator
-from genai_detection.paraphrasing.one_step_paraphrasers import (DipperParaphraser, SAIAParaphraser,
+from genai_detection.paraphrasing.one_step_paraphrasers import (FinetunedParaphraser, SAIAParaphraser,
                                                                 OneStepParaphraser, )
 from genai_detection.paraphrasing.paraphraser import Paraphraser
 
@@ -58,7 +58,7 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
                 # self.saiai_paraphraser_qwen,  # explanations in the output, separated by </think>
             ]
             if use_dipper:
-                self.dipper_paraphraser = DipperParaphraser()
+                self.dipper_paraphraser = FinetunedParaphraser()
                 self.paraphrasers.append(self.dipper_paraphraser)
         else:
             assert all(
@@ -213,7 +213,14 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
                 if isinstance(paraphraser, SAIAParaphraser):
                     raw = paraphraser.paraphrase(text, prompt=prompt, **decoding)
                 else:
-                    raw = paraphraser.paraphrase(text, prompt=prompt)
+                    local_decoding = {
+                        key: value
+                        for key, value in decoding.items()
+                        if key in {"temperature", "top_p"}
+                    }
+                    raw = paraphraser.paraphrase(
+                        text, prompt=prompt, **local_decoding
+                    )
 
                 candidates = raw if isinstance(raw, list) else [raw]
                 impostor_text = self._select_best_candidate(
