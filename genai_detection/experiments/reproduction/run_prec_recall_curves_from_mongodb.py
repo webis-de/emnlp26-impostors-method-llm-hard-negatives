@@ -30,6 +30,7 @@ if __name__ == "__main__":
         "in_domain",
         # "one_step_llm",   # SAIA URL on betaweb error: httpx.InvalidURL: Invalid port: 'academiccloud:de'
         "two_step_llm",
+        "random_words",
         # "translation",
         # "mirror_minds",   # raises error
     ]
