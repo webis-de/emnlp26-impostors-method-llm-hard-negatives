@@ -29,6 +29,8 @@ from genai_detection.paraphrasing.batch_paraphraser import BatchParaphraser
 
 logger = logging.getLogger(__name__)
 
+N_DOCUMENTS = 100
+
 BATCH_ID = "batch_6a69dc56700c8190b88c1817c25f2f6a"
            #"batch_6a69d38466f88190983e275fef950de4"
     #"batch_6a69b0a71c008190a9f74327908d87af"
@@ -80,7 +82,7 @@ def submit_one() -> Optional[str]:
     text_ids = get_original_text_ids_without_naive_paraphrases(
         mongo=mongo,
         dataset_name=None,
-        n_documents=2,
+        n_documents=N_DOCUMENTS,
     )
     logger.info("About to submit one batch for text_ids=%s", text_ids)
 
@@ -111,8 +113,8 @@ def main() -> None:
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
 
-    # submitted_batch_id = submit_one()
-    # collect_batch(batch_id=submitted_batch_id)
+    submitted_batch_id = submit_one()
+    collect_batch(batch_id=submitted_batch_id)
 
     # To only collect an existing job, comment out submit_one above and call:
     collect_batch(batch_id=BATCH_ID)
