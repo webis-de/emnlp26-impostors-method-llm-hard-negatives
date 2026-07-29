@@ -23,38 +23,65 @@ from typing import List, Optional
 
 from bson import ObjectId
 
+from genai_detection.config import CONFIG
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 from genai_detection.paraphrasing.batch_paraphraser import BatchParaphraser
 
 logger = logging.getLogger(__name__)
 
-BATCH_ID = "batch_6a68c7bf86108190958f69fdb6eeadc6"
+BATCH_ID = "batch_6a69dc56700c8190b88c1817c25f2f6a"
+           #"batch_6a69d38466f88190983e275fef950de4"
+    #"batch_6a69b0a71c008190a9f74327908d87af"
+#"batch_6a68c7bf86108190958f69fdb6eeadc6"
 
 
-def get_original_text_ids(
+def get_original_text_ids_without_naive_paraphrases(
     mongo: ParaphraseMongoDB,
     dataset_name: Optional[str],
     n_documents: int,
+    llm: str = CONFIG.BATCH_OPENAI_MODEL,
 ) -> List[ObjectId]:
     query = {}
     if dataset_name:
         query["dataset_name"] = dataset_name
-    cursor = mongo.original_collection.find(query, {"_id": 1}).sort("_id", 1).limit(
-        n_documents
-    )
-    text_ids = [ObjectId(doc["_id"]) for doc in cursor]
+
+    text_ids = []
+    cursor = mongo.original_collection.find(query, {"_id": 1}).sort("_id", 1)
+    for doc in cursor:
+        text_id = ObjectId(doc["_id"])
+        existing = mongo.naive_paraphrase_collection.find_one(
+            {
+                "text_id": text_id,
+                "llm": llm,
+            },
+            {"_id": 1},
+        )
+        if existing:
+            continue
+        text_ids.append(text_id)
+        if len(text_ids) >= n_documents:
+            break
+
     if len(text_ids) < n_documents:
         raise ValueError(
-            f"Expected {n_documents} original texts for query {query}, "
-            f"found {len(text_ids)}."
+            f"Expected {n_documents} original texts without naive paraphrases "
+            f"for query {query} and llm={llm!r}, found {len(text_ids)}."
         )
-    logger.info("Selected original text_ids=%s", text_ids)
+    logger.info(
+        "Selected original text_ids without naive paraphrases for llm=%s: %s",
+        llm,
+        text_ids,
+    )
     return text_ids
 
 
 def submit_one() -> Optional[str]:
     mongo = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
-    text_ids = get_original_text_ids(mongo=mongo, dataset_name=None, n_documents=2)
+    text_ids = get_original_text_ids_without_naive_paraphrases(
+        mongo=mongo,
+        dataset_name=None,
+        n_documents=2,
+    )
     logger.info("About to submit one batch for text_ids=%s", text_ids)
 
     paraphraser = BatchParaphraser()
@@ -84,8 +111,8 @@ def main() -> None:
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
 
-    submitted_batch_id = submit_one()
-    collect_batch(batch_id=submitted_batch_id)
+    # submitted_batch_id = submit_one()
+    # collect_batch(batch_id=submitted_batch_id)
 
     # To only collect an existing job, comment out submit_one above and call:
     collect_batch(batch_id=BATCH_ID)
