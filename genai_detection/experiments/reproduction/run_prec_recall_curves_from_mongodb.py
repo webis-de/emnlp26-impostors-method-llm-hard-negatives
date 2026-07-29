@@ -28,7 +28,7 @@ if __name__ == "__main__":
         # "on_the_fly_serpapi",
         "on_the_fly_startpage",
         "in_domain",
-        # "one_step_llm",   # SAIA URL on betaweb error: httpx.InvalidURL: Invalid port: 'academiccloud:de'
+        "one_step_llm",
         "two_step_llm",
         "random_words",
         # "translation",
@@ -39,8 +39,9 @@ if __name__ == "__main__":
         dataset_name=CONFIG.STUDENT_ESSAYS,
         imp_gen_techniques=our_figure_impostor_options,
         compute_score_fn=compute_prec_recall_f1_acc_dict_on_existing_impostor_scores,
+        one_step_llm_label_translations=CONFIG.ONE_STEP_LLM_LABEL_TRANSLATIONS,
     )
 
-    run_prec_recall_curves(
-        dataset_name=CONFIG.BLOG, imp_gen_techniques=our_figure_impostor_options, compute_score_fn=compute_prec_recall_f1_acc_dict_on_existing_impostor_scores
-    )
+    # run_prec_recall_curves(
+    #     dataset_name=CONFIG.BLOG, imp_gen_techniques=our_figure_impostor_options, compute_score_fn=compute_prec_recall_f1_acc_dict_on_existing_impostor_scores
+    # )

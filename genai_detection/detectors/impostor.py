@@ -31,6 +31,7 @@ from genai_detection.detectors.components.scorer import Scorer, ScoreResult
 from genai_detection.detectors.components.vector_similarity import minmax_similarity
 from genai_detection.detectors.impostor_base import ImpostorBase
 from genai_detection.impostor_generators.search_generator_base import SearchImpostorGeneratorBase
+from genai_detection.paraphrasing.exceptions import MissingPrecomputedParaphrasesError
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from genai_detection.config import CONFIG
@@ -81,6 +82,7 @@ class ImpostorDetector(ImpostorBase):
         dataset_name: str = "student_essays",
         min_n_tokens: int = 500,  # minimum number of tokens to consider input sequence valid, defaults to 500
         upsample: bool = True,  # whether to upsample short texts (default: True, i.e., upsample) or skip them
+        llm: str | None = None,
     ):
         """
         :param rounds: Number of random feature selection rounds, Koppel et al. (2014) use 100
@@ -103,6 +105,7 @@ class ImpostorDetector(ImpostorBase):
         et al. (2019): 500 words)
         :param upsample: Whether to upsample short texts (default: True, i.e., upsample acc. to Bevendorff (2019)) or
         skip them (Bevendorff et al. (2019)/ Koppel et al. (2014) at 500 words)
+        :param llm: Optional one-step LLM model id to pin for ``one_step_llm`` impostors.
         """
         super().__init__()
 
@@ -115,12 +118,14 @@ class ImpostorDetector(ImpostorBase):
         self.min_n_tokens = min_n_tokens
         self.upsample = upsample
         self.impostor_technique = impostor_technique
+        self.llm = llm
 
         self.impostor_generator = create_impostor_generator(
             impostor_technique=impostor_technique,
             n_impostors=self.n_impostors,
             dataset_name=self.dataset_name,
             top_n_freq_words=self.top_n,
+            llm=self.llm,
         )
         self.text_preprocessor = Preprocessor()
         self.feature_extractor = TfidfFeatureExtractor(top_n_freq_words=self.top_n)
@@ -253,7 +258,7 @@ class ImpostorDetector(ImpostorBase):
             generation_failed, pair = self._build_impostor_pair_datastructure(pair=pair)
 
             if generation_failed:
-                final_scores.append(0.5) 
+                final_scores.append(np.nan)
                 continue  # skip to next pair and save nothing to mongoDB
 
             # --- 2) Build corpus for TFIDF -----------------------------------------------
@@ -356,6 +361,8 @@ class ImpostorDetector(ImpostorBase):
             document2insert["dataset_name"] = (
                 self.dataset_name or self.impostor_generator.dataset_name
             )
+            if self.impostor_technique in {"one_step_llm"}:
+                document2insert.update(self._get_one_step_llm_metadata())
             document2insert["n_impostors"] = self.n_impostors
             document2insert["n_potential_impostors"] = (
                 self.impostor_generator.num_potential_impostors
@@ -397,17 +404,35 @@ class ImpostorDetector(ImpostorBase):
     def _build_impostor_pair_datastructure(self, pair: t.Dict[str, str], keys: List[str] = ["left", "right"]) -> (
                 bool, t.Dict[str, str]):
         generation_failed = False
-        for key in keys:
-            try:
-                pair[key]["impostors"] = self._generate_impostors_for_single_input(input_dict=pair[key])
-                logger.info(
-                        f"Obtained {len(pair[key]['impostors'])} impostors for {key} input text. Type of impostors is {type(pair[key]['impostors'])}.")
-            except Exception as e:
-                logger.error(
-                        f"Failed to generate impostors for text with ID {pair[key]['id']} and text: {pair[key]['original_text'][:200]} -> Return 0.5. Error: {e}")
-                generation_failed = True
-                break  # exit for loop over sides
+        if hasattr(self.impostor_generator, "select_paraphraser_for_pair"):
+            self.impostor_generator.select_paraphraser_for_pair()
+        try:
+            for key in keys:
+                try:
+                    pair[key]["impostors"] = self._generate_impostors_for_single_input(input_dict=pair[key])
+                    logger.info(
+                            f"Obtained {len(pair[key]['impostors'])} impostors for {key} input text. Type of impostors is {type(pair[key]['impostors'])}.")
+                except MissingPrecomputedParaphrasesError as e:
+                    logger.warning(
+                            f"Skipping pair because precomputed one-step paraphrases are missing for text with ID {pair[key]['id']}: {e}")
+                    generation_failed = True
+                    break
+                except Exception as e:
+                    logger.error(
+                            f"Failed to generate impostors for text with ID {pair[key]['id']} and text: {pair[key]['original_text'][:200]} -> Return 0.5. Error: {e}")
+                    generation_failed = True
+                    break  # exit for loop over sides
+        finally:
+            if hasattr(self.impostor_generator, "clear_selected_paraphraser"):
+                self.impostor_generator.clear_selected_paraphraser()
         return generation_failed, pair
+
+    def _get_one_step_llm_metadata(self) -> t.Dict[str, t.Any]:
+        selected_llm = (getattr(self.impostor_generator, "llm", None) or
+                        getattr(self.impostor_generator, "last_pair_paraphraser_model_id", None))
+        if selected_llm:
+            return {"llm": selected_llm}
+        return {}
 
     def _handle_statistical_test(self, document2insert: dict[str, Any], p_values, pair):
         # compare corrected p-value (times 2, since two tests) to alpha for statistical significance

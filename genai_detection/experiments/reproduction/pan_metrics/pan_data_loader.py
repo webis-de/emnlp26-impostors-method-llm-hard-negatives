@@ -135,6 +135,59 @@ class PANDataLoader:
 
         return scores_by_pair
 
+    def load_one_step_llm_scores_by_llm(
+        self,
+        dataset_name: str,
+        *,
+        n_impostors: int = 10,
+        n_potential_impostors: int | None = None,
+        rounds: int = 100,
+        feature_name: str = "scores_over_different_rounds",
+    ) -> Dict[str | None, Dict[Tuple[ObjectId, ObjectId], float]]:
+        query = {
+            "impostor_generation_technique": "one_step_llm",
+            "n_impostors": n_impostors,
+            "dataset_name": dataset_name,
+        }
+        if n_potential_impostors is not None:
+            query["n_potential_impostors"] = n_potential_impostors
+
+        cursor = self.mongo.impostor_output_collection.find(
+            query,
+            {"left_id": 1, "right_id": 1, feature_name: 1, "llm": 1, "llms": 1},
+            batch_size=self.batch_size,
+        ).sort("_id", 1)
+
+        scores_by_llm: Dict[str | None, Dict[Tuple[ObjectId, ObjectId], float]] = {}
+        llms_by_text_id: Dict[ObjectId, List[str]] = {}
+        for doc in cursor:
+            llm = doc.get("llm")
+            if llm is None and len(doc.get("llms", [])) == 1:
+                llm = doc["llms"][0]
+            pair = (doc["left_id"], doc["right_id"])
+            if llm is None:
+                llms = set()
+                for text_id in pair:
+                    if text_id not in llms_by_text_id:
+                        text_cursor = self.mongo.naive_paraphrase_collection.find(
+                            {"text_id": text_id},
+                            {"llm": 1},
+                        )
+                        llms_by_text_id[text_id] = sorted(
+                            {text_doc["llm"] for text_doc in text_cursor if text_doc.get("llm")}
+                        )
+                    llms.update(llms_by_text_id[text_id])
+                if len(llms) == 1:
+                    llm = next(iter(llms))
+            scores_by_pair = scores_by_llm.setdefault(llm, {})
+            if pair not in scores_by_pair:
+                value = doc[feature_name]
+                if "score" in feature_name:
+                    value = value / rounds
+                scores_by_pair[pair] = float(value)
+
+        return scores_by_llm
+
     def load_or_compute_baseline_scores(
         self,
         method_name: str,

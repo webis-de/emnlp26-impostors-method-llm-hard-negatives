@@ -23,13 +23,13 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
 
     our_figure_impostor_options = [
+        "one_step_llm",
         "random_words",
         "two_step_llm",
         "on_the_fly_chatnoir",
         # "on_the_fly_serpapi",
         "on_the_fly_startpage",
         "in_domain",
-        # "one_step_llm",   # SAIA URL on betaweb error: httpx.InvalidURL: Invalid port: 'academiccloud:de'
         # "translation",
         # "mirror_minds",   # raises error
     ]
@@ -37,8 +37,9 @@ if __name__ == "__main__":
     run_prec_recall_curves(
         dataset_name=CONFIG.STUDENT_ESSAYS,
         imp_gen_techniques=our_figure_impostor_options,
+            one_step_llm_label_translations=CONFIG.ONE_STEP_LLM_LABEL_TRANSLATIONS,
     )
 
-    run_prec_recall_curves(
-        dataset_name=CONFIG.BLOG, imp_gen_techniques=our_figure_impostor_options
-    )
+    # run_prec_recall_curves(
+    #     dataset_name=CONFIG.BLOG, imp_gen_techniques=our_figure_impostor_options
+    # )

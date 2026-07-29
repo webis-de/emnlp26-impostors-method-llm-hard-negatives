@@ -14,17 +14,15 @@
 import json
 import logging
 import os
-import random
 import re
 import dspy
-from typing import List, Optional
+from typing import List
 
 import openai
 import torch
 from nltk import sent_tokenize
 from openai import OpenAI
-from transformers import (AutoModelForSeq2SeqLM, AutoTokenizer, PegasusForConditionalGeneration, PegasusTokenizer,
-                          T5ForConditionalGeneration, T5Tokenizer, )
+from transformers import (AutoModelForSeq2SeqLM, AutoTokenizer )
 
 from genai_detection.config import CONFIG
 from genai_detection.paraphrasing.paraphraser import Paraphraser
@@ -226,158 +224,6 @@ class T5GooglePAWSParaphraser(OneStepParaphraser):
             )
             res.append(line)
         return res
-
-
-class FinetunedParaphraser(OneStepParaphraser):
-    """
-    Local seq2seq paraphraser backed by a fine-tuned Pegasus model.
-
-    The default model, ``tuner007/pegasus_paraphrase``, works best on short
-    sentence-level inputs. Longer texts are split into sentence windows and each
-    window is paraphrased independently. To avoid repeated identical paraphrases,
-    generation samples multiple candidates per window and returns one complete
-    sampled variant.
-
-    References
-    ==========
-    - Pegasus paraphrase model: https://huggingface.co/tuner007/pegasus_paraphrase
-    """
-
-    def __init__(
-        self,
-        model_id: str = "tuner007/pegasus_paraphrase",
-        sent_interval: int = 1,
-        device: Optional[str] = None,
-    ):
-        self.model_id = model_id
-        self.sent_interval = sent_interval
-
-        if device is not None:
-            self.device = torch.device(device)
-        elif torch.cuda.is_available() and torch.version.cuda is not None:
-            self.device = torch.device("cuda")
-        elif torch.backends.mps.is_available():
-            self.device = torch.device("mps")
-        else:
-            self.device = torch.device("cpu")
-
-        logging.info("Using %s Paraphraser on %s", self.model_id, self.device)
-        self.tokenizer = PegasusTokenizer.from_pretrained(self.model_id)
-
-        dtype = torch.float16 if self.device.type == "cuda" else torch.float32
-
-        self.model = PegasusForConditionalGeneration.from_pretrained(self.model_id, torch_dtype=dtype,
-                low_cpu_mem_usage=True, ).to(self.device)
-        self.max_model_input_length = min(
-            getattr(self.tokenizer, "model_max_length", 1024),
-            getattr(self.model.config, "max_position_embeddings", 1024),
-        )
-        self.max_model_output_length = getattr(
-            self.model.config, "max_position_embeddings", self.max_model_input_length
-        )
-
-        self.model.eval()
-        logging.info("Loaded %s paraphraser model", self.model_id)
-
-    def paraphrase(
-        self,
-        text: str,
-        prompt: str = "",
-        max_length: int = 128,#CONFIG.MAX_LENGTH,
-        lexical_diversity: Optional[int] = None,
-        order_diversity: Optional[int] = None,
-        sent_interval: Optional[int] = 1,
-        do_sample: bool = True,
-        temperature: float = 1.1,
-        top_p: float = 0.98,
-        top_k: Optional[int] = 120,
-        num_return_sequences: int = 8,
-    ) -> str:
-        """
-        Generate one sampled paraphrase with the local Pegasus paraphraser.
-
-        :param text: The input text to be paraphrased.
-        :param prompt: Accepted for interface compatibility, but ignored because
-            Pegasus expects plain source text rather than chat instructions.
-        :param max_length: Maximum number of output tokens per generation step.
-        :param lexical_diversity: Accepted for compatibility with the old DIPPER
-            interface, but unused by Pegasus.
-        :param order_diversity: Accepted for compatibility with the old DIPPER
-            interface, but unused by Pegasus.
-        :param sent_interval: Number of sentences paraphrased per generation step.
-        :param do_sample: Whether to sample during generation.
-        :param temperature: Sampling temperature.
-        :param top_p: Nucleus sampling value.
-        :param top_k: Top-k sampling value.
-        :param num_return_sequences: Number of sampled candidates per sentence window.
-        :return: A paraphrased version of the input text.
-        """
-        interval = self.sent_interval if sent_interval is None else sent_interval
-        if interval < 1:
-            raise ValueError("sent_interval must be at least 1.")
-
-        sentences = sent_tokenize(text)
-
-        if not sentences:
-            return ""
-
-        paraphrase_variants = ["" for _ in range(max(num_return_sequences, 1))]
-        input_max_length = min(max_length, self.max_model_input_length)
-        output_max_length = min(max_length, self.max_model_output_length)
-
-        for sent_idx in range(0, len(sentences), interval):
-            # Process short sentence windows because the Pegasus paraphrase model is
-            # trained for sentence-level inputs and has a limited position budget.
-            sentence_window = " ".join(sentences[sent_idx: sent_idx + interval])
-
-            # Pegasus expects ordinary text, not chat instructions or DIPPER control tokens.
-            input_text = sentence_window
-
-            # Truncate to the model's real input limit to avoid CUDA embedding
-            # asserts when a sentence window is longer than Pegasus can encode.
-            tokenized = self.tokenizer(input_text, return_tensors="pt", truncation=True, padding=True,
-                    max_length=input_max_length, ).to(self.device)
-
-            # Sample multiple candidates per window and discourage copied or
-            # repetitive wording so repeated calls produce more diverse outputs.
-            generation_args = {
-                    "max_length": output_max_length,
-                    "do_sample": do_sample,
-                    "num_return_sequences": max(num_return_sequences, 1),
-                    "repetition_penalty": 1.15,
-                    "no_repeat_ngram_size": 3,
-                    }
-
-            if do_sample:
-                generation_args["temperature"] = temperature
-                generation_args["top_p"] = top_p
-
-                if top_k is not None:
-                    generation_args["top_k"] = top_k
-
-            # inference_mode disables gradient bookkeeping and keeps GPU memory
-            # usage lower during generation.
-            with torch.inference_mode():
-                generated = self.model.generate(**tokenized, **generation_args, )
-
-            # Decode all sampled sequences; they are stitched by candidate index
-            # below to keep full-text variants internally consistent.
-            decoded = self.tokenizer.batch_decode(
-                generated,
-                skip_special_tokens=True,
-                clean_up_tokenization_spaces=True,
-            )
-
-            # Keep candidate index stable across windows so each variant is one
-            # coherent full-text paraphrase, then randomly choose among variants.
-            for variant_idx, candidate in enumerate(decoded):
-                candidate = candidate.strip()
-                paraphrase_variants[variant_idx] = (
-                    f"{paraphrase_variants[variant_idx]} {candidate}".strip()
-                )
-
-        candidates = [candidate for candidate in paraphrase_variants if candidate]
-        return random.choice(candidates) if candidates else ""
 
 
 class SAIAParaphraser(OneStepParaphraser):
