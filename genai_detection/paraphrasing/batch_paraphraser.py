@@ -397,7 +397,7 @@ class BatchParaphraser(OneStepParaphraser):
             ],
             "temperature": 1.0 if is_reasoning_model else temperature,
             "response_format": DSPyOneStepBatchSignature.response_format(),
-            "reasoning_effort": "minimal",
+            "reasoning_effort": "none", # Supported values are: 'none', 'low', 'medium', 'high', and 'xhigh'
         }
         if top_p is not None:
             body["top_p"] = top_p
