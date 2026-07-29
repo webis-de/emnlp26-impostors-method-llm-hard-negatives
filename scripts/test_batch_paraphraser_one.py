@@ -31,7 +31,8 @@ logger = logging.getLogger(__name__)
 
 N_DOCUMENTS = 100
 
-BATCH_ID = "batch_6a69dc56700c8190b88c1817c25f2f6a"
+BATCH_ID = "batch_6a69f9469dac81909c9b7d43dcca7627"
+    # "batch_6a69dc56700c8190b88c1817c25f2f6a"
            #"batch_6a69d38466f88190983e275fef950de4"
     #"batch_6a69b0a71c008190a9f74327908d87af"
 #"batch_6a68c7bf86108190958f69fdb6eeadc6"
@@ -112,10 +113,18 @@ def main() -> None:
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
+    # from openai import OpenAI
+    #
+    # client = OpenAI(base_url=CONFIG.OPENAI_URL, api_key=CONFIG.OPENAI_KEY, )
+    #
+    # batches = client.batches.list(limit=10)
+    #
+    # for batch in batches.data:
+    #     print(batch.id, batch.status, batch.created_at, batch.request_counts)
 
-    submitted_batch_id = submit_one()
-    collect_batch(batch_id=submitted_batch_id)
-
+    # submitted_batch_id = submit_one()
+    # collect_batch(batch_id=submitted_batch_id)
+    #
     # To only collect an existing job, comment out submit_one above and call:
     collect_batch(batch_id=BATCH_ID)
 

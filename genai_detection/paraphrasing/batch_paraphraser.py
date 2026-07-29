@@ -30,18 +30,26 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
+import torch
 from bson import ObjectId
+from nltk import sent_tokenize
 from openai import OpenAI
 from pymongo.collection import Collection
+from transformers import PegasusForConditionalGeneration, PegasusTokenizer
 
 from genai_detection.config import CONFIG
 from genai_detection.paraphrasing.batch_signatures import DSPyOneStepBatchSignature
+from genai_detection.paraphrasing.exceptions import MissingPrecomputedParaphrasesError
 from genai_detection.paraphrasing.one_step_paraphrasers import OneStepParaphraser
+import random
 
 logger = logging.getLogger(__name__)
 
+class PrecomputedParaphraser(OneStepParaphraser):
+    requires_precomputed_paraphrases = True
 
-class BatchParaphraser(OneStepParaphraser):
+
+class BatchParaphraser(PrecomputedParaphraser):
     """Collect, submit, and finalize one-step paraphrases using OpenAI batches."""
 
     ENDPOINT = "/v1/chat/completions"
@@ -71,6 +79,7 @@ class BatchParaphraser(OneStepParaphraser):
             if job_collection_name == CONFIG.MONGO_JOB_COLLECTION_NAME
             else self._ensure_job_collection(job_collection_name)
         )
+        self.pending_openai_requests: List[Dict[str, Any]] = []
         self.pending_requests: List[Dict[str, Any]] = []
         self.client = OpenAI(
             base_url=(
@@ -91,7 +100,7 @@ class BatchParaphraser(OneStepParaphraser):
         prompt: str = CONFIG.PROMPT,
         max_length: int = CONFIG.MAX_LENGTH,
     ) -> str:
-        raise NotImplementedError(
+        raise MissingPrecomputedParaphrasesError(
             "BatchParaphraser is asynchronous. Use add_text/add_texts, "
             "submit_batch, and collect_batch instead of paraphrase."
         )
@@ -134,22 +143,23 @@ class BatchParaphraser(OneStepParaphraser):
                 {
                     "custom_id": custom_id,
                     "text_id": ObjectId(original_text_id),
-                    "original_text": original_text,
                     "dataset_name": dataset_name,
                     "temperature": temperature,
                     "top_p": top_p,
                     "frequency_penalty": frequency_penalty,
                     "paraphrase_index": paraphrase_index,
                     "metadata": metadata or {},
-                    "request": {
-                        "custom_id": custom_id,
-                        "method": "POST",
-                        "url": self.endpoint,
-                        "body": body,
-                    },
                     "saved": False,
                     "saved_paraphrase_id": None,
                     "error": None,
+                }
+            )
+            self.pending_openai_requests.append(
+                {
+                    "custom_id": custom_id,
+                    "method": "POST",
+                    "url": self.endpoint,
+                    "body": body,
                 }
             )
             custom_ids.append(custom_id)
@@ -190,7 +200,7 @@ class BatchParaphraser(OneStepParaphraser):
         if self._has_pending_requests_already_active():
             return None
 
-        input_file_path = self._write_jsonl_input_file(self.pending_requests)
+        input_file_path = self._write_jsonl_input_file(self.pending_openai_requests)
         try:
             with input_file_path.open("rb") as input_file:
                 uploaded_file = self.client.files.create(
@@ -219,6 +229,7 @@ class BatchParaphraser(OneStepParaphraser):
             self.job_collection.insert_one(batch_doc)
             if clear_pending:
                 self.pending_requests = []
+                self.pending_openai_requests = []
             logger.info("Submitted OpenAI paraphrase batch %s.", batch.id)
             return batch.id
         finally:
@@ -264,11 +275,22 @@ class BatchParaphraser(OneStepParaphraser):
             custom_id = row.get("custom_id")
             request_state = self._request_state(batch_id=batch_id, custom_id=custom_id)
             if not request_state:
-                failed_count += 1
-                errors.append(
-                    {"custom_id": custom_id, "error": "No matching request state."}
-                )
-                continue
+                request_state = self._request_state_from_custom_id(custom_id)
+                if request_state:
+                    logger.warning(
+                        "Recovered request state for custom_id=%s from custom_id "
+                        "fallback because no MongoDB job request state exists.",
+                        custom_id,
+                    )
+                else:
+                    failed_count += 1
+                    errors.append(
+                        {
+                            "custom_id": custom_id,
+                            "error": "No matching request state and custom_id fallback failed.",
+                        }
+                    )
+                    continue
 
             response_error = row.get("error")
             if response_error:
@@ -302,6 +324,9 @@ class BatchParaphraser(OneStepParaphraser):
             {
                 "$set": {
                     "status": batch.status,
+                    "batch_id": batch_id,
+                    "model": self.model_id,
+                    "endpoint": self.endpoint,
                     "output_file_id": output_file_id,
                     "last_collected_at": self._now(),
                     "saved_count": self._count_saved_requests(batch_id),
@@ -309,6 +334,7 @@ class BatchParaphraser(OneStepParaphraser):
                     "collection_errors": errors,
                 }
             },
+            upsert=True,
         )
         return self._batch_summary(
             batch=batch,
@@ -420,10 +446,10 @@ class BatchParaphraser(OneStepParaphraser):
             suffix=".jsonl",
             delete=False,
         ) as tmp_file:
-            for request_state in requests:
+            for request in requests:
                 tmp_file.write(
                     json.dumps(
-                        request_state["request"],
+                        request,
                         ensure_ascii=True,
                         default=str,
                     )
@@ -505,6 +531,50 @@ class BatchParaphraser(OneStepParaphraser):
             return None
         return job["requests"][0]
 
+    def _request_state_from_custom_id(
+        self,
+        custom_id: Optional[str],
+    ) -> Optional[Dict[str, Any]]:
+        if not custom_id:
+            return None
+        prefix = "naive-paraphrase-"
+        if not custom_id.startswith(prefix):
+            return None
+
+        parts = custom_id[len(prefix) :].rsplit("-", 2)
+        if len(parts) != 3:
+            return None
+        text_id, paraphrase_index, _request_index = parts
+        try:
+            text_id = ObjectId(text_id)
+            paraphrase_index = int(paraphrase_index)
+        except Exception:
+            return None
+
+        doc = self.mongoDB.original_collection.find_one(
+            {"_id": text_id},
+            {"dataset_name": 1},
+        )
+        if not doc:
+            return None
+
+        return {
+            "custom_id": custom_id,
+            "text_id": text_id,
+            "dataset_name": doc.get("dataset_name"),
+            "temperature": CONFIG.TEMPERATURE,
+            "top_p": None,
+            "frequency_penalty": None,
+            "paraphrase_index": paraphrase_index,
+            "metadata": {
+                "recovered_from_custom_id": True,
+                "missing_job_collection_state": True,
+            },
+            "saved": False,
+            "saved_paraphrase_id": None,
+            "error": None,
+        }
+
     def _extract_paraphrase(self, response_row: Dict[str, Any]) -> str:
         response_body = response_row.get("response", {}).get("body", {})
         return DSPyOneStepBatchSignature.parse_chat_completion_body(response_body)
@@ -521,6 +591,7 @@ class BatchParaphraser(OneStepParaphraser):
         response_body = response_row.get("response", {}).get("body", {})
         usage = response_body.get("usage")
         job_state = self.get_batch_job_state(batch_id) or {}
+        original_text = self._get_original_text_for_request(request_state)
         extracted_info = {
             "batch_id": batch_id,
             "input_file_id": job_state.get("input_file_id"),
@@ -539,7 +610,7 @@ class BatchParaphraser(OneStepParaphraser):
             },
         }
         self.save_paraphrase_in_mongodb(
-            original_text=request_state["original_text"],
+            original_text=original_text,
             original_text_id=request_state["text_id"],
             paraphrased_text=paraphrase,
             extracted_info=extracted_info,
@@ -556,7 +627,23 @@ class BatchParaphraser(OneStepParaphraser):
             sort=[("_id", -1)],
         )
         saved_id = saved_doc["_id"] if saved_doc else None
-        self.job_collection.update_one(
+        self._mark_request_saved(
+            batch_id=batch_id,
+            custom_id=custom_id,
+            request_state=request_state,
+            saved_id=saved_id,
+            response_body=response_body,
+        )
+
+    def _mark_request_saved(
+        self,
+        batch_id: str,
+        custom_id: str,
+        request_state: Dict[str, Any],
+        saved_id: Optional[ObjectId],
+        response_body: Dict[str, Any],
+    ) -> None:
+        update_result = self.job_collection.update_one(
             {"batch_id": batch_id, "requests.custom_id": custom_id},
             {
                 "$set": {
@@ -567,6 +654,43 @@ class BatchParaphraser(OneStepParaphraser):
                 }
             },
         )
+        if update_result.matched_count:
+            return
+
+        recovered_request_state = {
+            **request_state,
+            "saved": True,
+            "saved_at": self._now(),
+            "saved_paraphrase_id": saved_id,
+            "response_metadata": self._json_safe(response_body),
+        }
+        self.job_collection.update_one(
+            {"batch_id": batch_id},
+            {
+                "$setOnInsert": {
+                    "batch_id": batch_id,
+                    "model": self.model_id,
+                    "endpoint": self.endpoint,
+                    "completion_window": self.completion_window,
+                    "created_at": self._now(),
+                    "submitted_at": None,
+                    "request_count": 0,
+                },
+                "$push": {"requests": recovered_request_state},
+            },
+            upsert=True,
+        )
+
+    def _get_original_text_for_request(self, request_state: Dict[str, Any]) -> str:
+        doc = self.mongoDB.original_collection.find_one(
+            {"_id": ObjectId(request_state["text_id"])},
+            {"text": 1},
+        )
+        if not doc or not doc.get("text"):
+            raise ValueError(
+                f"Original text not found for text_id={request_state['text_id']}"
+            )
+        return doc["text"]
 
     def _mark_request_failed(
         self, batch_id: str, custom_id: str, error: Any
@@ -663,3 +787,156 @@ class BatchParaphraser(OneStepParaphraser):
 
     def _now(self) -> str:
         return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+
+
+class FinetunedParaphraser(PrecomputedParaphraser):
+    """
+    Local seq2seq paraphraser backed by a fine-tuned Pegasus model.
+
+    The default model, ``tuner007/pegasus_paraphrase``, works best on short
+    sentence-level inputs. Longer texts are split into sentence windows and each
+    window is paraphrased independently. To avoid repeated identical paraphrases,
+    generation samples multiple candidates per window and returns one complete
+    sampled variant.
+
+    References
+    ==========
+    - Pegasus paraphrase model: https://huggingface.co/tuner007/pegasus_paraphrase
+    """
+
+    def __init__(
+        self,
+        model_id: str = CONFIG.HUGGINGFACE_FINETUNED_MODEL,
+        sent_interval: int = 1,
+        device: Optional[str] = None,
+    ):
+        self.model_id = model_id
+        self.sent_interval = sent_interval
+
+        if device is not None:
+            self.device = torch.device(device)
+        elif torch.cuda.is_available() and torch.version.cuda is not None:
+            self.device = torch.device("cuda")
+        elif torch.backends.mps.is_available():
+            self.device = torch.device("mps")
+        else:
+            self.device = torch.device("cpu")
+
+        logging.info("Using %s Paraphraser on %s", self.model_id, self.device)
+        self.tokenizer = PegasusTokenizer.from_pretrained(self.model_id)
+
+        dtype = torch.float16 if self.device.type == "cuda" else torch.float32
+
+        self.model = PegasusForConditionalGeneration.from_pretrained(self.model_id, torch_dtype=dtype,
+                low_cpu_mem_usage=True, ).to(self.device)
+        self.max_model_input_length = min(
+            getattr(self.tokenizer, "model_max_length", 1024),
+            getattr(self.model.config, "max_position_embeddings", 1024),
+        )
+        self.max_model_output_length = getattr(
+            self.model.config, "max_position_embeddings", self.max_model_input_length
+        )
+
+        self.model.eval()
+        logging.info("Loaded %s paraphraser model", self.model_id)
+
+    def paraphrase(
+        self,
+        text: str,
+        prompt: str = "",
+        max_length: int = 128,#CONFIG.MAX_LENGTH,
+        lexical_diversity: Optional[int] = None,
+        order_diversity: Optional[int] = None,
+        sent_interval: Optional[int] = 1,
+        do_sample: bool = True,
+        temperature: float = 1.1,
+        top_p: float = 0.98,
+        top_k: Optional[int] = 120,
+        num_return_sequences: int = 8,
+    ) -> str:
+        """
+        Generate one sampled paraphrase with the local Pegasus paraphraser.
+
+        :param text: The input text to be paraphrased.
+        :param prompt: Accepted for interface compatibility, but ignored because
+            Pegasus expects plain source text rather than chat instructions.
+        :param max_length: Maximum number of output tokens per generation step.
+        :param lexical_diversity: Accepted for compatibility with the old DIPPER
+            interface, but unused by Pegasus.
+        :param order_diversity: Accepted for compatibility with the old DIPPER
+            interface, but unused by Pegasus.
+        :param sent_interval: Number of sentences paraphrased per generation step.
+        :param do_sample: Whether to sample during generation.
+        :param temperature: Sampling temperature.
+        :param top_p: Nucleus sampling value.
+        :param top_k: Top-k sampling value.
+        :param num_return_sequences: Number of sampled candidates per sentence window.
+        :return: A paraphrased version of the input text.
+        """
+        interval = self.sent_interval if sent_interval is None else sent_interval
+        if interval < 1:
+            raise ValueError("sent_interval must be at least 1.")
+
+        sentences = sent_tokenize(text)
+
+        if not sentences:
+            return ""
+
+        paraphrase_variants = ["" for _ in range(max(num_return_sequences, 1))]
+        input_max_length = min(max_length, self.max_model_input_length)
+        output_max_length = min(max_length, self.max_model_output_length)
+
+        for sent_idx in range(0, len(sentences), interval):
+            # Process short sentence windows because the Pegasus paraphrase model is
+            # trained for sentence-level inputs and has a limited position budget.
+            sentence_window = " ".join(sentences[sent_idx: sent_idx + interval])
+
+            # Pegasus expects ordinary text, not chat instructions or DIPPER control tokens.
+            input_text = sentence_window
+
+            # Truncate to the model's real input limit to avoid CUDA embedding
+            # asserts when a sentence window is longer than Pegasus can encode.
+            tokenized = self.tokenizer(input_text, return_tensors="pt", truncation=True, padding=True,
+                    max_length=input_max_length, ).to(self.device)
+
+            # Sample multiple candidates per window and discourage copied or
+            # repetitive wording so repeated calls produce more diverse outputs.
+            generation_args = {
+                    "max_length": output_max_length,
+                    "do_sample": do_sample,
+                    "num_return_sequences": max(num_return_sequences, 1),
+                    "repetition_penalty": 1.15,
+                    "no_repeat_ngram_size": 3,
+                    }
+
+            if do_sample:
+                generation_args["temperature"] = temperature
+                generation_args["top_p"] = top_p
+
+                if top_k is not None:
+                    generation_args["top_k"] = top_k
+
+            # inference_mode disables gradient bookkeeping and keeps GPU memory
+            # usage lower during generation.
+            with torch.inference_mode():
+                generated = self.model.generate(**tokenized, **generation_args, )
+
+            # Decode all sampled sequences; they are stitched by candidate index
+            # below to keep full-text variants internally consistent.
+            decoded = self.tokenizer.batch_decode(
+                generated,
+                skip_special_tokens=True,
+                clean_up_tokenization_spaces=True,
+            )
+
+            # Keep candidate index stable across windows so each variant is one
+            # coherent full-text paraphrase, then randomly choose among variants.
+            for variant_idx, candidate in enumerate(decoded):
+                candidate = candidate.strip()
+                paraphrase_variants[variant_idx] = (
+                    f"{paraphrase_variants[variant_idx]} {candidate}".strip()
+                )
+
+        candidates = [candidate for candidate in paraphrase_variants if candidate]
+        return random.choice(candidates) if candidates else ""
