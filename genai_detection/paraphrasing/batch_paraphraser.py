@@ -102,7 +102,6 @@ class BatchParaphraser(OneStepParaphraser):
         text: Optional[str] = None,
         dataset_name: Optional[str] = None,
         temperature: float = CONFIG.TEMPERATURE,
-        max_tokens: int = CONFIG.MAX_LENGTH,
         top_p: Optional[float] = None,
         frequency_penalty: Optional[float] = None,
         metadata: Optional[Dict[str, Any]] = None,
@@ -128,7 +127,6 @@ class BatchParaphraser(OneStepParaphraser):
             body = self._build_request_body(
                 text=original_text,
                 temperature=temperature,
-                max_tokens=max_tokens,
                 top_p=top_p,
                 frequency_penalty=frequency_penalty,
             )
@@ -139,7 +137,6 @@ class BatchParaphraser(OneStepParaphraser):
                     "original_text": original_text,
                     "dataset_name": dataset_name,
                     "temperature": temperature,
-                    "max_tokens": max_tokens,
                     "top_p": top_p,
                     "frequency_penalty": frequency_penalty,
                     "paraphrase_index": paraphrase_index,
@@ -163,7 +160,6 @@ class BatchParaphraser(OneStepParaphraser):
         text_ids: Iterable[ObjectId | str],
         dataset_name: Optional[str] = None,
         temperature: float = CONFIG.TEMPERATURE,
-        max_tokens: int = CONFIG.MAX_LENGTH,
         top_p: Optional[float] = None,
         frequency_penalty: Optional[float] = None,
         metadata: Optional[Dict[str, Any]] = None,
@@ -176,7 +172,6 @@ class BatchParaphraser(OneStepParaphraser):
                     text_id=text_id,
                     dataset_name=dataset_name,
                     temperature=temperature,
-                    max_tokens=max_tokens,
                     top_p=top_p,
                     frequency_penalty=frequency_penalty,
                     metadata=metadata,
@@ -249,9 +244,15 @@ class BatchParaphraser(OneStepParaphraser):
 
         output_file_id = getattr(batch, "output_file_id", None)
         if not output_file_id:
+            error_rows = self._collect_error_file_if_present(
+                batch_id=batch_id,
+                batch=batch,
+            )
             return self._batch_summary(
                 batch=batch,
                 message="Batch completed but no output_file_id is available.",
+                failed_count=len(error_rows),
+                errors=error_rows[:10],
             )
 
         result_rows = self._download_jsonl_file(output_file_id)
@@ -378,7 +379,6 @@ class BatchParaphraser(OneStepParaphraser):
         self,
         text: str,
         temperature: float,
-        max_tokens: int,
         top_p: Optional[float],
         frequency_penalty: Optional[float],
     ) -> Dict[str, Any]:
@@ -396,7 +396,6 @@ class BatchParaphraser(OneStepParaphraser):
                 },
             ],
             "temperature": 1.0 if is_reasoning_model else temperature,
-            "max_tokens": 16000 if is_reasoning_model else max_tokens,
             "response_format": DSPyOneStepBatchSignature.response_format(),
             "reasoning_effort": "minimal",
         }
@@ -535,7 +534,6 @@ class BatchParaphraser(OneStepParaphraser):
             "openai_usage": usage,
             "decoding": {
                 "temperature": request_state.get("temperature"),
-                "max_tokens": request_state.get("max_tokens"),
                 "top_p": request_state.get("top_p"),
                 "frequency_penalty": request_state.get("frequency_penalty"),
             },
@@ -583,10 +581,14 @@ class BatchParaphraser(OneStepParaphraser):
             },
         )
 
-    def _collect_error_file_if_present(self, batch_id: str, batch: Any) -> None:
+    def _collect_error_file_if_present(
+        self,
+        batch_id: str,
+        batch: Any,
+    ) -> List[Dict[str, Any]]:
         error_file_id = getattr(batch, "error_file_id", None)
         if not error_file_id:
-            return
+            return []
         try:
             error_rows = self._download_jsonl_file(error_file_id)
         except Exception as e:
@@ -601,6 +603,7 @@ class BatchParaphraser(OneStepParaphraser):
                 }
             },
         )
+        return error_rows
 
     def _count_saved_requests(self, batch_id: str) -> int:
         job = self.job_collection.find_one({"batch_id": batch_id}, {"requests": 1})
