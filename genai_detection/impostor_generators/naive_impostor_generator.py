@@ -27,7 +27,7 @@ from genai_detection.paraphrasing.paraphraser import Paraphraser
 
 class NaiveImpostorGenerator(LLMImpostorGenerator):
     def __init__(
-        self, n_impostors: int, top_n_freq_words:int, paraphrasers: Optional[List[Paraphraser]] = None,  use_dipper:
+        self, n_impostors: int, top_n_freq_words:int, paraphrasers: Optional[List[Paraphraser]] = None,  use_finetuned:
             bool = True
     ):
         super().__init__(n_impostors=n_impostors, top_n_freq_words=top_n_freq_words)
@@ -57,7 +57,7 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
                 # self.saiai_paraphraser_gpt,
                 # self.saiai_paraphraser_qwen,  # explanations in the output, separated by </think>
             ]
-            if use_dipper:
+            if use_finetuned:
                 self.finetuned_paraphraser = FinetunedParaphraser()
                 self.paraphrasers.append(self.finetuned_paraphraser)
         else:
