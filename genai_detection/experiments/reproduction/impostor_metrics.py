@@ -18,6 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 from itertools import zip_longest
 from typing import Dict, List, Iterable, Tuple
 
+import numpy as np
 import pandas as pd
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 
@@ -143,6 +144,19 @@ def compute_metrics_for_thresholds(
     """
     rows = []
     assert len(ground_truth) == len(scores), f"Length of ground_truth and scores do not match: gt {len(ground_truth)}, scores {len(scores)}"
+    valid_pairs = [
+        (gt, score)
+        for gt, score in zip(ground_truth, scores)
+        if score is not None and np.isfinite(float(score))
+    ]
+    if len(valid_pairs) != len(scores):
+        logger.warning(
+            "Filtered %d NaN/inf scores before metric computation.",
+            len(scores) - len(valid_pairs),
+        )
+    if not valid_pairs:
+        return pd.DataFrame()
+    ground_truth, scores = map(list, zip(*valid_pairs))
 
     for t in thresholds:
         binary_preds = [1 if s >= t else 0 for s in scores]
