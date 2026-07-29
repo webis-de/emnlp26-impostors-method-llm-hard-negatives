@@ -20,46 +20,26 @@ from bson import ObjectId
 
 from genai_detection.config import CONFIG
 from genai_detection.impostor_generators.ImpostorGenerator import LLMImpostorGenerator
-from genai_detection.paraphrasing.one_step_paraphrasers import (FinetunedParaphraser, SAIAParaphraser,
-                                                                OneStepParaphraser, )
+from genai_detection.paraphrasing.one_step_paraphrasers import (OllamaParaphraser,
+                                                                SAIAParaphraser, OneStepParaphraser,
+                                                                T5ChatGPTParaphraser, T5GooglePAWSParaphraser, )
+from genai_detection.paraphrasing.batch_paraphraser import BatchParaphraser, FinetunedParaphraser
+from genai_detection.paraphrasing.exceptions import MissingPrecomputedParaphrasesError
 from genai_detection.paraphrasing.paraphraser import Paraphraser
 
 
 class NaiveImpostorGenerator(LLMImpostorGenerator):
     def __init__(
-        self, n_impostors: int, top_n_freq_words:int, paraphrasers: Optional[List[Paraphraser]] = None,  use_finetuned:
-            bool = True
+        self,
+        n_impostors: int,
+        top_n_freq_words: int,
+        paraphrasers: Optional[List[Paraphraser]] = None,
+        llm: Optional[str] = None,
     ):
         super().__init__(n_impostors=n_impostors, top_n_freq_words=top_n_freq_words)
+        self.llm = llm
         if paraphrasers is None:
-            # self.t5_chatgpt_paraphraser = T5ChatGPTParaphraser()
-            # self.t5_google_paws_paraphraser = T5GooglePAWSParaphraser()
-            # self.ollama_paraphraser = OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL)
-
-            # self.saiai_paraphraser_llama = SAIAParaphraser(
-            #     model_id="meta-llama-3.1-8b-instruct"
-            # )
-            # self.saiai_paraphraser_mistral = SAIAParaphraser(
-            #     model_id="mistral-large-instruct"
-            # )
-            # self.saiai_paraphraser_gpt = SAIAParaphraser(
-            #     model_id="openai-gpt-oss-120b"
-            # )
-            # self.saiai_paraphraser_qwen = SAIAParaphraser(model_id="qwen3-32b")
-
-            self.paraphrasers = [
-                # self.t5_chatgpt_paraphraser,
-                # self.t5_google_paws_paraphraser,
-                # self.ollama_paraphraser,
-
-                # self.saiai_paraphraser_llama,
-                # self.saiai_paraphraser_mistral,
-                # self.saiai_paraphraser_gpt,
-                # self.saiai_paraphraser_qwen,  # explanations in the output, separated by </think>
-            ]
-            if use_finetuned:
-                self.finetuned_paraphraser = FinetunedParaphraser()
-                self.paraphrasers.append(self.finetuned_paraphraser)
+            self.paraphrasers = self._build_default_paraphrasers(llm=llm)
         else:
             assert all(
                 isinstance(p, Paraphraser) for p in paraphrasers
@@ -68,6 +48,10 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
                 len(paraphrasers) > 0
             ), "At least one paraphraser must be provided."
             self.paraphrasers = paraphrasers
+        if not self.paraphrasers:
+            raise ValueError("NaiveImpostorGenerator requires at least one paraphraser.")
+        self.current_paraphraser: Optional[Paraphraser] = None
+        self.last_pair_paraphraser_model_id: Optional[str] = None
         self.prompt_bank = [
             CONFIG.PROMPT,
             "Rewrite the text to preserve meaning but restructure sentences. Avoid copying original phrasing. Output only the paraphrase.",
@@ -85,6 +69,35 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
         self.max_token_jaccard = 0.65
         self.max_char_ngram_overlap = 0.75
         self.char_ngram_n = 4
+
+    def _build_default_paraphrasers(self, llm: Optional[str]) -> List[Paraphraser]:
+        paraphrasers = []
+        if llm is not None:
+            paraphrasers = [self._build_paraphraser_for_llm(llm)]
+        if paraphrasers == []:
+            paraphrasers = [
+                T5ChatGPTParaphraser(),
+                T5GooglePAWSParaphraser(),
+                OllamaParaphraser(model_id=CONFIG.OLLAMA_MODEL),
+                SAIAParaphraser(model_id="meta-llama-3.1-8b-instruct"),
+                SAIAParaphraser(model_id="mistral-large-instruct"),
+                SAIAParaphraser(model_id="openai-gpt-oss-120b"),
+                SAIAParaphraser(model_id="qwen3-32b"),
+            ]
+        return paraphrasers
+
+    def _build_paraphraser_for_llm(self, llm: str) -> Paraphraser:
+        if llm == CONFIG.HUGGINGFACE_FINETUNED_MODEL:
+            return FinetunedParaphraser(model_id=llm)
+        if llm == CONFIG.BATCH_OPENAI_MODEL:
+            return BatchParaphraser(model_id=llm)
+        if llm == "humarin/chatgpt_paraphraser_on_T5_base":
+            return T5ChatGPTParaphraser()
+        if llm == "Vamsi/T5_Paraphrase_Paws":
+            return T5GooglePAWSParaphraser()
+        if llm == CONFIG.OLLAMA_MODEL:
+            return OllamaParaphraser(model_id=llm)
+        return []
 
     @staticmethod
     def _tokenize(text: str) -> List[str]:
@@ -180,11 +193,20 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
         if text is None:
             text = self.mongoDB.get_text_or_id_from_orginal_collection(text_id=text_id, text=text)
 
+        paraphraser = self.current_paraphraser or random.choice(self.paraphrasers)
+        paraphraser_model_id = getattr(paraphraser, "model_id", None)
+        search_args = {"text_id": text_id}
+        if paraphraser_model_id is not None:
+            search_args["llm"] = paraphraser_model_id
         impostors, _ = self.obtain_existing_paraphrases(
             collection=self.mongoDB.naive_paraphrase_collection,
-            search_args={"text_id": text_id},
+            search_args=search_args,
         )
-        logging.info("Obtained {} existing impostors from naive paraphrases mongodb collection".format(len(impostors)))
+        logging.info(
+            "Obtained %d existing impostors from naive paraphrases mongodb collection for llm=%s",
+            len(impostors),
+            paraphraser_model_id,
+        )
 
         n_imp_to_generate -= len(impostors)
         if n_imp_to_generate <= 0:
@@ -194,6 +216,12 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
                 )
             )
             return impostors[: self.n_impostors]
+        if getattr(paraphraser, "requires_precomputed_paraphrases", False):
+            raise MissingPrecomputedParaphrasesError(
+                f"{paraphraser.__class__.__name__} requires precomputed naive "
+                f"paraphrases for text_id={text_id}, llm={paraphraser_model_id!r}. "
+                f"Found {len(impostors)}, need {self.n_impostors}."
+            )
 
         if isinstance(text, tuple):
             text = text[0]
@@ -204,9 +232,13 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
         seen = {i.lower() for i in impostors}
         max_attempts = max(n_imp_to_generate * self.max_candidates_per_impostor, 1)
         attempts = 0
-        logging.info("Start generating {} impostors with {} attempts.".format(n_imp_to_generate,max_attempts))
+        logging.info(
+            "Start generating %d impostors with %d attempts using paraphraser %s.",
+            n_imp_to_generate,
+            max_attempts,
+            paraphraser_model_id,
+        )
         while len(impostors) < self.n_impostors and attempts < max_attempts:
-            paraphraser = random.choice(self.paraphrasers)
             prompt = random.choice(self.prompt_bank)
             decoding = random.choice(self.decoding_param_bank)
             try:
@@ -254,3 +286,17 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
             attempts += 1
 
         return impostors
+
+    def select_paraphraser_for_pair(self) -> Paraphraser:
+        self.current_paraphraser = random.choice(self.paraphrasers)
+        self.last_pair_paraphraser_model_id = getattr(
+            self.current_paraphraser, "model_id", None
+        )
+        logging.info(
+            "Selected paraphraser %s for one_step_llm impostor pair generation.",
+            self.last_pair_paraphraser_model_id or self.current_paraphraser,
+        )
+        return self.current_paraphraser
+
+    def clear_selected_paraphraser(self) -> None:
+        self.current_paraphraser = None
