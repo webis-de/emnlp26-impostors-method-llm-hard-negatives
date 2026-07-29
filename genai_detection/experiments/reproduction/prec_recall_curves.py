@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import datetime
+import hashlib
 import json
 import logging
 import os
@@ -46,6 +47,8 @@ from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 logger = logging.getLogger(__name__)
+
+ONE_STEP_LLM_KEY_PREFIX = "one_step_llm:"
 
 # ---------------------------------------------------------------------
 # Paths
@@ -277,6 +280,8 @@ def compute_prec_recall_f1_acc_dict(
             impostor_technique=technique,
             n_impostors=50,
             dataset_name=dataset_name,
+            llm=CONFIG.HUGGINGFACE_FINETUNED_MODEL if technique == "one_step_llm" else None,
+            # llm=CONFIG.BATCH_OPENAI_MODEL if technique == "one_step_llm" else None,     
         )
         for technique in imp_gen_techniques
     }
@@ -353,6 +358,7 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
     batch_size: int = 250,
     include_baselines: bool = True,
     save_artifacts: bool = True,
+    one_step_llm_label_translations: Optional[Dict[str, str]] = None,
 ) -> Dict[str, pd.DataFrame]:
     """
     Same as compute_prec_recall_f1_acc_dict, but loads precomputed
@@ -378,6 +384,49 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
     n_pairs_per_technique: dict[str, int] = defaultdict(int)
 
     for technique in imp_gen_techniques:
+        if technique == "one_step_llm" and one_step_llm_label_translations is not None:
+            scores_by_llm = loader.load_one_step_llm_scores_by_llm(
+                dataset_name=dataset_name,
+                n_impostors=10,
+                n_potential_impostors=n_potential_impostors,
+                rounds=rounds,
+            )
+            for llm, scores_by_pair in scores_by_llm.items():
+                result_key = f"{ONE_STEP_LLM_KEY_PREFIX}{llm}" if llm else technique
+                n_pairs_per_technique[result_key] = len(scores_by_pair)
+                if not scores_by_pair:
+                    logger.warning(
+                        "No scores for one_step_llm llm=%s found in MongoDB.",
+                        llm,
+                    )
+                    continue
+
+                ordered_pairs = list(scores_by_pair.keys())
+                gt_by_pair = loader.load_ground_truth(ordered_pairs, dataset_name)
+                ordered_pairs = [pair for pair in ordered_pairs if pair in gt_by_pair]
+                if not ordered_pairs:
+                    logger.warning(
+                        "No ground-truth found for one_step_llm llm=%s (dataset=%s).",
+                        llm,
+                        dataset_name,
+                    )
+                    continue
+
+                ground_truth = [gt_by_pair[pair] for pair in ordered_pairs]
+                scores = [scores_by_pair[pair] for pair in ordered_pairs]
+                results[result_key] = compute_metrics_for_thresholds(
+                    ground_truth=ground_truth,
+                    scores=scores,
+                    thresholds=CONFIG.THRESHOLDS,
+                )
+                logger.info(
+                    "Results for %s (pairs=%d): %s",
+                    result_key,
+                    len(scores),
+                    results[result_key],
+                )
+            continue
+
         scores_by_pair = loader.load_scores(
             method_name=technique,
             dataset_name=dataset_name,
@@ -479,6 +528,38 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
 # Plotting
 # ---------------------------------------------------------------------
 
+def _one_step_llm_from_result_key(key: str) -> Optional[str]:
+    if key.startswith(ONE_STEP_LLM_KEY_PREFIX):
+        return key[len(ONE_STEP_LLM_KEY_PREFIX):]
+    return None
+
+
+def _label_for_result_key(
+    key: str,
+    label_translations: Optional[Dict[str, str]],
+    one_step_llm_label_translations: Optional[Dict[str, str]],
+) -> str:
+    llm = _one_step_llm_from_result_key(key)
+    if llm is not None:
+        if one_step_llm_label_translations and llm in one_step_llm_label_translations:
+            return one_step_llm_label_translations[llm]
+        return CONFIG.LABEL_TRANSLATIONS["one_step_llm"]
+    if label_translations is None:
+        return key
+    return label_translations.get(key, key)
+
+
+def _color_for_result_key(key: str) -> str:
+    llm = _one_step_llm_from_result_key(key)
+    if llm is None:
+        return CONFIG.LABEL_COLORS.get(key, "black")
+    configured_color = CONFIG.ONE_STEP_LLM_LABEL_COLORS.get(llm)
+    if configured_color:
+        return configured_color
+    palette = plt.get_cmap("tab20").colors
+    color_index = int(hashlib.md5(llm.encode("utf-8")).hexdigest(), 16) % len(palette)
+    return palette[color_index]
+
 def plot_precision_recall_curve(
     results: Dict[str, pd.DataFrame],
     dataset_name: str,
@@ -486,6 +567,7 @@ def plot_precision_recall_curve(
     title: str = None,
     filename_extra: str= None,
     label_translations: Optional[Dict[str, str]] = CONFIG.LABEL_TRANSLATIONS,
+    one_step_llm_label_translations: Optional[Dict[str, str]] = None,
 ):
     """
     Precision–Recall curves (Figures 4a, 4b in Koppel et al., 2014).
@@ -497,8 +579,12 @@ def plot_precision_recall_curve(
         )
 
         for key, df in results.items():
-            label = label_translations.get(key, key)
-            color = CONFIG.LABEL_COLORS.get(key, "black")
+            label = _label_for_result_key(
+                key=key,
+                label_translations=label_translations,
+                one_step_llm_label_translations=one_step_llm_label_translations,
+            )
+            color = _color_for_result_key(key)
             if "precision" in df.columns and "recall" in df.columns:
                 precisions = df["precision"].apply(
                     lambda x: x[positive_class_id]
@@ -601,7 +687,11 @@ def _extract_best_pr_points_per_impostor(
 
                 rows.append({
                     "dataset_name": dataset_name.replace("_", " ").capitalize(),
-                    "impostor_generation": CONFIG.LABEL_TRANSLATIONS[impostor_method],
+                    "impostor_generation": _label_for_result_key(
+                        key=impostor_method,
+                        label_translations=CONFIG.LABEL_TRANSLATIONS,
+                        one_step_llm_label_translations=CONFIG.ONE_STEP_LLM_LABEL_TRANSLATIONS,
+                    ),
                     "class": class_name,
 
                     "n_test_samples": 50,   # TODO: adjust
@@ -623,8 +713,23 @@ def _extract_best_pr_points_per_impostor(
 
     return pd.DataFrame(rows)
 
-def run_prec_recall_curves(dataset_name:str, imp_gen_techniques:List[str], compute_score_fn=compute_prec_recall_f1_acc_dict):
-    results_dict = compute_score_fn(dataset_name=dataset_name, imp_gen_techniques=imp_gen_techniques)
+def run_prec_recall_curves(
+    dataset_name: str,
+    imp_gen_techniques: List[str],
+    compute_score_fn=compute_prec_recall_f1_acc_dict,
+    one_step_llm_label_translations: Optional[Dict[str, str]] = None,
+):
+    compute_kwargs = {}
+    if (
+        compute_score_fn is compute_prec_recall_f1_acc_dict_on_existing_impostor_scores
+        and one_step_llm_label_translations is not None
+    ):
+        compute_kwargs["one_step_llm_label_translations"] = one_step_llm_label_translations
+    results_dict = compute_score_fn(
+        dataset_name=dataset_name,
+        imp_gen_techniques=imp_gen_techniques,
+        **compute_kwargs,
+    )
     logger.info("Obtained scores for approaches %s", results_dict.keys())
 
     # results_dict: {approach_name: DataFrame}
@@ -672,4 +777,8 @@ def run_prec_recall_curves(dataset_name:str, imp_gen_techniques:List[str], compu
         LOCAL_SAVE_PATH / "best_precision_recall_points.csv",
     )
 
-    plot_precision_recall_curve(results=results_dict, dataset_name=dataset_name)
+    plot_precision_recall_curve(
+        results=results_dict,
+        dataset_name=dataset_name,
+        one_step_llm_label_translations=one_step_llm_label_translations,
+    )
