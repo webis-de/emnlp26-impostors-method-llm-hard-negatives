@@ -76,6 +76,7 @@ class BaseConfig:
     OPENAI_MODEL = "openai/gpt-5-nano-2025-08-07"  # specify snapshot for consistency: https://platform.openai.com/docs/models/gpt-5-nano (30.10.2025)
     # too expensive without batching:
     BATCH_OPENAI_MODEL =  "gpt-5.4-nano-2026-03-17"     # https://developers.openai.com/api/docs/models/gpt-5.4-nano
+    HUGGINGFACE_FINETUNED_MODEL = "tuner007/pegasus_paraphrase"
     PROMPT = "Paraphrase the text above without changing its meaning. Use different words and vary the sentence structure while maintaining a consistent tone. Your paraphrase should be three times as long than the original. Output only the paraphrased sentence, with NO explanations or extra text."
 
     MONGO_DATABASE = "impostors"  # initial db (!= collection in db)
@@ -133,6 +134,11 @@ class BaseConfig:
         "homotopy": "Gutierrez et al., 2015",
     }
 
+    ONE_STEP_LLM_LABEL_TRANSLATIONS = {
+        "gpt-5.4-nano-2026-03-17": "GPT 5.4 Nano",
+        "tuner007/pegasus_paraphrase": "Pegasus",
+    }
+
     # Fixed colors per label (matplotlib-compatible)
     LABEL_COLORS = {
         "in_domain": "#1f77b4",  # blue
@@ -154,6 +160,11 @@ class BaseConfig:
         "std_impostor": "#98df8a",  # light green
         "bdi": "#c5b0d5",  # light purple
         "homotopy": "#ff9896",  # light red
+    }
+
+    ONE_STEP_LLM_LABEL_COLORS = {
+        "gpt-5.4-nano-2026-03-17": "#005f73", # darker blue
+        "tuner007/pegasus_paraphrase": "#005f78", # darker purple
     }
 
     SCORE_TRANSLATIONS = {
