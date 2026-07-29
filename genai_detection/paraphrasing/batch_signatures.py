@@ -34,7 +34,7 @@ class DSPyOneStepBatchSignature:
             "You are a paraphrasing assistant implementing:\n"
             "text: original text to paraphrase.\n"
             "paraphrase: only the final paraphrased text, preserving meaning "
-            "and tone while using different wording and sentence structure.\n"
+            "and tone while using different wording and sentence structure. Avoid copying original phrasing.\n"
             "Return JSON that matches the provided schema."
         )
 
@@ -62,7 +62,7 @@ class DSPyOneStepBatchSignature:
                             "description": (
                                 "A faithful paraphrase of the input text using "
                                 "different wording and sentence structure while "
-                                "preserving meaning and tone."
+                                "preserving meaning and tone. Avoid copying original phrasing."
                             ),
                         }
                     },
