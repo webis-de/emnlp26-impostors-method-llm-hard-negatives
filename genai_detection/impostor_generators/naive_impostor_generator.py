@@ -58,8 +58,8 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
                 # self.saiai_paraphraser_qwen,  # explanations in the output, separated by </think>
             ]
             if use_dipper:
-                self.dipper_paraphraser = FinetunedParaphraser()
-                self.paraphrasers.append(self.dipper_paraphraser)
+                self.finetuned_paraphraser = FinetunedParaphraser()
+                self.paraphrasers.append(self.finetuned_paraphraser)
         else:
             assert all(
                 isinstance(p, Paraphraser) for p in paraphrasers
