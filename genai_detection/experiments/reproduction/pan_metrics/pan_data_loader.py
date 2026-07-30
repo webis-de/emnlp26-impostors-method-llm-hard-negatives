@@ -139,16 +139,17 @@ class PANDataLoader:
         self,
         dataset_name: str,
         *,
-        n_impostors: int = 10,
+        n_impostors: int | None = None,
         n_potential_impostors: int | None = None,
         rounds: int = 100,
         feature_name: str = "scores_over_different_rounds",
     ) -> Dict[str | None, Dict[Tuple[ObjectId, ObjectId], float]]:
         query = {
             "impostor_generation_technique": "one_step_llm",
-            "n_impostors": n_impostors,
             "dataset_name": dataset_name,
         }
+        if n_impostors is not None:
+            query["n_impostors"] = n_impostors
         if n_potential_impostors is not None:
             query["n_potential_impostors"] = n_potential_impostors
 

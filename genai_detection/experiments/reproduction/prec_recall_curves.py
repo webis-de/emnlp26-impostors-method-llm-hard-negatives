@@ -280,8 +280,8 @@ def compute_prec_recall_f1_acc_dict(
             impostor_technique=technique,
             n_impostors=50,
             dataset_name=dataset_name,
-            llm=CONFIG.HUGGINGFACE_FINETUNED_MODEL if technique == "one_step_llm" else None,
-            # llm=CONFIG.BATCH_OPENAI_MODEL if technique == "one_step_llm" else None,     
+            # llm=CONFIG.HUGGINGFACE_FINETUNED_MODEL if technique == "one_step_llm" else None,
+            llm=CONFIG.BATCH_OPENAI_MODEL if technique == "one_step_llm" else None,
         )
         for technique in imp_gen_techniques
     }
@@ -387,7 +387,6 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
         if technique == "one_step_llm" and one_step_llm_label_translations is not None:
             scores_by_llm = loader.load_one_step_llm_scores_by_llm(
                 dataset_name=dataset_name,
-                n_impostors=10,
                 n_potential_impostors=n_potential_impostors,
                 rounds=rounds,
             )
@@ -430,7 +429,7 @@ def compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
         scores_by_pair = loader.load_scores(
             method_name=technique,
             dataset_name=dataset_name,
-            n_impostors=10 if technique == "one_step_llm" else n_impostors,
+            n_impostors=n_impostors,
             n_potential_impostors=n_potential_impostors,
             rounds=rounds,
         )
