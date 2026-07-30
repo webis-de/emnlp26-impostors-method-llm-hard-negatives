@@ -23,9 +23,23 @@ from genai_detection.impostor_generators.ImpostorGenerator import LLMImpostorGen
 from genai_detection.paraphrasing.one_step_paraphrasers import (OllamaParaphraser,
                                                                 SAIAParaphraser, OneStepParaphraser,
                                                                 T5ChatGPTParaphraser, T5GooglePAWSParaphraser, )
-from genai_detection.paraphrasing.batch_paraphraser import BatchParaphraser, FinetunedParaphraser
 from genai_detection.paraphrasing.exceptions import MissingPrecomputedParaphrasesError
 from genai_detection.paraphrasing.paraphraser import Paraphraser
+
+
+class PrecomputedParaphraserReference(Paraphraser):
+    requires_precomputed_paraphrases = True
+
+    def __init__(self, model_id: str):
+        self.model_id = model_id
+        self.n_paraphrases = 0
+
+    def paraphrase(
+        self, text: str, prompt: str, max_length: int = CONFIG.MAX_LENGTH
+    ) -> str:
+        raise MissingPrecomputedParaphrasesError(
+            f"Precomputed paraphrases are required for llm={self.model_id!r}."
+        )
 
 
 class NaiveImpostorGenerator(LLMImpostorGenerator):
@@ -88,9 +102,9 @@ class NaiveImpostorGenerator(LLMImpostorGenerator):
 
     def _build_paraphraser_for_llm(self, llm: str) -> Paraphraser:
         if llm == CONFIG.HUGGINGFACE_FINETUNED_MODEL:
-            return FinetunedParaphraser(model_id=llm)
+            return PrecomputedParaphraserReference(model_id=llm)
         if llm == CONFIG.BATCH_OPENAI_MODEL:
-            return BatchParaphraser(model_id=llm)
+            return PrecomputedParaphraserReference(model_id=llm)
         if llm == "humarin/chatgpt_paraphraser_on_T5_base":
             return T5ChatGPTParaphraser()
         if llm == "Vamsi/T5_Paraphrase_Paws":
