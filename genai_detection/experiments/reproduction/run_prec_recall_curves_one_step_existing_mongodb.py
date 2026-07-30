@@ -295,6 +295,13 @@ def compute_prec_recall_f1_acc_dict_one_step_existing_mongodb(
         )
     if not scores:
         raise RuntimeError(f"No eligible one_step_llm scores for dataset '{dataset_name}'.")
+    logger.info("one_step_llm n scores=%d", len(scores))
+    logger.info(
+        "one_step_llm ground_truth counts=%s",
+        pd.Series(ground_truth).value_counts(dropna=False).to_dict(),
+    )
+    logger.info("one_step_llm score describe=%s", pd.Series(scores).describe())
+    logger.info("one_step_llm unique scores=%d", len(set(scores)))
 
     results: Dict[str, pd.DataFrame] = {
         ONE_STEP_LLM_TECHNIQUE: compute_metrics_for_thresholds(

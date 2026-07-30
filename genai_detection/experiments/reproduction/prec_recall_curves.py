@@ -604,6 +604,13 @@ def plot_precision_recall_curve(
                 unique_pairs = set(zip(recalls, precisions))
 
                 logger.info("%s: class %d", key, positive_class_id)
+                logger.info(
+                    "%s class=%d points after mask=%d unique_pairs=%d",
+                    key,
+                    positive_class_id,
+                    len(recalls),
+                    len(unique_pairs),
+                )
 
                 plt.plot(
                     recalls,
