@@ -308,6 +308,20 @@ class BatchParaphraser(PrecomputedParaphraser):
                 continue
 
             if save and not request_state.get("saved"):
+                saved_id = self._saved_paraphrase_id(custom_id)
+                if saved_id is not None:
+                    logger.info(
+                        "Skipping already saved paraphrase for custom_id=%s.",
+                        custom_id,
+                    )
+                    self._mark_request_saved(
+                        batch_id=batch_id,
+                        custom_id=custom_id,
+                        request_state=request_state,
+                        saved_id=saved_id,
+                        response_body=row.get("response", {}).get("body", {}),
+                    )
+                    continue
                 self._save_finished_paraphrase(
                     batch_id=batch_id,
                     output_file_id=output_file_id,
@@ -319,23 +333,31 @@ class BatchParaphraser(PrecomputedParaphraser):
                 saved_count += 1
 
         self._collect_error_file_if_present(batch_id=batch_id, batch=batch)
-        self.job_collection.update_one(
-            {"batch_id": batch_id},
-            {
-                "$set": {
-                    "status": batch.status,
-                    "batch_id": batch_id,
-                    "model": self.model_id,
-                    "endpoint": self.endpoint,
-                    "output_file_id": output_file_id,
-                    "last_collected_at": self._now(),
-                    "saved_count": self._count_saved_requests(batch_id),
-                    "failed_count": failed_count,
-                    "collection_errors": errors,
-                }
-            },
-            upsert=True,
-        )
+        try:
+            self.job_collection.update_one(
+                {"batch_id": batch_id},
+                {
+                    "$set": {
+                        "status": batch.status,
+                        "batch_id": batch_id,
+                        "model": self.model_id,
+                        "endpoint": self.endpoint,
+                        "output_file_id": output_file_id,
+                        "last_collected_at": self._now(),
+                        "saved_count": self._count_saved_requests(batch_id),
+                        "failed_count": failed_count,
+                        "collection_errors": errors[:10],
+                    }
+                },
+                upsert=True,
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to update batch job collection state for batch_id=%s "
+                "after collection: %s",
+                batch_id,
+                e,
+            )
         return self._batch_summary(
             batch=batch,
             message="Batch completed and output was collected.",
@@ -650,20 +672,15 @@ class BatchParaphraser(PrecomputedParaphraser):
                     "requests.$.saved": True,
                     "requests.$.saved_at": self._now(),
                     "requests.$.saved_paraphrase_id": saved_id,
-                    "requests.$.response_metadata": self._json_safe(response_body),
+                    "requests.$.response_metadata": self._compact_response_metadata(
+                        response_body
+                    ),
                 }
             },
         )
         if update_result.matched_count:
             return
 
-        recovered_request_state = {
-            **request_state,
-            "saved": True,
-            "saved_at": self._now(),
-            "saved_paraphrase_id": saved_id,
-            "response_metadata": self._json_safe(response_body),
-        }
         self.job_collection.update_one(
             {"batch_id": batch_id},
             {
@@ -676,9 +693,30 @@ class BatchParaphraser(PrecomputedParaphraser):
                     "submitted_at": None,
                     "request_count": 0,
                 },
-                "$push": {"requests": recovered_request_state},
+                "$set": {
+                    "last_recovered_save_at": self._now(),
+                    "last_recovered_custom_id": custom_id,
+                    "last_recovered_text_id": request_state.get("text_id"),
+                },
+                "$inc": {"recovered_saved_count": 1},
             },
             upsert=True,
+        )
+
+    def _saved_paraphrase_id(self, custom_id: str) -> Optional[ObjectId]:
+        saved_doc = self.mongoDB.naive_paraphrase_collection.find_one(
+            {"extracted_info.custom_id": custom_id},
+            {"_id": 1},
+        )
+        return saved_doc["_id"] if saved_doc else None
+
+    def _compact_response_metadata(self, response_body: Dict[str, Any]) -> Dict[str, Any]:
+        return self._json_safe(
+            {
+                "id": response_body.get("id"),
+                "model": response_body.get("model"),
+                "usage": response_body.get("usage"),
+            }
         )
 
     def _get_original_text_for_request(self, request_state: Dict[str, Any]) -> str:
