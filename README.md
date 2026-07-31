@@ -244,7 +244,7 @@ From there, you can interact with the MongoDB database using `mongosh`:
 - find documents: `db.mycollection.find()`
 
 Otherwise you can connect to it from anywhere on the Kubernetes cluster using the address above.
-You cannot access it from Gammaweb.
+You cannot access it from Gammaweb (hence, jobs must be scheduled with kubectl; not slurm).
 
 
 ### Change password of the database
