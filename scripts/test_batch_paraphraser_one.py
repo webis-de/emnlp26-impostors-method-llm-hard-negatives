@@ -29,9 +29,21 @@ from genai_detection.paraphrasing.batch_paraphraser import BatchParaphraser
 
 logger = logging.getLogger(__name__)
 
-N_DOCUMENTS = 100
-
-BATCH_ID = "batch_6a69f9469dac81909c9b7d43dcca7627"
+N_DOCUMENTS = 200
+BATCH_ID =
+#"batch_6a7181d4d7ec8190a995ebeff68712b7"
+#"batch_6a6e14edeab88190877185ef055c6abd"
+#"batch_6a6cbb2a9da081908899ba4b7a797d85"
+#"batch_6a6c6a14b4048190be47fb05fd558616"
+    # "batch_6a6c698375948190a7b56af8232a69e0" # other model
+#"batch_6a6c52f2d0948190887566be886a3c2d"
+#"batch_6a6c39afca7c8190be2cc1a9a380939a"
+#"batch_6a6b7334a24481908b2f8c9c22e099d0"
+#"batch_6a6b50d2b3b48190af33eac552cd68fa"
+#"batch_6a6b317454188190b304b53370e5a364"
+#"batch_6a6b1aa3d88c8190a2a89496d3b959bf"
+#"batch_6a6ae324decc8190a15285b01c0f835b"
+#"batch_6a69f9469dac81909c9b7d43dcca7627"   # 100 docs with 50 paraphrases each
     # "batch_6a69dc56700c8190b88c1817c25f2f6a"
            #"batch_6a69d38466f88190983e275fef950de4"
     #"batch_6a69b0a71c008190a9f74327908d87af"
@@ -49,21 +61,62 @@ def get_original_text_ids_without_naive_paraphrases(
         query["dataset_name"] = dataset_name
 
     text_ids = []
-    cursor = mongo.original_collection.find(query, {"_id": 1}).sort("_id", 1)
-    for doc in cursor:
-        text_id = ObjectId(doc["_id"])
-        existing = mongo.naive_paraphrase_collection.find_one(
-            {
-                "text_id": text_id,
-                "llm": llm,
-            },
-            {"_id": 1},
-        )
-        if existing:
-            continue
-        text_ids.append(text_id)
+    seen = set()
+    missing_pair_ids = []
+    cursor = mongo.all_pairs_collection.find(
+        query,
+        {"left_id": 1, "right_id": 1},
+    ).sort("_id", 1)
+    for pair in cursor:
+        pair_text_ids = [ObjectId(pair["left_id"]), ObjectId(pair["right_id"])]
+        existing_ids = {
+            ObjectId(doc["text_id"])
+            for doc in mongo.naive_paraphrase_collection.find(
+                {
+                    "text_id": {"$in": pair_text_ids},
+                    "llm": llm,
+                },
+                {"text_id": 1},
+            )
+        }
+        missing_ids = [text_id for text_id in pair_text_ids if text_id not in existing_ids]
+        if len(missing_ids) == 1:
+            text_id = missing_ids[0]
+            if text_id not in seen:
+                text_ids.append(text_id)
+                seen.add(text_id)
+        elif len(missing_ids) == 2:
+            missing_pair_ids.extend(missing_ids)
         if len(text_ids) >= n_documents:
             break
+
+    for text_id in missing_pair_ids:
+        if len(text_ids) >= n_documents:
+            break
+        if text_id in seen:
+            continue
+        text_ids.append(text_id)
+        seen.add(text_id)
+
+    if len(text_ids) < n_documents:
+        cursor = mongo.original_collection.find(query, {"_id": 1}).sort("_id", 1)
+        for doc in cursor:
+            text_id = ObjectId(doc["_id"])
+            if text_id in seen:
+                continue
+            existing = mongo.naive_paraphrase_collection.find_one(
+                {
+                    "text_id": text_id,
+                    "llm": llm,
+                },
+                {"_id": 1},
+            )
+            if existing:
+                continue
+            text_ids.append(text_id)
+            seen.add(text_id)
+            if len(text_ids) >= n_documents:
+                break
 
     if len(text_ids) < n_documents:
         raise ValueError(
@@ -122,11 +175,11 @@ def main() -> None:
     # for batch in batches.data:
     #     print(batch.id, batch.status, batch.created_at, batch.request_counts)
 
-    # submitted_batch_id = submit_one()
-    # collect_batch(batch_id=submitted_batch_id)
+    submitted_batch_id = submit_one()
+    collect_batch(batch_id=submitted_batch_id)
     #
     # To only collect an existing job, comment out submit_one above and call:
-    collect_batch(batch_id=BATCH_ID)
+    # collect_batch(batch_id=BATCH_ID)
 
 
 if __name__ == "__main__":
