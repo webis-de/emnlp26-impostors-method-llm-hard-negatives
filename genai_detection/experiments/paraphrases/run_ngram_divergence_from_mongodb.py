@@ -186,32 +186,61 @@ class MongoNGramDivergenceExperiment:
             "js_divergence": "Jensen-Shannon Divergence",
         }.get(metric, metric)
 
+    def _prepare_boxplot_data(
+        self,
+        data: pd.DataFrame,
+        metric: str,
+        group_by: Optional[str],
+        constant_group_label: str = "All texts",
+    ) -> tuple[pd.DataFrame, str]:
+        """Return plotting data for feature-separated or unseparated boxplots."""
+        if metric not in data.columns:
+            raise ValueError(f"Metric column '{metric}' not found in DataFrame.")
+
+        plot_df = data.copy()
+        if group_by is None:
+            group_by = "_boxplot_group"
+            plot_df[group_by] = constant_group_label
+        elif group_by not in plot_df.columns:
+            raise ValueError(f"Group by column '{group_by}' not found in DataFrame.")
+
+        plot_df = plot_df[[group_by, metric]].dropna().copy()
+        return plot_df, group_by
+
     def _plot_metric_boxplot(
         self,
         data: pd.DataFrame,
-        dataset_name: str,
         metric: str,
-        group_by: str,
+        group_by: Optional[str],
+        title_group_label: str,
+        out_dir: Path,
+        filename_prefix: str,
+        constant_group_label: str = "All texts",
+        xlabel: Optional[str] = None,
     ) -> None:
-        plot_df = data[[group_by, metric]].dropna().copy()
+        plot_df, resolved_group_by = self._prepare_boxplot_data(
+            data=data,
+            metric=metric,
+            group_by=group_by,
+            constant_group_label=constant_group_label,
+        )
         if plot_df.empty:
             logger.warning(
-                "Skipping plot for dataset=%s metric=%s group_by=%s because no values remain.",
-                dataset_name,
+                "Skipping plot for metric=%s group_by=%s because no values remain.",
                 metric,
-                group_by,
+                group_by or constant_group_label,
             )
             return
 
-        counts = plot_df.groupby(group_by, sort=True)[metric].count()
+        counts = plot_df.groupby(resolved_group_by, sort=True)[metric].count()
         order = counts.index.tolist()
         width = max(8, len(order) * 1.35)
         fig, ax = plt.subplots(figsize=(width, 5.8), constrained_layout=True)
         sns.boxplot(
             data=plot_df,
-            x=group_by,
+            x=resolved_group_by,
             y=metric,
-            hue=group_by,
+            hue=resolved_group_by,
             order=order,
             dodge=False,
             showfliers=False,
@@ -223,30 +252,34 @@ class MongoNGramDivergenceExperiment:
             ax.legend_.remove()
 
         metric_label = self._readable_metric(metric)
-        ax.set_xlabel(group_by.replace("_", " ").title())
+        ax.set_xlabel(xlabel or resolved_group_by.replace("_", " ").title())
         ax.set_ylabel(metric_label)
         max_features = rf"${self.calculator.max_features:,}".replace(",", r"\,") + "$"
 
         ax.set_title(f"{metric_label} of Top-{max_features} "
                      f"{self.calculator.n}-Gram Distributions\n"
-                     f"{self._readable_dataset(dataset_name)} Dataset")
+                     f"{title_group_label}")
         ax.grid(axis="y", linestyle="--", alpha=0.35)
         plt.setp(ax.get_xticklabels(), rotation=20, ha="right")
         sns.despine(ax=ax)
 
-        out_dir = self.save_base_path / self._safe_name(dataset_name)
         out_dir.mkdir(parents=True, exist_ok=True)
+        safe_group = self._safe_name(group_by) if group_by else "all_features_combined"
         for file_format in ("svg", "pdf"):
             out = (
                 out_dir
-                / f"{self._safe_name(dataset_name)}_{metric}_boxplot_grouped_by_{self._safe_name(group_by)}.{file_format}"
+                / f"{filename_prefix}_{metric}_boxplot_grouped_by_{safe_group}.{file_format}"
             )
             fig.savefig(out, bbox_inches="tight", transparent=True, format=file_format)
             logger.info("Plot saved to %s", out)
         plt.close(fig)
 
-    def plot(self, aggregate_df: pd.DataFrame, features: tuple[str, ...]) -> None:
-        """Create per-dataset boxplots for each divergence metric and feature."""
+    def plot_by_feature_per_dataset(
+        self,
+        aggregate_df: pd.DataFrame,
+        features: tuple[str, ...],
+    ) -> None:
+        """Create one boxplot per dataset, metric, and separating feature."""
         for dataset_name in sorted(aggregate_df["dataset_name"].dropna().astype(str).unique()):
             dataset_df = aggregate_df[aggregate_df["dataset_name"].astype(str) == dataset_name].copy()
             if dataset_df.empty:
@@ -275,10 +308,38 @@ class MongoNGramDivergenceExperiment:
                 for metric in self.METRICS:
                     self._plot_metric_boxplot(
                         data=dataset_df,
-                        dataset_name=dataset_name,
                         metric=metric,
                         group_by=feature,
+                        title_group_label=f"{self._readable_dataset(dataset_name)} Dataset",
+                        out_dir=self.save_base_path / self._safe_name(dataset_name),
+                        filename_prefix=self._safe_name(dataset_name),
                     )
+
+    def plot_combined_by_dataset(self, aggregate_df: pd.DataFrame) -> None:
+        """Create one box per dataset using all datapoints, irrespective of feature."""
+        if "dataset_name" not in aggregate_df.columns:
+            raise ValueError("DataFrame is missing required column 'dataset_name'.")
+
+        plot_df = aggregate_df.copy()
+        plot_df["dataset_label"] = plot_df["dataset_name"].astype(str).map(
+            self._readable_dataset
+        )
+        out_dir = self.save_base_path / "all_datasets"
+        for metric in self.METRICS:
+            self._plot_metric_boxplot(
+                data=plot_df,
+                metric=metric,
+                group_by="dataset_label",
+                title_group_label="All Datasets",
+                out_dir=out_dir,
+                filename_prefix="all_datasets",
+                xlabel="Dataset",
+            )
+
+    def plot(self, aggregate_df: pd.DataFrame, features: tuple[str, ...]) -> None:
+        """Create feature-separated plots and all-feature dataset-level plots."""
+        self.plot_by_feature_per_dataset(aggregate_df=aggregate_df, features=features)
+        self.plot_combined_by_dataset(aggregate_df=aggregate_df)
 
     def run(
         self,
