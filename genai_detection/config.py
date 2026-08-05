@@ -74,6 +74,8 @@ class BaseConfig:
     OPENAI_URL = "https://api.openai.com/v1"
     OPENAI_MODEL = "openai/gpt-5-nano-2025-08-07"  # specify snapshot for consistency: https://platform.openai.com/docs/models/gpt-5-nano (30.10.2025)
     # too expensive without batching:
+    # https://developers.openai.com/api/docs/pricing?latest-pricing=batch
+    BATCH_OPENAI_MODEL_LUNA = "gpt-5.6-luna" # 31.07.26: cheaper than gpt-5.4-nano-2026-03-17
     BATCH_OPENAI_MODEL =  "gpt-5.4-nano-2026-03-17"     # https://developers.openai.com/api/docs/models/gpt-5.4-nano
     HUGGINGFACE_FINETUNED_MODEL = "tuner007/pegasus_paraphrase"
     PROMPT = "Paraphrase the text above without changing its meaning. Use different words and vary the sentence structure while maintaining a consistent tone. Your paraphrase should be three times as long than the original. Output only the paraphrased sentence, with NO explanations or extra text."
@@ -135,6 +137,7 @@ class BaseConfig:
 
     ONE_STEP_LLM_LABEL_TRANSLATIONS = {
         "gpt-5.4-nano-2026-03-17": "GPT 5.4 Nano",
+        "gpt-5.6-luna": "GPT 5.6 Luna",
         "tuner007/pegasus_paraphrase": "Pegasus",
     }
 
@@ -163,6 +166,7 @@ class BaseConfig:
 
     ONE_STEP_LLM_LABEL_COLORS = {
         "gpt-5.4-nano-2026-03-17": "#005f73", # darker blue
+        "gpt-5.6-luna": "#613712",  # dark brown
         "tuner007/pegasus_paraphrase": "#005f78", # darker purple
     }
 
