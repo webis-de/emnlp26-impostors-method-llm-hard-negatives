@@ -103,10 +103,19 @@ def get_original_text_ids_without_naive_paraphrases(
             if len(text_ids) >= n_documents:
                 break
 
-    if len(text_ids) < n_documents:
+    if not text_ids:
         raise ValueError(
-            f"Expected {n_documents} original texts without naive paraphrases "
-            f"for query {query} and llm={llm!r}, found {len(text_ids)}."
+            "Expected at least one original text without naive paraphrases "
+            f"for query {query} and llm={llm!r}, found 0."
+        )
+    if len(text_ids) < n_documents:
+        logger.info(
+            "Only found %d original texts without naive paraphrases for query %s "
+            "and llm=%r; submitting a smaller batch than requested (%d).",
+            len(text_ids),
+            query,
+            llm,
+            n_documents,
         )
     logger.info(
         "Selected original text_ids without naive paraphrases for llm=%s: %s",
@@ -125,8 +134,13 @@ def submit_one() -> Optional[str]:
         n_documents=N_DOCUMENTS,
         llm=LLM,
     )
-    logger.info("About to submit one batch for %s text_ids=%s for dataset %s using %s model (batched)", N_DOCUMENTS,
-                text_ids, DATASET_NAME, LLM)
+    logger.info(
+        "About to submit one batch for %s text_ids=%s for dataset %s using %s model (batched)",
+        len(text_ids),
+        text_ids,
+        DATASET_NAME,
+        LLM,
+    )
 
     paraphraser = BatchParaphraser()
     custom_ids = paraphraser.add_texts(
