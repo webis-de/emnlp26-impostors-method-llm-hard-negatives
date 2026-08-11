@@ -30,8 +30,9 @@ from genai_detection.paraphrasing.batch_paraphraser import BatchParaphraser
 logger = logging.getLogger(__name__)
 
 N_DOCUMENTS = 400
-BATCH_ID = "batch_6a72f0631508819082cd8c902a380a4b" # blogs, TODO
-DATASET_NAME = None#CONFIG.BLOG # None
+BATCH_ID = "batch_6a7ada7fd6248190a4e114f2a2b3bbb8" # blogs, # TODO
+# BATCH_ID = "batch_6a799ec8bc948190bcc3faaf35ff991d" # blogs, # TODO
+DATASET_NAME = CONFIG.BLOG #CONFIG.STUDENT_ESSAYS  # None
 LLM = CONFIG.BATCH_OPENAI_MODEL_LUNA if DATASET_NAME==CONFIG.BLOG else CONFIG.BATCH_OPENAI_MODEL
 
 
@@ -142,7 +143,7 @@ def submit_one() -> Optional[str]:
         LLM,
     )
 
-    paraphraser = BatchParaphraser()
+    paraphraser = BatchParaphraser(model_id=LLM)
     custom_ids = paraphraser.add_texts(
         text_ids=text_ids,
         metadata={"script": os.path.basename(__file__)},
@@ -158,7 +159,7 @@ def collect_batch(batch_id: Optional[str]) -> None:
         logger.info("No batch_id provided; skipping collection.")
         return
 
-    paraphraser = BatchParaphraser()
+    paraphraser = BatchParaphraser(model_id=LLM)
     summary = paraphraser.collect_batch(batch_id=batch_id, save=True)
     logger.info("Collect summary: %s", summary)
 
