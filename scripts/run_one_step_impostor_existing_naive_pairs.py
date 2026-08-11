@@ -104,7 +104,7 @@ def _load_all_pairs_with_existing_naive_paraphrases_and_n_impostors(
         left_count = naive_counts.get(left_id, 0)
         right_count = naive_counts.get(right_id, 0)
 
-        if left_count == 0 and right_count == 0:
+        if left_count == 0 or right_count == 0:
             skipped_without_naive += 1
             continue
 
