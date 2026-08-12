@@ -56,7 +56,7 @@ TECHNIQUE_LABEL_MODES: tuple[str, ...] = (
 
 def run_paraphrase_experiments(
     display_plot: bool = False,
-    technique_label_mode: TechniqueLabelMode = "model",
+    technique_label_mode: TechniqueLabelMode = "model_prompt_approach",
     prompt_words: int = 6,
 ):
     """Run scoring + visualization for paraphrase experiments.
@@ -133,7 +133,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run paraphrase evaluation experiments.")
     parser.add_argument(
         "--label-mode",
-        default="model",
+        default="model_prompt_approach",
         choices=TECHNIQUE_LABEL_MODES,
         help=(
             "How to build paraphrase-technique labels for boxplots: "
