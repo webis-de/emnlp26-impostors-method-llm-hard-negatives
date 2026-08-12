@@ -6,6 +6,7 @@ __pycache__/
 results/
 logs/
 models/
+experiments/alpha_scatter_plots/*
 
 # Datasets
 data/
