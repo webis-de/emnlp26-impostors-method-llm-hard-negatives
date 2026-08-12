@@ -374,17 +374,21 @@ class ParaphrasePlotter:
     ) -> dict[str, str]:
         label_map = {}
         translate_to_readable = {
-                "meta" : "LLama 3.1 8B",
-                "mistral" : "Mistral 675B",
-                "gpt-oss": "GPT OSS 120B",
-                "gpt-5": "GPT-5 Nano",
-                "qwen": "Qwen 3 32B",
-                }
+            "meta": "LLama 3.1 8B",
+            "mistral": "Mistral 675B",
+            "gpt-oss": "GPT OSS 120B",
+            "gpt-5": "GPT-5 Nano",
+            "qwen": "Qwen 3 32B",
+        }
+        approach_to_readable = {
+            "non_naive": "Two-step",
+            "naive": "One-step",
+        }
         for label, count in counts.items():
             # wrapped = self._wrap_label(str(label), words_per_line=words_per_line)
             label_str = str(label)
 
-            readable_label = next(
+            readable_model = next(
                 (
                     readable
                     for key, readable in translate_to_readable.items()
@@ -392,7 +396,19 @@ class ParaphrasePlotter:
                 ),
                 label_str,
             )
-            label_map[label] = readable_label#f"{wrapped}\n[n={int(count)}]"
+            readable_approach = next(
+                (
+                    readable
+                    for key, readable in approach_to_readable.items()
+                    if key.lower() in label_str.lower()
+                ),
+                None,
+            )
+            label_map[label] = (
+                f"{readable_approach}\n{readable_model}"
+                if readable_approach
+                else readable_model
+            )  # f"{wrapped}\n[n={int(count)}]"
         return label_map
 
     def plot_length_percentage_boxplot(
