@@ -30,10 +30,11 @@ from genai_detection.paraphrasing.batch_paraphraser import BatchParaphraser
 logger = logging.getLogger(__name__)
 
 N_DOCUMENTS = 400
-BATCH_ID = "batch_6a7ada7fd6248190a4e114f2a2b3bbb8" # blogs, # TODO
-# BATCH_ID = "batch_6a799ec8bc948190bcc3faaf35ff991d" # blogs, # TODO
+# BATCH_ID = "batch_6a7ada7fd6248190a4e114f2a2b3bbb8" # blogs, # TODO; done?
+BATCH_ID = "batch_6a799ec8bc948190bcc3faaf35ff991d" # blogs, # TODO
 DATASET_NAME = CONFIG.BLOG #CONFIG.STUDENT_ESSAYS  # None
-LLM = CONFIG.BATCH_OPENAI_MODEL_LUNA if DATASET_NAME==CONFIG.BLOG else CONFIG.BATCH_OPENAI_MODEL
+# LLM = CONFIG.BATCH_OPENAI_MODEL_LUNA if DATASET_NAME==CONFIG.BLOG else CONFIG.BATCH_OPENAI_MODEL
+LLM = CONFIG.BATCH_OPENAI_MODEL
 
 
 def get_original_text_ids_without_naive_paraphrases(
