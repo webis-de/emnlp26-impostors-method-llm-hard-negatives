@@ -172,7 +172,10 @@ class ParaphraseDataLoader:
         df.dropna(how="all", inplace=True)
         return df
 
-    def obtain_complete_paraphrase_df_from_mongodb(self) -> pd.DataFrame:
+    def obtain_complete_paraphrase_df_from_mongodb(
+        self,
+        original_projection: dict | None = None,
+    ) -> pd.DataFrame:
         non_naive_paraphrases_cursor = self.mongodb.non_naive_paraphrase_collection.find({})
         non_naive_paraphrases = pd.DataFrame(non_naive_paraphrases_cursor)
         if not non_naive_paraphrases.empty:
@@ -192,11 +195,18 @@ class ParaphraseDataLoader:
         dup_cols = paraphrases.columns[paraphrases.columns.duplicated()].tolist()
         assert len(dup_cols) < 1, f"It exits {len(dup_cols)} duplicated columns after merging."
         paraphrases["text_id"] = paraphrases["text_id"].map(ObjectId)
+        if original_projection is None:
+            original_projection = {"_id": True, "text": True, "dataset": True}
         original_texts_cursor = self.mongodb.original_collection.find(
             {"_id": {"$in": paraphrases["text_id"].tolist()}},
-            {"_id": True, "text": True, "dataset": True},
+            original_projection,
         )
         original_texts = pd.DataFrame(original_texts_cursor)
+        original_metadata_cols = [
+            col for col in original_texts.columns if col != "_id" and col in paraphrases.columns
+        ]
+        if original_metadata_cols:
+            paraphrases = paraphrases.drop(columns=original_metadata_cols)
 
         df = paraphrases.merge(
             original_texts,
