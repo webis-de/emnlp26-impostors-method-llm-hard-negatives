@@ -24,12 +24,12 @@ if __name__ == "__main__":
 
     our_figure_impostor_options = [
         "one_step_llm",
-        "random_words",
-        "two_step_llm",
-        "on_the_fly_chatnoir",
-        # "on_the_fly_serpapi",
-        "on_the_fly_startpage",
-        "in_domain",
+        # "random_words",
+        # "two_step_llm",
+        # "on_the_fly_chatnoir",
+        # # "on_the_fly_serpapi",
+        # "on_the_fly_startpage",
+        # "in_domain",
         # "translation",
         # "mirror_minds",   # raises error
     ]
@@ -40,6 +40,6 @@ if __name__ == "__main__":
             one_step_llm_label_translations=CONFIG.ONE_STEP_LLM_LABEL_TRANSLATIONS,
     )
 
-    # run_prec_recall_curves(
-    #     dataset_name=CONFIG.BLOG, imp_gen_techniques=our_figure_impostor_options
-    # )
+    run_prec_recall_curves(
+        dataset_name=CONFIG.BLOG, imp_gen_techniques=our_figure_impostor_options
+    )
