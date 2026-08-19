@@ -255,6 +255,8 @@ def _load_impostor_outputs_for_pairs(
 
         rows.append(
             {
+                "left_id": doc["left_id"],
+                "right_id": doc["right_id"],
                 "dataset_name": doc["dataset_name"],
                 "impostor_generation_technique": doc["impostor_generation_technique"],
                 "retrieval_index": doc.get("retrieval_index"),
@@ -333,12 +335,16 @@ def _compute_alpha_curves(
             technique_df = dataset_df[dataset_df[method_col] == technique]
             if technique_df.empty:
                 continue
+            technique_df = technique_df.drop_duplicates(
+                subset=["left_id", "right_id", "dataset_name", method_col],
+                keep="first",
+            )
 
             left_p_values = technique_df["left_p_value"].to_numpy(dtype=float)
             right_p_values = technique_df["right_p_value"].to_numpy(dtype=float)
             rejected = (
-                (left_p_values[None, :] < alphas[:, None])
-                & (right_p_values[None, :] < alphas[:, None])
+                (left_p_values[None, :] <= alphas[:, None])
+                & (right_p_values[None, :] <= alphas[:, None])
             )
             if use_non_rejection_rate:
                 rate = (~rejected).sum(axis=1) / len(technique_df)
@@ -490,7 +496,7 @@ def save_type_one_error_plots(
             title="Impostor Generation",
             frameon=False,
             loc="lower center",
-            bbox_to_anchor=(0.5, 0.12),
+            bbox_to_anchor=(0.5, 0.14),
             borderaxespad=0,
             ncol=min(3, len(method_handles)),
         )
@@ -499,7 +505,7 @@ def save_type_one_error_plots(
             title="Error Rate",
             frameon=False,
             loc="lower center",
-            bbox_to_anchor=(0.5, 0.06),
+            bbox_to_anchor=(0.5, 0.04),
             borderaxespad=0,
             ncol=len(style_handles),
         )
@@ -615,6 +621,7 @@ def main() -> None:
         dataset_names=args.dataset_names,
         batch_size=args.batch_size,
     )
+    logger.info(f"Using techniques: {args.techniques or 'all'}")
     df = _load_impostor_outputs_for_pairs(
         impostor_output_collection,
         pair_keys=different_author_pairs,
