@@ -868,12 +868,12 @@ def main() -> None:
         (
             "left_disputed_right_candidate",
             "Left-Disputed Right-Candidate Direction",
-            " (Left -> Right)",
+            r" (Left $\rightarrow$ Right)",
         ),
         (
             "right_disputed_left_candidate",
             "Right-Disputed Left-Candidate Direction",
-            " (Right -> Left)",
+            r" (Right $\rightarrow$ Left)",
         ),
     ]
     for decision_rule, plot_suffix, plot_title_suffix in plot_specs:
