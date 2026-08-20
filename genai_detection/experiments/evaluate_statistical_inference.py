@@ -79,6 +79,8 @@ ALPHA_SWEEP_DIRNAME = "alpha_sweeps"
 DEFAULT_ALPHA_MIN = 0.001
 DEFAULT_ALPHA_MAX = 0.9
 DEFAULT_N_ALPHA = 30
+DEFAULT_ALPHA_CRITICAL_N_TRIALS = (100, 50, 10)
+DEFAULT_ALPHA_BONFERRONI_FACTOR = 2.0
 METRIC_ORDER = [
     "accuracy",
     "f1",
@@ -164,8 +166,40 @@ def _alpha_grid(alpha_min: float, alpha_max: float, num_points: int = 30) -> lis
     ).tolist()
 
 
+def _critical_alpha_grid(
+    *,
+    n_trials_values: Sequence[int],
+    n_impostors: int,
+    bonferroni_factor: float = DEFAULT_ALPHA_BONFERRONI_FACTOR,
+) -> list[float]:
+    """Return alpha values where the binomial-test critical success count changes."""
+    if n_impostors < 1:
+        raise ValueError("n_impostors must be at least 1.")
+    if bonferroni_factor <= 0:
+        raise ValueError("bonferroni_factor must be greater than 0.")
+
+    p0 = 1.0 / (1 + n_impostors)
+    alphas: set[float] = set()
+    for n_trials in n_trials_values:
+        if n_trials < 1:
+            raise ValueError("n_trials values must be positive integers.")
+        for critical_k in range(1, n_trials + 1):
+            tail_probability = sum(
+                math.comb(n_trials, k) * (p0**k) * ((1 - p0) ** (n_trials - k))
+                for k in range(critical_k, n_trials + 1)
+            )
+            alpha = min(1.0, bonferroni_factor * tail_probability)
+            if 0.0 < alpha <= 1.0:
+                alphas.add(float(alpha))
+    if not alphas:
+        raise ValueError(
+            "No critical-k alpha values fall inside the requested alpha range."
+        )
+    return sorted(alphas)
+
+
 def _format_alpha(alpha: float) -> str:
-    return f"{alpha:.3f}"
+    return f"{alpha:.6g}"
 
 
 def _alpha_slug(alpha: float) -> str:
@@ -189,6 +223,10 @@ def _prediction_field_for_alpha(alpha: float) -> str:
     return f"{DEFAULT_PREDICTION_FIELD}_{_alpha_slug(alpha)}"
 
 
+def _prediction_field_for_alpha_decision_rule(alpha: float, decision_rule: str) -> str:
+    return f"{_prediction_field_for_alpha(alpha)}_{decision_rule}"
+
+
 def _label_with_alpha(label: str, alpha: float) -> str:
     return f"{label}-{_alpha_slug(alpha).replace('_', '-')}"
 
@@ -205,6 +243,16 @@ def _display_dataset(dataset_name: str) -> str:
 
 
 def _display_method(method_name: str) -> str:
+    directional_suffixes = {
+        "__pair_both": "Pair-Level Both Directions",
+        "__left_disputed_right_candidate": "Left -> Right",
+        "__right_disputed_left_candidate": "Right -> Left",
+    }
+    for suffix, suffix_label in directional_suffixes.items():
+        if method_name.endswith(suffix):
+            base_method = method_name.removesuffix(suffix)
+            base_label = CONFIG.LABEL_TRANSLATIONS.get(base_method, base_method)
+            return f"{base_label} ({suffix_label})"
     return CONFIG.LABEL_TRANSLATIONS.get(method_name, method_name)
 
 
@@ -835,6 +883,7 @@ class StatisticalInferenceExperiment:
         *,
         dataset_name: str,
         alphas: Sequence[float],
+        decision_rule: str,
         left_p_value_field: str,
         right_p_value_field: str,
         n_impostors: int,
@@ -894,9 +943,16 @@ class StatisticalInferenceExperiment:
 
         results: list[StatisticalInferenceMetrics] = []
         for alpha in alphas:
-            predictions = ((left_p_values <= alpha) & (right_p_values <= alpha)).astype(
-                float
-            )
+            if decision_rule == "pair_both":
+                predictions = (
+                    (left_p_values <= alpha) & (right_p_values <= alpha)
+                ).astype(float)
+            elif decision_rule == "left_disputed_right_candidate":
+                predictions = (left_p_values <= alpha).astype(float)
+            elif decision_rule == "right_disputed_left_candidate":
+                predictions = (right_p_values <= alpha).astype(float)
+            else:
+                raise ValueError(f"Unknown decision rule: {decision_rule}")
             error_rates = _classification_error_rates(y_true, predictions)
             cv_result = self.evaluator.compute_cv(
                 y_true=y_true,
@@ -908,8 +964,10 @@ class StatisticalInferenceExperiment:
             results.append(
                 StatisticalInferenceMetrics(
                     dataset_name=dataset_name,
-                    method_name=method_name,
-                    prediction_field=_prediction_field_for_alpha(alpha),
+                    method_name=f"{method_name}__{decision_rule}",
+                    prediction_field=_prediction_field_for_alpha_decision_rule(
+                        alpha, decision_rule
+                    ),
                     alpha=float(alpha),
                     left_p_value_field=left_p_value_field,
                     right_p_value_field=right_p_value_field,
@@ -930,7 +988,7 @@ class StatisticalInferenceExperiment:
         logger.info(
             "Computed alpha sweep for %s/%s on %d samples and %d alpha values.",
             dataset_name,
-            method_name,
+            f"{method_name}__{decision_rule}",
             len(ordered_keys),
             len(results),
         )
@@ -998,25 +1056,31 @@ class StatisticalInferenceExperiment:
                 )
 
             for method_name in methods:
-                results.extend(
-                    self.evaluate_method_alpha_sweep(
-                        method_name,
-                        dataset_name=dataset_name,
-                        alphas=alphas,
-                        left_p_value_field=left_p_value_field,
-                        right_p_value_field=right_p_value_field,
-                        n_impostors=n_impostors,
-                        n_potential_impostors=n_potential_impostors,
-                        ci_level=ci_level,
-                        n_boot=n_boot,
-                        p_values_by_pair=(
-                            None
-                            if p_values_by_method is None
-                            else p_values_by_method[method_name]
-                        ),
-                        required_pair_keys=common_pair_keys,
+                for decision_rule in (
+                    "pair_both",
+                    "left_disputed_right_candidate",
+                    "right_disputed_left_candidate",
+                ):
+                    results.extend(
+                        self.evaluate_method_alpha_sweep(
+                            method_name,
+                            dataset_name=dataset_name,
+                            alphas=alphas,
+                            decision_rule=decision_rule,
+                            left_p_value_field=left_p_value_field,
+                            right_p_value_field=right_p_value_field,
+                            n_impostors=n_impostors,
+                            n_potential_impostors=n_potential_impostors,
+                            ci_level=ci_level,
+                            n_boot=n_boot,
+                            p_values_by_pair=(
+                                None
+                                if p_values_by_method is None
+                                else p_values_by_method[method_name]
+                            ),
+                            required_pair_keys=common_pair_keys,
+                        )
                     )
-                )
         return results
 
     def evaluate_directional_agreement_method(
@@ -1411,6 +1475,47 @@ def write_csv(results: Sequence[StatisticalInferenceMetrics], out_path: Path) ->
     return out_path
 
 
+def write_attainable_fpr_table(
+    *,
+    out_path: Path,
+    n_trials_values: Sequence[int],
+    n_impostors: int,
+    bonferroni_factor: float,
+) -> Path:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    if n_impostors < 1:
+        raise ValueError("n_impostors must be at least 1.")
+    if bonferroni_factor <= 0:
+        raise ValueError("bonferroni_factor must be greater than 0.")
+
+    p0 = 1.0 / (1 + n_impostors)
+    rows: list[dict[str, float | int]] = []
+    for n_trials in n_trials_values:
+        if n_trials < 1:
+            raise ValueError("n_trials values must be positive.")
+        for critical_c in range(1, n_trials + 1):
+            directional_fpr = sum(
+                math.comb(n_trials, k) * (p0**k) * ((1 - p0) ** (n_trials - k))
+                for k in range(critical_c, n_trials + 1)
+            )
+            rows.append(
+                {
+                    "n_trials": int(n_trials),
+                    "n_impostors": int(n_impostors),
+                    "null_probability": p0,
+                    "critical_c": int(critical_c),
+                    "directional_fpr": directional_fpr,
+                    "bonferroni_corrected_alpha": min(
+                        1.0, bonferroni_factor * directional_fpr
+                    ),
+                    "pair_level_fpr_both_directions_independent": directional_fpr
+                    * directional_fpr,
+                }
+            )
+    pd.DataFrame(rows).to_csv(out_path, index=False)
+    return out_path
+
+
 def best_alpha_rows(
     results: Sequence[StatisticalInferenceMetrics],
     *,
@@ -1734,6 +1839,45 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="CSV containing the best alpha for each dataset/method/metric.",
     )
     parser.add_argument(
+        "--attainable-fpr-output",
+        type=Path,
+        default=None,
+        help=(
+            "CSV containing theoretical attainable directional and pair-level "
+            "FPRs for every critical count. Defaults to alpha-sweep-dir/"
+            "attainable_fpr_by_critical_count.csv."
+        ),
+    )
+    parser.add_argument(
+        "--alpha-grid",
+        choices=("critical-k", "log"),
+        default="critical-k",
+        help=(
+            "Alpha values for the alpha sweep. 'critical-k' evaluates only "
+            "Bonferroni-corrected binomial tail probabilities where the critical "
+            "success count changes; 'log' keeps the previous logarithmic grid."
+        ),
+    )
+    parser.add_argument(
+        "--alpha-critical-n-trials",
+        type=int,
+        nargs="+",
+        default=list(DEFAULT_ALPHA_CRITICAL_N_TRIALS),
+        help=(
+            "Trial counts used to build the critical-k alpha grid. Defaults to "
+            "100 50 10."
+        ),
+    )
+    parser.add_argument(
+        "--alpha-bonferroni-factor",
+        type=float,
+        default=DEFAULT_ALPHA_BONFERRONI_FACTOR,
+        help=(
+            "Correction factor applied to attainable one-direction binomial "
+            "p-values when constructing the critical-k alpha grid."
+        ),
+    )
+    parser.add_argument(
         "--csv-output",
         type=Path,
         default=output_dir / f"pan_metrics_statistical_inference_{safe_field}.csv",
@@ -1827,6 +1971,10 @@ def main(argv: Sequence[str] | None = None) -> None:
         args.best_alpha_output = (
             args.alpha_sweep_dir / "best_alpha_by_metric_method_dataset.csv"
         )
+    if args.attainable_fpr_output is None:
+        args.attainable_fpr_output = (
+            args.alpha_sweep_dir / "attainable_fpr_by_critical_count.csv"
+        )
 
     mongo = ParaphraseMongoDB(local_ray=os.path.exists("/Users/klara"))
     loader = StatisticalInferencePredictionLoader(
@@ -1858,23 +2006,42 @@ def main(argv: Sequence[str] | None = None) -> None:
         best_alpha_output = _with_shared_subset_suffix(
             args.best_alpha_output, require_all_methods
         )
+        attainable_fpr_output = _with_shared_subset_suffix(
+            args.attainable_fpr_output, require_all_methods
+        )
 
         if args.alpha_sweep:
-            alphas = _alpha_grid(DEFAULT_ALPHA_MIN, DEFAULT_ALPHA_MAX, DEFAULT_N_ALPHA)
+            if args.alpha_grid == "critical-k":
+                alphas = _critical_alpha_grid(
+                    n_trials_values=args.alpha_critical_n_trials,
+                    n_impostors=args.n_impostors,
+                    bonferroni_factor=args.alpha_bonferroni_factor,
+                )
+            else:
+                alphas = _alpha_grid(DEFAULT_ALPHA_MIN, DEFAULT_ALPHA_MAX, DEFAULT_N_ALPHA)
             logger.info(
-                "Running alpha sweep with %d values: %s to %s with %s alpha values on shared subset of data: %s",
+                "Running %s alpha sweep with %d values: %s to %s on shared subset of data: %s",
+                args.alpha_grid,
                 len(alphas),
                 _format_alpha(alphas[0]),
                 _format_alpha(alphas[-1]),
-                DEFAULT_N_ALPHA,
                 require_all_methods,
             )
-            if not math.isclose(alphas[-1], DEFAULT_ALPHA_MAX, rel_tol=0.0, abs_tol=1e-12):
+            if args.alpha_grid == "log" and not math.isclose(
+                alphas[-1], DEFAULT_ALPHA_MAX, rel_tol=0.0, abs_tol=1e-12
+            ):
                 logger.info(
                     "Alpha max %.12g is not on the requested grid; last evaluated alpha is %s.",
                     DEFAULT_ALPHA_MAX,
                     _format_alpha(alphas[-1]),
                 )
+            fpr_path = write_attainable_fpr_table(
+                out_path=attainable_fpr_output,
+                n_trials_values=args.alpha_critical_n_trials,
+                n_impostors=args.n_impostors,
+                bonferroni_factor=args.alpha_bonferroni_factor,
+            )
+            logger.info("Wrote attainable FPR table to %s.", fpr_path)
 
             results = experiment.evaluate_alpha_sweep(
                 datasets=args.datasets,

@@ -71,6 +71,9 @@ from pymongo.collection import Collection
 
 from genai_detection.config import CONFIG
 from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
+from genai_detection.experiments.reproduction.pan_metrics.run_pan_metrics import (
+    N_IMPOSTORS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +98,8 @@ PLOT_LABEL_FONT_SIZE = 13
 PLOT_TICK_FONT_SIZE = 11
 PLOT_LEGEND_FONT_SIZE = 11
 PLOT_LEGEND_TITLE_FONT_SIZE = 12
+DEFAULT_ALPHA_CRITICAL_N_TRIALS = (100, 50, 10)
+DEFAULT_ALPHA_BONFERRONI_FACTOR = 2.0
 
 
 def _safe_filename(value: str) -> str:
@@ -174,6 +179,38 @@ def _alpha_grid(alpha_min: float, alpha_max: float, alpha_step: float) -> np.nda
     return alphas[alphas <= alpha_max + 1e-12]
 
 
+def _critical_alpha_grid(
+    *,
+    n_trials_values: Iterable[int],
+    n_impostors: int,
+    bonferroni_factor: float = DEFAULT_ALPHA_BONFERRONI_FACTOR,
+) -> np.ndarray:
+    """Return alpha values where the binomial-test critical success count changes."""
+    if n_impostors < 1:
+        raise ValueError("--n-impostors must be at least 1.")
+    if bonferroni_factor <= 0:
+        raise ValueError("--alpha-bonferroni-factor must be greater than 0.")
+
+    p0 = 1.0 / (1 + n_impostors)
+    alphas: set[float] = set()
+    for n_trials in n_trials_values:
+        if n_trials < 1:
+            raise ValueError("--alpha-critical-n-trials values must be positive.")
+        for critical_k in range(1, n_trials + 1):
+            tail_probability = sum(
+                math.comb(n_trials, k) * (p0**k) * ((1 - p0) ** (n_trials - k))
+                for k in range(critical_k, n_trials + 1)
+            )
+            alpha = min(1.0, bonferroni_factor * tail_probability)
+            if 0.0 < alpha <= 1.0:
+                alphas.add(float(alpha))
+    if not alphas:
+        raise ValueError(
+            "No critical-k alpha values fall inside the requested alpha range."
+        )
+    return np.asarray(sorted(alphas), dtype=float)
+
+
 def _load_author_pairs(
     collection: Collection,
     *,
@@ -211,6 +248,7 @@ def _load_impostor_outputs_for_pairs(
     dataset_names: list[str] | None,
     techniques: list[str] | None,
     ablations: list[str] | None,
+    n_impostors: int | None,
     left_p_value_field: str,
     right_p_value_field: str,
     batch_size: int,
@@ -230,6 +268,8 @@ def _load_impostor_outputs_for_pairs(
         query["impostor_generation_technique"] = {"$in": technique_query_values}
     if ablations:
         query["ablation"] = {"$in": ablations}
+    if n_impostors is not None:
+        query["n_impostors"] = n_impostors
 
     projection = {
         "_id": 0,
@@ -239,6 +279,7 @@ def _load_impostor_outputs_for_pairs(
         "impostor_generation_technique": 1,
         "retrieval_index": 1,
         "ablation": 1,
+        "n_impostors": 1,
         left_p_value_field: 1,
         right_p_value_field: 1,
     }
@@ -277,6 +318,7 @@ def _load_impostor_outputs_for_pairs(
                 "impostor_generation_technique": doc["impostor_generation_technique"],
                 "retrieval_index": doc.get("retrieval_index"),
                 "ablation": ablation,
+                "n_impostors": doc.get("n_impostors"),
                 "method_key": method_key,
                 "left_p_value": left_p_value,
                 "right_p_value": right_p_value,
@@ -305,6 +347,8 @@ def _load_impostor_outputs_for_pairs(
 def compute_type_one_error_curves(
     df: pd.DataFrame,
     alphas: np.ndarray,
+    *,
+    decision_rule: str = "pair_both",
 ) -> dict[str, dict[str, pd.DataFrame]]:
     return _compute_alpha_curves(
         df=df,
@@ -313,12 +357,15 @@ def compute_type_one_error_curves(
         count_column="n_different_author_pairs",
         use_non_rejection_rate=False,
         record_label="different-author",
+        decision_rule=decision_rule,
     )
 
 
 def compute_same_author_non_rejection_curves(
     df: pd.DataFrame,
     alphas: np.ndarray,
+    *,
+    decision_rule: str = "pair_both",
 ) -> dict[str, dict[str, pd.DataFrame]]:
     return _compute_alpha_curves(
         df=df,
@@ -327,6 +374,7 @@ def compute_same_author_non_rejection_curves(
         count_column="n_same_author_pairs",
         use_non_rejection_rate=True,
         record_label="same-author",
+        decision_rule=decision_rule,
     )
 
 
@@ -338,6 +386,7 @@ def _compute_alpha_curves(
     count_column: str,
     use_non_rejection_rate: bool,
     record_label: str,
+    decision_rule: str,
 ) -> dict[str, dict[str, pd.DataFrame]]:
     curves: dict[str, dict[str, pd.DataFrame]] = {}
     if df.empty:
@@ -359,10 +408,17 @@ def _compute_alpha_curves(
 
             left_p_values = technique_df["left_p_value"].to_numpy(dtype=float)
             right_p_values = technique_df["right_p_value"].to_numpy(dtype=float)
-            rejected = (
-                (left_p_values[None, :] <= alphas[:, None])
-                & (right_p_values[None, :] <= alphas[:, None])
-            )
+            if decision_rule == "pair_both":
+                rejected = (
+                    (left_p_values[None, :] <= alphas[:, None])
+                    & (right_p_values[None, :] <= alphas[:, None])
+                )
+            elif decision_rule == "left_disputed_right_candidate":
+                rejected = left_p_values[None, :] <= alphas[:, None]
+            elif decision_rule == "right_disputed_left_candidate":
+                rejected = right_p_values[None, :] <= alphas[:, None]
+            else:
+                raise ValueError(f"Unknown decision rule: {decision_rule}")
             if use_non_rejection_rate:
                 rate = (~rejected).sum(axis=1) / len(technique_df)
             else:
@@ -392,6 +448,8 @@ def save_type_one_error_plots(
     same_author_non_rejection_curves: dict[str, dict[str, pd.DataFrame]] | None = None,
     *,
     output_dir: Path,
+    plot_suffix: str = "pair_both",
+    plot_title_suffix: str = "",
 ) -> list[Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     saved_paths: list[Path] = []
@@ -456,7 +514,7 @@ def save_type_one_error_plots(
 
         display_dataset = _display_dataset(dataset_name)
         ax.set_title(
-            r"$\alpha$" + f" Calibration on the {display_dataset} Dataset",
+            r"$\alpha$" + f" Calibration on the {display_dataset} Dataset{plot_title_suffix}",
             fontsize=PLOT_TITLE_FONT_SIZE,
         )
         ax.set_xlabel(r"Significance level $\alpha$", fontsize=PLOT_LABEL_FONT_SIZE)
@@ -534,7 +592,7 @@ def save_type_one_error_plots(
 
         filename = (
             "alpha_calibration_directional_hypothesis_tests_"
-            f"{_safe_filename(dataset_name)}"
+            f"{_safe_filename(dataset_name)}_{_safe_filename(plot_suffix)}"
         )
         for file_format in ("pdf", "svg"):
             output_path = output_dir / f"{filename}.{file_format}"
@@ -544,6 +602,51 @@ def save_type_one_error_plots(
         plt.close(fig)
 
     return saved_paths
+
+
+def write_attainable_fpr_table(
+    *,
+    output_dir: Path,
+    n_trials_values: Iterable[int],
+    n_impostors: int,
+    bonferroni_factor: float,
+) -> Path:
+    """Write theoretical attainable FPRs for every critical count c."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    if n_impostors < 1:
+        raise ValueError("n_impostors must be at least 1.")
+    if bonferroni_factor <= 0:
+        raise ValueError("bonferroni_factor must be greater than 0.")
+
+    p0 = 1.0 / (1 + n_impostors)
+    rows: list[dict[str, float | int]] = []
+    for n_trials in n_trials_values:
+        if n_trials < 1:
+            raise ValueError("n_trials values must be positive.")
+        for critical_c in range(1, n_trials + 1):
+            directional_fpr = sum(
+                math.comb(n_trials, k) * (p0**k) * ((1 - p0) ** (n_trials - k))
+                for k in range(critical_c, n_trials + 1)
+            )
+            rows.append(
+                {
+                    "n_trials": int(n_trials),
+                    "n_impostors": int(n_impostors),
+                    "null_probability": p0,
+                    "critical_c": int(critical_c),
+                    "directional_fpr": directional_fpr,
+                    "bonferroni_corrected_alpha": min(
+                        1.0, bonferroni_factor * directional_fpr
+                    ),
+                    "pair_level_fpr_both_directions_independent": directional_fpr
+                    * directional_fpr,
+                }
+            )
+
+    out_path = output_dir / "attainable_fpr_by_critical_count.csv"
+    pd.DataFrame(rows).to_csv(out_path, index=False)
+    logger.info("Saved attainable FPR table to %s", out_path)
+    return out_path
 
 
 def parse_args() -> argparse.Namespace:
@@ -616,6 +719,54 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--alpha-max", type=float, default=0.075)
     parser.add_argument("--alpha-step", type=float, default=0.0001)
     parser.add_argument(
+        "--alpha-grid",
+        choices=("critical-k", "linear"),
+        default="critical-k",
+        help=(
+            "Alpha values to evaluate. 'critical-k' evaluates only "
+            "Bonferroni-corrected binomial tail probabilities where the critical "
+            "success count changes; 'linear' keeps the previous fixed-step grid."
+        ),
+    )
+    parser.add_argument(
+        "--alpha-critical-n-trials",
+        type=int,
+        nargs="+",
+        default=list(DEFAULT_ALPHA_CRITICAL_N_TRIALS),
+        help=(
+            "Trial counts used to build the critical-k alpha grid. Defaults to "
+            "100 50 10."
+        ),
+    )
+    parser.add_argument(
+        "--n-impostors",
+        type=int,
+        default=N_IMPOSTORS,
+        help=(
+            "Number of impostors used to derive the null probability "
+            "1 / (1 + n_impostors) for the critical-k alpha grid."
+        ),
+    )
+    parser.add_argument(
+        "--alpha-bonferroni-factor",
+        type=float,
+        default=DEFAULT_ALPHA_BONFERRONI_FACTOR,
+        help=(
+            "Correction factor applied to attainable one-direction binomial "
+            "p-values when constructing the critical-k alpha grid."
+        ),
+    )
+    parser.add_argument(
+        "--attainable-fpr-output",
+        type=Path,
+        default=None,
+        help=(
+            "CSV path for theoretical attainable directional and pair-level FPRs "
+            "for every critical count. Defaults to output-dir/"
+            "attainable_fpr_by_critical_count.csv."
+        ),
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         default=DEFAULT_OUTPUT_DIR,
@@ -643,7 +794,21 @@ def main() -> None:
     args = parse_args()
     if args.use_ablation_collection:
         args.impostor_output_collection = CONFIG.MONGO_IMPOSTOR_ABLATION_OUTPUT_COLLECTION
-    alphas = _alpha_grid(args.alpha_min, args.alpha_max, args.alpha_step)
+    if args.alpha_grid == "critical-k":
+        alphas = _critical_alpha_grid(
+            n_trials_values=args.alpha_critical_n_trials,
+            n_impostors=args.n_impostors,
+            bonferroni_factor=args.alpha_bonferroni_factor,
+        )
+    else:
+        alphas = _alpha_grid(args.alpha_min, args.alpha_max, args.alpha_step)
+    logger.info(
+        "Using %s alpha grid with %d values from %.6g to %.6g.",
+        args.alpha_grid,
+        len(alphas),
+        float(alphas[0]),
+        float(alphas[-1]),
+    )
 
     mongo = ParaphraseMongoDB(local_ray=not args.remote_mongo)
     impostor_output_collection = mongo.db[args.impostor_output_collection]
@@ -669,6 +834,7 @@ def main() -> None:
         dataset_names=args.dataset_names,
         techniques=args.techniques,
         ablations=args.ablations,
+        n_impostors=args.n_impostors,
         left_p_value_field=args.left_p_value_field,
         right_p_value_field=args.right_p_value_field,
         batch_size=args.batch_size,
@@ -680,6 +846,7 @@ def main() -> None:
         dataset_names=args.dataset_names,
         techniques=args.techniques,
         ablations=args.ablations,
+        n_impostors=args.n_impostors,
         left_p_value_field=args.left_p_value_field,
         right_p_value_field=args.right_p_value_field,
         batch_size=args.batch_size,
@@ -695,19 +862,64 @@ def main() -> None:
             "same-author non-rejection curves will be omitted."
         )
 
-    curves = compute_type_one_error_curves(df=df, alphas=alphas)
-    same_author_non_rejection_curves = compute_same_author_non_rejection_curves(
-        df=same_author_df,
-        alphas=alphas,
-    )
-    saved_paths = save_type_one_error_plots(
-        curves,
-        same_author_non_rejection_curves=same_author_non_rejection_curves,
-        output_dir=args.output_dir,
-    )
+    saved_paths: list[Path] = []
+    plot_specs = [
+        ("pair_both", "Pair-Level Both Directions", ""),
+        (
+            "left_disputed_right_candidate",
+            "Left-Disputed Right-Candidate Direction",
+            " (Left -> Right)",
+        ),
+        (
+            "right_disputed_left_candidate",
+            "Right-Disputed Left-Candidate Direction",
+            " (Right -> Left)",
+        ),
+    ]
+    for decision_rule, plot_suffix, plot_title_suffix in plot_specs:
+        curves = compute_type_one_error_curves(
+            df=df,
+            alphas=alphas,
+            decision_rule=decision_rule,
+        )
+        same_author_non_rejection_curves = compute_same_author_non_rejection_curves(
+            df=same_author_df,
+            alphas=alphas,
+            decision_rule=decision_rule,
+        )
+        saved_paths.extend(
+            save_type_one_error_plots(
+                curves,
+                same_author_non_rejection_curves=same_author_non_rejection_curves,
+                output_dir=args.output_dir,
+                plot_suffix=plot_suffix,
+                plot_title_suffix=plot_title_suffix,
+            )
+        )
+    attainable_fpr_output = args.attainable_fpr_output
+    if attainable_fpr_output is None:
+        attainable_fpr_output = write_attainable_fpr_table(
+            output_dir=args.output_dir,
+            n_trials_values=args.alpha_critical_n_trials,
+            n_impostors=args.n_impostors,
+            bonferroni_factor=args.alpha_bonferroni_factor,
+        )
+    else:
+        attainable_fpr_output.parent.mkdir(parents=True, exist_ok=True)
+        generated_path = write_attainable_fpr_table(
+            output_dir=attainable_fpr_output.parent,
+            n_trials_values=args.alpha_critical_n_trials,
+            n_impostors=args.n_impostors,
+            bonferroni_factor=args.alpha_bonferroni_factor,
+        )
+        if generated_path != attainable_fpr_output:
+            generated_path.replace(attainable_fpr_output)
+            logger.info("Moved attainable FPR table to %s", attainable_fpr_output)
     print("Saved plots:")
     for path in saved_paths:
         print(path)
+    print("Saved attainable FPR table:")
+    print(attainable_fpr_output)
 
 
 if __name__ == "__main__":
