@@ -39,7 +39,6 @@ if __name__ == "__main__":
         dataset_name=CONFIG.STUDENT_ESSAYS,
         imp_gen_techniques=our_figure_impostor_options,
         compute_score_fn=compute_prec_recall_f1_acc_dict_on_existing_impostor_scores,
-        one_step_llm_label_translations=CONFIG.ONE_STEP_LLM_LABEL_TRANSLATIONS,
     )
 
     run_prec_recall_curves(
