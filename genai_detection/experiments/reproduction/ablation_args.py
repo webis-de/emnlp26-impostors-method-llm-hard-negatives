@@ -15,8 +15,10 @@
 from ablations import (ASGALFImpostorDetector, BDIImpostorDetector,
                        HBCImpostorDetector,
                        Potha2017ImpostorDetector,
+                       PermutationCalibratedImpostorDetector,
 )
 from ablations.std_impostor import StdImpostor
+
 
 ABLATION_DETECTORS = {
     "bdi": BDIImpostorDetector,
@@ -24,6 +26,7 @@ ABLATION_DETECTORS = {
     "potha2017": Potha2017ImpostorDetector,
     "asgalf": ASGALFImpostorDetector,
     "std_impostor": StdImpostor,
+    "permutation_calibrated": PermutationCalibratedImpostorDetector,
 }
 
 ABLATION_ARGS = {
@@ -45,6 +48,12 @@ ABLATION_ARGS = {
             "rounds": 50,
             "portion_delete": 0.6,
             "n_impostors": 20,
+                },
+        "permutation_calibrated": {
+            "rounds": 100,
+            "portion_delete": 0.5,
+            "n_impostors": 25,
+            "n_permutations": 199,
                 },
         "potha2017": {
                 "rounds": 10,
