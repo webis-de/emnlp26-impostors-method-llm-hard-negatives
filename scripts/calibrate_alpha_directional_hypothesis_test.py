@@ -109,6 +109,11 @@ def _display_dataset(dataset_name: str) -> str:
 
 
 def _display_method(method_name: str) -> str:
+    if "__" in method_name:
+        base_method, ablation = method_name.split("__", maxsplit=1)
+        base_display = _display_method(base_method)
+        ablation_display = ablation.removesuffix("ImpostorDetector").replace("_", " ")
+        return f"{base_display} ({ablation_display})"
     return CONFIG.LABEL_TRANSLATIONS.get(
         method_name, method_name.replace("_", " ").title()
     )
@@ -123,6 +128,10 @@ def _method_order(methods: Iterable[str]) -> list[str]:
 
 def _method_column(df: pd.DataFrame) -> str:
     return "method_key" if "method_key" in df.columns else "impostor_generation_technique"
+
+
+def _plot_method_base(method_name: str) -> str:
+    return method_name.split("__", maxsplit=1)[0]
 
 
 def _technique_query_values(techniques: list[str] | None) -> list[str] | None:
@@ -201,6 +210,7 @@ def _load_impostor_outputs_for_pairs(
     pair_label: str,
     dataset_names: list[str] | None,
     techniques: list[str] | None,
+    ablations: list[str] | None,
     left_p_value_field: str,
     right_p_value_field: str,
     batch_size: int,
@@ -218,6 +228,8 @@ def _load_impostor_outputs_for_pairs(
     technique_query_values = _technique_query_values(techniques)
     if technique_query_values:
         query["impostor_generation_technique"] = {"$in": technique_query_values}
+    if ablations:
+        query["ablation"] = {"$in": ablations}
 
     projection = {
         "_id": 0,
@@ -226,6 +238,7 @@ def _load_impostor_outputs_for_pairs(
         "dataset_name": 1,
         "impostor_generation_technique": 1,
         "retrieval_index": 1,
+        "ablation": 1,
         left_p_value_field: 1,
         right_p_value_field: 1,
     }
@@ -241,9 +254,12 @@ def _load_impostor_outputs_for_pairs(
             continue
 
         method_key = _impostor_method_key(doc)
+        ablation = doc.get("ablation")
+        if ablation:
+            method_key = f"{method_key}__{ablation}"
         if techniques and (
             doc["impostor_generation_technique"] not in techniques
-            and method_key not in techniques
+            and _plot_method_base(method_key) not in techniques
         ):
             continue
 
@@ -260,6 +276,7 @@ def _load_impostor_outputs_for_pairs(
                 "dataset_name": doc["dataset_name"],
                 "impostor_generation_technique": doc["impostor_generation_technique"],
                 "retrieval_index": doc.get("retrieval_index"),
+                "ablation": ablation,
                 "method_key": method_key,
                 "left_p_value": left_p_value,
                 "right_p_value": right_p_value,
@@ -394,7 +411,7 @@ def save_type_one_error_plots(
         technique_order = [
             technique
             for technique in _method_order(set(dataset_curves) | set(same_dataset_curves))
-            if technique not in PLOT_EXCLUDED_METHODS
+            if _plot_method_base(technique) not in PLOT_EXCLUDED_METHODS
         ]
         if not technique_order:
             logger.warning(
@@ -406,6 +423,7 @@ def save_type_one_error_plots(
 
         for technique in technique_order:
             color = CONFIG.LABEL_COLORS.get(technique, "#4c4c4c")
+            color = CONFIG.LABEL_COLORS.get(_plot_method_base(technique), color)
             if technique in dataset_curves:
                 curve = dataset_curves[technique]
                 max_error = max(max_error, float(curve["type_one_error"].max()))
@@ -467,7 +485,9 @@ def save_type_one_error_plots(
             Line2D(
                 [0],
                 [0],
-                color=CONFIG.LABEL_COLORS.get(technique, "#4c4c4c"),
+                color=CONFIG.LABEL_COLORS.get(
+                    _plot_method_base(technique), "#4c4c4c"
+                ),
                 linewidth=2,
                 label=_display_method(technique),
             )
@@ -542,6 +562,14 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--use-ablation-collection",
+        action="store_true",
+        help=(
+            "Read from the configured ablation output collection "
+            f"({CONFIG.MONGO_IMPOSTOR_ABLATION_OUTPUT_COLLECTION!r})."
+        ),
+    )
+    parser.add_argument(
         "--all-pairs-collection",
         default=CONFIG.MONGO_ALL_PAIRS_COLLECTION,
         help=(
@@ -562,6 +590,16 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Restrict to one impostor_generation_technique. Repeat the option "
             "for multiple techniques."
+        ),
+    )
+    parser.add_argument(
+        "--ablation",
+        action="append",
+        dest="ablations",
+        help=(
+            "Restrict to one ablation class in an ablation output collection. "
+            "Repeat the option for multiple ablations, e.g. "
+            "PermutationCalibratedImpostorDetector."
         ),
     )
     parser.add_argument(
@@ -603,6 +641,8 @@ def main() -> None:
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
     args = parse_args()
+    if args.use_ablation_collection:
+        args.impostor_output_collection = CONFIG.MONGO_IMPOSTOR_ABLATION_OUTPUT_COLLECTION
     alphas = _alpha_grid(args.alpha_min, args.alpha_max, args.alpha_step)
 
     mongo = ParaphraseMongoDB(local_ray=not args.remote_mongo)
@@ -628,6 +668,7 @@ def main() -> None:
         pair_label="different-author",
         dataset_names=args.dataset_names,
         techniques=args.techniques,
+        ablations=args.ablations,
         left_p_value_field=args.left_p_value_field,
         right_p_value_field=args.right_p_value_field,
         batch_size=args.batch_size,
@@ -638,6 +679,7 @@ def main() -> None:
         pair_label="same-author",
         dataset_names=args.dataset_names,
         techniques=args.techniques,
+        ablations=args.ablations,
         left_p_value_field=args.left_p_value_field,
         right_p_value_field=args.right_p_value_field,
         batch_size=args.batch_size,
