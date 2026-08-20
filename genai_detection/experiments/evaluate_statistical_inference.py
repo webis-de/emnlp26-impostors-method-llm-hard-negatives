@@ -106,18 +106,23 @@ STATISTICAL_INFERENCE_DATASET_LABELS = {
     CONFIG.STUDENT_ESSAYS: "Student Essays Dataset",
 }
 
-STATISTICAL_INFERENCE_METHOD_LABELS = {
-    "on_the_fly_chatnoir": "ChatNoir",
-    "on_the_fly_startpage": "Startpage",
-    "in_domain": "In-Domain",
-    "two_step_llm": "LLM impostors",
-}
+# TODO: delete
+# STATISTICAL_INFERENCE_METHOD_LABELS = {
+#     "on_the_fly_chatnoir": "ChatNoir",
+#     "on_the_fly_startpage": "Startpage",
+#     "in_domain": "In-Domain",
+#     "two_step_llm": "LLM impostors",
+#     "one_step_llm",
+#     "random_words",
+# }
 
 DEFAULT_METHOD_ORDER = [
     "on_the_fly_chatnoir",
     "on_the_fly_startpage",
     "in_domain",
     "two_step_llm",
+    "one_step_llm",
+    "random_words",
     # "ppmd",
     # "unmasking",
     # "supervised_baseline",
@@ -214,7 +219,7 @@ def _display_statistical_inference_dataset(dataset_name: str) -> str:
 
 
 def _display_statistical_inference_method(method_name: str) -> str:
-    return STATISTICAL_INFERENCE_METHOD_LABELS.get(
+    return CONFIG.LABEL_TRANSLATIONS.get(
         method_name, _display_method(method_name)
     )
 
@@ -2089,6 +2094,7 @@ def plot_results(csv_path, *, require_all_methods: bool = False):
             ax.set_title(metric_label)
             ax.set_xlabel(r"$\alpha$")
             ax.set_ylabel(metric_label)
+            ax.set_ylim((0,1))
             ax.grid(alpha=0.3)
 
         # Remove unused subplot
