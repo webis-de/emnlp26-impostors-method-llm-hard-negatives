@@ -2195,6 +2195,11 @@ METRICS = [
     "auroc_c_at_1",
 ]
 
+PLOT_TITLE_FONT_SIZE = 18
+PLOT_AXIS_LABEL_FONT_SIZE = 16
+PLOT_TICK_LABEL_FONT_SIZE = 14
+PLOT_LEGEND_FONT_SIZE = 14
+
 
 def plot_results(csv_path, *, require_all_methods: bool = False):
     # Input/output
@@ -2228,10 +2233,11 @@ def plot_results(csv_path, *, require_all_methods: bool = False):
                 )
 
             metric_label = CONFIG.SCORE_TRANSLATIONS.get(metric, metric)
-            ax.set_title(metric_label)
-            ax.set_xlabel(r"$\alpha$")
-            ax.set_ylabel(metric_label)
-            ax.set_ylim((0,1))
+            ax.set_title(metric_label, fontsize=PLOT_TITLE_FONT_SIZE)
+            ax.set_xlabel(r"$\alpha$", fontsize=PLOT_AXIS_LABEL_FONT_SIZE)
+            ax.set_ylabel(metric_label, fontsize=PLOT_AXIS_LABEL_FONT_SIZE)
+            ax.set_ylim((0, 1))
+            ax.tick_params(axis="both", labelsize=PLOT_TICK_LABEL_FONT_SIZE)
             ax.grid(alpha=0.3)
 
         # Remove unused subplot
@@ -2244,6 +2250,7 @@ def plot_results(csv_path, *, require_all_methods: bool = False):
             loc="lower center",
             ncol=len(labels),
             bbox_to_anchor=(0.5, -0.04),
+            fontsize=PLOT_LEGEND_FONT_SIZE,
         )
 
         dataset_label = CONFIG.DATASET_TRANSLATIONS.get(dataset_name, dataset_name)
@@ -2251,7 +2258,7 @@ def plot_results(csv_path, *, require_all_methods: bool = False):
             n_samples = sorted(dataset_df["n_samples"].dropna().unique())
             if len(n_samples) == 1:
                 dataset_label = f"{dataset_label} (n={int(n_samples[0])})"
-        fig.suptitle(dataset_label, fontsize=16)
+        fig.suptitle(dataset_label, fontsize=PLOT_TITLE_FONT_SIZE)
         for type in ["png", "svg", "pdf"]:
             plot_path = (
                 output_dir
