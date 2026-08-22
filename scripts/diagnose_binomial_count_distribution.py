@@ -118,6 +118,14 @@ DIRECTION_LABELS = {
     "right_disputed_left_candidate": r"Right $\rightarrow$ Left",
     "both_directions_pooled": "Both Directions Pooled",
 }
+DEFAULT_EXACT_COUNT_MAX = 10
+DEFAULT_TAIL_BIN_WIDTH = 5
+PLOT_TITLE_FONT_SIZE = 18
+PLOT_LABEL_FONT_SIZE = 16
+PLOT_TICK_FONT_SIZE = 13
+PLOT_LEGEND_FONT_SIZE = 13
+PLOT_LEGEND_TITLE_FONT_SIZE = 14
+PLOT_ANNOTATION_FONT_SIZE = 12
 
 
 def _safe_filename(value: str) -> str:
@@ -137,11 +145,41 @@ def _display_method(method_name: str) -> str:
     )
 
 
+def _method_color(method_name: str, fallback_index: int = 0) -> str:
+    fallback_colors = plt.rcParams["axes.prop_cycle"].by_key().get("color", ["#4c4c4c"])
+    return CONFIG.LABEL_COLORS.get(
+        method_name, fallback_colors[fallback_index % len(fallback_colors)]
+    )
+
+
 def _method_order(methods: Iterable[str]) -> list[str]:
     method_set = set(methods)
     configured = [method for method in CONFIG.LABEL_TRANSLATIONS if method in method_set]
     remaining = sorted(method_set - set(configured))
     return configured + remaining
+
+
+def _plot_title(
+    *,
+    dataset_name: str,
+    direction: str,
+    method_key: str | None = None,
+) -> str:
+    method_part = "" if method_key is None else f" - {_display_method(method_key)}"
+    title = (
+        r"Candidate-Win Count under $H_0$"
+        f" (Different-Author Pairs Only){method_part} on "
+        f"{_display_dataset(dataset_name)} Dataset"
+    )
+    if direction != "both_directions_pooled":
+        title = f"{title}\n{DIRECTION_LABELS.get(direction, direction)}"
+    return title
+
+
+def _x_axis_label(direction: str) -> str:
+    if direction == "both_directions_pooled":
+        return r"Pooled directional counts ($\neq$ final decision)"
+    return r"Directional success count $X_i$"
 
 
 def _technique_query_values(techniques: list[str] | None) -> list[str] | None:
@@ -521,14 +559,21 @@ def save_plots(
             label="Binomial PMF",
         )
         ax.set_title(
-            f"{_display_method(method_key)} - {_display_dataset(dataset_name)}\n"
-            f"{DIRECTION_LABELS.get(direction, direction)}",
-            fontsize=12,
+            _plot_title(
+                dataset_name=dataset_name,
+                method_key=method_key,
+                direction=direction,
+            ),
+            fontsize=PLOT_TITLE_FONT_SIZE,
         )
-        ax.set_xlabel("Directional success count $X_i$")
-        ax.set_ylabel("Probability")
+        ax.set_xlabel(_x_axis_label(direction), fontsize=PLOT_LABEL_FONT_SIZE)
+        ax.set_ylabel("Probability", fontsize=PLOT_LABEL_FONT_SIZE)
+        ax.tick_params(axis="both", labelsize=PLOT_TICK_FONT_SIZE)
         ax.grid(axis="y", linestyle="--", alpha=0.4)
-        ax.legend(frameon=False)
+        ax.legend(
+            frameon=False,
+            fontsize=PLOT_LEGEND_FONT_SIZE,
+        )
 
         annotation = (
             f"n={int(summary['n_null_directions'])}\n"
@@ -544,7 +589,7 @@ def save_plots(
             ha="right",
             va="top",
             bbox={"boxstyle": "round,pad=0.35", "facecolor": "white", "alpha": 0.9},
-            fontsize=9,
+            fontsize=PLOT_ANNOTATION_FONT_SIZE,
         )
         fig.tight_layout()
 
@@ -559,6 +604,145 @@ def save_plots(
         plt.close(fig)
 
     logger.info("Saved %d plot files in %s.", len(saved_paths), plot_dir)
+    return saved_paths
+
+
+def _count_bins(
+    *,
+    n_trials: int,
+    exact_count_max: int,
+    tail_bin_width: int,
+) -> list[tuple[int, int, str]]:
+    if exact_count_max < 0:
+        raise ValueError("exact_count_max must be non-negative.")
+    if tail_bin_width < 1:
+        raise ValueError("tail_bin_width must be positive.")
+
+    bins: list[tuple[int, int, str]] = []
+    exact_end = min(exact_count_max, n_trials)
+    for count in range(exact_end + 1):
+        bins.append((count, count, str(count)))
+    start = exact_end + 1
+    while start <= n_trials:
+        end = min(start + tail_bin_width - 1, n_trials)
+        bins.append((start, end, f"{start}-{end}" if start != end else str(start)))
+        start = end + 1
+    return bins
+
+
+def _binned_probabilities(
+    distribution_group: pd.DataFrame,
+    *,
+    bins: Sequence[tuple[int, int, str]],
+) -> tuple[np.ndarray, np.ndarray]:
+    observed: list[float] = []
+    theoretical: list[float] = []
+    for start, end, _ in bins:
+        mask = (distribution_group["count"] >= start) & (distribution_group["count"] <= end)
+        observed.append(float(distribution_group.loc[mask, "observed_probability"].sum()))
+        theoretical.append(
+            float(distribution_group.loc[mask, "theoretical_probability"].sum())
+        )
+    return np.asarray(observed), np.asarray(theoretical)
+
+
+def save_combined_approach_plots(
+    *,
+    distribution_df: pd.DataFrame,
+    output_dir: Path,
+    exact_count_max: int = DEFAULT_EXACT_COUNT_MAX,
+    tail_bin_width: int = DEFAULT_TAIL_BIN_WIDTH,
+    alpha: float = 0.65,
+) -> list[Path]:
+    """Save combined empirical/theoretical count plots across all approaches."""
+    plot_dir = output_dir / "plots" / "combined_approaches"
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    saved_paths: list[Path] = []
+
+    for key, group in distribution_df.groupby(["dataset_name", "direction"]):
+        dataset_name, direction = key
+        n_trials = int(group["n_trials"].iloc[0])
+        bins = _count_bins(
+            n_trials=n_trials,
+            exact_count_max=exact_count_max,
+            tail_bin_width=tail_bin_width,
+        )
+        x = np.arange(len(bins), dtype=float)
+        labels = [label for _, _, label in bins]
+        method_order = _method_order(group["method_key"].dropna().unique())
+        if not method_order:
+            continue
+
+        fig_width = max(9.5, 0.42 * len(labels))
+        fig, ax = plt.subplots(figsize=(fig_width, 5.4))
+        bar_width = min(0.8 / max(len(method_order), 1), 0.16)
+
+        theoretical_reference: np.ndarray | None = None
+        for method_idx, method_key in enumerate(method_order):
+            method_group = group[group["method_key"] == method_key]
+            if method_group.empty:
+                continue
+            observed, theoretical = _binned_probabilities(method_group, bins=bins)
+            if theoretical_reference is None:
+                theoretical_reference = theoretical
+            offset = (method_idx - (len(method_order) - 1) / 2) * bar_width
+            color = _method_color(method_key, fallback_index=method_idx)
+            ax.bar(
+                x + offset,
+                observed,
+                width=bar_width,
+                color=color,
+                alpha=alpha,
+                edgecolor=color,
+                linewidth=0.7,
+                label=_display_method(method_key),
+            )
+
+        if theoretical_reference is not None:
+            ax.plot(
+                x,
+                theoretical_reference,
+                color="#111111",
+                linestyle="-",
+                linewidth=2.4,
+                marker="o",
+                markersize=3,
+                label="Theoretical binomial",
+            )
+
+        ax.set_title(
+            _plot_title(dataset_name=dataset_name, direction=direction),
+            fontsize=PLOT_TITLE_FONT_SIZE,
+        )
+        ax.set_xlabel(
+            _x_axis_label(direction),
+            fontsize=PLOT_LABEL_FONT_SIZE,
+        )
+        ax.set_ylabel("Probability mass", fontsize=PLOT_LABEL_FONT_SIZE)
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels, rotation=45, ha="right")
+        ax.tick_params(axis="both", labelsize=PLOT_TICK_FONT_SIZE)
+        ax.grid(axis="y", linestyle="--", alpha=0.35)
+        ax.legend(
+            title="Empirical Bars / Reference Line",
+            frameon=False,
+            fontsize=PLOT_LEGEND_FONT_SIZE,
+            title_fontsize=PLOT_LEGEND_TITLE_FONT_SIZE,
+            ncol=2,
+        )
+        fig.tight_layout()
+
+        filename = (
+            f"combined_binomial_count_distribution_{_safe_filename(dataset_name)}_"
+            f"{_safe_filename(direction)}"
+        )
+        for file_format in ("pdf", "svg"):
+            out_path = plot_dir / f"{filename}.{file_format}"
+            fig.savefig(out_path, bbox_inches="tight")
+            saved_paths.append(out_path)
+        plt.close(fig)
+
+    logger.info("Saved %d combined approach plot files in %s.", len(saved_paths), plot_dir)
     return saved_paths
 
 
@@ -581,6 +765,9 @@ of the impostor hypothesis test, restricted to null pairs (`same == False`).
   model.
 - `plots/`: bar plots of the empirical count distribution overlaid with the
   theoretical binomial PMF. These are the main diagnostic figures.
+- `plots/combined_approaches/`: combined figures comparing all impostor
+  generation approaches for the same dataset and direction. These use exact
+  bins at small counts and wider bins in the tail.
 
 ## Interpretation
 
@@ -605,6 +792,11 @@ As a rule of thumb:
 The chi-square p-value is included as a rough descriptive check. It can be
 unstable when many expected bin counts are small, so use it together with the
 dispersion ratio and the plots rather than as the sole decision criterion.
+
+For comparing impostor-generation approaches directly, use
+`plots/combined_approaches/`. Solid transparent bars show empirical probability
+mass per approach; the solid black line shows the shared theoretical binomial
+mass for the same count bins.
 """
     readme_path = output_dir / "README.md"
     readme_path.write_text(text, encoding="utf-8")
@@ -659,6 +851,27 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=1e-9,
         help="Tolerance for matching stored p-values to attainable binomial tails.",
+    )
+    parser.add_argument(
+        "--combined-exact-count-max",
+        type=int,
+        default=DEFAULT_EXACT_COUNT_MAX,
+        help=(
+            "For combined approach plots, keep exact one-count bins through this "
+            "count before switching to wider tail bins."
+        ),
+    )
+    parser.add_argument(
+        "--combined-tail-bin-width",
+        type=int,
+        default=DEFAULT_TAIL_BIN_WIDTH,
+        help="Width of tail bins in combined approach plots.",
+    )
+    parser.add_argument(
+        "--combined-alpha",
+        type=float,
+        default=0.65,
+        help="Transparency for empirical bars in combined approach plots.",
     )
     parser.add_argument(
         "--remote-mongo",
@@ -734,12 +947,22 @@ def main() -> None:
         summary_df=summary_df,
         output_dir=args.output_dir,
     )
+    combined_plot_paths = save_combined_approach_plots(
+        distribution_df=distribution_df,
+        output_dir=args.output_dir,
+        exact_count_max=args.combined_exact_count_max,
+        tail_bin_width=args.combined_tail_bin_width,
+        alpha=args.combined_alpha,
+    )
     readme_path = write_readme(args.output_dir)
 
     logger.info("Saved counts_long.csv: raw inferred X_i count rows.")
     logger.info("Saved summary.csv: primary validity diagnostics; inspect dispersion_ratio.")
     logger.info("Saved distribution.csv: empirical vs theoretical probability per count.")
     logger.info("Saved plots/: empirical histograms overlaid with binomial PMF.")
+    logger.info(
+        "Saved plots/combined_approaches/: combined empirical/theoretical figures across approaches."
+    )
     logger.info("Saved README.md: output-file guide and interpretation notes.")
 
     print("Saved binomial-count diagnostic outputs:")
@@ -748,6 +971,10 @@ def main() -> None:
     print(f"- distribution: {distribution_path}")
     print(f"- readme: {readme_path}")
     print(f"- plots: {args.output_dir / 'plots'} ({len(plot_paths)} files)")
+    print(
+        f"- combined plots: {args.output_dir / 'plots' / 'combined_approaches'} "
+        f"({len(combined_plot_paths)} files)"
+    )
     print("\nFor binomial validity, start with summary.csv dispersion_ratio and the matching plots.")
 
 
