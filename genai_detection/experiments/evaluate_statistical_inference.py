@@ -223,10 +223,6 @@ def _prediction_field_for_alpha(alpha: float) -> str:
     return f"{DEFAULT_PREDICTION_FIELD}_{_alpha_slug(alpha)}"
 
 
-def _prediction_field_for_alpha_decision_rule(alpha: float, decision_rule: str) -> str:
-    return f"{_prediction_field_for_alpha(alpha)}_{decision_rule}"
-
-
 def _label_with_alpha(label: str, alpha: float) -> str:
     return f"{label}-{_alpha_slug(alpha).replace('_', '-')}"
 
@@ -243,16 +239,6 @@ def _display_dataset(dataset_name: str) -> str:
 
 
 def _display_method(method_name: str) -> str:
-    directional_suffixes = {
-        "__pair_both": "Pair-Level Both Directions",
-        "__left_disputed_right_candidate": "Left -> Right",
-        "__right_disputed_left_candidate": "Right -> Left",
-    }
-    for suffix, suffix_label in directional_suffixes.items():
-        if method_name.endswith(suffix):
-            base_method = method_name.removesuffix(suffix)
-            base_label = CONFIG.LABEL_TRANSLATIONS.get(base_method, base_method)
-            return f"{base_label} ({suffix_label})"
     return CONFIG.LABEL_TRANSLATIONS.get(method_name, method_name)
 
 
@@ -883,7 +869,6 @@ class StatisticalInferenceExperiment:
         *,
         dataset_name: str,
         alphas: Sequence[float],
-        decision_rule: str,
         left_p_value_field: str,
         right_p_value_field: str,
         n_impostors: int,
@@ -943,16 +928,9 @@ class StatisticalInferenceExperiment:
 
         results: list[StatisticalInferenceMetrics] = []
         for alpha in alphas:
-            if decision_rule == "pair_both":
-                predictions = (
-                    (left_p_values <= alpha) & (right_p_values <= alpha)
-                ).astype(float)
-            elif decision_rule == "left_disputed_right_candidate":
-                predictions = (left_p_values <= alpha).astype(float)
-            elif decision_rule == "right_disputed_left_candidate":
-                predictions = (right_p_values <= alpha).astype(float)
-            else:
-                raise ValueError(f"Unknown decision rule: {decision_rule}")
+            predictions = ((left_p_values <= alpha) & (right_p_values <= alpha)).astype(
+                float
+            )
             error_rates = _classification_error_rates(y_true, predictions)
             cv_result = self.evaluator.compute_cv(
                 y_true=y_true,
@@ -964,10 +942,8 @@ class StatisticalInferenceExperiment:
             results.append(
                 StatisticalInferenceMetrics(
                     dataset_name=dataset_name,
-                    method_name=f"{method_name}__{decision_rule}",
-                    prediction_field=_prediction_field_for_alpha_decision_rule(
-                        alpha, decision_rule
-                    ),
+                    method_name=method_name,
+                    prediction_field=_prediction_field_for_alpha(alpha),
                     alpha=float(alpha),
                     left_p_value_field=left_p_value_field,
                     right_p_value_field=right_p_value_field,
@@ -988,7 +964,7 @@ class StatisticalInferenceExperiment:
         logger.info(
             "Computed alpha sweep for %s/%s on %d samples and %d alpha values.",
             dataset_name,
-            f"{method_name}__{decision_rule}",
+            method_name,
             len(ordered_keys),
             len(results),
         )
@@ -1056,31 +1032,25 @@ class StatisticalInferenceExperiment:
                 )
 
             for method_name in methods:
-                for decision_rule in (
-                    "pair_both",
-                    "left_disputed_right_candidate",
-                    "right_disputed_left_candidate",
-                ):
-                    results.extend(
-                        self.evaluate_method_alpha_sweep(
-                            method_name,
-                            dataset_name=dataset_name,
-                            alphas=alphas,
-                            decision_rule=decision_rule,
-                            left_p_value_field=left_p_value_field,
-                            right_p_value_field=right_p_value_field,
-                            n_impostors=n_impostors,
-                            n_potential_impostors=n_potential_impostors,
-                            ci_level=ci_level,
-                            n_boot=n_boot,
-                            p_values_by_pair=(
-                                None
-                                if p_values_by_method is None
-                                else p_values_by_method[method_name]
-                            ),
-                            required_pair_keys=common_pair_keys,
-                        )
+                results.extend(
+                    self.evaluate_method_alpha_sweep(
+                        method_name,
+                        dataset_name=dataset_name,
+                        alphas=alphas,
+                        left_p_value_field=left_p_value_field,
+                        right_p_value_field=right_p_value_field,
+                        n_impostors=n_impostors,
+                        n_potential_impostors=n_potential_impostors,
+                        ci_level=ci_level,
+                        n_boot=n_boot,
+                        p_values_by_pair=(
+                            None
+                            if p_values_by_method is None
+                            else p_values_by_method[method_name]
+                        ),
+                        required_pair_keys=common_pair_keys,
                     )
+                )
         return results
 
     def evaluate_directional_agreement_method(
