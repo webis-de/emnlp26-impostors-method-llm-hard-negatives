@@ -60,6 +60,10 @@ from genai_detection.mongo_db.mongo_utils import ParaphraseMongoDB
 logger = logging.getLogger(__name__)
 
 DEFAULT_PREDICTION_FIELD = "pred_both_hypotheses_directions"
+LEGACY_DEFAULT_PREDICTION_FIELD = "pred_both_hypothesis_directions"
+PREDICTION_FIELD_FALLBACKS = {
+    DEFAULT_PREDICTION_FIELD: (LEGACY_DEFAULT_PREDICTION_FIELD,),
+}
 RIGHT_DISPUTED_LEFT_CANDIDATE_PREDICTION_FIELD = (
     "right_disputed_left_candidate_uncorrected_p_value_pred"
 )
@@ -451,30 +455,61 @@ class StatisticalInferencePredictionLoader(PANDataLoader):
 
         cursor = self.mongo.impostor_output_collection.find(
             query,
-            {"left_id": 1, "right_id": 1, prediction_field: 1},
+            {
+                "left_id": 1,
+                "right_id": 1,
+                prediction_field: 1,
+                **{
+                    fallback_field: 1
+                    for fallback_field in PREDICTION_FIELD_FALLBACKS.get(
+                        prediction_field, ()
+                    )
+                },
+            },
             batch_size=self.batch_size,
         ).sort("_id", 1)
 
         predictions_by_pair: dict[tuple[ObjectId, ObjectId], float] = {}
         missing_prediction_field = 0
+        used_fallback_fields: dict[str, int] = defaultdict(int)
         for doc in cursor:
             pair = (doc["left_id"], doc["right_id"])
             if pair in predictions_by_pair:
                 continue
-            if prediction_field not in doc:
-                missing_prediction_field += 1
-                continue
+            field_to_read = prediction_field
+            if field_to_read not in doc:
+                for fallback_field in PREDICTION_FIELD_FALLBACKS.get(
+                    prediction_field, ()
+                ):
+                    if fallback_field in doc:
+                        field_to_read = fallback_field
+                        used_fallback_fields[fallback_field] += 1
+                        break
+                else:
+                    missing_prediction_field += 1
+                    continue
             predictions_by_pair[pair] = self._coerce_binary_prediction(
-                doc[prediction_field],
-                prediction_field=prediction_field,
+                doc[field_to_read],
+                prediction_field=field_to_read,
             )
 
         if missing_prediction_field:
             logger.warning(
-                "Skipped %d %s/%s documents without prediction field %s.",
+                "Skipped %d %s/%s documents without prediction field %s or fallbacks %s.",
                 missing_prediction_field,
                 dataset_name,
                 technique,
+                prediction_field,
+                ", ".join(PREDICTION_FIELD_FALLBACKS.get(prediction_field, ()))
+                or "--",
+            )
+        for fallback_field, count in used_fallback_fields.items():
+            logger.info(
+                "Loaded %d %s/%s predictions from fallback field %s for requested field %s.",
+                count,
+                dataset_name,
+                technique,
+                fallback_field,
                 prediction_field,
             )
 
@@ -1777,7 +1812,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--alpha-sweep",
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=False, # False to get cohen's kappa tex file
         help="Generate alpha-specific outputs from stored p-values. Enabled by default.",
     )
     parser.add_argument(
