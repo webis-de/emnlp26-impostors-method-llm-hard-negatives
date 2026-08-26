@@ -2195,10 +2195,10 @@ METRICS = [
     "auroc_c_at_1",
 ]
 
-PLOT_TITLE_FONT_SIZE = 18
-PLOT_AXIS_LABEL_FONT_SIZE = 16
-PLOT_TICK_LABEL_FONT_SIZE = 14
-PLOT_LEGEND_FONT_SIZE = 14
+PLOT_TITLE_FONT_SIZE = 24
+PLOT_AXIS_LABEL_FONT_SIZE = 22
+PLOT_TICK_LABEL_FONT_SIZE = 18
+PLOT_LEGEND_FONT_SIZE = 18
 
 
 def plot_results(csv_path, *, require_all_methods: bool = False):
@@ -2215,7 +2215,7 @@ def plot_results(csv_path, *, require_all_methods: bool = False):
         fig, axes = plt.subplots(
             nrows=2,
             ncols=4,
-            figsize=(16, 8),
+            figsize=(20, 10),
             constrained_layout=True,
         )
         axes = axes.flatten()
