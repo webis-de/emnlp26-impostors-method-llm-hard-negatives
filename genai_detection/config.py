@@ -140,6 +140,11 @@ class BaseConfig:
         "gpt-5.4-nano-2026-03-17": "GPT 5.4 Nano",
         "gpt-5.6-luna": "GPT 5.6 Luna",
         "tuner007/pegasus_paraphrase": "Pegasus",
+        "meta-llama-3.1-8b-instruct": "LLama 3.1 8B",
+        "mistral-large-instruct": "Mistral 675B",
+        "openai-gpt-oss-120b": "GPT OSS 120B",
+        "openai/gpt-5-nano-2025-08-07": "GPT-5 Nano",
+        "qwen3-32b": "Qwen 3 32B",
     }
 
     # Fixed colors per label (matplotlib-compatible)

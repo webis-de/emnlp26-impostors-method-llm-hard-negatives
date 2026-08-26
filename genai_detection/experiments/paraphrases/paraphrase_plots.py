@@ -25,7 +25,7 @@ from matplotlib import pyplot as plt
 
 from genai_detection.config import CONFIG
 
-
+logger = logging.getLogger(__name__)
 class ParaphrasePlotter:
     def __init__(self, save_base_path: Path):
         self.save_base_path = save_base_path
@@ -370,22 +370,15 @@ class ParaphrasePlotter:
         return approach_series + " | " + model_series + " | " + prompt_signatures
 
     def _labels_with_counts(
-        self, counts: pd.Series, words_per_line: int = 4
+        self, counts: pd.Series
     ) -> dict[str, str]:
         label_map = {}
-        translate_to_readable = {
-            "meta": "LLama 3.1 8B",
-            "mistral": "Mistral 675B",
-            "gpt-oss": "GPT OSS 120B",
-            "gpt-5": "GPT-5 Nano",
-            "qwen": "Qwen 3 32B",
-        }
+        translate_to_readable = CONFIG.ONE_STEP_LLM_LABEL_TRANSLATIONS
         approach_to_readable = {
             "non_naive": "Two-step",
             "naive": "One-step",
         }
         for label, count in counts.items():
-            # wrapped = self._wrap_label(str(label), words_per_line=words_per_line)
             label_str = str(label)
             configured_model_labels = {
                 **CONFIG.LABEL_TRANSLATIONS,
@@ -394,14 +387,7 @@ class ParaphrasePlotter:
 
             readable_model = configured_model_labels.get(label_str)
             if readable_model is None:
-                readable_model = next(
-                    (
-                        readable
-                        for key, readable in translate_to_readable.items()
-                        if key.lower() in label_str.lower()
-                    ),
-                    label_str,
-                )
+                logger.warning("Did not recognize model '%s', skipping.", label_str)
             readable_approach = next(
                 (
                     readable
