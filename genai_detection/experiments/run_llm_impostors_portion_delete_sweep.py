@@ -261,6 +261,10 @@ def plot_metrics(
 ) -> None:
     """One plot per dataset, all metrics in the same plot."""
     fig, ax = plt.subplots(figsize=(10, 6))
+    label_fontsize = 18
+    tick_fontsize = 16
+    title_fontsize = 20
+    legend_fontsize = 18
 
     for metric in METRICS:
         if metric in summary_df.columns:
@@ -271,13 +275,15 @@ def plot_metrics(
                 label=CONFIG.SCORE_TRANSLATIONS.get(metric, metric),
             )
 
-    ax.set_xlabel("Portion of features deleted")
-    ax.set_ylabel("Metric score")
+    ax.set_xlabel("Portion of features deleted", fontsize=label_fontsize)
+    ax.set_ylabel("Metric score", fontsize=label_fontsize)
     ax.set_ylim(-0.01, 1.01)
+    ax.tick_params(axis="both", labelsize=tick_fontsize)
     ax.grid(True, linestyle="--", alpha=0.4)
-    ax.legend(ncol=2)
-    ax.set_title(f"{CONFIG.LABEL_TRANSLATIONS.get(method_name, method_name)} portion_delete sweep - "
-                 f"{CONFIG.DATASET_TRANSLATIONS.get(dataset_name, dataset_name)} ")
+    ax.legend(ncol=2, fontsize=legend_fontsize, loc="lower center")
+    ax.set_title(f"{CONFIG.LABEL_TRANSLATIONS.get(method_name, method_name)} Approach on the "
+                 f"{CONFIG.DATASET_TRANSLATIONS.get(dataset_name, dataset_name)} Dataset",
+                 fontsize=title_fontsize)
     fig.tight_layout()
 
     for ext in ("png", "pdf", "svg"):
