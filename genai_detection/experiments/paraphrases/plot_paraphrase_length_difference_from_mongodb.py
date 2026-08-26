@@ -158,6 +158,7 @@ class MongoParaphraseLengthPercentagePlotter:
                     dataset_name,
                 )
                 continue
+            logger.info("Found %d models for dataset %s.", len(df_subset["model"].unique()), dataset_name)
             self.plotter.plot_length_percentage_boxplot(
                 df=df_subset,
                 data_category=dataset_name,

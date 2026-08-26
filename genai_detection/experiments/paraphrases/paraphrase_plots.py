@@ -387,15 +387,21 @@ class ParaphrasePlotter:
         for label, count in counts.items():
             # wrapped = self._wrap_label(str(label), words_per_line=words_per_line)
             label_str = str(label)
+            configured_model_labels = {
+                **CONFIG.LABEL_TRANSLATIONS,
+                **CONFIG.ONE_STEP_LLM_LABEL_TRANSLATIONS,
+            }
 
-            readable_model = next(
-                (
-                    readable
-                    for key, readable in translate_to_readable.items()
-                    if key.lower() in label_str.lower()
-                ),
-                label_str,
-            )
+            readable_model = configured_model_labels.get(label_str)
+            if readable_model is None:
+                readable_model = next(
+                    (
+                        readable
+                        for key, readable in translate_to_readable.items()
+                        if key.lower() in label_str.lower()
+                    ),
+                    label_str,
+                )
             readable_approach = next(
                 (
                     readable
