@@ -248,8 +248,26 @@ def _latex_label(collection_name: str) -> str:
 def _latex_caption(collection_name: str, include_llm: bool) -> str:
     collection_label = _latex_escape(collection_name)
     if include_llm:
-        return f"Language distribution of paraphrases in {collection_label} by LLM."
-    return f"Language distribution of paraphrases in {collection_label}."
+        return f"Relative language distribution of paraphrases in {collection_label} by LLM."
+    return f"Relative language distribution of paraphrases in {collection_label}."
+
+
+def _format_llm_label(
+    llm: str,
+    llm_totals: Counter[str] | None = None,
+    *,
+    use_one_step_translations: bool = True,
+) -> str:
+    label = (
+        CONFIG.ONE_STEP_LLM_LABEL_TRANSLATIONS.get(llm)
+        if use_one_step_translations
+        else None
+    )
+    if label is None:
+        label = CONFIG.LABEL_TRANSLATIONS.get(llm, llm)
+    if llm_totals is None:
+        return label
+    return f"{label} ({llm_totals[llm]})"
 
 
 def _write_latex_table(
@@ -265,23 +283,27 @@ def _write_latex_table(
 
     rows: list[dict[str, Any]] = []
     if include_llm:
-        for (llm, language), count in sorted(
-            counts.items(), key=lambda item: (item[0][0], -item[1], item[0][1])
-        ):
-            denominator = (
-                llm_totals[llm]
-                if percentage_denominator == "llm"
-                else collection_total
-            )
-            percentage = (count / denominator * 100) if denominator else 0.0
-            rows.append(
-                {
-                    "llm": llm,
-                    "language": language,
-                    "relative_percentage": f"{percentage:.4f}",
-                    "absolute_count": count,
-                }
-            )
+        llms = sorted(llm_totals, key=lambda llm: _format_llm_label(llm).lower())
+        languages = sorted(
+            {language for (_, language) in counts},
+            key=lambda language: (
+                -sum(counts[(llm, language)] for llm in llms),
+                language,
+            ),
+        )
+
+        for language in languages:
+            row = {"language": language}
+            for llm in llms:
+                denominator = (
+                    llm_totals[llm]
+                    if percentage_denominator == "llm"
+                    else collection_total
+                )
+                count = counts[(llm, language)]
+                percentage = (count / denominator * 100) if denominator else 0.0
+                row[llm] = f"{percentage:.4f}"
+            rows.append(row)
     else:
         language_counts: Counter[str] = Counter()
         for (_, language), count in counts.items():
@@ -299,9 +321,11 @@ def _write_latex_table(
                 }
             )
 
-    column_format = "llrr" if include_llm else "lrr"
+    column_format = "l" + ("r" * len(llms) if include_llm else "rr")
     header = (
-        r"LLM & Language & Relative percentage (\%) & Count \\"
+        "Language & "
+        + " & ".join(_latex_escape(_format_llm_label(llm)) for llm in llms)
+        + r" \\"
         if include_llm
         else r"Language & Relative percentage (\%) & Count \\"
     )
@@ -311,12 +335,8 @@ def _write_latex_table(
         if include_llm:
             body_lines.append(
                 " & ".join(
-                    [
-                        _latex_escape(row["llm"]),
-                        _latex_escape(row["language"]),
-                        row["relative_percentage"],
-                        str(row["absolute_count"]),
-                    ]
+                    [_latex_escape(row["language"])]
+                    + [row[llm] for llm in llms]
                 )
                 + r" \\"
             )
@@ -344,12 +364,108 @@ def _write_latex_table(
         r"\bottomrule",
         r"\end{tabular}%",
         r"}",
-        r"\caption{" + _latex_caption(collection_name, include_llm) + "}",
+        r"\caption{"
+        + _latex_caption(collection_name, include_llm)
+        + (
+            " Values are relative percentages. Total paraphrases per LLM: "
+            + ", ".join(
+                _latex_escape(_format_llm_label(llm, llm_totals)) for llm in llms
+            )
+            + "."
+            if include_llm
+            else " Values are relative percentages."
+        )
+        + "}",
         r"\label{" + _latex_label(collection_name) + "}",
         r"\end{table}",
         "",
     ]
     output_path.write_text("\n".join(table_lines), encoding="utf-8")
+
+
+def _read_language_summary(
+    input_path: Path,
+) -> tuple[Counter[tuple[str, str]], Counter[str]]:
+    counts: Counter[tuple[str, str]] = Counter()
+    llm_totals: Counter[str] = Counter()
+
+    with input_path.open(encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            llm = _normalize_llm(row["llm"])
+            language = _normalize_language_label(row["language"])
+            count = int(row["absolute_count"])
+            counts[(llm, language)] += count
+            llm_totals[llm] += count
+
+    return counts, llm_totals
+
+
+def write_combined_language_distribution_table(
+    output_dir: Path = DEFAULT_OUTPUT_DIR,
+    output_filename: str = "paraphrases_language_distribution.tex",
+) -> Path:
+    combined_counts: Counter[tuple[str, str]] = Counter()
+    llm_totals: Counter[str] = Counter()
+
+    for collection_name in DEFAULT_COLLECTIONS:
+        input_path = output_dir / f"{collection_name}_language_distribution.csv"
+        counts, totals = _read_language_summary(input_path)
+        combined_counts.update(counts)
+        llm_totals.update(totals)
+
+    llms = sorted(llm_totals, key=lambda llm: _format_llm_label(llm).lower())
+    languages = sorted(
+        {language for (_, language) in combined_counts},
+        key=lambda language: (
+            -sum(combined_counts[(llm, language)] for llm in llms),
+            language,
+        ),
+    )
+
+    header = (
+        "Language & "
+        + " & ".join(_latex_escape(_format_llm_label(llm)) for llm in llms)
+        + r" \\"
+    )
+    body_lines = []
+    for language in languages:
+        cells = [_latex_escape(language)]
+        for llm in llms:
+            count = combined_counts[(llm, language)]
+            total = llm_totals[llm]
+            percentage = (count / total * 100) if total else 0.0
+            cells.append(f"{percentage:.4f}")
+        body_lines.append(" & ".join(cells) + r" \\")
+
+    table_lines = [
+        r"\begin{table}",
+        r"\centering",
+        r"\resizebox{\linewidth}{!}{%",
+        rf"\begin{{tabular}}{{l{'r' * len(llms)}}}",
+        r"\toprule",
+        header,
+        r"\midrule",
+        *body_lines,
+        r"\bottomrule",
+        r"\end{tabular}%",
+        r"}",
+        r"\caption{"
+        r"Relative language distribution of paraphrases in naive\_paraphrases "
+        r"and non\_naive\_paraphrases by LLM. Values are relative percentages. "
+        "Total paraphrases per LLM: "
+        + ", ".join(
+            _latex_escape(_format_llm_label(llm, llm_totals)) for llm in llms
+        )
+        + ".}",
+        r"\label{tab:paraphrases-language-distribution}",
+        r"\end{table}",
+        "",
+    ]
+
+    output_path = output_dir / output_filename
+    output_path.write_text("\n".join(table_lines), encoding="utf-8")
+    logger.info(f"Wrote output to {output_path}")
+    return output_path
 
 
 def _analyze_collection(
@@ -403,9 +519,6 @@ def _analyze_collection(
 
 
 def main() -> None:
-    args = _parse_args()
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
-
     DetectorFactory.seed = 0
     mongo = ParaphraseMongoDB(local_ray=not args.remote_ray)
 
@@ -418,4 +531,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    args = _parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
+    # main()
+    write_combined_language_distribution_table()
