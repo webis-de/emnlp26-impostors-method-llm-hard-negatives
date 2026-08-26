@@ -411,6 +411,8 @@ class ParaphrasePlotter:
         technique_label_mode: str = "model_prompt_approach",
         prompt_words: int = 6,
         display_plot: bool = True,
+        star_approach: Optional[str] = None,
+        star_label: Optional[str] = None,
     ):
         """Plot paraphrase length as percentage of original text length.
 
@@ -431,6 +433,9 @@ class ParaphrasePlotter:
             prompt_words: Maximum number of prompt words shown in synthesized
                 labels; ignored when prompt information is not used.
             display_plot: Whether to show the plot interactively after saving.
+            star_approach: Optional ``paraphrase_approach`` value whose boxes
+                should be split out and marked with ``*`` in the x-axis labels.
+            star_label: Optional x-axis note explaining the star marker.
         """
         data, group_by = self._prepare_plot_data(
             df=df,
@@ -453,13 +458,49 @@ class ParaphrasePlotter:
                     "Missing 'paraphrase_length_pct_words' and source text columns."
                 )
 
-        plot_df = data[[group_by, "paraphrase_length_pct_words"]].dropna().copy()
+        plot_cols = [group_by, "paraphrase_length_pct_words"]
+        if star_approach and "paraphrase_approach" in data.columns:
+            plot_cols.append("paraphrase_approach")
+        plot_df = (
+            data[plot_cols]
+            .dropna(subset=[group_by, "paraphrase_length_pct_words"])
+            .copy()
+        )
         if plot_df.empty:
             raise ValueError("No valid rows to plot for paraphrase length percentage.")
 
-        counts = plot_df.groupby(group_by, sort=True)["paraphrase_length_pct_words"].count()
-        label_map = self._labels_with_counts(counts=counts)
-        plot_df["_group_label"] = plot_df[group_by].map(label_map)
+        box_group_by = group_by
+        star_group_labels: set[object] = set()
+        if star_approach and "paraphrase_approach" in plot_df.columns:
+            box_group_by = "_boxplot_group"
+            plot_df["_is_starred_approach"] = (
+                plot_df["paraphrase_approach"].astype(str) == star_approach
+            )
+            plot_df[box_group_by] = list(
+                zip(plot_df[group_by].astype(str), plot_df["_is_starred_approach"])
+            )
+
+        counts = plot_df.groupby(box_group_by, sort=True)[
+            "paraphrase_length_pct_words"
+        ].count()
+        if box_group_by == group_by:
+            label_map = self._labels_with_counts(counts=counts)
+        else:
+            base_counts = pd.Series(
+                data=counts.values,
+                index=[label for label, _is_starred in counts.index],
+            )
+            base_label_map = self._labels_with_counts(counts=base_counts)
+            label_map = {}
+            for box_label in counts.index:
+                label, is_starred = box_label
+                readable_label = base_label_map[label] or str(label)
+                if is_starred:
+                    readable_label = f"{readable_label}*"
+                    star_group_labels.add(readable_label)
+                label_map[box_label] = readable_label
+
+        plot_df["_group_label"] = plot_df[box_group_by].map(label_map)
         order = [label_map[label] for label in counts.index]
         palette = sns.color_palette(self.paper_palette_name, n_colors=len(order))
         label_to_color = {
@@ -488,7 +529,10 @@ class ParaphrasePlotter:
         if ax.legend_ is not None:
             ax.legend_.remove()
         ax.axhline(100, color="gray", linestyle="--", linewidth=1, alpha=0.8)
-        ax.set_xlabel(group_by.capitalize(), fontsize=label_fontsize)
+        x_label = group_by.capitalize()
+        if star_group_labels and star_label:
+            x_label = f"{x_label} (* = {star_label})"
+        ax.set_xlabel(x_label, fontsize=label_fontsize)
         ax.set_ylabel(
             "Paraphrase length (% of original words)", fontsize=label_fontsize
         )

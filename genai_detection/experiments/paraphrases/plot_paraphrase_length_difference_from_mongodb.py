@@ -164,6 +164,8 @@ class MongoParaphraseLengthPercentagePlotter:
                 data_category=dataset_name,
                 group_by="model",
                 display_plot=display_plot,
+                star_approach="non_naive",
+                star_label="Two-step Approach",
             )
 
         return data
