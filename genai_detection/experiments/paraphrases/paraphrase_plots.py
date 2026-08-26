@@ -573,6 +573,8 @@ class ParaphrasePlotter:
         technique_label_mode: str = "model",
         prompt_words: int = 6,
         display_plot: bool = True,
+        star_approach: Optional[str] = None,
+        star_label: Optional[str] = None,
     ):
         """Plot one metric-distribution boxplot per metric.
 
@@ -595,6 +597,9 @@ class ParaphrasePlotter:
             prompt_words: Maximum number of prompt words shown in synthesized
                 labels; ignored when prompt information is not used.
             display_plot: Whether to show each plot interactively after saving.
+            star_approach: Optional ``paraphrase_approach`` value whose boxes
+                should be split out and marked with ``*`` in the x-axis labels.
+            star_label: Optional x-axis note explaining the star marker.
         """
         data, group_by = self._prepare_plot_data(
             df=df,
@@ -619,14 +624,44 @@ class ParaphrasePlotter:
         tick_fontsize = 16
 
         for metric in metric_names:
-            plot_df = data[[group_by, metric]].dropna().copy()
+            plot_cols = [group_by, metric]
+            if star_approach and "paraphrase_approach" in data.columns:
+                plot_cols.append("paraphrase_approach")
+            plot_df = data[plot_cols].dropna(subset=[group_by, metric]).copy()
             if plot_df.empty:
                 logging.warning(f"Skipping metric '{metric}' because it has no data.")
                 continue
 
-            counts = plot_df.groupby(group_by, sort=True)[metric].count()
-            label_map = self._labels_with_counts(counts=counts)
-            plot_df["_group_label"] = plot_df[group_by].map(label_map)
+            box_group_by = group_by
+            star_group_labels: set[object] = set()
+            if star_approach and "paraphrase_approach" in plot_df.columns:
+                box_group_by = "_boxplot_group"
+                plot_df["_is_starred_approach"] = (
+                    plot_df["paraphrase_approach"].astype(str) == star_approach
+                )
+                plot_df[box_group_by] = list(
+                    zip(plot_df[group_by].astype(str), plot_df["_is_starred_approach"])
+                )
+
+            counts = plot_df.groupby(box_group_by, sort=True)[metric].count()
+            if box_group_by == group_by:
+                label_map = self._labels_with_counts(counts=counts)
+            else:
+                base_counts = pd.Series(
+                    data=counts.values,
+                    index=[label for label, _is_starred in counts.index],
+                )
+                base_label_map = self._labels_with_counts(counts=base_counts)
+                label_map = {}
+                for box_label in counts.index:
+                    label, is_starred = box_label
+                    readable_label = base_label_map[label] or str(label)
+                    if is_starred:
+                        readable_label = f"{readable_label}*"
+                        star_group_labels.add(readable_label)
+                    label_map[box_label] = readable_label
+
+            plot_df["_group_label"] = plot_df[box_group_by].map(label_map)
             order = [label_map[label] for label in counts.index]
 
             palette = sns.color_palette(self.paper_palette_name, n_colors=len(order))
@@ -659,7 +694,10 @@ class ParaphrasePlotter:
                 else t.upper()
                 for t in metric.split("_")
             )
-            ax.set_xlabel(group_by.capitalize(), fontsize=label_fontsize)
+            x_label = group_by.capitalize()
+            if star_group_labels and star_label:
+                x_label = f"{x_label} (* = {star_label})"
+            ax.set_xlabel(x_label, fontsize=label_fontsize)
             ax.set_ylabel(metric_for_title, fontsize=label_fontsize)
             title = (
                 f"{metric_for_title} by Paraphrase Technique\n{CONFIG.DATASET_TRANSLATIONS[data_category]} Dataset"
