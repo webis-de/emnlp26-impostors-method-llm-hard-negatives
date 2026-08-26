@@ -133,6 +133,7 @@ class BaseConfig:
         "std_impostor": "Kestemont et al., 2016",
         "bdi": "Nagy, 2024",
         "homotopy": "Gutierrez et al., 2015",
+        "tuner007/pegasus_paraphrase": "Pegasus",
     }
 
     ONE_STEP_LLM_LABEL_TRANSLATIONS = {
