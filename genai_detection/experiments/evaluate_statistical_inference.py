@@ -112,22 +112,12 @@ STATISTICAL_INFERENCE_DATASET_LABELS = {
     CONFIG.STUDENT_ESSAYS: "Student Essays Dataset",
 }
 
-# TODO: delete
-# STATISTICAL_INFERENCE_METHOD_LABELS = {
-#     "on_the_fly_chatnoir": "ChatNoir",
-#     "on_the_fly_startpage": "Startpage",
-#     "in_domain": "In-Domain",
-#     "two_step_llm": "LLM impostors",
-#     "one_step_llm",
-#     "random_words",
-# }
-
 DEFAULT_METHOD_ORDER = [
     "on_the_fly_chatnoir",
     "on_the_fly_startpage",
     "in_domain",
-    "two_step_llm",
     "one_step_llm",
+    "two_step_llm",
     "random_words",
     # "ppmd",
     # "unmasking",
@@ -1899,7 +1889,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--latex-caption",
         default=(
             "PAN metrics for statistical-inference formulation of the Impostors Method "
-            r"($\alpha=0.05$). ChatNoir and Startpage are retrieval-based approaches."
+            r"($\alpha=0.05$). ChatNoir and Startpage are retrieval-based approaches. One- and Two-Step (LLM) are LLM generated impostors."
         ),
     )
     parser.add_argument(
