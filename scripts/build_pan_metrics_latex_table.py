@@ -343,7 +343,7 @@ def build_table(
         r"\caption{Reproduction\,of\,the\,Impostors\,Method\,variants and baselines. The scores are computed as mean "
         r"over ten 10-fold CVs. For LLM impostors, $^{2}$ denotes two-step and $^{1}$ denotes one-step paraphrase generation.}"
     )
-    lines.append(r"\label{table-impostor-method-reproduction-results}")
+    lines.append(r"\label{table-impostors-method-reproduction-results}")
     lines.append(r"\end{table}")
 
     return "\n".join(lines)

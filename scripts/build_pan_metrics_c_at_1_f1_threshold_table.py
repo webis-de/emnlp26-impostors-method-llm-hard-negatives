@@ -31,7 +31,7 @@ LOCAL_SAVE_PATH = (
     Path(__file__).resolve().parents[1] / CONFIG.SAVE_PATH / "reproduction"
 )
 OUTPUT_DIR = LOCAL_SAVE_PATH / "pan_metrics_tex"
-OUTPUT_FILENAME = "table-impostor-method-reproduction-c-at-one-f1-thresholds.tex"
+OUTPUT_FILENAME = "table-impostors-method-reproduction-c-at-one-f1-thresholds.tex"
 
 
 @dataclass(frozen=True)
@@ -386,7 +386,7 @@ def build_latex_table(
         r"Impostors Method. The lower and upper thresholds define the c@1 rejection band, "
         r"whereas $\tau_{F1}$ is the threshold optimized for F1, precision, recall and accuracy. Values are "
         r"reported as mean $\pm$ standard deviation over the per-fold thresholds from cross-validation. These dataset-specific thresholds were used to obtain the scores reported in "
-        r"Table~\ref{table-impostor-method-reproduction-results}.}"
+        r"Table~\ref{table-impostors-method-reproduction-results}.}"
     )
     lines.append(r"\label{tab:ablation_thresholds}")
     lines.append(r"\end{table}")

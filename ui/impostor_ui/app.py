@@ -98,7 +98,7 @@ def _build_detector(
 class ImpostorUI:
     def __init__(self):
         self.root = Tk()
-        self.root.title("Impostor Method UI")
+        self.root.title("Impostors Method UI")
         self.root.geometry("1280x900")
 
         self.method_mode = StringVar(value="original")
@@ -132,7 +132,7 @@ class ImpostorUI:
         self._refresh_dynamic_controls()
 
     def _build_layout(self):
-        title = ttk.Label(self.root, text="Impostor Method UI", font=("TkDefaultFont", 16, "bold"))
+        title = ttk.Label(self.root, text="Impostors Method UI", font=("TkDefaultFont", 16, "bold"))
         title.grid(row=0, column=0, columnspan=2, padx=12, pady=(12, 4), sticky="w")
         subtitle = ttk.Label(
             self.root,
@@ -428,7 +428,7 @@ class ImpostorUI:
 
         self.start_btn.config(state="disabled")
         self.next_btn.config(state="disabled")
-        self.status_label.config(text="Running impostor method...")
+        self.status_label.config(text="Running Impostors Method...")
         self.progress_value = 0
         self.progress["value"] = 0
         self.worker_result = None

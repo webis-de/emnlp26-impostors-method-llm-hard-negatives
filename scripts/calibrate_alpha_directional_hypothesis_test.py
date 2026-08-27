@@ -148,7 +148,7 @@ def _technique_query_values(techniques: list[str] | None) -> list[str] | None:
     return sorted(query_values)
 
 
-def _impostor_method_key(doc: dict[str, Any]) -> str:
+def _impostors_method_key(doc: dict[str, Any]) -> str:
     technique = doc["impostor_generation_technique"]
     if technique == "on_the_fly":
         retrieval_index = doc.get("retrieval_index")
@@ -294,7 +294,7 @@ def _load_impostor_outputs_for_pairs(
             skipped_missing_pair += 1
             continue
 
-        method_key = _impostor_method_key(doc)
+        method_key = _impostors_method_key(doc)
         ablation = doc.get("ablation")
         if ablation:
             method_key = f"{method_key}__{ablation}"

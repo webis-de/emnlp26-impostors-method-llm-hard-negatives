@@ -823,7 +823,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "Restrict to one impostor-generation technique. Repeat for multiple "
-            "techniques. Defaults to the configured impostor methods."
+            "techniques. Defaults to the configured impostors methods."
         ),
     )
     parser.add_argument("--n-trials", type=int, default=ROUNDS)
