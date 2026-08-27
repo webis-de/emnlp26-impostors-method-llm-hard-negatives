@@ -103,7 +103,7 @@ METRIC_LABELS = {
     "auroc": "AUROC",
     "c_at_1": "c@1",
     "auroc_c_at_1": (
-        r"\raisebox{0.75ex}[0em][0em]{\begin{tabular}{@{}c@{}}AUROC\\[-0.5ex]$\times$~c@1\end{tabular}}"
+        r"\raisebox{0.75ex}[0em][0em]{\begin{tabular}{@{}c@{}}AUROC\\[-0.5ex]$\cdot$~c@1\end{tabular}}"
     ),
 }
 
@@ -2230,10 +2230,10 @@ METRICS = [
     "auroc_c_at_1",
 ]
 
-PLOT_TITLE_FONT_SIZE = 24
-PLOT_AXIS_LABEL_FONT_SIZE = 22
-PLOT_TICK_LABEL_FONT_SIZE = 18
-PLOT_LEGEND_FONT_SIZE = 18
+PLOT_TITLE_FONT_SIZE = 28
+PLOT_AXIS_LABEL_FONT_SIZE = 26
+PLOT_TICK_LABEL_FONT_SIZE = 22
+PLOT_LEGEND_FONT_SIZE = 22
 
 
 def plot_results(csv_path, *, require_all_methods: bool = False):
@@ -2284,7 +2284,7 @@ def plot_results(csv_path, *, require_all_methods: bool = False):
             labels,
             loc="lower center",
             ncol=len(labels),
-            bbox_to_anchor=(0.5, -0.04),
+            bbox_to_anchor=(0.5, -0.12),
             fontsize=PLOT_LEGEND_FONT_SIZE,
         )
 

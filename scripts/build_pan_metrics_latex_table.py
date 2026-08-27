@@ -61,7 +61,7 @@ METRIC_LABELS = {
     "auroc": "AUROC",
     "c_at_1": "c@1",
     "auroc_c_at_1": (
-        r"\raisebox{0.75ex}[0em][0em]{\begin{tabular}{@{}c@{}}AUROC\\[-0.5ex]$\times$~c@1\end{tabular}}"
+        r"\raisebox{0.75ex}[0em][0em]{\begin{tabular}{@{}c@{}}AUROC\\[-0.5ex]$\cdot$~c@1\end{tabular}}"
     ),
 }
 
