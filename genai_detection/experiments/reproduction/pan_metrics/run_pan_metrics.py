@@ -36,13 +36,13 @@ logger = logging.getLogger(__name__)
 IMPOSTOR_TECHNIQUE_FOR_ABLATIONS = "in_domain"
 
 # Comment out methods you don't want to run.
-IMPOSTOR_METHODS = [
+IMPOSTORS_METHODS = [
     "on_the_fly_chatnoir",
     # "on_the_fly_serpapi",
     "on_the_fly_startpage",
     "in_domain",
-    "one_step_llm",
     "two_step_llm",
+    "one_step_llm",
     "random_words"
     # "translation",
     # "mirror_minds",   # raises error
@@ -145,7 +145,7 @@ if __name__ == "__main__":
     store = PANMetricsStore()
     evaluator = PANEvaluator(metric_computer=PANMetricComputer(), split_manager=split_manager, store=store)
 
-    for dataset_name in [CONFIG.STUDENT_ESSAYS, CONFIG.BLOG]:
+    for dataset_name in [CONFIG.BLOG, CONFIG.STUDENT_ESSAYS]:
         input_args = {
                 "dataset_name":dataset_name,
                 "loader":loader,
@@ -157,7 +157,7 @@ if __name__ == "__main__":
                 "rounds":ROUNDS,
                 }
 
-        for method in BASELINE_METHODS + IMPOSTOR_METHODS + ABLATION_METHODS:
+        for method in BASELINE_METHODS + IMPOSTORS_METHODS + ABLATION_METHODS:
             logger.info("Computing PAN metrics for %s method (dataset=%s).", method, dataset_name)
             # ablation methods
             if method in ABLATION_METHODS:
