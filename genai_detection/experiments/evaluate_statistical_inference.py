@@ -108,7 +108,7 @@ METRIC_LABELS = {
 }
 
 STATISTICAL_INFERENCE_DATASET_LABELS = {
-    CONFIG.BLOG: "Blogs Posts Dataset",
+    CONFIG.BLOG: "Blog Posts Dataset",
     CONFIG.STUDENT_ESSAYS: "Student Essays Dataset",
 }
 
