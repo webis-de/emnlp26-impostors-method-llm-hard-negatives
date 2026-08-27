@@ -1794,7 +1794,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         )
     )
     parser.add_argument(
-        "--datasets", nargs="+", default=[CONFIG.BLOG, CONFIG.STUDENT_ESSAYS]
+        "--datasets", nargs="+", default=[CONFIG.STUDENT_ESSAYS,CONFIG.BLOG]
     )
     parser.add_argument("--methods", nargs="+", default=list(DEFAULT_METHOD_ORDER))
     parser.add_argument("--prediction-field", default=DEFAULT_PREDICTION_FIELD)
