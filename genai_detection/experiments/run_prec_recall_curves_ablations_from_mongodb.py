@@ -44,6 +44,7 @@ def compute_prec_recall_curves_ablations_from_mongodb(
     *,
     include_traditional: bool = True,
     batch_size: int = 250,
+    exclude_ablations: tuple[str, ...] = (),
 ) -> Dict[str, object]:
     """
     Compute ablation precision–recall curves entirely from MongoDB-stored scores.
@@ -57,7 +58,13 @@ def compute_prec_recall_curves_ablations_from_mongodb(
     metrics: Dict[str, pd.DataFrame] = {}
     n_pairs_per_method: Dict[str, int] = {}
 
+    excluded_ablations = set(exclude_ablations)
+
     for variant in ABLATION_DETECTORS:
+        if variant in excluded_ablations:
+            logger.info("Skipping excluded ablation '%s'.", variant)
+            continue
+
         scores_by_pair = loader.load_scores(
             method_name=variant,
             dataset_name=dataset_name,
@@ -138,6 +145,7 @@ if __name__ == "__main__":
             dataset_name=dataset_name,
             impostor_technique="in_domain",
             include_traditional=True,
+            exclude_ablations=("permutation_calibrated",),
         )
         results_dict = results.get("metrics", {})
         if not results_dict:
