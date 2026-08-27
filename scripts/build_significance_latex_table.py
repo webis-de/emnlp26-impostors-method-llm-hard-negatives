@@ -28,6 +28,8 @@ DEFAULT_METHOD_ORDER = [
     "on_the_fly_startpage",
     "in_domain",
     "two_step_llm",
+    "one_step_llm",
+    "random_words",
 
     "bdi",
     "homotopy",
@@ -205,7 +207,7 @@ def build_table(
 
     lines: List[str] = []
     lines.append("% Auto-generated; do not edit by hand.")
-    lines.append("\\begin{table}[t]")
+    lines.append("\\begin{table*}[t]")
     lines.append("\\fontsize{7.5pt}{8pt}\\selectfont")
     lines.append("\\renewcommand{\\tabcolsep}{2pt}")
     lines.append("\\centering")
@@ -253,7 +255,7 @@ def build_table(
         "({\\tiny \\texttt{*, **, ***}} for $p_{\\text{corr}} < 0.05, 0.01, 0.005$, respectively).}"
     )
     lines.append("\\label{tab:pan-significance-stat-inf}")
-    lines.append("\\end{table}")
+    lines.append("\\end{table*}")
 
     return "\n".join(lines)
 
@@ -276,7 +278,7 @@ def build_effect_size_table(
 
     lines: List[str] = []
     lines.append("% Auto-generated; do not edit by hand.")
-    lines.append("\\begin{table}[t]\\small")
+    lines.append("\\begin{table*}[t]\\small")
     lines.append("  \\tabcolsep=0.11cm")
     lines.append("\\centering")
     lines.append("\\resizebox{\\linewidth}{!}{%")
@@ -321,7 +323,7 @@ def build_effect_size_table(
         "Effect sizes are reported for the same corrected paired tests used in the significance table.}"
     )
     lines.append("\\label{tab:pan-effect-sizes}")
-    lines.append("\\end{table}")
+    lines.append("\\end{table*}")
 
     return "\n".join(lines)
 
@@ -390,4 +392,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    print("run genai_detection.experiments.reproduction.pan_metrics.run_pan_metrics_significance.py first")
+    print("run scripts/extract_statistical_significance_tables.py second")
     main()
