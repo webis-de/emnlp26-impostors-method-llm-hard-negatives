@@ -186,6 +186,6 @@ class BaseConfig:
         "auroc_c_at_1": "AUROC×c@1",
     }
 
-    DATASET_TRANSLATIONS = {BLOG:"Blog Posts", STUDENT_ESSAYS: "Student Essays"}
+    DATASET_TRANSLATIONS = {STUDENT_ESSAYS: "Student Essays", BLOG:"Blog Posts"}
 
 CONFIG = BaseConfig()
