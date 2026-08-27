@@ -106,9 +106,14 @@ ROW_SPECS: Sequence[RowSpec] = [
         method_keys=("bdi",),
     ),
     RowSpec(
-        label="LLM impostors",
+        label=r"LLM impostors$^{2}$",
         year="2026",
-        method_keys=("two_step_llm", "one_step_llm"),
+        method_keys=("two_step_llm",),
+    ),
+    RowSpec(
+        label=r"LLM impostors$^{1}$",
+        year="2026",
+        method_keys=("one_step_llm",),
     ),
     RowSpec(
         label="Min-max (B)",
@@ -298,7 +303,7 @@ def build_table(
         for row_index, (row, metrics) in enumerate(rows_with_metrics):
             if row_index > 0:
                 previous_row = rows_with_metrics[row_index - 1][0]
-                if row.method_keys == ("two_step_llm", "one_step_llm"):
+                if row.method_keys == ("two_step_llm",):
                     lines.append(r"\addlinespace[0.75ex]")
                 elif row.is_baseline and not previous_row.is_baseline:
                     lines.append(r"\addlinespace[0.5ex]")
@@ -331,7 +336,7 @@ def build_table(
     lines.append(r"\end{tabular}")
     lines.append(
         r"\caption{Reproduction\,of\,the\,Impostors\,Method\,variants and baselines. The scores are computed as mean "
-        r"over ten 10-fold CVs.}"
+        r"over ten 10-fold CVs. For LLM impostors, $^{2}$ denotes two-step and $^{1}$ denotes one-step paraphrase generation.}"
     )
     lines.append(r"\label{table-impostor-method-reproduction-results}")
     lines.append(r"\end{table}")
@@ -347,7 +352,7 @@ def main() -> None:
 
     latex = build_table(
         mongo=mongo,
-        datasets=[CONFIG.BLOG, CONFIG.STUDENT_ESSAYS],
+        datasets=[CONFIG.STUDENT_ESSAYS,CONFIG.BLOG],
         bold_max=True
     )
 
