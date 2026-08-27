@@ -105,7 +105,7 @@ def compute_prec_recall_curves_ablations_from_mongodb(
         logger.info("Pairs per ablation (dataset=%s): %s", dataset_name, n_pairs_per_method)
 
     if include_traditional:
-        imp_generation_techniques = [impostor_technique, "two_step_llm"]
+        imp_generation_techniques = [impostor_technique, "one_step_llm", "two_step_llm"]
         traditional_results = compute_prec_recall_f1_acc_dict_on_existing_impostor_scores(
             dataset_name=dataset_name,
             imp_gen_techniques=imp_generation_techniques,
@@ -130,7 +130,8 @@ def compute_prec_recall_curves_ablations_from_mongodb(
 if __name__ == "__main__":
     label_translations = dict(CONFIG.LABEL_TRANSLATIONS)
     label_translations["in_domain"] = "Koppel and Winter, 2014"
-    label_translations["two_step_llm"] = "LLM-based impostors"
+    label_translations["two_step_llm"] = "Two-Step (LLM), 2026"
+    label_translations["one_step_llm"] = "One-Step (LLM), 2026"
 
     for dataset_name in [CONFIG.BLOG, CONFIG.STUDENT_ESSAYS]:
         results = compute_prec_recall_curves_ablations_from_mongodb(
