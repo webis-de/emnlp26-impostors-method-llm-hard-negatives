@@ -308,7 +308,7 @@ def build_table(
         for row_index, (row, metrics) in enumerate(rows_with_metrics):
             if row_index > 0:
                 previous_row = rows_with_metrics[row_index - 1][0]
-                if row.method_keys == ("two_step_llm",):
+                if row.method_keys == ("one_step_llm",):
                     lines.append(r"\addlinespace[0.75ex]")
                 elif row.is_baseline and not previous_row.is_baseline:
                     lines.append(r"\addlinespace[0.5ex]")
