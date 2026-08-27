@@ -211,7 +211,8 @@ def plot_metrics(
     ax.set_ylim(-0.01, 1.01)
     ax.grid(True, linestyle="--", alpha=0.4)
     ax.legend(ncol=2)
-    ax.set_title(f"{CONFIG.LABEL_TRANSLATIONS.get(method_name, method_name)} portion_delete sweep - {CONFIG.DATASET_TRANSLATIONS.get(dataset_name, dataset_name)}")
+    ax.set_title(f"{CONFIG.LABEL_TRANSLATIONS.get(method_name, method_name)} Approach on the "
+                 f"{CONFIG.DATASET_TRANSLATIONS.get(dataset_name, dataset_name)} Dataset")
     fig.tight_layout()
 
     for ext in ("png", "pdf", "svg"):
