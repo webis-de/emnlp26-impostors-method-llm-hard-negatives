@@ -106,12 +106,12 @@ ROW_SPECS: Sequence[RowSpec] = [
         method_keys=("bdi",),
     ),
     RowSpec(
-            label=r"One-Step (LLM)",
+            label=r"One-Step\,({\fontsize{8.5}{10}\selectfont LLM})",
             year="2026",
             method_keys=("one_step_llm",),
         ),
     RowSpec(
-        label=r"Two-Step (LLM)",
+        label=r"Two-Step\,({\fontsize{8.5}{10}\selectfont LLM})",
         year="2026",
         method_keys=("two_step_llm",),
     ),
@@ -280,7 +280,7 @@ def build_table(
     lines.append(r"\begin{table}[t]")
     lines.append(r"\fontsize{7.5pt}{8pt}\selectfont")
     lines.append(r"\renewcommand{\tabcolsep}{2pt}")
-    lines.append(r"\begin{tabular}{@{}lccccc@{}c@{}c@{}c@{}}")
+    lines.append(r"\begin{tabular}{@{}lcccccccc@{}}")
     lines.append(r"\toprule")
     lines.append(
         r"\multicolumn{2}{@{}l@{}}{\textbf{Method}} & \multicolumn{7}{@{}c@{}}{\textbf{Reproduction Scores}} \\"
