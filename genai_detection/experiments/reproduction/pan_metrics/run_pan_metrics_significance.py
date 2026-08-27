@@ -39,7 +39,8 @@ METHODS = [
     "on_the_fly_startpage",
     "in_domain",
     "two_step_llm",
-    # "one_step_llm",
+    "one_step_llm",
+    "random_words",
     # "translation",
     # "mirror_minds",   # raises error
 
