@@ -273,7 +273,7 @@ def build_table(
     lines.append(r"\begin{tabular}{@{}lccccc@{}c@{}c@{}c@{}}")
     lines.append(r"\toprule")
     lines.append(
-        r"\multicolumn{2}{@{}l@{}}{\textbf{Impostors Method}} & \multicolumn{7}{@{}c@{}}{\textbf{Reproduction Scores}} \\"
+        r"\multicolumn{2}{@{}l@{}}{\textbf{Method}} & \multicolumn{7}{@{}c@{}}{\textbf{Reproduction Scores}} \\"
     )
     lines.append(
         r"\cmidrule(r@{\tabcolsep}){1-2}\cmidrule(l@{\tabcolsep}){3-8}"
