@@ -116,6 +116,11 @@ ROW_SPECS: Sequence[RowSpec] = [
         method_keys=("one_step_llm",),
     ),
     RowSpec(
+        label="Random words",
+        year="2026",
+        method_keys=("random_words",),
+    ),
+    RowSpec(
         label="Min-max (B)",
         year="",
         method_keys=("unsupervised_baseline_min-max",),
