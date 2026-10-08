@@ -1,5 +1,5 @@
 persistence:
-  size: 32Gi
+  size: 64Gi
   storageClass: csi-rbd-retain
 architecture: standalone #replicaset
 updateStrategy:
@@ -11,3 +11,21 @@ resources:
      ephemeral-storage: 20Gi
    limits:
      ephemeral-storage: 20Gi
+image:
+  # MongoDB 9.0.2
+  digest: sha256:18bacf425195ea70e1fb3622fd59d0e726c634520c9f2803c5e5c4bf59aeb92e
+
+# https://kb.webis.de/k8s-manual/kubernetes-tutorial/index.html#using-kubernetes-to-work-with-gpu-on-gammaweb
+# uncomment to request gammaweb with newer linux kernel (7.0.0-22-generic) to check for compatibility
+#tolerations:
+#- key: "special"
+#  operator: "Equal"
+#  value: "gpu"
+#  effect: "NoSchedule"
+#- key: "special"
+#  operator: "Equal"
+#  value: "gpu"
+#  effect: "NoExecute"
+#
+#nodeSelector:
+#  accelerator: nvidia-a100
