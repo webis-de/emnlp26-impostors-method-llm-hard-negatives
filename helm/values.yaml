@@ -17,6 +17,9 @@ image:
 
 # https://kb.webis.de/k8s-manual/kubernetes-tutorial/index.html#using-kubernetes-to-work-with-gpu-on-gammaweb
 # uncomment to request gammaweb with newer linux kernel (7.0.0-22-generic) to check for compatibility
+# then: helm upgrade --install --namespace webisservices --create-namespace artificial-authorship-
+#verification oci://registry-1.docker.io/bitnamicharts/mongodb -f helm/values.yaml --set auth.rootPassword=PASSWORD
+# then: kubectl get pod -n webisservices -o wide | grep artificial
 #tolerations:
 #- key: "special"
 #  operator: "Equal"
